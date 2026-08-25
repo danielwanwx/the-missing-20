@@ -1,0 +1,13 @@
+{
+  "name": "supply-chain-exception-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Business-first control tower for synthetic supply-chain exception resolution.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test tests-js/*.test.mjs",
+    "check": "npm test"
+  }
+}
