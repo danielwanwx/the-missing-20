@@ -368,6 +368,7 @@ The synthesis step ranks hypotheses but must preserve dissenting evidence. It ca
 13. Integration Operator requests `release_invoice`; no grant and zero downstream writes.
 14. AP Approver requests `restart_receipt_message`; no grant and zero downstream writes.
 15. AP Approver requests invoice release before `RECEIPT_VERIFIED`; no grant and zero downstream writes.
+16. Receipt restart succeeds downstream but execution-receipt persistence fails; retry uses the same idempotency key or fresh-read safe no-op and creates zero duplicate business effects.
 
 ## 10. Error handling
 
@@ -429,6 +430,7 @@ The project will not describe a planned AWS control as implemented until its pro
 - `make dev` starts the API and UI with synthetic fixtures.
 - `make demo` runs the deterministic main case without AWS credentials.
 - `make golden` runs all golden cases and produces a machine-readable report.
+- `make agent-smoke` is explicit and budget-bounded; real model calls never run as part of offline CI.
 - `make aws-smoke` is explicit, opt-in, and refuses root credentials. Before creating or changing a real resource it validates the expected AWS account, `us-west-2`, the approved budget ceiling, a dedicated resource prefix, and a recorded cleanup plan, then requires user authorization.
 - Secrets remain in ignored local configuration or AWS SSO sessions.
 
@@ -466,7 +468,7 @@ Acceptance:
 - Implement synthetic enterprise adapters.
 - Implement detector, case aggregate, append-only events, approvals, grants, executor, and verifier.
 - Complete the main flow without an LLM.
-- Pass already-posted, state-drift, stale-version, expired-grant, replay, and postcondition-failure tests.
+- Pass already-posted, state-drift, stale-version, expired-grant, replay, crash-consistency, and postcondition-failure tests.
 
 Acceptance:
 
@@ -497,7 +499,7 @@ Acceptance:
 - Deny cases visibly fail closed.
 - Cloud cost remains within the approved budget.
 
-If Gateway or Policy cannot enforce the required contract, implementation stops for architecture review. The project will not replace a failed real control with a UI-only simulation.
+If Gateway or Policy cannot enforce the required contract, record the capability as `NOT_PROVEN` or `UNSUITABLE`, remove it from final claims, retain the deterministic local authority path, and continue. Stop for architecture review only if AgentCore Runtime cannot host the required Strands diagnosis, an agent would need write authority, or the fallback would weaken the approved safety model. The project will not replace a failed real control with a UI-only simulation.
 
 ### Phase 4: Decision workspace and competition demo
 
