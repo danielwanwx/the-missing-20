@@ -4,7 +4,7 @@ This ledger separates pre-competition work from work created for this competitio
 
 ## New competition repository
 
-- Repository: `danielwanwx/the-missing-20` (public URL will be recorded after publication)
+- Repository: <https://github.com/danielwanwx/the-missing-20>
 - Created: 2026-08-24
 - License: MIT
 - Enterprise data: entirely synthetic
