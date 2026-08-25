@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Architecture v4.2：可验证的供应链异常诊断与双审批恢复",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "legend": {
+      "mode": "hidden"
+    },
+    "viewBox": [1760, 980],
+    "views": [
+      {
+        "id": "reasoning",
+        "label": "为什么需要 Agent",
+        "focus": ["business_systems", "detector", "agent_graph", "knowledge_base", "evaluator"],
+        "note": "规则只发现 100 对 80；Agent 比较临时锁、真实短装、已经入账三种解释；评估器拒绝危险结论。"
+      },
+      {
+        "id": "receipt_recovery",
+        "label": "收货消息恢复",
+        "focus": ["integration_operator", "decision_workspace", "application_service", "case_store", "authorization_service", "signed_grant", "policy_gateway", "executor_verifier", "business_systems"],
+        "note": "操作员只能批准 restart_receipt_message；执行器重新验证状态后重启原 LUW，并证明没有重复过账。"
+      },
+      {
+        "id": "invoice_release",
+        "label": "发票释放与结案",
+        "focus": ["ap_approver", "decision_workspace", "application_service", "case_store", "authorization_service", "signed_grant", "policy_gateway", "executor_verifier"],
+        "note": "AP 审批人只能批准 release_invoice；Invoice=Released 后案件才 Closed；系统没有付款工具。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "business_systems",
+      "type": "external",
+      "label": "合成企业系统",
+      "sublabel": "EWM、qRFC、S/4、Invoice API",
+      "pos": [40, 306],
+      "size": [176, 76],
+      "tag": "SAP-shaped"
+    },
+    {
+      "id": "detector",
+      "type": "backend",
+      "label": "确定性异常检测",
+      "sublabel": "仓库 100，ERP 80",
+      "pos": [250, 306],
+      "size": [168, 76]
+    },
+    {
+      "id": "agent_graph",
+      "type": "cloud",
+      "label": "Strands 多 Agent 调查",
+      "sublabel": "提出假设、找证据、引用 SOP",
+      "pos": [470, 306],
+      "size": [198, 76],
+      "tag": "AgentCore Runtime"
+    },
+    {
+      "id": "knowledge_base",
+      "type": "database",
+      "label": "版本化知识库",
+      "sublabel": "错误语义、SOP、恢复规则",
+      "pos": [480, 88],
+      "size": [178, 72],
+      "tag": "运行时无预期答案"
+    },
+    {
+      "id": "evaluator",
+      "type": "security",
+      "label": "独立证据评估器",
+      "sublabel": "验证引用并拒绝危险结论",
+      "pos": [720, 306],
+      "size": [194, 76],
+      "tag": "只读"
+    },
+    {
+      "id": "application_service",
+      "type": "backend",
+      "label": "确定性案件服务",
+      "sublabel": "校验结果、追加事件、推进状态",
+      "pos": [950, 306],
+      "size": [190, 76],
+      "tag": "唯一状态转换者"
+    },
+    {
+      "id": "case_store",
+      "type": "database",
+      "label": "案件与审批账本",
+      "sublabel": "case_version、摘要、状态、审计",
+      "pos": [1180, 306],
+      "size": [198, 76],
+      "tag": "DynamoDB 条件写入"
+    },
+    {
+      "id": "decision_workspace",
+      "type": "frontend",
+      "label": "决策工作台与审批 API",
+      "sublabel": "展示证据；提交角色限定审批",
+      "pos": [1450, 306],
+      "size": [204, 76]
+    },
+    {
+      "id": "integration_operator",
+      "type": "external",
+      "label": "Integration Operator",
+      "sublabel": "仅批准消息重启",
+      "pos": [1450, 510],
+      "size": [204, 72],
+      "tag": "Cognito Group A"
+    },
+    {
+      "id": "ap_approver",
+      "type": "external",
+      "label": "AP Approver",
+      "sublabel": "仅批准发票释放",
+      "pos": [1450, 630],
+      "size": [198, 72],
+      "tag": "Cognito Group B"
+    },
+    {
+      "id": "authorization_service",
+      "type": "security",
+      "label": "动作授权服务",
+      "sublabel": "验证审批并请求 KMS 签名",
+      "pos": [1190, 740],
+      "size": [210, 78],
+      "tag": "唯一签名调用者"
+    },
+    {
+      "id": "signed_grant",
+      "type": "security",
+      "label": "KMS 签名动作授权",
+      "sublabel": "身份、角色、工具、参数、摘要、TTL",
+      "pos": [900, 740],
+      "size": [218, 78],
+      "tag": "唯一授权 ID"
+    },
+    {
+      "id": "policy_gateway",
+      "type": "security",
+      "label": "AgentCore Policy 与 Gateway",
+      "sublabel": "按角色、工具和完整参数判定",
+      "pos": [610, 740],
+      "size": [226, 78],
+      "tag": "唯一变更入口"
+    },
+    {
+      "id": "executor_verifier",
+      "type": "backend",
+      "label": "确定性执行与验证器",
+      "sublabel": "restart_receipt_message / release_invoice",
+      "pos": [290, 740],
+      "size": [250, 78],
+      "tag": "唯一持有下游写凭证"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "只读调查、解释与人类决策",
+      "wraps": ["detector", "agent_graph", "knowledge_base", "evaluator", "application_service", "case_store", "decision_workspace", "integration_operator", "ap_approver"],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "不可绕过的变更边界",
+      "wraps": ["authorization_service", "signed_grant", "policy_gateway", "executor_verifier"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "from": "business_systems",
+      "to": "detector",
+      "label": "权威业务事实",
+      "variant": "emphasis",
+      "labelAt": [236, 302]
+    },
+    {
+      "from": "detector",
+      "to": "application_service",
+      "label": "异常事实；创建 versioned case",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [[334, 430], [1045, 430]],
+      "labelAt": [690, 422]
+    },
+    {
+      "from": "application_service",
+      "to": "agent_graph",
+      "label": "启动只读调查",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "left",
+      "via": [[1045, 210], [450, 210], [450, 344]],
+      "labelAt": [750, 202]
+    },
+    {
+      "from": "business_systems",
+      "to": "agent_graph",
+      "label": "只读 Gateway / Adapter 取证",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [[128, 190], [569, 190]],
+      "labelAt": [348, 182]
+    },
+    {
+      "from": "knowledge_base",
+      "to": "agent_graph",
+      "label": "带版本引用",
+      "variant": "dashed",
+      "labelAt": [569, 176]
+    },
+    {
+      "from": "agent_graph",
+      "to": "evaluator",
+      "label": "三个候选解释与证据",
+      "variant": "emphasis",
+      "labelAt": [690, 302]
+    },
+    {
+      "from": "evaluator",
+      "to": "application_service",
+      "label": "结构化评估结果",
+      "variant": "security",
+      "labelAt": [920, 396]
+    },
+    {
+      "from": "application_service",
+      "to": "case_store",
+      "label": "校验后追加事件与状态",
+      "variant": "security",
+      "labelAt": [1160, 396]
+    },
+    {
+      "from": "case_store",
+      "to": "decision_workspace",
+      "label": "领先假设与安全证明",
+      "variant": "emphasis",
+      "labelAt": [1420, 302]
+    },
+    {
+      "from": "integration_operator",
+      "to": "decision_workspace",
+      "label": "批准 restart_receipt_message",
+      "variant": "security",
+      "labelAt": [1552, 456]
+    },
+    {
+      "from": "ap_approver",
+      "to": "decision_workspace",
+      "label": "收货验证后批准 release_invoice",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "right",
+      "via": [[1700, 666], [1700, 344]],
+      "labelAt": [1600, 596]
+    },
+    {
+      "from": "decision_workspace",
+      "to": "application_service",
+      "label": "角色限定审批命令",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [[1552, 250], [1045, 250]],
+      "labelAt": [1300, 242]
+    },
+    {
+      "from": "case_store",
+      "to": "authorization_service",
+      "label": "已批准动作与完整摘要",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "authorization_service",
+      "to": "signed_grant",
+      "label": "KMS 签发单次授权",
+      "variant": "security",
+      "labelAt": [1154, 832]
+    },
+    {
+      "from": "signed_grant",
+      "to": "policy_gateway",
+      "label": "已签名授权",
+      "variant": "security"
+    },
+    {
+      "from": "policy_gateway",
+      "to": "executor_verifier",
+      "label": "只放行精确工具与参数",
+      "variant": "security",
+      "labelAt": [580, 832]
+    },
+    {
+      "from": "executor_verifier",
+      "to": "business_systems",
+      "label": "先重读，再变更，再验证",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "bottom"
+    },
+    {
+      "from": "executor_verifier",
+      "to": "application_service",
+      "label": "执行回执与验证结果",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [[415, 900], [1720, 900], [1720, 200], [1045, 200]],
+      "labelAt": [880, 892]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "合成 SAP-shaped 主案例",
+      "items": [
+        "第二个 HU 的 20 EA 消息因并发锁进入 DOCUMENT_LOCKED_RETRYABLE；锁已解除、原消息可重试且没有 material document",
+        "系统只重启原消息；at-least-once 传输与幂等键共同保证单一业务效果"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "签名授权与拒绝条件",
+      "items": [
+        "单次授权绑定 principal、role、case_version、tool、完整参数、摘要与 TTL",
+        "执行器 fresh-read 后才行动；签名、版本、摘要或状态变化均 fail closed；Agent 与前端没有写凭证"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "双审批闭环与反例",
+      "items": [
+        "Principal A 重启并验证 ERP=100；Principal B 释放发票并验证 Invoice=Released 后案件才 Closed",
+        "审批前已入账则拒绝重启；授权后状态漂移则安全 no-op；两者都不能产生重复凭证"
+      ]
+    }
+  ]
+}

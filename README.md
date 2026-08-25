@@ -1,6 +1,8 @@
-# Supply Chain Exception Resolution Agent
+# The Missing 20
 
-An evidence-grounded Professional Agent for investigating and safely resolving synthetic supply-chain and ERP exceptions.
+**Find the gap. Prove the cause. Close it safely.**
+
+An agentic supply-chain exception resolution system that investigates cross-system discrepancies and carries approved recovery actions through verified closure.
 
 This repository is being created for the 2026 AWS Agents for Humans Hackathon. The current stage is foundation and design validation; it does not yet claim a deployed AgentCore implementation or a completed competition demo.
 
@@ -31,7 +33,7 @@ make check PYTHON=.venv/bin/python
 
 ## Design
 
-The independently reviewed design and implementation plan will be copied into `docs/` before the first public release.
+The independently reviewed design is available in [`docs/superpowers/specs/2026-08-25-the-missing-20-design.md`](docs/superpowers/specs/2026-08-25-the-missing-20-design.md), with its explorable [Architecture v4.2](docs/architecture/the-missing-20-architecture-v4.2.html). The implementation plan will be added before development begins.
 
 ## Provenance
 

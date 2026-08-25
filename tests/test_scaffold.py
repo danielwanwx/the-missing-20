@@ -1,4 +1,4 @@
-from supply_chain_exception_agent import __version__
+from the_missing_20 import __version__
 
 
 def test_package_version_is_explicit() -> None:

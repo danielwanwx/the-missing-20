@@ -3,9 +3,9 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "supply-chain-exception-agent"
+name = "the-missing-20"
 version = "0.1.0"
-description = "Evidence-grounded investigation and controlled recovery for synthetic supply-chain exceptions."
+description = "Agentic supply-chain exception resolution with evidence-grounded diagnosis and controlled recovery."
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 license = { text = "MIT" }
@@ -21,7 +21,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/supply_chain_exception_agent"]
+packages = ["src/the_missing_20"]
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --strict-config"

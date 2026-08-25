@@ -1,8 +1,8 @@
 {
-  "name": "supply-chain-exception-agent",
+  "name": "the-missing-20",
   "version": "0.1.0",
   "private": true,
-  "description": "Business-first control tower for synthetic supply-chain exception resolution.",
+  "description": "Agentic supply-chain exception resolution with evidence-grounded diagnosis and controlled recovery.",
   "engines": {
     "node": ">=20"
   },

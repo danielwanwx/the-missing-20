@@ -1,4 +1,4 @@
-# Supply Chain Exception Resolution Agent Design
+# The Missing 20 Design
 
 **Status:** Ready for user review  
 **Date:** 2026-08-25  
@@ -17,11 +17,11 @@ This decision supersedes the earlier comparison report where it recommended a ge
 
 ### One-sentence pitch
 
-CloseLoop detects when physical receipt, ERP receipt, and invoice records disagree, uses evidence-grounded agents to determine why, and carries the case through controlled human approval and verified recovery.
+The Missing 20 detects when physical receipt, ERP receipt, and invoice records disagree, uses evidence-grounded agents to determine why, and carries the case through controlled human approval and verified recovery.
 
 ### Plain-language explanation
 
-A warehouse received 100 items, but the accounting system shows only 80. CloseLoop checks what happened to the missing 20, shows the evidence to the right employees, performs only the exact actions they approve, and verifies that the systems agree before it declares the problem solved.
+A warehouse received 100 items, but the accounting system shows only 80. The Missing 20 checks what happened to the missing 20 items, shows the evidence to the right employees, performs only the exact actions they approve, and verifies that the systems agree before it declares the problem solved.
 
 ### Target users
 

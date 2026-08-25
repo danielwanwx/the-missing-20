@@ -4,7 +4,7 @@ This ledger separates pre-competition work from work created for this competitio
 
 ## New competition repository
 
-- Repository: `danielwanwx/supply-chain-exception-agent` (working name; public URL will be recorded after repository publication)
+- Repository: `danielwanwx/the-missing-20` (public URL will be recorded after publication)
 - Created: 2026-08-24
 - License: MIT
 - Enterprise data: entirely synthetic
