@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -57,14 +58,15 @@ def validate_mutation_gate(settings: Settings, repository_root: Path) -> None:
 
 
 def validate_cli_version(version_output: str) -> None:
-    if not version_output.startswith("aws-cli/2."):
-        raise PreflightError("AWS CLI v2 is required")
+    match = re.match(r"aws-cli/(\d+)\.(\d+)\.(\d+)", version_output)
+    if match is None or tuple(map(int, match.groups())) < (2, 32, 0):
+        raise PreflightError("AWS CLI 2.32.0 or newer is required")
 
 
 def load_identity(settings: Settings) -> Identity:
     aws = shutil.which("aws")
     if aws is None:
-        raise PreflightError("AWS CLI v2 is not installed")
+        raise PreflightError("AWS CLI 2.32.0 or newer is not installed")
     if settings.aws_profile is None:
         raise PreflightError("MISSING20_AWS_PROFILE is required")
 

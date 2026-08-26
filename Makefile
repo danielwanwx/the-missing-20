@@ -4,6 +4,16 @@ PYTHON ?= .venv/bin/python
 UV ?= uv
 AWS_CONFIRM ?= 0
 
+-include .env
+export MISSING20_ENVIRONMENT
+export MISSING20_AWS_REGION
+export MISSING20_AWS_PROFILE
+export MISSING20_EXPECTED_AWS_ACCOUNT_ID
+export MISSING20_RESOURCE_PREFIX
+export MISSING20_CLEANUP_MANIFEST
+export MISSING20_MAX_AWS_SPEND_USD
+export MISSING20_ALLOW_AWS_MUTATIONS
+
 bootstrap:
 	$(UV) sync --frozen --extra dev
 	npm ci --ignore-scripts

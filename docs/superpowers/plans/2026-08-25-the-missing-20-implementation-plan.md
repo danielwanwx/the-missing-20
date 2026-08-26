@@ -168,7 +168,7 @@ Directories are created only when their first executable file is added.
    - a region other than `us-west-2`;
    - missing resource prefix or cleanup manifest;
    - execution without an explicit confirmation flag.
-6. Install AWS CLI v2 and configure an SSO profile only after user approval.
+6. Install AWS CLI 2.32+ and, only after user approval, configure a dedicated MFA IAM user with `aws login` temporary credentials and exact project-role assumption. Do not create long-lived API access keys; constrain the role with the project permissions boundary and remove the root bootstrap session after setup.
 7. Update CI to use the locks and exact Python/Node lines.
 8. Copy the retained AgentCore spike evidence into `artifacts/aws/` with a provenance note; do not copy credentials or account identifiers.
 9. Run disposable, minimum-resource AWS capability probes before product code depends on them:

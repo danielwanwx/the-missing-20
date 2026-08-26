@@ -417,8 +417,8 @@ The project will not describe a planned AWS control as implemented until its pro
 - Node.js 20.x.
 - Python 3.12.x from a reproducible project bootstrap, not an undocumented global interpreter.
 - Repository version files pin the exact Python and Node patch releases used by CI and the demo.
-- AWS CLI v2.
-- AWS IAM Identity Center/SSO with short-lived credentials; root access keys are prohibited.
+- AWS CLI 2.32 or newer.
+- A dedicated MFA-protected IAM user uses `aws login` for temporary credentials and can assume only the exact project role. Long-lived API access keys and root credentials are prohibited; the project role remains constrained by a permissions boundary.
 - Default AWS region: `us-west-2`.
 - GitHub CLI for repository operations.
 - Docker is optional until a concrete test requires it; the project will not introduce container infrastructure merely for parity with FlowPulse.
@@ -432,7 +432,7 @@ The project will not describe a planned AWS control as implemented until its pro
 - `make golden` runs all golden cases and produces a machine-readable report.
 - `make agent-smoke` is explicit and budget-bounded; real model calls never run as part of offline CI.
 - `make aws-smoke` is explicit, opt-in, and refuses root credentials. Before creating or changing a real resource it validates the expected AWS account, `us-west-2`, the approved budget ceiling, a dedicated resource prefix, and a recorded cleanup plan, then requires user authorization.
-- Secrets remain in ignored local configuration or AWS SSO sessions.
+- Secrets remain in ignored local configuration or the AWS CLI login cache.
 
 ## 13. Implementation workflow
 
@@ -453,7 +453,7 @@ Human gates: account changes, paid deployment, public publishing, consequential 
 
 - Freeze this specification and Architecture v4.2 mapping.
 - Add dependency locks and reproducible bootstrap.
-- Install and verify AWS CLI v2 and SSO path after human approval.
+- Install and verify AWS CLI 2.32+, the dedicated MFA IAM-user login path, exact project-role assumption, and root-session logout after human approval.
 - Add project commands and CI skeleton.
 - Produce the state-machine and AWS-proof test manifests.
 

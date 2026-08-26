@@ -71,11 +71,15 @@ def test_mutation_gate_rejects_empty_cleanup_plan(tmp_path: Path) -> None:
         validate_mutation_gate(settings, tmp_path)
 
 
-def test_aws_cli_must_be_v2() -> None:
+def test_aws_cli_must_support_temporary_login() -> None:
     validate_cli_version("aws-cli/2.36.30 Python/3.14.7 Darwin/24.6.0")
+    validate_cli_version("aws-cli/2.32.0 Python/3.13.7 Darwin/24.6.0")
 
-    with pytest.raises(PreflightError, match="CLI v2"):
+    with pytest.raises(PreflightError, match="2.32.0"):
         validate_cli_version("aws-cli/1.38.0 Python/3.12.0")
+
+    with pytest.raises(PreflightError, match="2.32.0"):
+        validate_cli_version("aws-cli/2.31.9 Python/3.13.7 Darwin/24.6.0")
 
 
 def test_cli_refuses_a_run_without_one_time_confirmation() -> None:
