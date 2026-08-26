@@ -242,6 +242,7 @@ make aws-smoke AWS_CONFIRM=0
 
 **Target:** August 28–30  
 **Goal:** Complete the entire primary case locally without an LLM.
+**Detailed execution contract:** [`../specs/2026-08-25-milestone-2-deterministic-vertical-slice-design.md`](../specs/2026-08-25-milestone-2-deterministic-vertical-slice-design.md)
 
 #### Tasks
 
@@ -255,6 +256,13 @@ make aws-smoke AWS_CONFIRM=0
 8. Implement receipt restart, invoice release, fresh-read, idempotency, and postcondition verification.
 9. Add `make demo` that runs the approved 100/80/100 path and writes `artifacts/demo/main-case.json`.
 10. Inject a persistence failure after a successful downstream receipt restart; retry must reuse the same idempotency key or become a fresh-read safe no-op.
+11. Persist enterprise truth and case/audit truth in separate SQLite files; restart service instances during the crash-consistency test.
+12. Reserve a single execution attempt before mutation so recovery resumes the same authorization without weakening replay protection.
+13. Save replayable event payloads, typed policy decisions, attempts, and business effects with shared case and trace IDs.
+14. Include a persisted early-invoice deny probe with zero business effects in the demo artifact.
+15. After grant expiry, permit only reconciliation of an exactly matching committed business effect; never perform a first mutation.
+16. Distinguish verified external state drift as a safe no-op from ambiguous or conflicting drift, which must deny or protect.
+17. Persist failed postcondition receipts, consume used grants, keep the case executing, and prohibit a second unconditional mutation.
 
 #### Files
 
@@ -278,6 +286,8 @@ make aws-smoke AWS_CONFIRM=0
 - Every event, grant, policy decision, and receipt shares the same case and trace IDs.
 - Running the executor twice creates no duplicate business effect.
 - A crash between downstream success and receipt persistence creates no duplicate business effect after recovery.
+- Replaying immutable genesis and ordered event payloads exactly reproduces the stored projection.
+- The demo artifact proves one policy deny, two role-correct approvals, both authoritative mutations, and every invariant from the actual SQLite-backed run.
 
 ### Milestone 3: Safety counterexamples and Golden v1
 
