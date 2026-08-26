@@ -15,3 +15,11 @@ class VersionConflict(DomainError):
 
 class InvalidEventPayload(DomainError):
     """Raised when an event carries missing, conflicting, or unsafe facts."""
+
+
+class IdempotencyConflict(DomainError):
+    """Raised when one idempotency key is reused for a different command."""
+
+
+class AuthorizationDenied(DomainError):
+    """Raised when trusted policy rejects an approval or execution request."""

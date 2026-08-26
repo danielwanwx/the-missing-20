@@ -116,6 +116,7 @@ def test_action_grant_requires_a_future_expiry() -> None:
         ActionGrant(
             authorization_id="authorization-001",
             case_id="case-001",
+            trace_id="trace-001",
             case_version=1,
             principal_id="operator-001",
             role=HumanRole.INTEGRATION_OPERATOR,
@@ -141,6 +142,7 @@ def test_approval_rejects_cross_role_tools(role: HumanRole, tool: ActionTool) ->
         Approval(
             approval_id="approval-001",
             case_id="case-001",
+            trace_id="trace-001",
             case_version=1,
             principal_id="principal-001",
             role=role,
@@ -163,6 +165,7 @@ def test_action_grant_rejects_cross_role_tools(role: HumanRole, tool: ActionTool
         ActionGrant(
             authorization_id="authorization-001",
             case_id="case-001",
+            trace_id="trace-001",
             case_version=1,
             principal_id="principal-001",
             role=role,
@@ -181,6 +184,7 @@ def test_json_contracts_reject_non_finite_numbers() -> None:
         EvidenceItem(
             evidence_id="evidence-001",
             case_id="case-001",
+            trace_id="trace-001",
             subject="queue message",
             source_type=EvidenceSourceType.FAILED_MESSAGE_QUEUE,
             source_record_id="message-001",
@@ -198,6 +202,7 @@ def test_json_contracts_reject_non_finite_numbers() -> None:
         ActionGrant(
             authorization_id="authorization-001",
             case_id="case-001",
+            trace_id="trace-001",
             case_version=1,
             principal_id="operator-001",
             role=HumanRole.INTEGRATION_OPERATOR,

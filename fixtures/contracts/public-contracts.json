@@ -28,6 +28,7 @@
   "EvidenceItem": {
     "evidence_id": "evidence-queue-001",
     "case_id": "case-001",
+    "trace_id": "trace-001",
     "subject": "failed receipt message",
     "source_type": "FAILED_MESSAGE_QUEUE",
     "source_record_id": "message-020",
@@ -63,6 +64,7 @@
   "Approval": {
     "approval_id": "approval-001",
     "case_id": "case-001",
+    "trace_id": "trace-001",
     "case_version": 6,
     "principal_id": "operator-001",
     "role": "INTEGRATION_OPERATOR",
@@ -74,6 +76,7 @@
   "ActionGrant": {
     "authorization_id": "authorization-001",
     "case_id": "case-001",
+    "trace_id": "trace-001",
     "case_version": 7,
     "principal_id": "operator-001",
     "role": "INTEGRATION_OPERATOR",
@@ -91,6 +94,7 @@
   "ExecutionReceipt": {
     "execution_id": "execution-001",
     "authorization_id": "authorization-001",
+    "case_id": "case-001",
     "pre_state_digest": "sha256:pre-state-001",
     "operation_result": "EXECUTED",
     "post_state_digest": "sha256:post-state-001",
@@ -119,6 +123,7 @@
     "evidence": {
       "evidence_id": "evidence-queue-001",
       "case_id": "case-001",
+      "trace_id": "trace-001",
       "subject": "failed receipt message",
       "source_type": "FAILED_MESSAGE_QUEUE",
       "source_record_id": "message-020",
@@ -147,6 +152,7 @@
     "idempotency_key": "idempotency-evidence-001",
     "trace_id": "trace-001",
     "occurred_at": "2026-08-25T16:06:00Z",
+    "payload_json": "{\"evidence_id\":\"evidence-queue-001\"}",
     "payload_digest": "sha256:evidence-payload-001"
   }
 }

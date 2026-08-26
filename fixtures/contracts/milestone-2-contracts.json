@@ -1,0 +1,343 @@
+{
+  "PolicyDecision": {
+    "decision_id": "decision-001",
+    "case_id": "case-001",
+    "trace_id": "trace-001",
+    "authorization_id": "authorization-001",
+    "execution_id": "execution-001",
+    "principal_id": "operator-001",
+    "trusted_role": "INTEGRATION_OPERATOR",
+    "tool": "restart_receipt_message",
+    "decision": "ALLOW",
+    "decision_stage": "EXECUTION_GATE",
+    "reason_codes": ["AUTHORIZED"],
+    "case_version": 7,
+    "parameters_digest": "parameters-digest-001",
+    "evidence_digest": "evidence-digest-001",
+    "action_digest": "action-digest-001",
+    "decided_at": "2026-08-25T16:11:30Z"
+  },
+  "ExecutionAttempt": {
+    "execution_id": "execution-001",
+    "authorization_id": "authorization-001",
+    "case_id": "case-001",
+    "trace_id": "trace-001",
+    "idempotency_key": "effect-receipt-001",
+    "tool": "restart_receipt_message",
+    "canonical_parameters": {
+      "message_id": "message-020",
+      "quantity": 20
+    },
+    "command_digest": "command-digest-001",
+    "status": "RESERVED",
+    "reserved_at": "2026-08-25T16:12:00Z",
+    "completed_at": null
+  },
+  "RestartReceiptMessageParameters": {
+    "message_id": "message-020",
+    "message_revision": 3,
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 20,
+    "expected_error_code": "DOCUMENT_LOCKED_RETRYABLE",
+    "expected_message_status": "FAILED"
+  },
+  "ReleaseInvoiceParameters": {
+    "invoice_id": "INV-10001",
+    "invoice_revision": 4,
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 100,
+    "expected_hold_reason": "RECEIPT_MISMATCH"
+  },
+  "DetectionGenesis": {
+    "case_id": "case-001",
+    "trace_id": "trace-001",
+    "fixture_path": "fixtures/scenarios/retryable-document-lock.json",
+    "fixture_digest": "fixture-digest-001",
+    "initial_case_json": "{\"case_id\":\"case-001\"}",
+    "detection_facts": {
+      "warehouse_quantity": 100,
+      "erp_receipt_quantity": 80,
+      "missing_quantity": 20
+    },
+    "detector_evidence_ids": ["evidence-warehouse", "evidence-erp-receipt"],
+    "created_at": "2026-08-25T16:00:00Z"
+  },
+  "PurchaseOrderLine": {
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "ordered_quantity": 100,
+    "unit": "EA"
+  },
+  "WarehouseReceipt": {
+    "receipt_id": "WH-RECEIPT-10001-10",
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 100
+  },
+  "FailedReceiptMessage": {
+    "message_id": "message-020",
+    "revision": 3,
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 20,
+    "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+    "status": "FAILED",
+    "retry_eligible": true,
+    "lock_cleared": true,
+    "consumed_by_execution_id": null
+  },
+  "ErpReceipt": {
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 80,
+    "revision": 8
+  },
+  "Invoice": {
+    "invoice_id": "INV-10001",
+    "revision": 4,
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 100,
+    "state": "HELD",
+    "hold_reason": "RECEIPT_MISMATCH",
+    "other_blocking_holds": [],
+    "released_by_execution_id": null
+  },
+  "MaterialDocument": {
+    "material_document_id": "material-message-020",
+    "source_message_id": "message-020",
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 20,
+    "execution_id": "execution-001",
+    "idempotency_key": "effect-receipt-001"
+  },
+  "BusinessEffect": {
+    "effect_id": "effect-execution-001",
+    "case_id": "case-001",
+    "trace_id": "trace-001",
+    "execution_id": "execution-001",
+    "idempotency_key": "effect-receipt-001",
+    "effect_type": "RECEIPT_RESTART",
+    "source_record_id": "message-020",
+    "result_record_ids": ["material-message-020"],
+    "committed_at": "2026-08-25T16:12:00Z"
+  },
+  "EnterpriseSnapshot": {
+    "purchase_order": {
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "ordered_quantity": 100,
+      "unit": "EA"
+    },
+    "warehouse_receipt": {
+      "receipt_id": "WH-RECEIPT-10001-10",
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 100
+    },
+    "failed_message": {
+      "message_id": "message-020",
+      "revision": 3,
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 20,
+      "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+      "status": "FAILED",
+      "retry_eligible": true,
+      "lock_cleared": true,
+      "consumed_by_execution_id": null
+    },
+    "erp_receipt": {
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 80,
+      "revision": 8
+    },
+    "invoice": {
+      "invoice_id": "INV-10001",
+      "revision": 4,
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 100,
+      "state": "HELD",
+      "hold_reason": "RECEIPT_MISMATCH",
+      "other_blocking_holds": [],
+      "released_by_execution_id": null
+    },
+    "material_documents": [],
+    "business_effects": []
+  },
+  "ScenarioFixture": {
+    "scenario_id": "retryable-document-lock",
+    "purchase_order": {
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "ordered_quantity": 100,
+      "unit": "EA"
+    },
+    "warehouse_receipt": {
+      "receipt_id": "WH-RECEIPT-10001-10",
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 100
+    },
+    "failed_message": {
+      "message_id": "message-020",
+      "revision": 3,
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 20,
+      "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+      "status": "FAILED",
+      "retry_eligible": true,
+      "lock_cleared": true,
+      "consumed_by_execution_id": null
+    },
+    "erp_receipt": {
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 80,
+      "revision": 8
+    },
+    "invoice": {
+      "invoice_id": "INV-10001",
+      "revision": 4,
+      "purchase_order_id": "PO-10001",
+      "line_id": "10",
+      "quantity": 100,
+      "state": "HELD",
+      "hold_reason": "RECEIPT_MISMATCH",
+      "other_blocking_holds": [],
+      "released_by_execution_id": null
+    }
+  },
+  "EnterpriseMutationResult": {
+    "outcome": "EXECUTED",
+    "effect": {
+      "effect_id": "effect-execution-001",
+      "case_id": "case-001",
+      "trace_id": "trace-001",
+      "execution_id": "execution-001",
+      "idempotency_key": "effect-receipt-001",
+      "effect_type": "RECEIPT_RESTART",
+      "source_record_id": "message-020",
+      "result_record_ids": ["material-message-020"],
+      "committed_at": "2026-08-25T16:12:00Z"
+    },
+    "pre_state": {
+      "purchase_order": {
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "ordered_quantity": 100,
+        "unit": "EA"
+      },
+      "warehouse_receipt": {
+        "receipt_id": "WH-RECEIPT-10001-10",
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 100
+      },
+      "failed_message": {
+        "message_id": "message-020",
+        "revision": 3,
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 20,
+        "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+        "status": "FAILED",
+        "retry_eligible": true,
+        "lock_cleared": true,
+        "consumed_by_execution_id": null
+      },
+      "erp_receipt": {
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 80,
+        "revision": 8
+      },
+      "invoice": {
+        "invoice_id": "INV-10001",
+        "revision": 4,
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 100,
+        "state": "HELD",
+        "hold_reason": "RECEIPT_MISMATCH",
+        "other_blocking_holds": [],
+        "released_by_execution_id": null
+      },
+      "material_documents": [],
+      "business_effects": []
+    },
+    "post_state": {
+      "purchase_order": {
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "ordered_quantity": 100,
+        "unit": "EA"
+      },
+      "warehouse_receipt": {
+        "receipt_id": "WH-RECEIPT-10001-10",
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 100
+      },
+      "failed_message": {
+        "message_id": "message-020",
+        "revision": 4,
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 20,
+        "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+        "status": "CONSUMED",
+        "retry_eligible": true,
+        "lock_cleared": true,
+        "consumed_by_execution_id": "execution-001"
+      },
+      "erp_receipt": {
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 100,
+        "revision": 9
+      },
+      "invoice": {
+        "invoice_id": "INV-10001",
+        "revision": 4,
+        "purchase_order_id": "PO-10001",
+        "line_id": "10",
+        "quantity": 100,
+        "state": "HELD",
+        "hold_reason": "RECEIPT_MISMATCH",
+        "other_blocking_holds": [],
+        "released_by_execution_id": null
+      },
+      "material_documents": [
+        {
+          "material_document_id": "material-message-020",
+          "source_message_id": "message-020",
+          "purchase_order_id": "PO-10001",
+          "line_id": "10",
+          "quantity": 20,
+          "execution_id": "execution-001",
+          "idempotency_key": "effect-receipt-001"
+        }
+      ],
+      "business_effects": [
+        {
+          "effect_id": "effect-execution-001",
+          "case_id": "case-001",
+          "trace_id": "trace-001",
+          "execution_id": "execution-001",
+          "idempotency_key": "effect-receipt-001",
+          "effect_type": "RECEIPT_RESTART",
+          "source_record_id": "message-020",
+          "result_record_ids": ["material-message-020"],
+          "committed_at": "2026-08-25T16:12:00Z"
+        }
+      ]
+    }
+  }
+}

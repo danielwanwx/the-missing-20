@@ -1,6 +1,6 @@
 # The Missing 20 Implementation Plan
 
-**Status:** Accepted after independent review; implementation in progress
+**Status:** Milestones 0–2 accepted; Milestone 3 design is next
 **Date:** 2026-08-25  
 **Deadline:** 2026-09-14 at 5:00 PM PDT  
 **Track:** Professional Agents  
@@ -239,6 +239,8 @@ make aws-smoke AWS_CONFIRM=0
 - `CLOSED` cannot be supplied by an agent or browser payload.
 
 ### Milestone 2: Deterministic main-case vertical slice
+
+**Gate:** Completed and accepted by the independent Chief Architect on August 25, 2026.
 
 **Target:** August 28–30  
 **Goal:** Complete the entire primary case locally without an LLM.

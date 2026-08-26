@@ -4,7 +4,26 @@ from typing import Any, cast
 
 import pytest
 
+from the_missing_20.domain.enterprise import (
+    BusinessEffect,
+    EnterpriseMutationResult,
+    EnterpriseSnapshot,
+    ErpReceipt,
+    FailedReceiptMessage,
+    Invoice,
+    MaterialDocument,
+    PurchaseOrderLine,
+    ScenarioFixture,
+    WarehouseReceipt,
+)
 from the_missing_20.domain.events import CaseEvent, TransitionCommand
+from the_missing_20.domain.execution import (
+    DetectionGenesis,
+    ExecutionAttempt,
+    PolicyDecision,
+    ReleaseInvoiceParameters,
+    RestartReceiptMessageParameters,
+)
 from the_missing_20.domain.models import (
     ActionGrant,
     Approval,
@@ -19,7 +38,10 @@ from the_missing_20.domain.models import (
     HypothesisResult,
 )
 
-CONTRACTS_FILE = Path("fixtures/contracts/public-contracts.json")
+CONTRACTS_FILES = (
+    Path("fixtures/contracts/public-contracts.json"),
+    Path("fixtures/contracts/milestone-2-contracts.json"),
+)
 MODEL_TYPES: dict[str, type[ContractModel]] = {
     "Discrepancy": Discrepancy,
     "Case": Case,
@@ -33,15 +55,32 @@ MODEL_TYPES: dict[str, type[ContractModel]] = {
     "ClosureFacts": ClosureFacts,
     "TransitionCommand": TransitionCommand,
     "CaseEvent": CaseEvent,
+    "PolicyDecision": PolicyDecision,
+    "ExecutionAttempt": ExecutionAttempt,
+    "RestartReceiptMessageParameters": RestartReceiptMessageParameters,
+    "ReleaseInvoiceParameters": ReleaseInvoiceParameters,
+    "DetectionGenesis": DetectionGenesis,
+    "PurchaseOrderLine": PurchaseOrderLine,
+    "WarehouseReceipt": WarehouseReceipt,
+    "FailedReceiptMessage": FailedReceiptMessage,
+    "ErpReceipt": ErpReceipt,
+    "Invoice": Invoice,
+    "MaterialDocument": MaterialDocument,
+    "BusinessEffect": BusinessEffect,
+    "EnterpriseSnapshot": EnterpriseSnapshot,
+    "ScenarioFixture": ScenarioFixture,
+    "EnterpriseMutationResult": EnterpriseMutationResult,
 }
 
 
 @pytest.fixture(scope="module")
 def contract_examples() -> dict[str, dict[str, Any]]:
-    return cast(
-        dict[str, dict[str, Any]],
-        json.loads(CONTRACTS_FILE.read_text(encoding="utf-8")),
-    )
+    examples: dict[str, dict[str, Any]] = {}
+    for path in CONTRACTS_FILES:
+        examples.update(
+            cast(dict[str, dict[str, Any]], json.loads(path.read_text(encoding="utf-8")))
+        )
+    return examples
 
 
 def test_every_public_contract_has_an_example(

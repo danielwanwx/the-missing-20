@@ -4,7 +4,7 @@
 
 An agentic supply-chain exception resolution system that investigates cross-system discrepancies and carries approved recovery actions through verified closure.
 
-This repository is being created for the 2026 AWS Agents for Humans Hackathon. The current stage is foundation and design validation; it does not yet claim a deployed AgentCore implementation or a completed competition demo.
+This repository is being created for the 2026 AWS Agents for Humans Hackathon. Its current deterministic vertical slice proves the synthetic supply-chain case through real local persistence, authorization, execution, verification, and replay. It does not yet claim a deployed AgentCore implementation or an agent-driven competition demo.
 
 ## Product boundary
 
@@ -31,9 +31,17 @@ make bootstrap PYTHON=.venv/bin/python
 make check PYTHON=.venv/bin/python
 ```
 
+Run the offline deterministic case:
+
+```bash
+make demo
+```
+
+The command seeds two temporary SQLite databases from the versioned JSON scenario, runs the complete `100 / 80 / 100` resolution path, and writes the auditable result to [`artifacts/demo/main-case.json`](artifacts/demo/main-case.json). It makes no AWS or model calls.
+
 ## Design
 
-The independently reviewed design is available in [`docs/superpowers/specs/2026-08-25-the-missing-20-design.md`](docs/superpowers/specs/2026-08-25-the-missing-20-design.md), with its explorable [Architecture v4.2](docs/architecture/the-missing-20-architecture-v4.2.html). The implementation plan will be added before development begins.
+The independently reviewed design is available in [`docs/superpowers/specs/2026-08-25-the-missing-20-design.md`](docs/superpowers/specs/2026-08-25-the-missing-20-design.md), with its explorable [Architecture v4.2](docs/architecture/the-missing-20-architecture-v4.2.html). See the [implementation plan](docs/superpowers/plans/2026-08-25-the-missing-20-implementation-plan.md) and the [Milestone 2 execution contract](docs/superpowers/specs/2026-08-25-milestone-2-deterministic-vertical-slice-design.md) for the current build.
 
 ## Provenance
 

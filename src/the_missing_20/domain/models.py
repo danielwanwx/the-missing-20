@@ -144,6 +144,7 @@ class EvidenceProvenance(ContractModel):
 class EvidenceItem(ContractModel):
     evidence_id: NonEmptyStr
     case_id: NonEmptyStr
+    trace_id: NonEmptyStr
     subject: NonEmptyStr
     source_type: EvidenceSourceType
     source_record_id: NonEmptyStr
@@ -174,6 +175,7 @@ class EvaluationResult(ContractModel):
 class Approval(ContractModel):
     approval_id: NonEmptyStr
     case_id: NonEmptyStr
+    trace_id: NonEmptyStr
     case_version: NonNegativeInt
     principal_id: NonEmptyStr
     role: HumanRole
@@ -191,6 +193,7 @@ class Approval(ContractModel):
 class ActionGrant(ContractModel):
     authorization_id: NonEmptyStr
     case_id: NonEmptyStr
+    trace_id: NonEmptyStr
     case_version: NonNegativeInt
     principal_id: NonEmptyStr
     role: HumanRole
@@ -213,6 +216,7 @@ class ActionGrant(ContractModel):
 class ExecutionReceipt(ContractModel):
     execution_id: NonEmptyStr
     authorization_id: NonEmptyStr
+    case_id: NonEmptyStr
     pre_state_digest: NonEmptyStr
     operation_result: OperationResult
     post_state_digest: NonEmptyStr

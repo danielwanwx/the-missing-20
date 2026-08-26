@@ -11,12 +11,19 @@ from the_missing_20.domain.errors import (
 )
 from the_missing_20.domain.events import TransitionCommand
 from the_missing_20.domain.models import (
+    ActionTool,
     Case,
     ClosureFacts,
+    ConfidenceBand,
     Discrepancy,
+    EvaluationDecision,
+    EvaluationResult,
     EvidenceItem,
     EvidenceProvenance,
     EvidenceSourceType,
+    HypothesisConclusion,
+    HypothesisResult,
+    HypothesisType,
     InvoiceState,
     MessageResolution,
 )
@@ -99,6 +106,7 @@ def make_evidence(*, case_id: str = "case-001") -> EvidenceItem:
     return EvidenceItem(
         evidence_id="evidence-queue-001",
         case_id=case_id,
+        trace_id="trace-001",
         subject="failed receipt message",
         source_type=EvidenceSourceType.FAILED_MESSAGE_QUEUE,
         source_record_id="message-020",
@@ -128,10 +136,29 @@ def valid_closure(**overrides: object) -> ClosureFacts:
 def make_command(event: TransitionEvent, *, case_id: str = "case-001") -> TransitionCommand:
     evidence = None
     closure_facts = None
+    hypothesis = None
+    evaluation = None
     if event is TransitionEvent.EVIDENCE_ADMITTED:
         evidence = make_evidence(case_id=case_id)
     if event is TransitionEvent.INVOICE_POSTCONDITIONS_VERIFIED:
         closure_facts = valid_closure()
+    if event is TransitionEvent.RECEIPT_RESTART_RECOMMENDED:
+        hypothesis = HypothesisResult(
+            hypothesis_type=HypothesisType.RETRYABLE_MESSAGE,
+            conclusion=HypothesisConclusion.SUPPORTED,
+            confidence_band=ConfidenceBand.HIGH,
+            supporting_evidence_ids=("evidence-queue-001",),
+            contradicting_evidence_ids=(),
+            missing_evidence=(),
+        )
+        evaluation = EvaluationResult(
+            decision=EvaluationDecision.ACCEPT,
+            validated_evidence_ids=("evidence-queue-001",),
+            failed_invariants=(),
+            allowed_next_action=ActionTool.RESTART_RECEIPT_MESSAGE,
+            evaluator_version="deterministic-v1",
+            trace_id="trace-001",
+        )
     return TransitionCommand(
         case_id=case_id,
         expected_version=3,
@@ -141,6 +168,8 @@ def make_command(event: TransitionEvent, *, case_id: str = "case-001") -> Transi
         occurred_at=NOW + timedelta(minutes=1),
         evidence=evidence,
         closure_facts=closure_facts,
+        hypothesis=hypothesis,
+        evaluation=evaluation,
     )
 
 

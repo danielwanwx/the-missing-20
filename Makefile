@@ -1,4 +1,4 @@
-.PHONY: bootstrap format lint typecheck test test-js check aws-smoke
+.PHONY: bootstrap format lint typecheck test test-js check demo aws-smoke
 
 PYTHON ?= .venv/bin/python
 UV ?= uv
@@ -36,6 +36,9 @@ test-js:
 	npm test
 
 check: lint typecheck test test-js
+
+demo:
+	PYTHONPATH=src $(PYTHON) scripts/run_demo.py
 
 aws-smoke:
 	PYTHONPATH=src $(PYTHON) scripts/aws_preflight.py --confirm $(AWS_CONFIRM)

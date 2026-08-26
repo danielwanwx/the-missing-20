@@ -1,6 +1,6 @@
 # Milestone 2 Deterministic Vertical Slice Design
 
-**Status:** Pending Chief Architect acceptance  
+**Status:** Implementation accepted by Chief Architect after five independent gate reviews
 **Date:** 2026-08-25  
 **Parent design:** [`2026-08-25-the-missing-20-design.md`](2026-08-25-the-missing-20-design.md)  
 **Implementation plan:** [`../plans/2026-08-25-the-missing-20-implementation-plan.md`](../plans/2026-08-25-the-missing-20-implementation-plan.md)
@@ -116,6 +116,7 @@ The receipt and invoice actions use the same reservation protocol.
 2. The accepted transition creates authorized version `N+1`.
 3. The grant binds the exact principal, trusted role, tool, full parameters, evidence, action digest, and case version `N+1`.
 4. The first execution request opens one `case.sqlite` transaction and:
+   - loads the immutable stored grant by authorization ID and uses a trusted clock; request payloads cannot supply or override either the signed grant or current time;
    - verifies signature, TTL, current case version, trusted identity, tool, complete parameters, evidence digest, and action digest;
    - records the policy allow;
    - creates the unique execution attempt;
@@ -125,6 +126,8 @@ The receipt and invoice actions use the same reservation protocol.
 6. After authoritative postconditions pass, one case transaction writes the execution receipt, marks the attempt `COMPLETED`, marks the grant `CONSUMED`, appends the verified event, and advances the projection.
 
 Crash recovery is not a second authorization. If the enterprise commit succeeded but step 6 failed, recovery must present the same `authorization_id`, `execution_id`, idempotency key, and command digest. The service returns the existing reservation, reads the enterprise ledger, verifies authoritative state, and completes step 6. A different attempt for the reserved or consumed authorization is denied.
+
+Recovery reloads and revalidates the stored signed grant. Caller-supplied expiry, signature, role, tool, case context, or version values are never accepted as recovery authority.
 
 TTL remains fail closed after reservation:
 
@@ -190,6 +193,8 @@ The postcondition-failure test hook must alter or expose authoritative enterpris
 
 - `operator-001 -> INTEGRATION_OPERATOR`;
 - `ap-approver-001 -> AP_APPROVER`.
+
+Approval, policy, attempt reservation, expiry checks, enterprise commit timestamps, and receipts read time from an injected trusted `Clock`. The deterministic test adapter may advance that clock; application requests cannot submit or backdate authorization time.
 
 Approval commands provide the principal and decision; the application service resolves the role from the trusted identity context before creating an approval or grant.
 

@@ -21,17 +21,26 @@ def _payload(command: TransitionCommand) -> dict[str, Any]:
         return {"evidence": command.evidence.model_dump(mode="json")}
     if command.closure_facts is not None:
         return {"closure_facts": command.closure_facts.model_dump(mode="json")}
+    if command.hypothesis is not None and command.evaluation is not None:
+        return {
+            "hypothesis": command.hypothesis.model_dump(mode="json"),
+            "evaluation": command.evaluation.model_dump(mode="json"),
+        }
     return {}
 
 
 def _digest(payload: dict[str, Any]) -> str:
-    encoded = json.dumps(
+    encoded = _canonical_json(payload).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _canonical_json(payload: dict[str, Any]) -> str:
+    return json.dumps(
         payload,
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
-    ).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    )
 
 
 def advance_case(case: Case, command: TransitionCommand) -> tuple[Case, CaseEvent]:
@@ -68,7 +77,9 @@ def advance_case(case: Case, command: TransitionCommand) -> tuple[Case, CaseEven
     ):
         raise InvalidEventPayload("closure quantity does not match the case discrepancy")
 
-    payload_digest = _digest(_payload(command))
+    payload = _payload(command)
+    payload_json = _canonical_json(payload)
+    payload_digest = _digest(payload)
     new_version = case.case_version + 1
     event_identity = ":".join(
         (
@@ -103,6 +114,7 @@ def advance_case(case: Case, command: TransitionCommand) -> tuple[Case, CaseEven
         idempotency_key=command.idempotency_key,
         trace_id=command.trace_id,
         occurred_at=command.occurred_at,
+        payload_json=payload_json,
         payload_digest=payload_digest,
     )
     return updated_case, event

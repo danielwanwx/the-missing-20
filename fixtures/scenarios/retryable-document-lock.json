@@ -1,0 +1,44 @@
+{
+  "scenario_id": "retryable-document-lock",
+  "purchase_order": {
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "ordered_quantity": 100,
+    "unit": "EA"
+  },
+  "warehouse_receipt": {
+    "receipt_id": "WH-RECEIPT-10001-10",
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 100
+  },
+  "failed_message": {
+    "message_id": "RECEIPT-MESSAGE-020",
+    "revision": 3,
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 20,
+    "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+    "status": "FAILED",
+    "retry_eligible": true,
+    "lock_cleared": true,
+    "consumed_by_execution_id": null
+  },
+  "erp_receipt": {
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 80,
+    "revision": 8
+  },
+  "invoice": {
+    "invoice_id": "INV-10001",
+    "revision": 4,
+    "purchase_order_id": "PO-10001",
+    "line_id": "10",
+    "quantity": 100,
+    "state": "HELD",
+    "hold_reason": "RECEIPT_MISMATCH",
+    "other_blocking_holds": [],
+    "released_by_execution_id": null
+  }
+}
