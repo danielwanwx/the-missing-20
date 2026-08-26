@@ -31,6 +31,7 @@ from the_missing_20.domain.execution import (
     PolicyOutcome,
     ReleaseInvoiceParameters,
     RestartReceiptMessageParameters,
+    uses_external_id_namespace,
 )
 from the_missing_20.domain.models import ActionTool, ExecutionReceipt, OperationResult
 from the_missing_20.domain.states import TransitionEvent
@@ -105,6 +106,8 @@ class ControlledExecutor:
     ) -> tuple[ExecutionReceipt, PolicyDecision | None]:
         occurred_at = self.clock.now()
         grant, grant_status = self.store.get_grant(authorization_id)
+        if uses_external_id_namespace(execution_id) or uses_external_id_namespace(idempotency_key):
+            raise AuthorizationDenied("local requests cannot use the reserved external namespace")
         request_digest = hashlib.sha256(
             canonical_json(
                 {
@@ -120,6 +123,26 @@ class ControlledExecutor:
         decision: PolicyDecision | None = None
         if attempt is None:
             if grant_status is not GrantStatus.ISSUED:
+                rejected = self.policy.evaluate_execution(
+                    grant=grant,
+                    principal_id=principal_id,
+                    execution_id=execution_id,
+                    parameters=parameters,
+                )
+                reason = (
+                    "AUTHORIZATION_ALREADY_CONSUMED"
+                    if grant_status is GrantStatus.CONSUMED
+                    else "AUTHORIZATION_NOT_ISSUED"
+                )
+                self.store.save_policy_decision(
+                    rejected.model_copy(
+                        update={
+                            "decision_id": f"decision-deny-unavailable-{execution_id}",
+                            "decision": PolicyOutcome.DENY,
+                            "reason_codes": (reason,),
+                        }
+                    )
+                )
                 raise AuthorizationDenied("authorization is not available for a new attempt")
             decision = self.policy.evaluate_execution(
                 grant=grant,

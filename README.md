@@ -41,7 +41,7 @@ The command seeds two temporary SQLite databases from the versioned JSON scenari
 
 ## Design
 
-The independently reviewed design is available in [`docs/superpowers/specs/2026-08-25-the-missing-20-design.md`](docs/superpowers/specs/2026-08-25-the-missing-20-design.md), with its explorable [Architecture v4.2](docs/architecture/the-missing-20-architecture-v4.2.html). See the [implementation plan](docs/superpowers/plans/2026-08-25-the-missing-20-implementation-plan.md) and the [Milestone 2 execution contract](docs/superpowers/specs/2026-08-25-milestone-2-deterministic-vertical-slice-design.md) for the current build.
+The independently reviewed design is available in [`docs/superpowers/specs/2026-08-25-the-missing-20-design.md`](docs/superpowers/specs/2026-08-25-the-missing-20-design.md), with its explorable [Architecture v4.2](docs/architecture/the-missing-20-architecture-v4.2.html). See the [implementation plan](docs/superpowers/plans/2026-08-25-the-missing-20-implementation-plan.md), the [Milestone 2 execution contract](docs/superpowers/specs/2026-08-25-milestone-2-deterministic-vertical-slice-design.md), and the accepted [Milestone 3 Golden v1 contract](docs/superpowers/specs/2026-08-25-milestone-3-golden-v1-design.md) for the current build.
 
 ## Provenance
 

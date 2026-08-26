@@ -31,6 +31,10 @@ class CaseStore(Protocol):
 
     def add_evidence(self, evidence: EvidenceItem) -> None: ...
 
+    def admit_evidence_with_transition(
+        self, evidence: EvidenceItem, transition: TransitionCommand
+    ) -> tuple[Case, CaseEvent]: ...
+
     def list_evidence(self, case_id: str) -> tuple[EvidenceItem, ...]: ...
 
     def save_approval_and_grant(

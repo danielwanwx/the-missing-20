@@ -172,6 +172,27 @@ class EvaluationResult(ContractModel):
     trace_id: NonEmptyStr
 
 
+class InvestigationDecision(StrEnum):
+    RECOMMEND_RECEIPT_RESTART = "RECOMMEND_RECEIPT_RESTART"
+    RECEIPT_ALREADY_POSTED = "RECEIPT_ALREADY_POSTED"
+    REQUIRE_EVIDENCE = "REQUIRE_EVIDENCE"
+    PROTECT = "PROTECT"
+    EVALUATOR_REJECTED = "EVALUATOR_REJECTED"
+
+
+class InvestigationAssessment(ContractModel):
+    assessment_id: NonEmptyStr
+    case_id: NonEmptyStr
+    trace_id: NonEmptyStr
+    hypothesis: HypothesisResult
+    evaluation: EvaluationResult
+    admitted_evidence_ids: tuple[NonEmptyStr, ...]
+    missing_evidence_sources: tuple[NonEmptyStr, ...]
+    decision: InvestigationDecision
+    reason_codes: tuple[NonEmptyStr, ...]
+    assessed_at: AwareDatetime
+
+
 class Approval(ContractModel):
     approval_id: NonEmptyStr
     case_id: NonEmptyStr

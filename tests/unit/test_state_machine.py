@@ -24,6 +24,8 @@ from the_missing_20.domain.models import (
     HypothesisConclusion,
     HypothesisResult,
     HypothesisType,
+    InvestigationAssessment,
+    InvestigationDecision,
     InvoiceState,
     MessageResolution,
 )
@@ -36,6 +38,14 @@ EXPECTED_TRANSITIONS: dict[tuple[CaseStatus, TransitionEvent], CaseStatus] = {
     (CaseStatus.OPEN, TransitionEvent.INVESTIGATION_STARTED): CaseStatus.INVESTIGATING,
     (CaseStatus.INVESTIGATING, TransitionEvent.EVIDENCE_REQUIRED): CaseStatus.NEEDS_EVIDENCE,
     (CaseStatus.NEEDS_EVIDENCE, TransitionEvent.EVIDENCE_ADMITTED): CaseStatus.INVESTIGATING,
+    (
+        CaseStatus.RECEIPT_ACTION_AUTHORIZED,
+        TransitionEvent.EVIDENCE_ADMITTED,
+    ): CaseStatus.INVESTIGATING,
+    (
+        CaseStatus.INVESTIGATING,
+        TransitionEvent.INVESTIGATION_ASSESSED,
+    ): CaseStatus.INVESTIGATING,
     (CaseStatus.INVESTIGATING, TransitionEvent.ACTION_PROTECTED): CaseStatus.PROTECTED,
     (
         CaseStatus.INVESTIGATING,
@@ -138,6 +148,7 @@ def make_command(event: TransitionEvent, *, case_id: str = "case-001") -> Transi
     closure_facts = None
     hypothesis = None
     evaluation = None
+    assessment = None
     if event is TransitionEvent.EVIDENCE_ADMITTED:
         evidence = make_evidence(case_id=case_id)
     if event is TransitionEvent.INVOICE_POSTCONDITIONS_VERIFIED:
@@ -159,6 +170,82 @@ def make_command(event: TransitionEvent, *, case_id: str = "case-001") -> Transi
             evaluator_version="deterministic-v1",
             trace_id="trace-001",
         )
+        assessment = InvestigationAssessment(
+            assessment_id="assessment-receipt-restart-recommended",
+            case_id=case_id,
+            trace_id="trace-001",
+            hypothesis=hypothesis,
+            evaluation=evaluation,
+            admitted_evidence_ids=("evidence-queue-001",),
+            missing_evidence_sources=(),
+            decision=InvestigationDecision.RECOMMEND_RECEIPT_RESTART,
+            reason_codes=("test-assessment",),
+            assessed_at=NOW + timedelta(minutes=1),
+        )
+        hypothesis = None
+        evaluation = None
+    investigation_decisions = {
+        TransitionEvent.EVIDENCE_REQUIRED: (
+            HypothesisType.RETRYABLE_MESSAGE,
+            HypothesisConclusion.NEEDS_EVIDENCE,
+            EvaluationDecision.MORE_EVIDENCE,
+            InvestigationDecision.REQUIRE_EVIDENCE,
+            ("MATERIAL_DOCUMENT",),
+        ),
+        TransitionEvent.ACTION_PROTECTED: (
+            HypothesisType.GENUINE_SHORT_SHIPMENT,
+            HypothesisConclusion.SUPPORTED,
+            EvaluationDecision.REJECT,
+            InvestigationDecision.PROTECT,
+            (),
+        ),
+        TransitionEvent.RECEIPT_ALREADY_POSTED: (
+            HypothesisType.ALREADY_POSTED,
+            HypothesisConclusion.SUPPORTED,
+            EvaluationDecision.ACCEPT,
+            InvestigationDecision.RECEIPT_ALREADY_POSTED,
+            (),
+        ),
+        TransitionEvent.INVESTIGATION_ASSESSED: (
+            HypothesisType.RETRYABLE_MESSAGE,
+            HypothesisConclusion.SUPPORTED,
+            EvaluationDecision.REJECT,
+            InvestigationDecision.EVALUATOR_REJECTED,
+            (),
+        ),
+    }
+    if event in investigation_decisions:
+        hypothesis_type, conclusion, decision, assessment_decision, missing = (
+            investigation_decisions[event]
+        )
+        outcome_hypothesis = HypothesisResult(
+            hypothesis_type=hypothesis_type,
+            conclusion=conclusion,
+            confidence_band=ConfidenceBand.HIGH,
+            supporting_evidence_ids=("evidence-queue-001",),
+            contradicting_evidence_ids=(),
+            missing_evidence=missing,
+        )
+        outcome_evaluation = EvaluationResult(
+            decision=decision,
+            validated_evidence_ids=("evidence-queue-001",),
+            failed_invariants=(() if decision is EvaluationDecision.ACCEPT else ("blocked",)),
+            allowed_next_action=None,
+            evaluator_version="deterministic-v1",
+            trace_id="trace-001",
+        )
+        assessment = InvestigationAssessment(
+            assessment_id=f"assessment-{event.value.lower()}",
+            case_id=case_id,
+            trace_id="trace-001",
+            hypothesis=outcome_hypothesis,
+            evaluation=outcome_evaluation,
+            admitted_evidence_ids=("evidence-queue-001",),
+            missing_evidence_sources=missing,
+            decision=assessment_decision,
+            reason_codes=("test-assessment",),
+            assessed_at=NOW + timedelta(minutes=1),
+        )
     return TransitionCommand(
         case_id=case_id,
         expected_version=3,
@@ -170,6 +257,7 @@ def make_command(event: TransitionEvent, *, case_id: str = "case-001") -> Transi
         closure_facts=closure_facts,
         hypothesis=hypothesis,
         evaluation=evaluation,
+        assessment=assessment,
     )
 
 

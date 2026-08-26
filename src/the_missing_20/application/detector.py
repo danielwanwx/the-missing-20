@@ -9,7 +9,7 @@ from typing import cast
 
 from pydantic import JsonValue
 
-from the_missing_20.domain.enterprise import ScenarioFixture
+from the_missing_20.domain.enterprise import EvidenceReadStatus, ScenarioFixture
 from the_missing_20.domain.events import TransitionCommand
 from the_missing_20.domain.execution import DetectionGenesis
 from the_missing_20.domain.models import (
@@ -53,10 +53,14 @@ class DiscrepancyDetector:
         occurred_at = self.clock.now()
         fixture = ScenarioFixture.model_validate_json(fixture_path.read_text(encoding="utf-8"))
         snapshot = self.enterprise.read_snapshot()
-        expected = snapshot.warehouse_receipt.quantity
+        expected = snapshot.purchase_order.ordered_quantity
         observed = snapshot.erp_receipt.quantity
         missing = expected - observed
-        if missing <= 0 or snapshot.invoice.quantity != expected:
+        if (
+            missing < 0
+            or snapshot.invoice.quantity != expected
+            or (missing == 0 and snapshot.invoice.state.value != "HELD")
+        ):
             raise ValueError("fixture does not contain the approved receipt discrepancy")
 
         provenance = EvidenceProvenance(
@@ -64,7 +68,7 @@ class DiscrepancyDetector:
             collection_method="fresh-read",
             collected_by="deterministic-detector",
         )
-        evidence_specs = (
+        evidence_specs = [
             (
                 f"{case_id}:warehouse",
                 EvidenceSourceType.WAREHOUSE,
@@ -89,17 +93,25 @@ class DiscrepancyDetector:
                 snapshot.invoice.invoice_id,
                 snapshot.invoice.model_dump(mode="json"),
             ),
-            (
-                f"{case_id}:material-documents",
-                EvidenceSourceType.MATERIAL_DOCUMENT,
-                snapshot.failed_message.message_id,
-                {
-                    "material_documents": [
-                        d.model_dump(mode="json") for d in snapshot.material_documents
-                    ]
-                },
-            ),
-        )
+        ]
+        document_read = self.enterprise.read_material_documents()
+        if document_read.status is EvidenceReadStatus.AVAILABLE:
+            evidence_specs.append(
+                (
+                    f"{case_id}:material-documents",
+                    EvidenceSourceType.MATERIAL_DOCUMENT,
+                    snapshot.failed_message.message_id,
+                    {
+                        "material_documents": [
+                            d.model_dump(mode="json") for d in document_read.documents
+                        ],
+                        "business_effects": [
+                            effect.model_dump(mode="json")
+                            for effect in document_read.business_effects
+                        ],
+                    },
+                )
+            )
         evidence = tuple(
             EvidenceItem(
                 evidence_id=evidence_id,
@@ -138,10 +150,14 @@ class DiscrepancyDetector:
             fixture_digest=fixture_digest,
             initial_case_json=case.model_dump_json(),
             detection_facts={
-                "warehouse_quantity": expected,
+                "ordered_quantity": expected,
+                "warehouse_quantity": snapshot.warehouse_receipt.quantity,
+                "physical_receipt_quantity": snapshot.warehouse_receipt.quantity,
                 "erp_receipt_quantity": observed,
                 "invoice_quantity": snapshot.invoice.quantity,
                 "missing_quantity": missing,
+                "material_document_source_status": document_read.status.value,
+                "material_document_source_reason": document_read.reason_code,
             },
             detector_evidence_ids=tuple(item.evidence_id for item in evidence),
             created_at=occurred_at,

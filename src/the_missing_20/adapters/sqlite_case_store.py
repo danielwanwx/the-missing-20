@@ -8,21 +8,31 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from the_missing_20.domain.assessment import validate_investigation_assessment
 from the_missing_20.domain.errors import IdempotencyConflict, InvalidEventPayload, VersionConflict
 from the_missing_20.domain.events import CaseEvent, TransitionCommand
 from the_missing_20.domain.execution import (
+    DecisionStage,
     DetectionGenesis,
     ExecutionAttempt,
     ExecutionAttemptStatus,
     GrantStatus,
     PolicyDecision,
+    PolicyOutcome,
 )
 from the_missing_20.domain.models import (
     ActionGrant,
     Approval,
     Case,
+    ClosureFacts,
+    EvaluationDecision,
     EvidenceItem,
     ExecutionReceipt,
+    HypothesisConclusion,
+    HypothesisType,
+    InvestigationAssessment,
+    InvestigationDecision,
+    validate_role_tool_pair,
 )
 from the_missing_20.domain.state_machine import advance_case
 from the_missing_20.domain.states import TRANSITIONS, TransitionEvent
@@ -211,6 +221,148 @@ class SQLiteCaseStore:
             connection.execute("BEGIN IMMEDIATE")
             return self._apply_transition(connection, command)
 
+    @staticmethod
+    def _validate_replay_payload(
+        connection: sqlite3.Connection,
+        event: CaseEvent,
+        payload: object,
+        case: Case,
+        admitted_evidence_ids: set[str],
+    ) -> None:
+        if not isinstance(payload, dict):
+            raise InvalidEventPayload("event payload must be a JSON object")
+        assessment_events = {
+            TransitionEvent.INVESTIGATION_ASSESSED: InvestigationDecision.EVALUATOR_REJECTED,
+            TransitionEvent.EVIDENCE_REQUIRED: InvestigationDecision.REQUIRE_EVIDENCE,
+            TransitionEvent.ACTION_PROTECTED: InvestigationDecision.PROTECT,
+            TransitionEvent.RECEIPT_ALREADY_POSTED: InvestigationDecision.RECEIPT_ALREADY_POSTED,
+            TransitionEvent.RECEIPT_RESTART_RECOMMENDED: (
+                InvestigationDecision.RECOMMEND_RECEIPT_RESTART
+            ),
+        }
+        if event.event in assessment_events:
+            if set(payload) != {"assessment"}:
+                raise InvalidEventPayload("assessment event payload is incomplete")
+            try:
+                assessment = InvestigationAssessment.model_validate_json(
+                    json.dumps(payload["assessment"])
+                )
+            except ValueError as exc:
+                raise InvalidEventPayload("assessment event payload is invalid") from exc
+            if (
+                assessment.case_id != event.case_id
+                or assessment.trace_id != event.trace_id
+                or assessment.evaluation.trace_id != event.trace_id
+                or assessment.decision is not assessment_events[event.event]
+                or not assessment.reason_codes
+                or set(assessment.admitted_evidence_ids) != admitted_evidence_ids
+                or not set(assessment.hypothesis.supporting_evidence_ids).issubset(
+                    admitted_evidence_ids
+                )
+                or not set(assessment.hypothesis.contradicting_evidence_ids).issubset(
+                    admitted_evidence_ids
+                )
+                or not set(assessment.evaluation.validated_evidence_ids).issubset(
+                    admitted_evidence_ids
+                )
+                or set(assessment.missing_evidence_sources)
+                != set(assessment.hypothesis.missing_evidence)
+            ):
+                raise InvalidEventPayload("assessment event payload does not match replay state")
+            evidence_rows = connection.execute(
+                "SELECT evidence_json FROM evidence WHERE case_id = ? ORDER BY rowid",
+                (event.case_id,),
+            ).fetchall()
+            validate_investigation_assessment(
+                assessment,
+                admitted_evidence=tuple(
+                    evidence
+                    for row in evidence_rows
+                    for evidence in (EvidenceItem.model_validate_json(row["evidence_json"]),)
+                    if evidence.evidence_id in admitted_evidence_ids
+                ),
+                trace_id=event.trace_id,
+            )
+            hypothesis = assessment.hypothesis
+            evaluation = assessment.evaluation
+            compatible = {
+                InvestigationDecision.RECOMMEND_RECEIPT_RESTART: (
+                    hypothesis.hypothesis_type is HypothesisType.RETRYABLE_MESSAGE
+                    and hypothesis.conclusion is HypothesisConclusion.SUPPORTED
+                    and evaluation.decision is EvaluationDecision.ACCEPT
+                    and evaluation.allowed_next_action is not None
+                    and evaluation.allowed_next_action.value == "restart_receipt_message"
+                    and not evaluation.failed_invariants
+                    and not hypothesis.missing_evidence
+                    and not hypothesis.contradicting_evidence_ids
+                ),
+                InvestigationDecision.RECEIPT_ALREADY_POSTED: (
+                    hypothesis.hypothesis_type is HypothesisType.ALREADY_POSTED
+                    and hypothesis.conclusion is HypothesisConclusion.SUPPORTED
+                    and evaluation.decision is EvaluationDecision.ACCEPT
+                    and evaluation.allowed_next_action is None
+                    and not evaluation.failed_invariants
+                ),
+                InvestigationDecision.REQUIRE_EVIDENCE: (
+                    hypothesis.conclusion is HypothesisConclusion.NEEDS_EVIDENCE
+                    and evaluation.decision is EvaluationDecision.MORE_EVIDENCE
+                    and bool(assessment.missing_evidence_sources)
+                    and evaluation.allowed_next_action is None
+                ),
+                InvestigationDecision.PROTECT: (
+                    hypothesis.hypothesis_type is HypothesisType.GENUINE_SHORT_SHIPMENT
+                    and hypothesis.conclusion is HypothesisConclusion.SUPPORTED
+                    and evaluation.decision is EvaluationDecision.REJECT
+                    and evaluation.allowed_next_action is None
+                    and not hypothesis.missing_evidence
+                ),
+                InvestigationDecision.EVALUATOR_REJECTED: (
+                    evaluation.decision is EvaluationDecision.REJECT
+                    and evaluation.allowed_next_action is None
+                ),
+            }[assessment.decision]
+            if not compatible:
+                raise InvalidEventPayload("assessment decision is incompatible on replay")
+            return
+        if event.event is TransitionEvent.EVIDENCE_ADMITTED:
+            if set(payload) != {"evidence"}:
+                raise InvalidEventPayload("evidence event payload is incomplete")
+            try:
+                evidence = EvidenceItem.model_validate_json(json.dumps(payload["evidence"]))
+            except ValueError as exc:
+                raise InvalidEventPayload("evidence event payload is invalid") from exc
+            if (
+                evidence.case_id != event.case_id
+                or evidence.trace_id != event.trace_id
+                or evidence.evidence_id in admitted_evidence_ids
+            ):
+                raise InvalidEventPayload("evidence event payload does not match replay state")
+            stored = connection.execute(
+                "SELECT evidence_json FROM evidence WHERE evidence_id = ?",
+                (evidence.evidence_id,),
+            ).fetchone()
+            if stored is None or (
+                EvidenceItem.model_validate_json(stored["evidence_json"]) != evidence
+            ):
+                raise InvalidEventPayload("replayed evidence is not the admitted evidence")
+            admitted_evidence_ids.add(evidence.evidence_id)
+            return
+        if event.event is TransitionEvent.INVOICE_POSTCONDITIONS_VERIFIED:
+            if set(payload) != {"closure_facts"}:
+                raise InvalidEventPayload("closure event payload is incomplete")
+            try:
+                closure = ClosureFacts.model_validate_json(json.dumps(payload["closure_facts"]))
+            except ValueError as exc:
+                raise InvalidEventPayload("closure event payload is invalid") from exc
+            if (
+                not closure.satisfies_closure()
+                or closure.expected_receipt_quantity != case.discrepancy.expected_quantity
+            ):
+                raise InvalidEventPayload("replayed closure facts are not valid")
+            return
+        if payload:
+            raise InvalidEventPayload("event payload is not allowed for this event")
+
     def replay_case(self, case_id: str) -> Case:
         with self._connect() as connection:
             genesis_row = connection.execute(
@@ -224,6 +376,7 @@ class SQLiteCaseStore:
                 raise InvalidEventPayload("genesis digest mismatch")
             genesis = DetectionGenesis.model_validate_json(genesis_row["genesis_json"])
             case = Case.model_validate_json(genesis.initial_case_json)
+            admitted_evidence_ids = set(genesis.detector_evidence_ids)
             rows = connection.execute(
                 "SELECT event_json FROM case_events WHERE case_id = ? ORDER BY new_version",
                 (case_id,),
@@ -234,10 +387,15 @@ class SQLiteCaseStore:
                 if _digest(payload) != event.payload_digest:
                     raise InvalidEventPayload("event payload digest mismatch")
                 if (
-                    event.prior_version != case.case_version
+                    event.case_id != case_id
+                    or event.trace_id != genesis.trace_id
+                    or event.prior_version != case.case_version
                     or event.prior_status is not case.status
                 ):
                     raise InvalidEventPayload("event does not follow the replayed projection")
+                self._validate_replay_payload(
+                    connection, event, payload, case, admitted_evidence_ids
+                )
                 expected_status = TRANSITIONS.get((case.status, event.event))
                 if expected_status is not event.new_status:
                     raise InvalidEventPayload("event transition is not allowed")
@@ -267,6 +425,33 @@ class SQLiteCaseStore:
                 ),
             )
 
+    def admit_evidence_with_transition(
+        self, evidence: EvidenceItem, transition: TransitionCommand
+    ) -> tuple[Case, CaseEvent]:
+        if evidence.case_id != transition.case_id or evidence.trace_id != transition.trace_id:
+            raise InvalidEventPayload("evidence and transition context must match")
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_trace(connection, evidence.case_id, evidence.trace_id)
+            existing = connection.execute(
+                "SELECT evidence_json FROM evidence WHERE evidence_id = ?",
+                (evidence.evidence_id,),
+            ).fetchone()
+            if existing is not None:
+                if EvidenceItem.model_validate_json(existing["evidence_json"]) != evidence:
+                    raise IdempotencyConflict("evidence ID was reused with different content")
+            else:
+                connection.execute(
+                    "INSERT INTO evidence VALUES (?, ?, ?, ?)",
+                    (
+                        evidence.evidence_id,
+                        evidence.case_id,
+                        evidence.trace_id,
+                        evidence.model_dump_json(),
+                    ),
+                )
+            return self._apply_transition(connection, transition)
+
     def list_evidence(self, case_id: str) -> tuple[EvidenceItem, ...]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -284,8 +469,17 @@ class SQLiteCaseStore:
         if not (
             approval.case_id == grant.case_id == transition.case_id
             and approval.trace_id == grant.trace_id == transition.trace_id
+            and approval.principal_id == grant.principal_id
+            and approval.role is grant.role
+            and approval.tool is grant.tool
+            and approval.case_version + 1 == grant.case_version
+            and approval.parameters_digest == _digest(grant.complete_parameters)
         ):
-            raise InvalidEventPayload("approval, grant, and transition context must match")
+            raise InvalidEventPayload("approval, grant, and transition binding does not match")
+        try:
+            validate_role_tool_pair(grant.role, grant.tool)
+        except ValueError as exc:
+            raise InvalidEventPayload("grant role and tool are not authorized together") from exc
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             updated, event = self._apply_transition(connection, transition)
@@ -405,11 +599,34 @@ class SQLiteCaseStore:
                     stored,
                 )
             grant_row = connection.execute(
-                "SELECT status FROM grants WHERE authorization_id = ?",
+                "SELECT status, grant_json FROM grants WHERE authorization_id = ?",
                 (attempt.authorization_id,),
             ).fetchone()
-            if grant_row is None or GrantStatus(grant_row["status"]) is not GrantStatus.ISSUED:
+            if grant_row is None:
                 raise IdempotencyConflict("authorization is not available for reservation")
+            grant = ActionGrant.model_validate_json(grant_row["grant_json"])
+            if GrantStatus(grant_row["status"]) is not GrantStatus.ISSUED:
+                raise IdempotencyConflict("authorization is not available for reservation")
+            try:
+                validate_role_tool_pair(grant.role, grant.tool)
+            except ValueError as exc:
+                raise InvalidEventPayload(
+                    "grant role and tool are not authorized together"
+                ) from exc
+            if (
+                decision.decision is not PolicyOutcome.ALLOW
+                or decision.decision_stage is not DecisionStage.EXECUTION_GATE
+                or decision.authorization_id != grant.authorization_id
+                or decision.execution_id != attempt.execution_id
+                or decision.principal_id != grant.principal_id
+                or decision.trusted_role is not grant.role
+                or decision.tool is not grant.tool
+                or attempt.authorization_id != grant.authorization_id
+                or attempt.case_id != grant.case_id
+                or attempt.trace_id != grant.trace_id
+                or attempt.tool is not grant.tool
+            ):
+                raise InvalidEventPayload("allow decision, grant, and attempt are not bound")
             updated, event = self._apply_transition(connection, transition)
             connection.execute(
                 "INSERT INTO policy_decisions VALUES (?, ?, ?, ?)",

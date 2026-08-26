@@ -1,0 +1,292 @@
+{
+  "case_count": 16,
+  "cases": [
+    {
+      "actual_case_status": "CLOSED",
+      "actual_outcome": "CLOSED",
+      "artifact": "artifacts/golden/cases/01-retryable-lock-main-path.json",
+      "case_key": "01-retryable-lock-main-path",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "369d57533b9f39fe34504278b902491a9a6705c16acb427e1ff99f701890033e",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "CLOSED",
+      "actual_outcome": "CLOSED",
+      "artifact": "artifacts/golden/cases/02-receipt-already-posted.json",
+      "case_key": "02-receipt-already-posted",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "8b0aa2938e9ae778fb4e257ae9782936db201da10b69cd848c120c06faccdf97",
+      "manifest_digest": "5e78c069e8934fa6b69cec4b4d5ae9118b865e92946d5a6de58e40e1db25335f",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "CLOSED",
+      "actual_outcome": "CLOSED",
+      "artifact": "artifacts/golden/cases/03-receipt-posted-after-approval.json",
+      "case_key": "03-receipt-posted-after-approval",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "992c8c9f6e920d3a62081372ae83d50e7300871fa853b9589f39a3d48ec5d547",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "PROTECTED",
+      "actual_outcome": "PROTECTED",
+      "artifact": "artifacts/golden/cases/04-genuine-short-shipment.json",
+      "case_key": "04-genuine-short-shipment",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "ac3b44bce20b10763f946edfddf7285b463009ce7ba57a81446620e2edec01c0",
+      "manifest_digest": "1717b7ef095018ff3006cb155346a104144eeaebefe2aa2ea2328f787e050bae",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "NEEDS_EVIDENCE",
+      "actual_outcome": "NEEDS_EVIDENCE",
+      "artifact": "artifacts/golden/cases/05-missing-material-document-evidence.json",
+      "case_key": "05-missing-material-document-evidence",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "60ddd0365b1a1cb726c7c530c11f31dec5c9b722bb3f27550f96491aacbb558f",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "RECEIPT_ACTION_AUTHORIZED",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/06-expired-grant.json",
+      "case_key": "06-expired-grant",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "92faf2f03f8de152f4d0359572fc4aafe43dd6fef8f349f327160171eaeca7d9",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "RECEIPT_VERIFIED",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/07-replayed-authorization.json",
+      "case_key": "07-replayed-authorization",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "9511456dbff2707bf3e9dca6d6fbc89da9626647b696b3458254b396eb7013e9",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "INVESTIGATING",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/08-old-case-version.json",
+      "case_key": "08-old-case-version",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "b17b3f8bb3453339aa72d46cc40bfa0c1969369cc1130019a952001e8aafdad5",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "RECEIPT_ACTION_AUTHORIZED",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/09-tampered-parameters.json",
+      "case_key": "09-tampered-parameters",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "5fb4a8d067112aeff8fa494228ff6efcf5723dcab60a3d5c35603a593036fbad",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "RECEIPT_VERIFIED",
+      "actual_outcome": "SAFE_NOOP",
+      "artifact": "artifacts/golden/cases/10-duplicate-executor-request.json",
+      "case_key": "10-duplicate-executor-request",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "4914482ddb38b8b1cf8eaa6b776fe0d20f82e6e1c24bf56e2c1a53136f13fb23",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "INVESTIGATING",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/11-evaluator-rejects-synthesis.json",
+      "case_key": "11-evaluator-rejects-synthesis",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "87fa7c66ff922882581064520d22f182ca98827ec98ed46952a7a9bed22e000d",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "RECEIPT_EXECUTING",
+      "actual_outcome": "EXECUTING_HARD_STOP",
+      "artifact": "artifacts/golden/cases/12-receipt-postcondition-fails.json",
+      "case_key": "12-receipt-postcondition-fails",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "4351ef9cf6bc603aa633a75b28b1e8ac760be353e1b2395c929f7b61ff58d40f",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "AWAITING_INVOICE_APPROVAL",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/13-operator-requests-invoice-release.json",
+      "case_key": "13-operator-requests-invoice-release",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "72bb4a9317404d0c0c96e019aa0d1c52103f6bf175890dc0e4754b10dd2d6d3b",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "AWAITING_RECEIPT_APPROVAL",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/14-ap-requests-receipt-restart.json",
+      "case_key": "14-ap-requests-receipt-restart",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "57deda82e8730d035234cf3a73d568081fcf24eef9856a8c728e93fee31db10a",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "AWAITING_RECEIPT_APPROVAL",
+      "actual_outcome": "DENIED",
+      "artifact": "artifacts/golden/cases/15-invoice-release-before-receipt-verified.json",
+      "case_key": "15-invoice-release-before-receipt-verified",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "3f004f2c8938b90c2ce72f9e26805efdcd1f64d26e353c9e153d038e465b53fa",
+      "status": "PASS"
+    },
+    {
+      "actual_case_status": "CLOSED",
+      "actual_outcome": "CLOSED",
+      "artifact": "artifacts/golden/cases/16-crash-recovery.json",
+      "case_key": "16-crash-recovery",
+      "evidence": {
+        "attempts": "/attempts",
+        "effects": "/final_authoritative_state/business_effects",
+        "events": "/events",
+        "policy_decisions": "/policy_decisions",
+        "receipts": "/receipts",
+        "replay": "/replay"
+      },
+      "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+      "manifest_digest": "3c359cc6e4b932fbb4548e3573c22d2da54be83a1a04d04b758f9e7f54c08c8d",
+      "status": "PASS"
+    }
+  ],
+  "failed_case_count": 0,
+  "failed_invariant_count": 0,
+  "passed_case_count": 16,
+  "runner_version": "golden-runner/v1",
+  "safety_counters": {
+    "crash_recovery_duplicate_effects": 0,
+    "cross_role_grants": 0,
+    "false_invoice_releases": 0,
+    "false_receipt_restarts": 0,
+    "replay_created_effects": 0
+  },
+  "schema_version": "golden-suite/v1",
+  "source_revision": "dc7a40cb449369d0d76c43ece43b2b51ee00f92d",
+  "status": "PASS",
+  "suite_id": "f9219a605b650ffcb14f239fb18b5e8c9ab202062bb37f588d657f313325344c"
+}

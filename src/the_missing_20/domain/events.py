@@ -12,6 +12,7 @@ from the_missing_20.domain.models import (
     EvaluationResult,
     EvidenceItem,
     HypothesisResult,
+    InvestigationAssessment,
     NonEmptyStr,
 )
 from the_missing_20.domain.states import CaseStatus, TransitionEvent
@@ -30,6 +31,7 @@ class TransitionCommand(ContractModel):
     closure_facts: ClosureFacts | None = None
     hypothesis: HypothesisResult | None = None
     evaluation: EvaluationResult | None = None
+    assessment: InvestigationAssessment | None = None
 
     @model_validator(mode="after")
     def payload_matches_event(self) -> TransitionCommand:
@@ -39,27 +41,42 @@ class TransitionCommand(ContractModel):
                 or self.closure_facts is not None
                 or self.hypothesis is not None
                 or self.evaluation is not None
+                or self.assessment is not None
             ):
                 raise ValueError("EVIDENCE_ADMITTED requires only typed evidence")
-        elif self.event is TransitionEvent.RECEIPT_RESTART_RECOMMENDED:
+        elif self.event in {
+            TransitionEvent.INVESTIGATION_ASSESSED,
+            TransitionEvent.EVIDENCE_REQUIRED,
+            TransitionEvent.ACTION_PROTECTED,
+            TransitionEvent.RECEIPT_ALREADY_POSTED,
+            TransitionEvent.RECEIPT_RESTART_RECOMMENDED,
+        }:
             if (
-                self.hypothesis is None
-                or self.evaluation is None
+                self.assessment is None
                 or self.evidence is not None
                 or self.closure_facts is not None
+                or self.hypothesis is not None
+                or self.evaluation is not None
             ):
-                raise ValueError("RECEIPT_RESTART_RECOMMENDED requires hypothesis and evaluation")
+                raise ValueError("investigation outcome requires only an assessment")
         elif self.event is TransitionEvent.INVOICE_POSTCONDITIONS_VERIFIED:
             if (
                 self.closure_facts is None
                 or self.evidence is not None
                 or self.hypothesis is not None
                 or self.evaluation is not None
+                or self.assessment is not None
             ):
                 raise ValueError("INVOICE_POSTCONDITIONS_VERIFIED requires only closure_facts")
         elif any(
             value is not None
-            for value in (self.evidence, self.closure_facts, self.hypothesis, self.evaluation)
+            for value in (
+                self.evidence,
+                self.closure_facts,
+                self.hypothesis,
+                self.evaluation,
+                self.assessment,
+            )
         ):
             raise ValueError("this transition event does not accept a payload")
         return self

@@ -12,20 +12,17 @@ from the_missing_20.domain.errors import (
     VersionConflict,
 )
 from the_missing_20.domain.events import CaseEvent, TransitionCommand
-from the_missing_20.domain.models import Case
+from the_missing_20.domain.models import Case, InvestigationDecision
 from the_missing_20.domain.states import TRANSITIONS, TransitionEvent
 
 
 def _payload(command: TransitionCommand) -> dict[str, Any]:
     if command.evidence is not None:
         return {"evidence": command.evidence.model_dump(mode="json")}
+    if command.assessment is not None:
+        return {"assessment": command.assessment.model_dump(mode="json")}
     if command.closure_facts is not None:
         return {"closure_facts": command.closure_facts.model_dump(mode="json")}
-    if command.hypothesis is not None and command.evaluation is not None:
-        return {
-            "hypothesis": command.hypothesis.model_dump(mode="json"),
-            "evaluation": command.evaluation.model_dump(mode="json"),
-        }
     return {}
 
 
@@ -66,6 +63,31 @@ def advance_case(case: Case, command: TransitionCommand) -> tuple[Case, CaseEven
         command.evidence is None or command.evidence.case_id != case.case_id
     ):
         raise InvalidEventPayload("admitted evidence must match the current case")
+    if command.event in {
+        TransitionEvent.INVESTIGATION_ASSESSED,
+        TransitionEvent.EVIDENCE_REQUIRED,
+        TransitionEvent.ACTION_PROTECTED,
+        TransitionEvent.RECEIPT_ALREADY_POSTED,
+        TransitionEvent.RECEIPT_RESTART_RECOMMENDED,
+    }:
+        if command.assessment is None:
+            raise InvalidEventPayload("investigation transition requires an assessment")
+        if (
+            command.assessment.case_id != case.case_id
+            or command.assessment.trace_id != command.trace_id
+        ):
+            raise InvalidEventPayload("assessment must match the current case and trace")
+        expected_decision = {
+            TransitionEvent.INVESTIGATION_ASSESSED: InvestigationDecision.EVALUATOR_REJECTED,
+            TransitionEvent.EVIDENCE_REQUIRED: InvestigationDecision.REQUIRE_EVIDENCE,
+            TransitionEvent.ACTION_PROTECTED: InvestigationDecision.PROTECT,
+            TransitionEvent.RECEIPT_ALREADY_POSTED: InvestigationDecision.RECEIPT_ALREADY_POSTED,
+            TransitionEvent.RECEIPT_RESTART_RECOMMENDED: (
+                InvestigationDecision.RECOMMEND_RECEIPT_RESTART
+            ),
+        }[command.event]
+        if command.assessment.decision is not expected_decision:
+            raise InvalidEventPayload("assessment decision does not match the transition event")
     if command.event is TransitionEvent.INVOICE_POSTCONDITIONS_VERIFIED and (
         command.closure_facts is None or not command.closure_facts.satisfies_closure()
     ):

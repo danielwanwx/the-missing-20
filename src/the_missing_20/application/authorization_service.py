@@ -25,6 +25,7 @@ from the_missing_20.domain.models import (
     ApprovalDecision,
     EvidenceItem,
     HumanRole,
+    validate_role_tool_pair,
 )
 from the_missing_20.domain.states import CaseStatus, TransitionEvent
 from the_missing_20.ports.case_store import CaseStore
@@ -147,7 +148,15 @@ class AuthorizationService:
             ),
         }[tool]
         required_role, required_status, accepted_event = required
-        if identity.role is not required_role or case.status is not required_status:
+        denial_reasons = tuple(
+            reason
+            for reason, denied in (
+                ("ROLE_NOT_AUTHORIZED", identity.role is not required_role),
+                ("CASE_STATUS_NOT_ELIGIBLE", case.status is not required_status),
+            )
+            if denied
+        )
+        if denial_reasons:
             denied_action_digest = action_digest(
                 case_id=case_id,
                 case_version=case.case_version,
@@ -169,7 +178,7 @@ class AuthorizationService:
                     tool=tool,
                     decision=PolicyOutcome.DENY,
                     decision_stage=DecisionStage.APPROVAL_GATE,
-                    reason_codes=("ROLE_OR_CASE_STATUS_NOT_ELIGIBLE",),
+                    reason_codes=denial_reasons,
                     case_version=case.case_version,
                     parameters_digest=parameter_digest,
                     evidence_digest=admitted_digest,
@@ -273,6 +282,10 @@ class LocalPolicy:
             ActionTool.RELEASE_INVOICE: CaseStatus.INVOICE_ACTION_AUTHORIZED,
         }[grant.tool]
         reasons: list[str] = []
+        try:
+            validate_role_tool_pair(grant.role, grant.tool)
+        except ValueError:
+            reasons.append("ROLE_TOOL_MISMATCH")
         if identity.principal_id != grant.principal_id or identity.role is not grant.role:
             reasons.append("IDENTITY_MISMATCH")
         if case.case_version != grant.case_version or case.status is not required_status:
@@ -334,6 +347,10 @@ class LocalPolicy:
             ActionTool.RELEASE_INVOICE: ReleaseInvoiceParameters,
         }[grant.tool]
         reasons: list[str] = []
+        try:
+            validate_role_tool_pair(grant.role, grant.tool)
+        except ValueError:
+            reasons.append("ROLE_TOOL_MISMATCH")
         if type(parameters) is not expected_parameter_type:
             reasons.append("TOOL_PARAMETER_MISMATCH")
         if identity.principal_id != grant.principal_id or identity.role is not grant.role:

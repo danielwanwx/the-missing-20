@@ -9,6 +9,7 @@ from the_missing_20.domain.enterprise import (
     BusinessEffect,
     EnterpriseMutationResult,
     EnterpriseSnapshot,
+    MaterialDocumentRead,
 )
 from the_missing_20.domain.execution import (
     ReleaseInvoiceParameters,
@@ -18,6 +19,8 @@ from the_missing_20.domain.execution import (
 
 class EnterpriseSystems(Protocol):
     def read_snapshot(self) -> EnterpriseSnapshot: ...
+
+    def read_material_documents(self) -> MaterialDocumentRead: ...
 
     def restart_receipt_message(
         self,

@@ -15,6 +15,12 @@ from the_missing_20.domain.models import (
     PositiveInt,
 )
 
+EXTERNAL_ID_NAMESPACE = "external:"
+
+
+def uses_external_id_namespace(value: str) -> bool:
+    return value.startswith(EXTERNAL_ID_NAMESPACE)
+
 
 class DecisionStage(StrEnum):
     APPROVAL_GATE = "APPROVAL_GATE"

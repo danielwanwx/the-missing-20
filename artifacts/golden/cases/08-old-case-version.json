@@ -1,0 +1,750 @@
+{
+  "actual_outcome": "DENIED",
+  "actual_reason_codes": [
+    "ACTION_DIGEST_MISMATCH",
+    "CASE_VERSION_OR_STATUS_MISMATCH",
+    "EVIDENCE_DIGEST_MISMATCH",
+    "RETRYABLE_MESSAGE"
+  ],
+  "approvals": [
+    {
+      "approval_id": "approval-receipt-08-old-case-version",
+      "case_id": "case-08-old-case-version",
+      "case_version": 3,
+      "decided_at": "2026-08-25T17:00:00Z",
+      "decision": "APPROVED",
+      "parameters_digest": "fb1f6a56e5f58c43678d472a9554ffd5674163be924deaca56617f7520c608b2",
+      "principal_id": "operator-001",
+      "role": "INTEGRATION_OPERATOR",
+      "tool": "restart_receipt_message",
+      "trace_id": "trace-08-old-case-version"
+    }
+  ],
+  "assessments": [
+    {
+      "admitted_evidence_ids": [
+        "case-08-old-case-version:erp-receipt",
+        "case-08-old-case-version:failed-message",
+        "case-08-old-case-version:invoice",
+        "case-08-old-case-version:material-documents",
+        "case-08-old-case-version:warehouse"
+      ],
+      "assessed_at": "2026-08-25T17:00:00Z",
+      "assessment_id": "assessment-08-old-case-version",
+      "case_id": "case-08-old-case-version",
+      "decision": "RECOMMEND_RECEIPT_RESTART",
+      "evaluation": {
+        "allowed_next_action": "restart_receipt_message",
+        "decision": "ACCEPT",
+        "evaluator_version": "deterministic-v1",
+        "failed_invariants": [],
+        "trace_id": "trace-08-old-case-version",
+        "validated_evidence_ids": [
+          "case-08-old-case-version:erp-receipt",
+          "case-08-old-case-version:failed-message",
+          "case-08-old-case-version:invoice",
+          "case-08-old-case-version:material-documents",
+          "case-08-old-case-version:warehouse"
+        ]
+      },
+      "hypothesis": {
+        "conclusion": "SUPPORTED",
+        "confidence_band": "HIGH",
+        "contradicting_evidence_ids": [],
+        "hypothesis_type": "RETRYABLE_MESSAGE",
+        "missing_evidence": [],
+        "supporting_evidence_ids": [
+          "case-08-old-case-version:erp-receipt",
+          "case-08-old-case-version:failed-message",
+          "case-08-old-case-version:invoice",
+          "case-08-old-case-version:material-documents",
+          "case-08-old-case-version:warehouse"
+        ]
+      },
+      "missing_evidence_sources": [],
+      "reason_codes": [
+        "RETRYABLE_MESSAGE"
+      ],
+      "trace_id": "trace-08-old-case-version"
+    }
+  ],
+  "attempts": [],
+  "baseline_authoritative_state": {
+    "business_effects": [],
+    "erp_receipt": {
+      "line_id": "10",
+      "purchase_order_id": "PO-10001",
+      "quantity": 80,
+      "revision": 8
+    },
+    "failed_message": {
+      "consumed_by_execution_id": null,
+      "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+      "line_id": "10",
+      "lock_cleared": true,
+      "message_id": "RECEIPT-MESSAGE-020",
+      "purchase_order_id": "PO-10001",
+      "quantity": 20,
+      "retry_eligible": true,
+      "revision": 3,
+      "status": "FAILED"
+    },
+    "invoice": {
+      "hold_reason": "RECEIPT_MISMATCH",
+      "invoice_id": "INV-10001",
+      "line_id": "10",
+      "other_blocking_holds": [],
+      "purchase_order_id": "PO-10001",
+      "quantity": 100,
+      "released_by_execution_id": null,
+      "revision": 4,
+      "state": "HELD"
+    },
+    "material_documents": [],
+    "purchase_order": {
+      "line_id": "10",
+      "ordered_quantity": 100,
+      "purchase_order_id": "PO-10001",
+      "unit": "EA"
+    },
+    "warehouse_receipt": {
+      "line_id": "10",
+      "purchase_order_id": "PO-10001",
+      "quantity": 100,
+      "receipt_id": "WH-RECEIPT-10001-10"
+    }
+  },
+  "case_id": "case-08-old-case-version",
+  "case_key": "08-old-case-version",
+  "diagnosis": {
+    "evaluation": {
+      "allowed_next_action": "restart_receipt_message",
+      "decision": "ACCEPT",
+      "evaluator_version": "deterministic-v1",
+      "failed_invariants": [],
+      "trace_id": "trace-08-old-case-version",
+      "validated_evidence_ids": [
+        "case-08-old-case-version:erp-receipt",
+        "case-08-old-case-version:failed-message",
+        "case-08-old-case-version:invoice",
+        "case-08-old-case-version:material-documents",
+        "case-08-old-case-version:warehouse"
+      ]
+    },
+    "hypothesis": {
+      "conclusion": "SUPPORTED",
+      "confidence_band": "HIGH",
+      "contradicting_evidence_ids": [],
+      "hypothesis_type": "RETRYABLE_MESSAGE",
+      "missing_evidence": [],
+      "supporting_evidence_ids": [
+        "case-08-old-case-version:erp-receipt",
+        "case-08-old-case-version:failed-message",
+        "case-08-old-case-version:invoice",
+        "case-08-old-case-version:material-documents",
+        "case-08-old-case-version:warehouse"
+      ]
+    }
+  },
+  "effect_delta": [],
+  "effect_provenance": {
+    "external": [],
+    "local": []
+  },
+  "events": [
+    {
+      "case_id": "case-08-old-case-version",
+      "event": "INVESTIGATION_STARTED",
+      "event_id": "evt_6e87788cc8c95239dc8cb8aa4de1c751",
+      "idempotency_key": "case-investigation-started",
+      "new_status": "INVESTIGATING",
+      "new_version": 1,
+      "occurred_at": "2026-08-25T17:00:00Z",
+      "payload_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "payload_json": "{}",
+      "prior_status": "OPEN",
+      "prior_version": 0,
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "case_id": "case-08-old-case-version",
+      "event": "RECEIPT_RESTART_RECOMMENDED",
+      "event_id": "evt_297b20a310066417f8f454b49f148b10",
+      "idempotency_key": "assessment:08-old-case-version",
+      "new_status": "RECEIPT_RESTART_RECOMMENDED",
+      "new_version": 2,
+      "occurred_at": "2026-08-25T17:00:00Z",
+      "payload_digest": "ca1f881f51d020df9446c83f7b1bf48c3649f6c998f5252867d89c893a2b88d6",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-08-old-case-version:erp-receipt\",\"case-08-old-case-version:failed-message\",\"case-08-old-case-version:invoice\",\"case-08-old-case-version:material-documents\",\"case-08-old-case-version:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-08-old-case-version\",\"case_id\":\"case-08-old-case-version\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-08-old-case-version\",\"validated_evidence_ids\":[\"case-08-old-case-version:erp-receipt\",\"case-08-old-case-version:failed-message\",\"case-08-old-case-version:invoice\",\"case-08-old-case-version:material-documents\",\"case-08-old-case-version:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-08-old-case-version:erp-receipt\",\"case-08-old-case-version:failed-message\",\"case-08-old-case-version:invoice\",\"case-08-old-case-version:material-documents\",\"case-08-old-case-version:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-08-old-case-version\"}}",
+      "prior_status": "INVESTIGATING",
+      "prior_version": 1,
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "case_id": "case-08-old-case-version",
+      "event": "RECEIPT_APPROVAL_REQUESTED",
+      "event_id": "evt_a18bedaa05aeb94c1ba9cf5dafce301c",
+      "idempotency_key": "receipt-approval-request:08-old-case-version",
+      "new_status": "AWAITING_RECEIPT_APPROVAL",
+      "new_version": 3,
+      "occurred_at": "2026-08-25T17:00:00Z",
+      "payload_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "payload_json": "{}",
+      "prior_status": "RECEIPT_RESTART_RECOMMENDED",
+      "prior_version": 2,
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "case_id": "case-08-old-case-version",
+      "event": "RECEIPT_APPROVAL_ACCEPTED",
+      "event_id": "evt_4faca849755368c7a58ed48b41199789",
+      "idempotency_key": "approval:approval-receipt-08-old-case-version",
+      "new_status": "RECEIPT_ACTION_AUTHORIZED",
+      "new_version": 4,
+      "occurred_at": "2026-08-25T17:00:00Z",
+      "payload_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "payload_json": "{}",
+      "prior_status": "AWAITING_RECEIPT_APPROVAL",
+      "prior_version": 3,
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "case_id": "case-08-old-case-version",
+      "event": "EVIDENCE_ADMITTED",
+      "event_id": "evt_25d49784fe910ac19c9bad42546e40ec",
+      "idempotency_key": "admit:08-old-case-version",
+      "new_status": "INVESTIGATING",
+      "new_version": 5,
+      "occurred_at": "2026-08-25T17:00:00Z",
+      "payload_digest": "dc93d2465d306d4b0af68eb56b328050159234d64a69e74d523b28c0572231dd",
+      "payload_json": "{\"evidence\":{\"admitted_fields\":{\"consumed_by_execution_id\":null,\"error_code\":\"DOCUMENT_LOCKED_RETRYABLE\",\"line_id\":\"10\",\"lock_cleared\":true,\"message_id\":\"RECEIPT-MESSAGE-020\",\"purchase_order_id\":\"PO-10001\",\"quantity\":20,\"retry_eligible\":true,\"revision\":4,\"status\":\"FAILED\"},\"case_id\":\"case-08-old-case-version\",\"content_digest\":\"b3a22bd589e2c03251ffe90c3ed336095bf59655d937c60a05665c1b62fad5fa\",\"evidence_id\":\"case-08-old-case-version:current-state-update\",\"observed_at\":\"2026-08-25T17:00:00Z\",\"provenance\":{\"collected_by\":\"deterministic-enterprise-reader\",\"collection_method\":\"fresh-read\",\"source_system\":\"synthetic-enterprise-sqlite\"},\"source_record_id\":\"RECEIPT-MESSAGE-020\",\"source_type\":\"FAILED_MESSAGE_QUEUE\",\"subject\":\"failed_message_queue\",\"trace_id\":\"trace-08-old-case-version\"}}",
+      "prior_status": "RECEIPT_ACTION_AUTHORIZED",
+      "prior_version": 4,
+      "trace_id": "trace-08-old-case-version"
+    }
+  ],
+  "evidence": [
+    {
+      "admitted_fields": {
+        "consumed_by_execution_id": null,
+        "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+        "line_id": "10",
+        "lock_cleared": true,
+        "message_id": "RECEIPT-MESSAGE-020",
+        "purchase_order_id": "PO-10001",
+        "quantity": 20,
+        "retry_eligible": true,
+        "revision": 4,
+        "status": "FAILED"
+      },
+      "case_id": "case-08-old-case-version",
+      "content_digest": "b3a22bd589e2c03251ffe90c3ed336095bf59655d937c60a05665c1b62fad5fa",
+      "evidence_id": "case-08-old-case-version:current-state-update",
+      "observed_at": "2026-08-25T17:00:00Z",
+      "provenance": {
+        "collected_by": "deterministic-enterprise-reader",
+        "collection_method": "fresh-read",
+        "source_system": "synthetic-enterprise-sqlite"
+      },
+      "source_record_id": "RECEIPT-MESSAGE-020",
+      "source_type": "FAILED_MESSAGE_QUEUE",
+      "subject": "failed_message_queue",
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "admitted_fields": {
+        "line_id": "10",
+        "purchase_order_id": "PO-10001",
+        "quantity": 80,
+        "revision": 8
+      },
+      "case_id": "case-08-old-case-version",
+      "content_digest": "67b026545aab0336c6398304511f1a179eb4e4368d786d7a7abc436956b091a0",
+      "evidence_id": "case-08-old-case-version:erp-receipt",
+      "observed_at": "2026-08-25T17:00:00Z",
+      "provenance": {
+        "collected_by": "deterministic-detector",
+        "collection_method": "fresh-read",
+        "source_system": "synthetic-enterprise-sqlite"
+      },
+      "source_record_id": "PO-10001:10",
+      "source_type": "ERP_RECEIPT",
+      "subject": "erp_receipt",
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "admitted_fields": {
+        "consumed_by_execution_id": null,
+        "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+        "line_id": "10",
+        "lock_cleared": true,
+        "message_id": "RECEIPT-MESSAGE-020",
+        "purchase_order_id": "PO-10001",
+        "quantity": 20,
+        "retry_eligible": true,
+        "revision": 3,
+        "status": "FAILED"
+      },
+      "case_id": "case-08-old-case-version",
+      "content_digest": "93c914aa8d23eef568faa94eae2de3bd5c32f58e7df4efff290777d0f3c3d5db",
+      "evidence_id": "case-08-old-case-version:failed-message",
+      "observed_at": "2026-08-25T17:00:00Z",
+      "provenance": {
+        "collected_by": "deterministic-detector",
+        "collection_method": "fresh-read",
+        "source_system": "synthetic-enterprise-sqlite"
+      },
+      "source_record_id": "RECEIPT-MESSAGE-020",
+      "source_type": "FAILED_MESSAGE_QUEUE",
+      "subject": "failed_message_queue",
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "admitted_fields": {
+        "hold_reason": "RECEIPT_MISMATCH",
+        "invoice_id": "INV-10001",
+        "line_id": "10",
+        "other_blocking_holds": [],
+        "purchase_order_id": "PO-10001",
+        "quantity": 100,
+        "released_by_execution_id": null,
+        "revision": 4,
+        "state": "HELD"
+      },
+      "case_id": "case-08-old-case-version",
+      "content_digest": "c31fb9f4962d52d172351638016dafd4d1cbb56e7f98d9ce192bc0e751b729c1",
+      "evidence_id": "case-08-old-case-version:invoice",
+      "observed_at": "2026-08-25T17:00:00Z",
+      "provenance": {
+        "collected_by": "deterministic-detector",
+        "collection_method": "fresh-read",
+        "source_system": "synthetic-enterprise-sqlite"
+      },
+      "source_record_id": "INV-10001",
+      "source_type": "INVOICE",
+      "subject": "invoice",
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "admitted_fields": {
+        "business_effects": [],
+        "material_documents": []
+      },
+      "case_id": "case-08-old-case-version",
+      "content_digest": "296fc3c5452815b4f6953b849139e8ae7c33395e0a79e7f58d993348d798aa45",
+      "evidence_id": "case-08-old-case-version:material-documents",
+      "observed_at": "2026-08-25T17:00:00Z",
+      "provenance": {
+        "collected_by": "deterministic-detector",
+        "collection_method": "fresh-read",
+        "source_system": "synthetic-enterprise-sqlite"
+      },
+      "source_record_id": "RECEIPT-MESSAGE-020",
+      "source_type": "MATERIAL_DOCUMENT",
+      "subject": "material_document",
+      "trace_id": "trace-08-old-case-version"
+    },
+    {
+      "admitted_fields": {
+        "line_id": "10",
+        "purchase_order_id": "PO-10001",
+        "quantity": 100,
+        "receipt_id": "WH-RECEIPT-10001-10"
+      },
+      "case_id": "case-08-old-case-version",
+      "content_digest": "c5736159fecb922c49885f89a151d673b4379261feb7d5ca3acbf06a902bfb3e",
+      "evidence_id": "case-08-old-case-version:warehouse",
+      "observed_at": "2026-08-25T17:00:00Z",
+      "provenance": {
+        "collected_by": "deterministic-detector",
+        "collection_method": "fresh-read",
+        "source_system": "synthetic-enterprise-sqlite"
+      },
+      "source_record_id": "WH-RECEIPT-10001-10",
+      "source_type": "WAREHOUSE",
+      "subject": "warehouse",
+      "trace_id": "trace-08-old-case-version"
+    }
+  ],
+  "expected": {
+    "case_status": "INVESTIGATING",
+    "hypothesis": "RETRYABLE_MESSAGE",
+    "invoice_action_eligible": false,
+    "invoice_effect_count": 0,
+    "outcome": "DENIED",
+    "reason_code": "CASE_VERSION_OR_STATUS_MISMATCH",
+    "receipt_action_eligible": false,
+    "receipt_effect_count": 0
+  },
+  "final_authoritative_state": {
+    "business_effects": [],
+    "erp_receipt": {
+      "line_id": "10",
+      "purchase_order_id": "PO-10001",
+      "quantity": 80,
+      "revision": 8
+    },
+    "failed_message": {
+      "consumed_by_execution_id": null,
+      "error_code": "DOCUMENT_LOCKED_RETRYABLE",
+      "line_id": "10",
+      "lock_cleared": true,
+      "message_id": "RECEIPT-MESSAGE-020",
+      "purchase_order_id": "PO-10001",
+      "quantity": 20,
+      "retry_eligible": true,
+      "revision": 4,
+      "status": "FAILED"
+    },
+    "invoice": {
+      "hold_reason": "RECEIPT_MISMATCH",
+      "invoice_id": "INV-10001",
+      "line_id": "10",
+      "other_blocking_holds": [],
+      "purchase_order_id": "PO-10001",
+      "quantity": 100,
+      "released_by_execution_id": null,
+      "revision": 4,
+      "state": "HELD"
+    },
+    "material_documents": [],
+    "purchase_order": {
+      "line_id": "10",
+      "ordered_quantity": 100,
+      "purchase_order_id": "PO-10001",
+      "unit": "EA"
+    },
+    "warehouse_receipt": {
+      "line_id": "10",
+      "purchase_order_id": "PO-10001",
+      "quantity": 100,
+      "receipt_id": "WH-RECEIPT-10001-10"
+    }
+  },
+  "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+  "fixture_loaded": true,
+  "genesis": {
+    "case_id": "case-08-old-case-version",
+    "created_at": "2026-08-25T17:00:00Z",
+    "detection_facts": {
+      "erp_receipt_quantity": 80,
+      "invoice_quantity": 100,
+      "material_document_source_reason": null,
+      "material_document_source_status": "AVAILABLE",
+      "missing_quantity": 20,
+      "ordered_quantity": 100,
+      "physical_receipt_quantity": 100,
+      "warehouse_quantity": 100
+    },
+    "detector_evidence_ids": [
+      "case-08-old-case-version:warehouse",
+      "case-08-old-case-version:erp-receipt",
+      "case-08-old-case-version:failed-message",
+      "case-08-old-case-version:invoice",
+      "case-08-old-case-version:material-documents"
+    ],
+    "fixture_digest": "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf",
+    "fixture_path": "fixtures/scenarios/retryable-document-lock.json",
+    "initial_case_json": "{\"case_id\":\"case-08-old-case-version\",\"case_version\":0,\"scenario_id\":\"retryable-document-lock\",\"status\":\"OPEN\",\"discrepancy\":{\"expected_quantity\":100,\"observed_quantity\":80,\"missing_quantity\":20,\"unit\":\"EA\"},\"current_evidence_revision\":0,\"created_at\":\"2026-08-25T17:00:00Z\",\"updated_at\":\"2026-08-25T17:00:00Z\"}",
+    "trace_id": "trace-08-old-case-version"
+  },
+  "grants": [
+    {
+      "action_digest": "76e02c34e8d06c988fb12a173369383891895bf45851483e566b86b2a654b4b6",
+      "authorization_id": "authorization-receipt-08-old-case-version",
+      "case_id": "case-08-old-case-version",
+      "case_version": 4,
+      "complete_parameters": {
+        "expected_error_code": "DOCUMENT_LOCKED_RETRYABLE",
+        "expected_message_status": "FAILED",
+        "line_id": "10",
+        "message_id": "RECEIPT-MESSAGE-020",
+        "message_revision": 3,
+        "purchase_order_id": "PO-10001",
+        "quantity": 20
+      },
+      "evidence_digest": "166a158d6e5efc60effcdac0279e1fcc066d4ad2af315f3ab32a6437c59af7d3",
+      "expires_at": "2026-08-25T17:05:00Z",
+      "issued_at": "2026-08-25T17:00:00Z",
+      "principal_id": "operator-001",
+      "role": "INTEGRATION_OPERATOR",
+      "signature": "[REDACTED]",
+      "tool": "restart_receipt_message",
+      "trace_id": "trace-08-old-case-version"
+    }
+  ],
+  "invariants": [
+    {
+      "evidence": "/manifest_digest",
+      "expected": true,
+      "name": "manifest_digest_matches",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/fixture_loaded",
+      "expected": true,
+      "name": "fixture_was_loaded",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/sqlite_proof",
+      "expected": true,
+      "name": "real_sqlite_databases_exist",
+      "observed": {
+        "case_database_created": true,
+        "enterprise_database_created": true,
+        "reopened_before_final_read": true
+      },
+      "passed": true
+    },
+    {
+      "evidence": "/case_id",
+      "expected": true,
+      "name": "case_and_trace_identity_consistent",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/replay/verified",
+      "expected": true,
+      "name": "audit_chain_replays",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/replayed_projection",
+      "expected": true,
+      "name": "projection_matches_replay",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/effect_provenance/local",
+      "expected": true,
+      "name": "local_effects_link_to_attempts_authorizations_and_receipts",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/effect_provenance/external",
+      "expected": true,
+      "name": "external_effects_link_to_authoritative_source_history",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/receipts",
+      "expected": true,
+      "name": "safe_noop_receipts_link_local_attempt_to_external_effect",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/final_authoritative_state",
+      "expected": true,
+      "name": "authoritative_snapshot_matches_report",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/effect_delta",
+      "expected": true,
+      "name": "no_unauthorized_business_effects",
+      "observed": true,
+      "passed": true
+    },
+    {
+      "evidence": "/actual_outcome",
+      "expected": "DENIED",
+      "name": "expected_outcome",
+      "observed": "DENIED",
+      "passed": true
+    },
+    {
+      "evidence": "/stored_projection/status",
+      "expected": "INVESTIGATING",
+      "name": "expected_case_status",
+      "observed": "INVESTIGATING",
+      "passed": true
+    },
+    {
+      "evidence": "/safety_calculation/local_effect_counts",
+      "expected": {
+        "invoice": 0,
+        "receipt": 0
+      },
+      "name": "expected_effect_counts",
+      "observed": {
+        "invoice": 0,
+        "receipt": 0
+      },
+      "passed": true
+    },
+    {
+      "evidence": "/diagnosis/hypothesis",
+      "expected": "RETRYABLE_MESSAGE",
+      "name": "expected_hypothesis",
+      "observed": "RETRYABLE_MESSAGE",
+      "passed": true
+    },
+    {
+      "evidence": "/actual_reason_codes",
+      "expected": "CASE_VERSION_OR_STATUS_MISMATCH",
+      "name": "expected_reason_code",
+      "observed": [
+        "ACTION_DIGEST_MISMATCH",
+        "CASE_VERSION_OR_STATUS_MISMATCH",
+        "EVIDENCE_DIGEST_MISMATCH",
+        "RETRYABLE_MESSAGE"
+      ],
+      "passed": true
+    }
+  ],
+  "manifest": {
+    "case_key": "08-old-case-version",
+    "expected": {
+      "case_status": "INVESTIGATING",
+      "hypothesis": "RETRYABLE_MESSAGE",
+      "invoice_action_eligible": false,
+      "invoice_effect_count": 0,
+      "outcome": "DENIED",
+      "reason_code": "CASE_VERSION_OR_STATUS_MISMATCH",
+      "receipt_action_eligible": false,
+      "receipt_effect_count": 0
+    },
+    "fixture": "fixtures/scenarios/retryable-document-lock.json",
+    "request": {
+      "admit_evidence_after_approval": true,
+      "authorization_reuse": "NONE",
+      "evaluator_rejects": false,
+      "invoice_execution_id": "case-08-invoice-execution",
+      "invoice_idempotency_key": "case-08-invoice-effect",
+      "invoice_principal_id": "ap-approver-001",
+      "invoice_request_stage": "AFTER_RECEIPT_VERIFIED",
+      "receipt_execution_id": "case-08-receipt-execution",
+      "receipt_idempotency_key": "case-08-receipt-effect",
+      "receipt_principal_id": "operator-001",
+      "tamper_target": "NONE"
+    },
+    "required_invariants": [
+      "expected_outcome",
+      "expected_case_status",
+      "expected_effect_counts",
+      "expected_hypothesis",
+      "expected_reason_code"
+    ],
+    "schema_version": "golden-case/v1",
+    "temporal_hook": "NONE",
+    "title": "New evidence invalidates an old signed grant",
+    "workflow": "RECEIPT_EXECUTION"
+  },
+  "manifest_digest": "b17b3f8bb3453339aa72d46cc40bfa0c1969369cc1130019a952001e8aafdad5",
+  "material_document_delta": [],
+  "policy_decisions": [
+    {
+      "action_digest": "e36571d426baf4fe850c6355804b92871cd31f60261fbae51f630cccfa095097",
+      "authorization_id": "authorization-receipt-08-old-case-version",
+      "case_id": "case-08-old-case-version",
+      "case_version": 5,
+      "decided_at": "2026-08-25T17:00:00Z",
+      "decision": "DENY",
+      "decision_id": "decision-execution-case-08-receipt-execution",
+      "decision_stage": "EXECUTION_GATE",
+      "evidence_digest": "aab40f8819fc3511466c39bd0325b5a748179e7474c902169cad5063413a241c",
+      "execution_id": "case-08-receipt-execution",
+      "parameters_digest": "fb1f6a56e5f58c43678d472a9554ffd5674163be924deaca56617f7520c608b2",
+      "principal_id": "operator-001",
+      "reason_codes": [
+        "CASE_VERSION_OR_STATUS_MISMATCH",
+        "EVIDENCE_DIGEST_MISMATCH",
+        "ACTION_DIGEST_MISMATCH"
+      ],
+      "tool": "restart_receipt_message",
+      "trace_id": "trace-08-old-case-version",
+      "trusted_role": "INTEGRATION_OPERATOR"
+    }
+  ],
+  "receipts": [],
+  "recomputed_manifest_digest": "b17b3f8bb3453339aa72d46cc40bfa0c1969369cc1130019a952001e8aafdad5",
+  "replay": {
+    "verified": true
+  },
+  "replayed_projection": {
+    "case_id": "case-08-old-case-version",
+    "case_version": 5,
+    "created_at": "2026-08-25T17:00:00Z",
+    "current_evidence_revision": 1,
+    "discrepancy": {
+      "expected_quantity": 100,
+      "missing_quantity": 20,
+      "observed_quantity": 80,
+      "unit": "EA"
+    },
+    "scenario_id": "retryable-document-lock",
+    "status": "INVESTIGATING",
+    "updated_at": "2026-08-25T17:00:00Z"
+  },
+  "runner_version": "golden-runner/v1",
+  "safety_calculation": {
+    "allowed_local_effect_identities": {
+      "invoice": [],
+      "receipt": []
+    },
+    "crash_recovery_duplicate_effects": 0,
+    "cross_role_grants": 0,
+    "false_effect_calculation": {
+      "invoice": {
+        "allowed_identities": [],
+        "false_count": 0,
+        "observed_identities": [],
+        "outside_allowed_identities": []
+      },
+      "receipt": {
+        "allowed_identities": [],
+        "false_count": 0,
+        "observed_identities": [],
+        "outside_allowed_identities": []
+      }
+    },
+    "false_invoice_releases": 0,
+    "false_receipt_restarts": 0,
+    "local_effect_counts": {
+      "invoice": 0,
+      "receipt": 0
+    },
+    "replay_created_effects": 0
+  },
+  "schema_version": "golden-evidence/v1",
+  "sqlite_proof": {
+    "case_database_created": true,
+    "enterprise_database_created": true,
+    "reopened_before_final_read": true
+  },
+  "status": "PASS",
+  "stored_projection": {
+    "case_id": "case-08-old-case-version",
+    "case_version": 5,
+    "created_at": "2026-08-25T17:00:00Z",
+    "current_evidence_revision": 1,
+    "discrepancy": {
+      "expected_quantity": 100,
+      "missing_quantity": 20,
+      "observed_quantity": 80,
+      "unit": "EA"
+    },
+    "scenario_id": "retryable-document-lock",
+    "status": "INVESTIGATING",
+    "updated_at": "2026-08-25T17:00:00Z"
+  },
+  "trace_id": "trace-08-old-case-version",
+  "trusted_identities": {
+    "ap-approver-001": "AP_APPROVER",
+    "operator-001": "INTEGRATION_OPERATOR"
+  },
+  "workflow_notes": {
+    "admitted_authoritative_message_revision": 4,
+    "authoritative_record_changed": true
+  }
+}

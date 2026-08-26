@@ -1,6 +1,6 @@
 # The Missing 20 Implementation Plan
 
-**Status:** Milestones 0–2 accepted; Milestone 3 design is next
+**Status:** Milestones 0–3 accepted; Milestone 4 design is next
 **Date:** 2026-08-25  
 **Deadline:** 2026-09-14 at 5:00 PM PDT  
 **Track:** Professional Agents  
@@ -293,6 +293,8 @@ make aws-smoke AWS_CONFIRM=0
 
 ### Milestone 3: Safety counterexamples and Golden v1
 
+**Gate:** Completed and accepted by the independent Chief Architect on August 26, 2026.
+
 **Target:** August 31  
 **Goal:** Prove the product is a controlled resolution harness, not an auto-write demo.
 
@@ -558,7 +560,7 @@ Every milestone appends one row to `artifacts/evidence-index.md`:
 | M0 | pending | `make check` | CI run and environment report | pending | pending |
 | M1 | pending | domain tests | contract report | pending | pending |
 | M2 | pending | `make demo` | main-case trace | pending | pending |
-| M3 | pending | `make golden` | Golden v1 | pending | pending |
+| M3 | this milestone commit | `make golden` | `artifacts/golden/golden-v1.json` | Independent Chief Architect | APPROVE |
 | M4 | pending | agent golden suite | Golden v2 and traces | pending | pending |
 | M5 | pending | browser smoke | UI recording | pending | pending |
 | M6 | pending | `make aws-smoke` | AWS proof bundle | pending | pending |

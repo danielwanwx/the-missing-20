@@ -14,15 +14,18 @@ from the_missing_20.domain.enterprise import (
     EnterpriseMutationResult,
     EnterpriseSnapshot,
     ErpReceipt,
+    EvidenceReadStatus,
     FailedReceiptMessage,
     Invoice,
     MaterialDocument,
+    MaterialDocumentRead,
     MessageStatus,
     PurchaseOrderLine,
     ScenarioFixture,
     WarehouseReceipt,
 )
 from the_missing_20.domain.execution import (
+    EXTERNAL_ID_NAMESPACE,
     EffectType,
     ReleaseInvoiceParameters,
     RestartReceiptMessageParameters,
@@ -33,6 +36,7 @@ from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed
 class SyntheticEnterprise:
     def __init__(self, database_path: Path) -> None:
         self.database_path = database_path
+        self._material_document_unavailable_reason: str | None = None
         self._create_schema()
 
     @classmethod
@@ -97,6 +101,34 @@ class SyntheticEnterprise:
                     invoice.released_by_execution_id,
                 ),
             )
+            for document in fixture.material_documents:
+                connection.execute(
+                    "INSERT INTO material_documents VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        document.material_document_id,
+                        document.source_message_id,
+                        document.purchase_order_id,
+                        document.line_id,
+                        document.quantity,
+                        document.execution_id,
+                        document.idempotency_key,
+                    ),
+                )
+            for effect in fixture.business_effects:
+                connection.execute(
+                    "INSERT INTO business_effects VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        effect.effect_id,
+                        effect.case_id,
+                        effect.trace_id,
+                        effect.execution_id,
+                        effect.idempotency_key,
+                        effect.effect_type.value,
+                        effect.source_record_id,
+                        json.dumps(effect.result_record_ids),
+                        effect.committed_at.isoformat(),
+                    ),
+                )
         return adapter
 
     def _connect(self) -> sqlite3.Connection:
@@ -178,6 +210,31 @@ class SyntheticEnterprise:
     def read_snapshot(self) -> EnterpriseSnapshot:
         with self._connect() as connection:
             return self._snapshot(connection)
+
+    def read_material_documents(self) -> MaterialDocumentRead:
+        if self._material_document_unavailable_reason is not None:
+            return MaterialDocumentRead(
+                status=EvidenceReadStatus.UNAVAILABLE,
+                reason_code=self._material_document_unavailable_reason,
+            )
+        snapshot = self.read_snapshot()
+        return MaterialDocumentRead(
+            status=EvidenceReadStatus.AVAILABLE,
+            documents=snapshot.material_documents,
+            business_effects=snapshot.business_effects,
+        )
+
+    def set_material_document_source_unavailable(self, reason_code: str) -> None:
+        self._material_document_unavailable_reason = reason_code
+
+    def advance_failed_message_revision(self) -> FailedReceiptMessage:
+        """Record a real authoritative message revision before a fresh evidence read."""
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE failed_messages SET revision = revision + 1 WHERE message_id = "
+                "(SELECT message_id FROM failed_messages LIMIT 1)"
+            )
+        return self.read_snapshot().failed_message
 
     def _snapshot(self, connection: sqlite3.Connection) -> EnterpriseSnapshot:
         po = connection.execute("SELECT * FROM purchase_order_lines").fetchone()
@@ -544,12 +601,12 @@ class SyntheticEnterprise:
         committed_at: datetime,
     ) -> EnterpriseMutationResult:
         """Apply a real competing receipt transaction before the local executor runs."""
-        execution_id = f"external-receipt-{parameters.message_id}"
+        execution_id = f"{EXTERNAL_ID_NAMESPACE}receipt:{parameters.message_id}"
         result = self.restart_receipt_message(
             case_id=case_id,
             trace_id=trace_id,
             execution_id=execution_id,
-            idempotency_key=f"external-receipt:{parameters.message_id}",
+            idempotency_key=f"{EXTERNAL_ID_NAMESPACE}receipt:{parameters.message_id}",
             parameters=parameters,
             committed_at=committed_at,
         )
@@ -575,12 +632,12 @@ class SyntheticEnterprise:
         committed_at: datetime,
     ) -> EnterpriseMutationResult:
         """Apply a real competing invoice transaction before the local executor runs."""
-        execution_id = f"external-invoice-{parameters.invoice_id}"
+        execution_id = f"{EXTERNAL_ID_NAMESPACE}invoice:{parameters.invoice_id}"
         result = self.release_invoice(
             case_id=case_id,
             trace_id=trace_id,
             execution_id=execution_id,
-            idempotency_key=f"external-invoice:{parameters.invoice_id}",
+            idempotency_key=f"{EXTERNAL_ID_NAMESPACE}invoice:{parameters.invoice_id}",
             parameters=parameters,
             committed_at=committed_at,
         )
