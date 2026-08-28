@@ -5,7 +5,9 @@
   const $ = (id) => document.getElementById(id);
   const query = new URLSearchParams(window.location.search);
   const smokeCapture = query.get("smoke") === "1";
-  const deferStart = query.get("autostart") === "0";
+  const demoMode = ["complete", "degraded", "invalid"].includes(query.get("mode") || "complete")
+    ? (query.get("mode") || "complete")
+    : "complete";
   const EVENT_TYPES = [
     "incident.detected",
     "investigation.started",
@@ -76,6 +78,9 @@
     reconnectTimer: null,
     loaded: false,
     startIssued: false,
+    startBusy: false,
+    replaying: false,
+    replayTargetSequence: 0,
     selectedUnitId: "",
     selectedAgentId: "",
     movingIds: new Set(),
@@ -85,6 +90,7 @@
     chatPending: false,
     commandBusy: false,
     commandError: "",
+    renderQueued: false,
     refreshPromise: Promise.resolve(),
   };
 
@@ -103,6 +109,14 @@
 
   function human(raw) {
     return value(raw).replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  function actionLabel(raw) {
+    const labels = {
+      restart_receipt_message: "Receipt Message Restart",
+      release_invoice: "Invoice Release",
+    };
+    return labels[value(raw)] || human(raw);
   }
 
   function stateClass(raw) {
@@ -153,9 +167,71 @@
     return state.connection === "live";
   }
 
+  function incidentStatus() {
+    return value(state.snapshot && state.snapshot.incident && state.snapshot.incident.status);
+  }
+
+  function hasStartedInvestigation() {
+    return state.events.some((event) => eventType(event) === "investigation.started");
+  }
+
+  function hasCompletedInvestigation() {
+    return state.events.some((event) => eventType(event) === "evaluation.completed");
+  }
+
+  function canOperate() {
+    return streamIsLive()
+      && !state.replaying
+      && !state.startBusy
+      && demoMode !== "degraded"
+      && incidentStatus() !== "CLOSED"
+      && hasCompletedInvestigation();
+  }
+
   function showUnavailable(detail, visible) {
     $("unavailable").hidden = !visible;
     if (visible) $("unavailable-detail").textContent = value(detail || "The local experiment did not return a usable state.");
+  }
+
+  function applyDemoMode(snapshot) {
+    document.body.dataset.demoMode = demoMode;
+    if (demoMode !== "degraded") return snapshot;
+    const advisory = snapshot && snapshot.advisory ? snapshot.advisory : {};
+    return {
+      ...snapshot,
+      advisory: {
+        ...advisory,
+        status: "DEGRADED",
+        provider: "scripted",
+        usefulness: "NOT_PROVEN",
+        authority: "ADVISORY_NOT_OPERATIONAL_DECISION",
+        error_code: "DEMO_DEGRADED_MODE",
+      },
+    };
+  }
+
+  function applyModeVisibility() {
+    const degraded = demoMode === "degraded";
+    [".live-panel", ".agent-system-panel", ".copilot-panel"].forEach((selector) => {
+      const panel = document.querySelector(selector);
+      if (panel) panel.hidden = degraded;
+    });
+    ["tab-agent", "open-agent", "dashboard-to-agent"].forEach((id) => {
+      const control = $(id);
+      if (!control) return;
+      control.disabled = degraded;
+      control.setAttribute("aria-disabled", String(degraded));
+    });
+    ["chat-input", "chat-submit"].forEach((id) => {
+      const control = $(id);
+      if (!control) return;
+      control.disabled = degraded;
+      control.setAttribute("aria-disabled", String(degraded));
+    });
+    document.querySelectorAll(".suggestion").forEach((control) => {
+      control.disabled = degraded;
+      control.setAttribute("aria-disabled", String(degraded));
+    });
   }
 
   async function requestJSON(path, options) {
@@ -205,11 +281,14 @@
         }
       });
     }
-    state.snapshot = snapshot;
+    state.snapshot = applyDemoMode(snapshot);
     state.incidentId = value(snapshot.incident_id);
     state.units = nextUnits;
     if (initial) mergeInitialEvents(snapshot.events || snapshot.activity);
     state.loaded = state.units.size > 0;
+    // Refresh the unit projection once per authoritative snapshot, rather than
+    // rebuilding all 100 buttons for every unrelated SSE operation event.
+    renderFlow();
     renderAll();
   }
 
@@ -217,8 +296,10 @@
     if (!state.incidentId) return state.refreshPromise;
     state.refreshPromise = state.refreshPromise.then(async () => {
       const snapshot = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}`);
-      const units = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}/units`);
-      applySnapshot(snapshot, units.units, false);
+      // The snapshot is one authoritative read and already carries its unit
+      // projection. Fetching /units concurrently can cross an execution commit
+      // and pair a new VERIFIED snapshot with an old 80/20 unit list.
+      applySnapshot(snapshot, snapshot.units, false);
     }).catch((error) => {
       setConnection("paused", `Snapshot refresh failed: ${error.message}`);
     });
@@ -239,10 +320,33 @@
     if (state.reconnectTimer == null) {
       state.reconnectTimer = window.setTimeout(() => {
         state.reconnectTimer = null;
-        connectEvents();
+        reconnectStream();
       }, 1500);
     }
     renderAll();
+  }
+
+  async function reconnectStream() {
+    if (!state.incidentId || state.source) return;
+    try {
+      // A server restart or ledger rotation can make the browser cursor newer
+      // than the current stream.  Re-read the authoritative projection and use
+      // its contiguous event history as the safe cursor before resubscribing.
+      const [snapshot, units] = await Promise.all([
+        requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}`),
+        requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}/units`),
+      ]);
+      // Use the unit rows embedded in the same snapshot so reconnect cannot
+      // combine a reset projection with a response from another case version.
+      applySnapshot(snapshot, snapshot.units || units.units, true);
+      if (state.replaying) {
+        state.replayTargetSequence = number(snapshot.projection_sequence);
+      }
+      state.streamError = "";
+      connectEvents();
+    } catch (error) {
+      pauseStream(`Stream recovery failed: ${error.message}`);
+    }
   }
 
   function acceptEvent(event) {
@@ -262,14 +366,38 @@
     state.activeEdges.clear();
     if (type === "execution.started") state.activeEdges.add("message-queue->erp");
     $("sequence-label").textContent = `seq ${state.lastSequence}`;
-    renderAll();
+    scheduleRender();
     if (["execution.completed", "verification.completed"].includes(type)) queueRefresh();
+    if (
+      state.replaying
+      && state.replayTargetSequence > 0
+      && sequence >= state.replayTargetSequence
+    ) {
+      finishReplay();
+    }
+  }
+
+  function finishReplay() {
+    state.replaying = false;
+    state.replayTargetSequence = 0;
+    if (state.source) {
+      state.source.close();
+      state.source = null;
+    }
+    setConnection("live", "Replay complete; the immutable investigation ledger is shown.");
+    renderAll();
   }
 
   function connectEvents() {
     if (!state.incidentId || state.source) return;
-    setConnection("connecting", "Opening the authoritative event stream.");
-    const url = `/api/v1/incidents/${encodeURIComponent(state.incidentId)}/events?after=${state.lastSequence}`;
+    setConnection(
+      "connecting",
+      state.replaying
+        ? "Replaying the immutable investigation ledger."
+        : "Opening the authoritative event stream.",
+    );
+    const replayQuery = state.replaying ? "&replay=1" : "";
+    const url = `/api/v1/incidents/${encodeURIComponent(state.incidentId)}/events?after=${state.lastSequence}${replayQuery}`;
     const source = new EventSource(url);
     state.source = source;
     const receive = (message) => {
@@ -279,6 +407,9 @@
         pauseStream("The event stream returned invalid JSON.");
       }
     };
+    source.addEventListener("stream.reset", () => {
+      pauseStream("The event ledger reset; resubscribing from a safe cursor.");
+    });
     EVENT_TYPES.forEach((type) => source.addEventListener(type, receive));
     source.onopen = () => {
       state.streamError = "";
@@ -286,12 +417,24 @@
       renderAll();
     };
     source.onerror = () => {
+      if (state.source !== source) return;
+      // EventSource reports a clean EOF as an error.  A finite replay is only
+      // complete after its authoritative target sequence has actually drained;
+      // evaluation.completed can arrive much earlier for an open incident.
+      if (
+        state.replaying
+        && state.replayTargetSequence > 0
+        && state.lastSequence >= state.replayTargetSequence
+      ) {
+        finishReplay();
+        return;
+      }
       pauseStream("The event stream disconnected.");
     };
   }
 
   function setView(view) {
-    state.view = view === "agent" ? "agent" : "dashboard";
+    state.view = demoMode === "degraded" ? "dashboard" : view === "agent" ? "agent" : "dashboard";
     document.body.dataset.view = state.view;
     const query = new URLSearchParams(window.location.search);
     query.set("view", state.view);
@@ -302,6 +445,9 @@
     $("tab-agent").classList.toggle("is-selected", state.view === "agent");
     $("tab-dashboard").setAttribute("aria-selected", String(state.view === "dashboard"));
     $("tab-agent").setAttribute("aria-selected", String(state.view === "agent"));
+    $("tab-dashboard").tabIndex = state.view === "dashboard" ? 0 : -1;
+    $("tab-agent").tabIndex = state.view === "agent" ? 0 : -1;
+    window.scrollTo(0, 0);
     renderAll();
   }
 
@@ -331,6 +477,13 @@
   }
 
   function orchestratorStatus() {
+    if (state.replaying) {
+      return {
+        label: "Replaying",
+        raw: "RUNNING",
+        detail: "Replaying the immutable investigation ledger",
+      };
+    }
     if (allAgentStates().some((item) => item.status === "RUNNING")) return { label: "Investigating", raw: "RUNNING", detail: "Three investigators are reading admitted evidence" };
     const lifecycleTypes = new Set([
       "investigation.started",
@@ -402,7 +555,10 @@
     if (type === "evaluation.completed") return value(payload.decision || event.status);
     if (type === "approval.recorded") return value(payload.principal_id || payload.role);
     if (type === "execution.completed") return "One effect recorded; executor returned a receipt.";
-    if (type === "verification.completed") return `${number(payload.recorded_units)} / ${number(payload.expected_units)} units · replay delta ${number(payload.replay_effect_delta)}`;
+    if (type === "verification.completed") {
+      const delta = Number.isInteger(payload.replay_effect_delta) ? payload.replay_effect_delta : "not proven";
+      return `${number(payload.recorded_units)} / ${number(payload.expected_units)} units · replay delta ${delta}`;
+    }
     if (type === "provider.degraded") return "The advisory path is visible; controlled actions remain deterministic.";
     return value(event.status || "recorded");
   }
@@ -418,6 +574,25 @@
     return "erp";
   }
 
+  function renderUnitDetail() {
+    const detailNode = $("unit-detail");
+    if (!detailNode) return;
+    const detail = state.units.get(state.selectedUnitId);
+    detailNode.replaceChildren();
+    if (!detail) {
+      detailNode.append(create("span", "detail-placeholder", "Select a unit to inspect its authoritative record."));
+      return;
+    }
+    const title = create("strong", "unit-detail-title", value(detail.unit_id));
+    const fields = create("div", "unit-detail-fields");
+    [["Stage", human(detail.current_stage)], ["State", human(detail.status)], ["Revision", value(detail.revision)], ["Message", detail.source_message_id || "No source message"]].forEach(([label, field]) => {
+      const item = create("span", "unit-detail-field");
+      item.append(create("small", null, label), create("strong", null, value(field)));
+      fields.append(item);
+    });
+    detailNode.append(title, fields);
+  }
+
   function renderHeader() {
     const snapshot = state.snapshot;
     if (!snapshot) return;
@@ -428,7 +603,11 @@
     const missing = number(incident.missing_quantity, number(counts.queue_failed));
     const unit = incident.unit === "EA" ? "units" : value(incident.unit || "records");
     $("incident-title").textContent = missing ? `${missing} ${unit} stopped before ERP` : `All ${expected} ${unit} are accounted for`;
-    $("incident-subtitle").textContent = missing ? "A message-queue exception is holding the invoice. The system is investigating the exact records before any recovery." : "The controlled recovery is verified. The same incident session remains available for replay.";
+    $("incident-subtitle").textContent = state.replaying
+      ? "Replaying the immutable investigation ledger; authoritative business state is not being changed."
+      : missing
+        ? "A message-queue exception is holding the invoice. Start the investigation to watch the exact records before any recovery."
+        : "The controlled recovery is verified. The same incident session remains available for replay.";
     $("incident-id").textContent = `Incident ${value(snapshot.incident_id)}`;
     $("trace-id").textContent = `Trace ${value(snapshot.trace_id)}`;
     $("missing-count").textContent = String(missing);
@@ -442,7 +621,11 @@
     document.body.dataset.recovered = String(missing === 0 && execution.verified === true);
     const isScripted = mode === "SCRIPTED_SYNTHETIC";
     $("mode-label").textContent = isScripted ? "Scripted synthetic experiment" : human(mode || "Experiment");
-    $("mode-detail").textContent = isScripted ? "Real API · synthetic records only" : "Provider state from API";
+    $("mode-detail").textContent = demoMode === "degraded"
+      ? "Local API · advisory degraded; usefulness NOT_PROVEN"
+      : isScripted
+        ? "Local API · synthetic records only"
+        : "Provider state from API";
     $("mode-dot").className = `status-dot ${isScripted ? "status-dot-lime" : "status-dot-cyan"}`;
     $("sequence-label").textContent = `seq ${state.lastSequence || number(snapshot.projection_sequence) || "—"}`;
   }
@@ -505,21 +688,7 @@
     });
     const pathNode = nodes.find((item) => item.id === "message-queue");
     setBadge($("path-status"), pathNode ? (pathNode.status === "ANOMALY" ? "Attention needed" : pathNode.status) : "Waiting", pathNode ? pathNode.status : "IDLE");
-    const detail = state.units.get(state.selectedUnitId);
-    const detailNode = $("unit-detail");
-    detailNode.replaceChildren();
-    if (!detail) {
-      detailNode.append(create("span", "detail-placeholder", "Select a unit to inspect its authoritative record."));
-    } else {
-      const title = create("strong", "unit-detail-title", value(detail.unit_id));
-      const fields = create("div", "unit-detail-fields");
-      [["Stage", human(detail.current_stage)], ["State", human(detail.status)], ["Revision", value(detail.revision)], ["Message", detail.source_message_id || "No source message"]].forEach(([label, field]) => {
-        const item = create("span", "unit-detail-field");
-        item.append(create("small", null, label), create("strong", null, value(field)));
-        fields.append(item);
-      });
-      detailNode.append(title, fields);
-    }
+    renderUnitDetail();
   }
 
   function renderAgentCard(item, compact) {
@@ -594,9 +763,13 @@
     const container = $("evidence-packets");
     container.replaceChildren();
     const evidenceEvents = state.events.filter((item) => eventType(item) === "evidence.returned");
-    if (!evidenceEvents.length) return;
+    const renderedIds = new Set();
+    const durableEvidence = state.snapshot && Array.isArray(state.snapshot.evidence)
+      ? state.snapshot.evidence
+      : [];
+    if (!evidenceEvents.length && !durableEvidence.length) return;
     const heading = create("div", "evidence-heading");
-    heading.append(create("span", "panel-label", "EVIDENCE PACKETS"), create("span", "sequence-label", `${evidenceEvents.length} returned`));
+    heading.append(create("span", "panel-label", "EVIDENCE PACKETS"), create("span", "sequence-label", `${durableEvidence.length || evidenceEvents.length} returned`));
     container.append(heading);
     evidenceEvents.slice(-6).reverse().forEach((event) => {
       const ids = Array.isArray(event.payload && event.payload.evidence_ids) ? event.payload.evidence_ids : [];
@@ -604,7 +777,29 @@
       const top = create("div", "evidence-packet-top");
       top.append(create("strong", null, agentDefinition(event.actor).name), create("span", "state-badge state-cyan", `${ids.length} IDs`));
       const list = create("div", "evidence-id-list");
-      ids.slice(0, 5).forEach((id) => list.append(create("code", null, id)));
+      ids.slice(0, 5).forEach((id) => {
+        renderedIds.add(value(id));
+        const code = create("code", null, id);
+        code.dataset.evidenceId = value(id);
+        list.append(code);
+      });
+      card.append(top, list);
+      container.append(card);
+    });
+    // Chat citations may point at a fresh-read evidence revision rather than the
+    // initial investigator packet.  Keep every durable citation target rendered
+    // so clicking a citation always lands on an actual DOM node.
+    durableEvidence.forEach((item) => {
+      const evidenceId = value(item && item.evidence_id);
+      if (!evidenceId || renderedIds.has(evidenceId)) return;
+      const card = create("article", "evidence-packet");
+      card.dataset.evidenceId = evidenceId;
+      const top = create("div", "evidence-packet-top");
+      top.append(create("strong", null, human(item.source_type || "Authoritative record")), create("span", "state-badge state-cyan", "READ"));
+      const list = create("div", "evidence-id-list");
+      const code = create("code", null, evidenceId);
+      code.dataset.evidenceId = evidenceId;
+      list.append(code);
       card.append(top, list);
       container.append(card);
     });
@@ -629,6 +824,105 @@
     renderLatestEvent();
   }
 
+  function renderInvestigationControls() {
+    const complete = hasCompletedInvestigation() || state.replaying;
+    const closed = incidentStatus() === "CLOSED";
+    const started = state.startIssued || hasStartedInvestigation();
+    const startAllowed = streamIsLive()
+      && !state.startBusy
+      && !state.replaying
+      && demoMode !== "degraded"
+      && !started
+      && !complete
+      && !closed;
+    const startLabel = state.startBusy
+      ? "Starting Investigation…"
+      : started
+        ? "Investigation in progress…"
+        : "Start Investigation";
+    const replayAllowed = complete && streamIsLive() && !state.startBusy && !state.replaying;
+    ["dashboard-start-investigation", "agent-start-investigation"].forEach((id) => {
+      const button = $(id);
+      if (!button) return;
+      button.hidden = complete || closed;
+      button.textContent = startLabel;
+      button.disabled = !startAllowed;
+      button.setAttribute("aria-disabled", String(!startAllowed));
+    });
+    ["dashboard-replay-investigation", "agent-replay-investigation"].forEach((id) => {
+      const button = $(id);
+      if (!button) return;
+      button.hidden = !complete;
+      button.textContent = state.replaying ? "Replaying Investigation…" : "Replay Investigation";
+      button.disabled = !replayAllowed;
+      button.setAttribute("aria-disabled", String(!replayAllowed));
+    });
+    document.body.dataset.replaying = String(state.replaying);
+  }
+
+  async function startInvestigation() {
+    const complete = hasCompletedInvestigation();
+    if (
+      state.startBusy
+      || state.startIssued
+      || !streamIsLive()
+      || demoMode === "degraded"
+      || state.replaying
+      || complete
+      || incidentStatus() === "CLOSED"
+    ) return;
+    state.startIssued = true;
+    state.startBusy = true;
+    state.commandError = "";
+    renderAll();
+    try {
+      const response = await requestJSON(
+        `/api/v1/incidents/${encodeURIComponent(state.incidentId)}/start`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: {} },
+      );
+      if (response && response.command === "investigation_already_complete") {
+        await reconnectStream();
+      }
+    } catch (error) {
+      state.startIssued = false;
+      state.commandError = error.message;
+      setConnection(state.connection, `Investigation could not start: ${error.message}`);
+    } finally {
+      state.startBusy = false;
+      renderAll();
+    }
+  }
+
+  function replayInvestigation() {
+    if (!hasCompletedInvestigation() || !streamIsLive() || state.replaying) return;
+    const initialEvents = state.events.filter((event) => eventType(event) === "incident.detected");
+    if (!initialEvents.length) return;
+    // The snapshot can lag the live ledger while the investigation is still
+    // streaming.  The contiguous client cursor is authoritative for the trace
+    // that is actually visible, so replay must drain through that cursor.
+    const replayTargetSequence = Math.max(
+      state.lastSequence,
+      number(state.snapshot && state.snapshot.projection_sequence),
+    );
+    if (state.source) {
+      state.source.close();
+      state.source = null;
+    }
+    state.events = initialEvents;
+    state.lastSequence = Math.max(...initialEvents.map((event) => number(event.sequence)));
+    state.replaying = true;
+    state.replayTargetSequence = replayTargetSequence;
+    state.startIssued = false;
+    state.startBusy = false;
+    state.chatMessages = [];
+    state.chatHydrated = false;
+    state.activeEdges.clear();
+    state.movingIds.clear();
+    setConnection("connecting", "Replaying the immutable investigation ledger.");
+    renderAll();
+    connectEvents();
+  }
+
   function renderDecision() {
     const snapshot = state.snapshot;
     if (!snapshot) return;
@@ -636,7 +930,18 @@
     const approvals = Array.isArray(snapshot.approvals) ? snapshot.approvals : [];
     const execution = snapshot.execution || {};
     const intent = value(approval.intent_id);
-    const prepared = Boolean(intent);
+    const activeTool = value(approval.tool);
+    const prepared = Boolean(intent && activeTool);
+    const decisions = Array.isArray(snapshot.decisions) ? snapshot.decisions : [];
+    const currentDecision = decisions.find((item) => item && item.eligibility === "PENDING_APPROVAL") || decisions[0] || null;
+    const currentAction = value(currentDecision && currentDecision.allowed_action);
+    const history = Array.isArray(approval.history) ? approval.history : [];
+    const completedIntent = history
+      .filter((item) => value(item.status) === "CONSUMED")
+      .sort((a, b) => number(a.case_version) - number(b.case_version))
+      .pop();
+    const noAction = value(currentDecision && currentDecision.eligibility) === "NO_ACTION"
+      || value(approval.decision_eligibility) === "NO_ACTION";
     const requiredRoles = Array.isArray(approval.required_roles) && approval.required_roles.length
       ? approval.required_roles.map((role) => value(role))
       : ROLE_DEFS.map((definition) => definition.role);
@@ -647,12 +952,17 @@
         .filter((role) => requiredRoles.includes(role)),
     );
     const approvalCount = approvedRoles.size;
-    const quorumApproved = value(approval.status) === "GRANTED" && approvalCount === requiredRoles.length;
-    const verified = Boolean(execution.verified);
-    const hasExecution = value(execution.status) === "COMPLETE" || state.events.some((event) => eventType(event) === "execution.completed");
-    const hasProposal = prepared || state.events.some((event) => eventType(event) === "recovery.prepared");
+    const quorumApproved = prepared && value(approval.status) === "GRANTED" && approvalCount === requiredRoles.length;
+    const hasExecution = prepared && state.events.some((event) => eventType(event) === "execution.completed" && value(event.payload && event.payload.tool) === activeTool);
+    // ``execution.verified`` is an incident-level summary.  Once a new intent is
+    // prepared (for example invoice release after receipt recovery), it must not
+    // make that new action look verified by the completed receipt intent.
+    const verified = Boolean(execution.verified) && (!prepared || hasExecution);
+    const hasProposal = prepared;
     const hasApproval = quorumApproved;
-    const steps = { proposal: hasProposal, approval: hasApproval, execution: hasExecution, verification: verified };
+    const steps = prepared
+      ? { proposal: hasProposal, approval: hasApproval, execution: hasExecution, verification: hasExecution && verified }
+      : { proposal: false, approval: false, execution: false, verification: false };
     Object.entries(steps).forEach(([name, done]) => {
       const node = document.querySelector(`[data-decision-step="${name}"]`);
       node.classList.toggle("is-done", done);
@@ -660,8 +970,10 @@
     });
     let status = "Not prepared";
     let rawStatus = "IDLE";
-    if (verified) { status = "VERIFIED"; rawStatus = "VERIFIED"; }
-    else if (value(execution.status) === "COMPLETE") { status = "RECOVERED"; rawStatus = "COMPLETE"; }
+    if (verified && !prepared && completedIntent && noAction) { status = "VERIFIED · CLOSED"; rawStatus = "VERIFIED"; }
+    else if (verified && !prepared && completedIntent) { status = "VERIFIED · NEXT ACTION PENDING"; rawStatus = "PENDING_APPROVAL"; }
+    else if (verified && prepared) { status = "VERIFIED"; rawStatus = "VERIFIED"; }
+    else if (hasExecution) { status = "RECOVERED"; rawStatus = "COMPLETE"; }
     else if (quorumApproved) { status = "APPROVED"; rawStatus = "GRANTED"; }
     else if (approvalCount) { status = `${approvalCount} of ${requiredRoles.length} approved`; rawStatus = "PENDING_APPROVAL"; }
     else if (prepared) { status = "Awaiting two roles"; rawStatus = "PENDING_APPROVAL"; }
@@ -669,10 +981,24 @@
     const intentNode = $("decision-intent");
     intentNode.replaceChildren();
     if (!prepared) {
-      intentNode.append(create("span", "detail-placeholder", "Prepare a recovery proposal after the investigation returns."));
+      if (completedIntent) {
+        intentNode.append(
+          create("span", "intent-label", "COMPLETED ACTION INTENT"),
+          create("strong", "intent-action", actionLabel(completedIntent.tool || "recovery")),
+          create("span", "intent-meta", "Verified; approvals are not carried into the next action."),
+        );
+      }
+      if (currentDecision && !noAction) {
+        intentNode.append(
+          create("span", "intent-label", completedIntent ? "NEXT ACTION — NOT PREPARED" : "CURRENT ACTION — NOT PREPARED"),
+          create("strong", "intent-action", actionLabel(currentAction || "pending action")),
+          create("span", "intent-meta", `Current deterministic decision · Case v${value(snapshot.case_version)}`),
+        );
+      } else if (!completedIntent) {
+        intentNode.append(create("span", "detail-placeholder", "Prepare a recovery proposal after the investigation returns."));
+      }
     } else {
-      const decision = Array.isArray(snapshot.decisions) ? snapshot.decisions[snapshot.decisions.length - 1] : null;
-      intentNode.append(create("span", "intent-label", "IMMUTABLE ACTION INTENT"), create("strong", "intent-action", human((decision && decision.allowed_action) || "restart_receipt_message")));
+      intentNode.append(create("span", "intent-label", "IMMUTABLE ACTION INTENT"), create("strong", "intent-action", actionLabel(activeTool)));
       const meta = create("div", "intent-meta");
       meta.append(create("span", null, intent), create("span", null, `Case v${value(snapshot.case_version)}`));
       intentNode.append(meta);
@@ -681,7 +1007,7 @@
     roles.replaceChildren();
     if (prepared) {
       ROLE_DEFS.forEach((definition) => {
-        const approved = approvals.some((item) => value(item.principal_id) === definition.principal && value(item.status) === "APPROVED");
+        const approved = approvals.some((item) => value(item.intent_id) === intent && value(item.principal_id) === definition.principal && value(item.status) === "APPROVED");
         const card = create("div", `approval-role${approved ? " is-approved" : ""}`);
         const copy = create("div", "approval-role-copy");
         copy.append(create("strong", null, definition.name), create("span", null, definition.role));
@@ -690,7 +1016,7 @@
         else {
           const button = create("button", "button button-approval", `Approve as ${definition.name}`);
           button.type = "button";
-          button.disabled = state.commandBusy || !streamIsLive() || quorumApproved || verified;
+          button.disabled = state.commandBusy || !canOperate() || quorumApproved || (verified && hasExecution);
           button.dataset.approvalPrincipal = definition.principal;
           button.addEventListener("click", () => recordApproval(definition.principal));
           card.append(button);
@@ -698,15 +1024,19 @@
         roles.append(card);
       });
     }
-    $("prepare-button").disabled = state.commandBusy || !streamIsLive() || verified || value(execution.status) === "COMPLETE";
-    $("execute-button").disabled = state.commandBusy || !streamIsLive() || !quorumApproved || verified || value(execution.status) === "COMPLETE";
+    const prepareButton = $("prepare-button");
+    prepareButton.textContent = noAction ? "No further action" : currentAction ? `Prepare ${actionLabel(currentAction)}` : "Prepare recovery";
+    prepareButton.disabled = state.commandBusy || !canOperate() || prepared || !currentDecision || currentDecision.eligibility !== "PENDING_APPROVAL";
+    const executeButton = $("execute-button");
+    executeButton.disabled = state.commandBusy || !canOperate() || !quorumApproved || (verified && hasExecution);
+    executeButton.hidden = Boolean(noAction && !prepared && completedIntent);
     if (state.commandError) {
       roles.append(create("p", "command-error", state.commandError));
     }
   }
 
   async function sendDecision(payload) {
-    if (!state.incidentId || state.commandBusy || !streamIsLive()) return;
+    if (!state.incidentId || state.commandBusy || !canOperate()) return;
     state.commandBusy = true;
     state.commandError = "";
     renderDecision();
@@ -724,7 +1054,11 @@
   }
 
   function prepareRecovery() {
-    sendDecision({ command: "prepare_recovery", tool: "restart_receipt_message", idempotency_key: makeKey("prepare") });
+    const decisions = state.snapshot && Array.isArray(state.snapshot.decisions) ? state.snapshot.decisions : [];
+    const decision = decisions.find((item) => item && item.eligibility === "PENDING_APPROVAL") || decisions[0];
+    const tool = decision && decision.allowed_action;
+    if (!tool) return;
+    sendDecision({ command: "prepare_recovery", tool, idempotency_key: makeKey("prepare") });
   }
 
   function recordApproval(principal) {
@@ -772,25 +1106,39 @@
       log.append(row);
     });
     if (state.chatPending) log.append(create("div", "chat-message chat-assistant chat-pending", "The agents are reading the admitted records…"));
-    const chatDisabled = state.chatPending || !streamIsLive();
+    const chatDisabled = demoMode === "degraded" || state.chatPending || state.replaying || !streamIsLive();
     $("chat-input").disabled = chatDisabled;
     $("chat-submit").disabled = chatDisabled;
+    $("chat-input").setAttribute("aria-disabled", String(chatDisabled));
+    $("chat-submit").setAttribute("aria-disabled", String(chatDisabled));
     document.querySelectorAll(".suggestion").forEach((button) => {
       button.disabled = chatDisabled;
     });
   }
 
   function focusEvidence(evidenceId) {
-    const packet = [...document.querySelectorAll(".evidence-packet code")].find((node) => node.textContent === evidenceId);
+    const packet = [...document.querySelectorAll("[data-evidence-id]")]
+      .find((node) => node.dataset.evidenceId === value(evidenceId));
     if (packet) {
-      packet.closest(".evidence-packet").classList.add("is-focused");
-      packet.closest(".evidence-packet").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const card = packet.closest(".evidence-packet");
+      card.classList.add("is-focused");
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      window.setTimeout(() => card.classList.remove("is-focused"), 1800);
     }
   }
 
   async function askQuestion(question) {
     const textValue = value(question).trim();
-    if (!textValue || state.chatPending || !state.incidentId || !streamIsLive()) return;
+    if (!textValue) {
+      state.chatMessages.push({
+        role: "assistant",
+        message: "Enter a question about the incident; Copilot will only read and explain.",
+        citations: [],
+      });
+      renderChat();
+      return;
+    }
+    if (state.chatPending || !state.incidentId || state.replaying || !streamIsLive()) return;
     state.chatMessages.push({ role: "user", message: textValue, citations: [] });
     state.chatPending = true;
     renderChat();
@@ -812,11 +1160,22 @@
     renderChat();
   }
 
+  function scheduleRender() {
+    if (state.renderQueued) return;
+    state.renderQueued = true;
+    window.requestAnimationFrame(() => {
+      state.renderQueued = false;
+      renderAll();
+    });
+  }
+
   function renderAll() {
     if (!state.snapshot) return;
+    applyModeVisibility();
+    renderInvestigationControls();
     renderHeader();
-    renderDashboard();
-    renderAgentView();
+    if (state.view === "agent") renderAgentView();
+    else renderDashboard();
     $("dashboard-view").hidden = state.view !== "dashboard";
     $("agent-view").hidden = state.view !== "agent";
     bodyReady();
@@ -833,20 +1192,24 @@
       const first = Array.isArray(listing.incidents) ? listing.incidents[0] : null;
       if (!first || !first.incident_id) throw new Error("No synthetic incident is available");
       const id = value(first.incident_id);
+      const snapshotQuery = smokeCapture ? "?compact=1" : "";
       const [snapshot, units] = await Promise.all([
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}`),
+        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}${snapshotQuery}`),
         requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}/units`),
       ]);
+      if (demoMode === "invalid") {
+        document.body.dataset.demoMode = "invalid";
+        document.body.dataset.workspaceReady = "false";
+        $("dashboard-view").hidden = true;
+        $("agent-view").hidden = true;
+        showUnavailable("The demo invalid mode has no admissible authoritative lifecycle evidence; operational claims are hidden.", true);
+        setConnection("paused", "Invalid evidence; the workspace is unavailable.");
+        return;
+      }
       applySnapshot(snapshot, units.units, true);
       showUnavailable("", false);
       setView(state.view);
       if (!smokeCapture) connectEvents();
-      if (!deferStart && !state.startIssued && value(snapshot.incident && snapshot.incident.status) !== "RECEIPT_VERIFIED") {
-        state.startIssued = true;
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: {} })
-          .then((response) => applySnapshot(response, response.units, false))
-          .catch((error) => { state.commandError = error.message; setConnection("paused", `Investigation could not start: ${error.message}`); renderAll(); });
-      }
     } catch (error) {
       state.loaded = false;
       showUnavailable(error.message, true);
@@ -863,9 +1226,28 @@
       queueRefresh();
     } else bootstrap();
   });
-  document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+  const viewTabs = [...document.querySelectorAll("[data-view]")];
+  viewTabs.forEach((button, index) => {
+    button.addEventListener("click", () => setView(button.dataset.view));
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const nextIndex = event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? viewTabs.length - 1
+          : (index + (event.key === "ArrowRight" ? 1 : -1) + viewTabs.length) % viewTabs.length;
+      const next = viewTabs[nextIndex];
+      next.focus();
+      setView(next.dataset.view);
+    });
+  });
   $("open-agent").addEventListener("click", () => setView("agent"));
   $("dashboard-to-agent").addEventListener("click", () => setView("agent"));
+  $("dashboard-start-investigation").addEventListener("click", startInvestigation);
+  $("agent-start-investigation").addEventListener("click", startInvestigation);
+  $("dashboard-replay-investigation").addEventListener("click", replayInvestigation);
+  $("agent-replay-investigation").addEventListener("click", replayInvestigation);
   $("prepare-button").addEventListener("click", prepareRecovery);
   $("execute-button").addEventListener("click", executeRecovery);
   $("chat-form").addEventListener("submit", (event) => {

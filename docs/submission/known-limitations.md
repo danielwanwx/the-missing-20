@@ -8,7 +8,7 @@ The limitations below are part of the acceptance boundary and are shown delibera
 | AgentCore Runtime/Gateway/Policy/Observability/deployment | `NOT_PROVEN` | No cloud deployment, runtime integration, gateway, policy, or service-level observability is claimed. |
 | Advisory authority | Hard boundary | Models cannot classify state, grant, execute, verify, replay, or change policy. A provider failure is visible as `DEGRADED`; it does not fabricate content or write. |
 | Production impact | Not measured | All scenarios, metrics, and records are synthetic. No savings, reliability, or customer outcome number is claimed. |
-| Workspace controls | Read-only by design | The demo shows the decision and audit surface. Human approval and execution are proven in the local lifecycle generator, while the browser package exposes no mutation endpoint. |
+| Workspace controls | Scoped synthetic controls | Copilot and advisory tools are read-only. Structured controls can mutate only the local synthetic experiment, require two distinct simulated role principals, and make no authentication or independent-human claim. |
 | Final release | Pending human gate | A source-repository push does not authorize a public video, hosted demo, or Devpost submission. |
 | Credentials and data | Excluded | No credentials, employer/customer data, private incident, runbook, or confidential provenance is in scope. |
 

@@ -9,7 +9,7 @@ official competition criteria.
 | Design | Step 3: advisory/operational separation | `PROVEN`: model output has no operational or write authority; deterministic policy has no advisory-shaped input. |
 | Potential impact | Steps 1–4: investigate a discrepancy and choose a safe next action | Demonstrates a repeatable operations pattern on synthetic data; no production impact metric or deployment claim is made. |
 | Creativity and originality | Steps 2, 5, and 7: competing investigators, per-action quorum, explicit degraded disclosure | `SCRIPTED_PROVEN` for advisory usefulness; the safety architecture is the differentiator. Stable real Nova usefulness and AgentCore are `NOT_PROVEN`. |
-| Presentation | Live Dashboard, Agent Workspace, and seven timed narration beats | The product leads the judge from the 100/80/20 gap through visible agent work, evidence-backed Copilot answers, human approval, controlled recovery, and 100/100 verification. |
+| Presentation | Live Dashboard, Agent Workspace, and seven timed narration beats | The product leads the judge from the 100/80/20 gap through visible agent work, evidence-backed Copilot answers, scripted simulated role-principal approval, controlled recovery, and 100/100 verification. |
 
 ## What a judge should verify
 
@@ -20,7 +20,7 @@ official competition criteria.
 3. The lifecycle shows two different actions and roles, authoritative after-reads,
    verification, and replay delta `0`.
 4. Copilot cannot approve or execute; local synthetic recovery requires two distinct
-   roles and fails closed when the live stream or authoritative lifecycle is absent.
+   simulated role principals and fails closed when the live stream or authoritative lifecycle is absent.
 
 ## Claims intentionally withheld
 

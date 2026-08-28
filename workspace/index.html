@@ -29,6 +29,7 @@
           role="tab"
           aria-selected="true"
           aria-controls="dashboard-view"
+          tabindex="0"
           data-view="dashboard"
         >
           Dashboard
@@ -40,6 +41,7 @@
           role="tab"
           aria-selected="false"
           aria-controls="agent-view"
+          tabindex="-1"
           data-view="agent"
         >
           Agent Workspace
@@ -86,7 +88,7 @@
           <span id="mode-detail">API-backed state</span>
         </div>
         <div class="truth-boundary">
-          <span>Agents investigate. Deterministic policy and two human roles control effects.</span>
+          <span>Scripted Strands investigates locally. Deterministic policy and two simulated role principals control effects.</span>
         </div>
       </div>
 
@@ -97,7 +99,15 @@
             <h2>Follow every unit through the supply path</h2>
             <p class="section-note">The diagram moves only when the incident API confirms a state change.</p>
           </div>
-          <button id="open-agent" class="button button-primary" type="button">Open Agent Workspace</button>
+          <div class="section-actions" aria-label="Investigation controls">
+            <button id="dashboard-start-investigation" class="button button-primary" type="button" disabled>
+              Start Investigation
+            </button>
+            <button id="dashboard-replay-investigation" class="button button-secondary" type="button" hidden>
+              Replay Investigation
+            </button>
+            <button id="open-agent" class="button button-secondary" type="button">Open Agent Workspace</button>
+          </div>
         </div>
 
         <div class="dashboard-layout">
@@ -161,7 +171,15 @@
             <h2>Watch the investigation, then make the decision</h2>
             <p class="section-note">Every node and evidence packet below is projected from the ordered event ledger.</p>
           </div>
-          <span id="workspace-state" class="state-badge state-neutral">Waiting</span>
+          <div class="section-actions" aria-label="Investigation controls">
+            <button id="agent-start-investigation" class="button button-primary" type="button" disabled>
+              Start Investigation
+            </button>
+            <button id="agent-replay-investigation" class="button button-secondary" type="button" hidden>
+              Replay Investigation
+            </button>
+            <span id="workspace-state" class="state-badge state-neutral">Waiting</span>
+          </div>
         </div>
 
         <div class="workspace-layout">
@@ -203,7 +221,7 @@
                 </div>
                 <span class="state-badge state-cyan">READ ONLY</span>
               </div>
-              <p class="copilot-intro">Questions run through the real scripted agent and its read-only tools. Chat cannot approve or execute.</p>
+              <p class="copilot-intro">Questions run through the bounded scripted Strands harness and its read-only tools. Chat cannot prepare, approve, or execute.</p>
               <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Copilot conversation">
                 <div class="chat-empty">Ask where the units stopped, why the agents chose a cause, or which evidence supports it.</div>
               </div>
@@ -229,7 +247,7 @@
               </div>
               <div class="decision-rail" aria-label="Recovery lifecycle">
                 <div class="decision-step" data-decision-step="proposal"><span class="step-number">1</span><span><strong>Prepare</strong><small>Deterministic proposal</small></span></div>
-                <div class="decision-step" data-decision-step="approval"><span class="step-number">2</span><span><strong>Approve</strong><small>Two distinct roles</small></span></div>
+                <div class="decision-step" data-decision-step="approval"><span class="step-number">2</span><span><strong>Approve</strong><small>Two simulated role principals</small></span></div>
                 <div class="decision-step" data-decision-step="execution"><span class="step-number">3</span><span><strong>Recover</strong><small>Controlled executor</small></span></div>
                 <div class="decision-step" data-decision-step="verification"><span class="step-number">4</span><span><strong>Verify</strong><small>Fresh read and replay</small></span></div>
               </div>

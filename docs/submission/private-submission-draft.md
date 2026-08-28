@@ -9,7 +9,7 @@
 
 The Missing 20 helps an operations team investigate a supply-chain discrepancy with
 bounded multi-agent reasoning, then closes only the actions that deterministic policy,
-two distinct human roles, controlled execution, authoritative verification, and replay
+two distinct simulated role principals, controlled execution, authoritative verification, and replay
 can prove safe.
 
 ## What the private package demonstrates
@@ -22,7 +22,8 @@ state, verifies postconditions, and replays without creating a second effect.
 
 The local product exposes a live Dashboard and Agent Workspace. Its Copilot is
 read-only and advisory. Separate operational controls can affect only the local
-synthetic experiment, require an exact two-role quorum, and execute through the
+synthetic experiment, require an exact two-role quorum from scripted simulated
+principals (the demo client has no authentication), and execute through the
 deterministic `ControlledExecutor`; no provider or external write is available.
 
 ## Truthful evidence statement

@@ -25,7 +25,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _copy_package_inputs(destination: Path) -> None:
-    for directory in ("artifacts", "fixtures", "workspace", "docs", "scripts"):
+    for directory in (
+        "artifacts",
+        "fixtures",
+        "workspace",
+        "docs",
+        "scripts",
+        "src",
+        "tests",
+    ):
         shutil.copytree(ROOT / directory, destination / directory)
 
 

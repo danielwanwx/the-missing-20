@@ -34,8 +34,7 @@
 ## Explicit non-goals
 
 No AWS/provider/network call, new spend, AgentCore deployment, credential handling,
-operational behavior change, active UI control, public release, commit, push, video,
-or Devpost submission.
+remote operational write, public release, commit, push, video, or Devpost submission.
 
 ## Final independent gate
 

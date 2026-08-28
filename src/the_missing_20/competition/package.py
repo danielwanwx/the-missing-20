@@ -16,7 +16,7 @@ import tempfile
 from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Any, Final, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -68,6 +68,7 @@ M7_SPEC_PATH: Final[str] = (
 M7_PLAN_PATH: Final[str] = (
     "docs/superpowers/plans/2026-08-27-milestone-7-private-competition-package-implementation-plan.md"
 )
+M7_AUDIT_RECORD_PATH: Final[str] = "docs/audits/2026-08-28-independent-product-audit.md"
 M7_SUBMISSION_PATHS: Final[tuple[str, ...]] = (
     "docs/submission/evidence-matrix.md",
     "docs/submission/judging-map.md",
@@ -82,6 +83,10 @@ M7_WORKSPACE_PATHS: Final[tuple[str, ...]] = (
     "workspace/app.js",
     "workspace/index.html",
     "workspace/style.css",
+)
+M7_RUNTIME_PROOF_PATHS: Final[tuple[str, ...]] = (
+    "src/the_missing_20/experiment/session.py",
+    "tests/contract/test_experiment_session_recovery.py",
 )
 M7_ARTIFACT_PATHS: Final[tuple[str, ...]] = (
     "artifacts/agent/authority-b-advisory-v1.json",
@@ -100,9 +105,11 @@ M7_SOURCE_PATHS: Final[tuple[str, ...]] = tuple(
             M7_DEMO_PATH,
             M7_PLAN_PATH,
             M7_SPEC_PATH,
+            M7_AUDIT_RECORD_PATH,
             *M7_SUBMISSION_PATHS,
             *M7_SCRIPT_PATHS,
             *M7_WORKSPACE_PATHS,
+            *M7_RUNTIME_PROOF_PATHS,
             *M7_ARTIFACT_PATHS,
         )
     )
@@ -124,6 +131,7 @@ M7_SOURCE_ROLES: Final[Mapping[str, str]] = {
     M7_DEMO_PATH: "FIVE_MINUTE_DEMO",
     M7_SPEC_PATH: "M7_DESIGN_SPEC",
     M7_PLAN_PATH: "M7_IMPLEMENTATION_PLAN",
+    M7_AUDIT_RECORD_PATH: "INDEPENDENT_PRODUCT_AUDIT",
     "docs/submission/evidence-matrix.md": "EVIDENCE_MATRIX",
     "docs/submission/judging-map.md": "JUDGING_MAP",
     "docs/submission/known-limitations.md": "KNOWN_LIMITATIONS",
@@ -133,6 +141,8 @@ M7_SOURCE_ROLES: Final[Mapping[str, str]] = {
     "workspace/app.js": "READ_ONLY_WORKSPACE_SCRIPT",
     "workspace/index.html": "READ_ONLY_WORKSPACE_HTML",
     "workspace/style.css": "READ_ONLY_WORKSPACE_STYLE",
+    "src/the_missing_20/experiment/session.py": "EXPERIMENT_SESSION_RUNTIME",
+    "tests/contract/test_experiment_session_recovery.py": "EXPERIMENT_CRASH_RECOVERY_TEST",
     "artifacts/agent/authority-b-advisory-v1.json": "REAL_ADVISORY_STATUS",
     "artifacts/agent/authority-b-failure-v1.json": "REAL_PROVIDER_DEGRADED_OUTCOME",
     "artifacts/agent/authority-b-usefulness-proof-v1.json": "REAL_USEFULNESS_DISCLOSURE",
@@ -326,6 +336,7 @@ class M7PrivateAudit(M7Model):
             "workspace_modes",
             "m6_evidence_boundary",
             "browser_safety",
+            "experiment_crash_recovery",
             "truth_boundary_scan",
             "private_release_gate",
         }
@@ -401,6 +412,221 @@ def _load_workspace(path: Path) -> DecisionWorkspaceDemo:
     return value
 
 
+def _validate_experiment_crash_recovery(repository_root: Path) -> None:
+    """Run the public-session crash proof before accepting a ready audit.
+
+    This is intentionally an offline runtime check.  It injects each documented
+    persistence fault into the local Authority-B adapter, retries the same public
+    command after reopening the session, and verifies that the durable event marker
+    and enterprise effect are each idempotent.  It also proves that a durable chat
+    turn can be reopened and retried without rerunning read tools or changing any
+    operational state.  A checked-in self-claim cannot make M7 ready if either path
+    regresses.
+    """
+
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from the_missing_20.application.executor import (  # noqa: PLC0415
+        SimulatedPersistenceFault,
+    )
+    from the_missing_20.authority_b.executor import (  # noqa: PLC0415
+        AuthorityBControlledExecutor,
+    )
+    from the_missing_20.experiment.events import PublicEventType  # noqa: PLC0415
+    from the_missing_20.experiment.session import ExperimentSession  # noqa: PLC0415
+
+    def operational_state_bytes(data_directory: Path) -> tuple[bytes | None, ...]:
+        """Capture durable state that chat is not allowed to mutate."""
+
+        return tuple(
+            (data_directory / filename).read_bytes()
+            if (data_directory / filename).exists()
+            else None
+            for filename in (
+                "enterprise.sqlite",
+                "case.sqlite",
+                "quorum-ledger.json",
+            )
+        )
+
+    def chat_contract(response: Mapping[str, Any], *, phase: str) -> tuple[Any, ...]:
+        intent = response.get("intent")
+        message = response.get("message")
+        citations = response.get("citations")
+        if (
+            not isinstance(intent, str)
+            or not intent
+            or not isinstance(message, str)
+            or not message
+            or not isinstance(citations, list)
+            or not all(isinstance(item, str) for item in citations)
+            or response.get("read_only") is not True
+        ):
+            raise M7PackageError(f"M7 chat {phase} response is not a read-only durable contract")
+        return intent, message, tuple(citations), True
+
+    for failure_flag in ("fail_after_reservation", "fail_after_enterprise_commit"):
+        try:
+            with tempfile.TemporaryDirectory(prefix="missing20-m7-crash-") as raw_directory:
+                data_directory = Path(raw_directory)
+                session = ExperimentSession(repository_root, data_directory=data_directory)
+                prepared = session.decision_command(
+                    {
+                        "command": "prepare_recovery",
+                        "tool": "restart_receipt_message",
+                        "idempotency_key": f"m7-crash:{failure_flag}:prepare",
+                    }
+                )
+                intent_id = str(prepared["approval"]["intent_id"])
+                prepared_case_version = int(prepared["case_version"])
+                for principal, suffix in (
+                    ("integration-operator", "operator"),
+                    ("ap-approver", "ap"),
+                ):
+                    session.decision_command(
+                        {
+                            "command": "approve",
+                            "intent_id": intent_id,
+                            "principal_id": principal,
+                            "idempotency_key": f"m7-crash:{failure_flag}:{suffix}",
+                        }
+                    )
+
+                original_execute = AuthorityBControlledExecutor.execute
+                calls = 0
+
+                def fail_once(
+                    *args: Any,
+                    _failure_flag: str = failure_flag,
+                    _original_execute: Any = original_execute,
+                    **kwargs: Any,
+                ) -> Any:
+                    nonlocal calls
+                    calls += 1
+                    if calls == 1:
+                        kwargs[_failure_flag] = True
+                    return _original_execute(*args, **kwargs)
+
+                execute_key = f"m7-crash:{failure_flag}:execute"
+                with patch.object(AuthorityBControlledExecutor, "execute", new=fail_once):
+                    try:
+                        session.decision_command(
+                            {
+                                "command": "execute",
+                                "intent_id": intent_id,
+                                "idempotency_key": execute_key,
+                            }
+                        )
+                    except SimulatedPersistenceFault:
+                        pass
+                    else:
+                        raise M7PackageError(f"M7 crash proof did not inject {failure_flag}")
+                    # The public command is retried by a fresh process/session, not
+                    # by the object that held the pre-crash in-memory caches.
+                    del session
+                    session = ExperimentSession(repository_root, data_directory=data_directory)
+                    retry = session.decision_command(
+                        {
+                            "command": "execute",
+                            "intent_id": intent_id,
+                            "idempotency_key": execute_key,
+                        }
+                    )
+
+                started = tuple(
+                    event
+                    for event in session.events_since()
+                    if event.event_type is PublicEventType.EXECUTION_STARTED
+                )
+                effects = session.enterprise.read_snapshot().business_effects
+                if (
+                    calls != 3
+                    or retry.get("execution", {}).get("verified") is not True
+                    or retry.get("execution", {}).get("replay_effect_delta") != 0
+                    or len(retry.get("execution", {}).get("effects", [])) != 1
+                    or len(effects) != 1
+                    or len(started) != 1
+                    or started[0].case_version != prepared_case_version
+                ):
+                    raise M7PackageError(
+                        f"M7 crash proof failed after reload for {failure_flag}: retry was not "
+                        "a truthful single-effect verification"
+                    )
+        except M7PackageError:
+            raise
+        except Exception as exc:
+            raise M7PackageError(
+                f"M7 crash proof failed after reload for {failure_flag}: {exc}"
+            ) from exc
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="missing20-m7-chat-") as raw_directory:
+            data_directory = Path(raw_directory)
+            session = ExperimentSession(repository_root, data_directory=data_directory)
+            question = "Where did the missing units go?"
+            idempotency_key = "m7-chat:exact-retry"
+            durable_before = operational_state_bytes(data_directory)
+            events_before = session.events_since()
+            first = session.chat_command(question, idempotency_key=idempotency_key)
+            first_contract = chat_contract(first, phase="first-turn")
+            durable_after_first = operational_state_bytes(data_directory)
+            events_after_first = session.events_since()
+            first_tool_events = tuple(
+                event
+                for event in events_after_first
+                if event.event_type is PublicEventType.TOOL_STARTED
+            )
+            first_evidence_events = tuple(
+                event
+                for event in events_after_first
+                if event.event_type is PublicEventType.EVIDENCE_RETURNED
+            )
+            first_chat_events = tuple(
+                event
+                for event in events_after_first
+                if event.event_type is PublicEventType.CHAT_MESSAGE
+            )
+            if (
+                durable_after_first != durable_before
+                or len(events_after_first) <= len(events_before)
+                or not first_tool_events
+                or not first_evidence_events
+                or len(first_chat_events) != 1
+            ):
+                raise M7PackageError(
+                    "M7 chat first-turn proof did not show read tools/evidence without "
+                    "operational mutation"
+                )
+
+            del session
+            session = ExperimentSession(repository_root, data_directory=data_directory)
+            events_before_retry = session.events_since()
+            durable_before_retry = operational_state_bytes(data_directory)
+            retry = session.chat_command(question, idempotency_key=idempotency_key)
+            retry_contract = chat_contract(retry, phase="exact-retry")
+            events_after_retry = session.events_since()
+            durable_after_retry = operational_state_bytes(data_directory)
+            retry_tool_events = tuple(
+                event
+                for event in events_after_retry
+                if event.event_type is PublicEventType.TOOL_STARTED
+            )
+            if (
+                retry_contract != first_contract
+                or events_after_retry != events_before_retry
+                or durable_after_retry != durable_before_retry
+                or len(retry_tool_events) != len(first_tool_events)
+            ):
+                raise M7PackageError(
+                    "M7 chat exact-retry proof did not preserve the read-only response "
+                    "without extra tools or operational state changes"
+                )
+    except M7PackageError:
+        raise
+    except Exception as exc:
+        raise M7PackageError(f"M7 chat reload proof failed: {exc}") from exc
+
+
 def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
     if value.get("schema_version") != "decision-workspace-browser-smoke/v1":
         raise M7PackageError("M7 browser smoke schema is invalid")
@@ -454,8 +680,23 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
         raise M7PackageError("M7 browser smoke does not bind the twenty failed units")
     if event_ledger.get("exactly_once_effects") != 1:
         raise M7PackageError("M7 browser smoke does not prove one exactly-once effect")
+    if event_ledger.get("exactly_once_effects_per_action") != 1:
+        raise M7PackageError("M7 browser smoke does not prove per-action idempotency")
+    if event_ledger.get("business_effects") != 2:
+        raise M7PackageError("M7 browser smoke does not prove both controlled effects")
+    if event_ledger.get("final_gate_closed") is not True:
+        raise M7PackageError("M7 browser smoke does not prove the closed final gate")
     if event_ledger.get("replay_effect_delta") != 0:
         raise M7PackageError("M7 browser smoke replay changed the effect count")
+    if (
+        event_ledger.get("open_replay_sequence_start") != 2
+        or event_ledger.get("open_replay_sequence_end") != 66
+        or event_ledger.get("open_replay_paced") is not True
+        or event_ledger.get("open_replay_api_bytes_unchanged") is not True
+    ):
+        raise M7PackageError(
+            "M7 browser smoke does not prove open-incident replay drained without mutation"
+        )
     observed_sequences = event_ledger.get("observed_sequences")
     if not isinstance(observed_sequences, list) or len(observed_sequences) < 2:
         raise M7PackageError("M7 browser smoke is missing observed SSE sequences")
@@ -481,6 +722,8 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
     for mode in modes:
         if not isinstance(mode, dict) or mode.get("status") != "PASS":
             raise M7PackageError("M7 browser smoke mode is not PASS")
+        if mode.get("ui_driven") is not True:
+            raise M7PackageError("M7 browser smoke mode was not exercised by the browser")
         if mode.get("remote_resources") != 0:
             raise M7PackageError("M7 browser smoke exposes an unsafe browser capability")
         if mode.get("provider_calls") != 0:
@@ -491,6 +734,22 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
             raise M7PackageError("M7 browser smoke write scope is not local synthetic-only")
         if mode.get("console_errors") != []:
             raise M7PackageError("M7 browser smoke contains console errors")
+        mode_name = mode.get("mode")
+        if mode_name == "complete" and (
+            mode.get("ready_marker") is not True or mode.get("advisory_status") != "COMPLETE"
+        ):
+            raise M7PackageError("M7 complete browser mode lacks its ready/advisory proof")
+        if mode_name == "degraded" and (
+            mode.get("ready_marker") is not True
+            or mode.get("advisory_status") != "DEGRADED"
+            or mode.get("dom_units") != 100
+        ):
+            raise M7PackageError("M7 degraded browser mode lacks its live degraded proof")
+        if mode_name == "invalid" and (
+            mode.get("ready_marker") is not False
+            or mode.get("operational_claims_hidden") is not True
+        ):
+            raise M7PackageError("M7 invalid browser mode lacks its fail-closed proof")
     views = value.get("views")
     if not isinstance(views, list) or {
         item.get("view") for item in views if isinstance(item, dict)
@@ -520,12 +779,24 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
             raise M7PackageError("M7 browser smoke view does not preserve ordered SSE evidence")
         if view.get("console_errors") != []:
             raise M7PackageError("M7 browser smoke view contains console errors")
+        if view.get("view") == "agent":
+            citations = view.get("copilot_citations")
+            if not isinstance(citations, int) or isinstance(citations, bool) or citations < 1:
+                raise M7PackageError(
+                    "M7 browser smoke agent view does not preserve live Copilot citations"
+                )
+            if view.get("execute_hidden") is not True:
+                raise M7PackageError(
+                    "M7 browser smoke closed agent view leaves execute control visible"
+                )
     ui_flow = value.get("ui_flow")
     if not isinstance(ui_flow, dict):
         raise M7PackageError("M7 browser smoke UI flow proof is missing")
     required_ui_actions = {
         "dashboard_loaded",
         "agent_workspace_opened",
+        "investigation_start_control",
+        "paced_investigation",
         "copilot_queried",
         "recovery_prepared",
         "operator_approved",
@@ -537,6 +808,63 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
         raise M7PackageError("M7 browser smoke UI flow is incomplete")
     if ui_flow.get("replay_effect_delta") != 0:
         raise M7PackageError("M7 browser smoke UI replay changed the effect count")
+    required_two_action_flow = {
+        "invoice_prepared",
+        "invoice_operator_approved",
+        "invoice_ap_approved",
+        "final_gate_closed",
+        "closed_url_no_relaunch",
+        "immutable_ledger_replay",
+    }
+    if any(ui_flow.get(action) is not True for action in required_two_action_flow):
+        raise M7PackageError("M7 browser smoke UI flow omits the second action or final gate")
+    degraded_mode = next(
+        (item for item in modes if isinstance(item, dict) and item.get("mode") == "degraded"),
+        None,
+    )
+    if degraded_mode is None or any(
+        degraded_mode.get(field) is not True
+        for field in (
+            "investigation_hidden",
+            "hypotheses_hidden",
+            "traces_hidden",
+            "evidence_hidden",
+            "copilot_hidden",
+            "controls_disabled",
+        )
+    ):
+        raise M7PackageError(
+            "M7 browser smoke does not prove degraded advisory surfaces are hidden"
+        )
+    mobile = value.get("mobile_responsive")
+    if not isinstance(mobile, dict):
+        raise M7PackageError("M7 browser smoke mobile proof is missing")
+    viewport = mobile.get("viewport")
+    body_scroll_width = mobile.get("body_scroll_width")
+    document_scroll_width = mobile.get("document_scroll_width")
+    flow_scroll_width = mobile.get("flow_scroll_width")
+    flow_client_width = mobile.get("flow_client_width")
+    mobile_values = (
+        viewport,
+        body_scroll_width,
+        document_scroll_width,
+        flow_scroll_width,
+        flow_client_width,
+    )
+    if any(not isinstance(item, int) or isinstance(item, bool) for item in mobile_values):
+        raise M7PackageError("M7 browser smoke mobile metrics are invalid")
+    viewport_int = cast(int, viewport)
+    body_scroll_width_int = cast(int, body_scroll_width)
+    document_scroll_width_int = cast(int, document_scroll_width)
+    flow_scroll_width_int = cast(int, flow_scroll_width)
+    flow_client_width_int = cast(int, flow_client_width)
+    if (
+        viewport_int != 390
+        or body_scroll_width_int > 390
+        or document_scroll_width_int > 390
+        or flow_scroll_width_int <= flow_client_width_int
+    ):
+        raise M7PackageError("M7 browser smoke does not prove the 390px responsive boundary")
 
 
 _REMOTE_URL = re.compile(r"https?://(?!127\.0\.0\.1|localhost)", re.IGNORECASE)
@@ -560,6 +888,7 @@ def _validate_package_text(repository_root: Path) -> None:
         M7_DEMO_PATH,
         M7_SPEC_PATH,
         M7_PLAN_PATH,
+        M7_AUDIT_RECORD_PATH,
         *M7_SUBMISSION_PATHS,
         *M7_SCRIPT_PATHS,
         *M7_WORKSPACE_PATHS,
@@ -765,7 +1094,9 @@ def _build_evidence() -> tuple[M7EvidenceRecord, ...]:
         M7EvidenceRecord(
             evidence_id="workspace_fail_closed",
             claim=(
-                "The read-only workspace renders complete, degraded, and invalid fail-closed modes."
+                "The read/advisory workspace renders complete, degraded, and invalid "
+                "fail-closed modes; only scoped local synthetic structured controls can "
+                "request recovery."
             ),
             evidence_class=M7EvidenceClass.PROVEN,
             status="PASS",
@@ -837,7 +1168,8 @@ def _build_evidence() -> tuple[M7EvidenceRecord, ...]:
             status="PASS",
             scope=(
                 "advisory output is display/audit content only; deterministic policy and "
-                "humans own action authority"
+                "scoped local synthetic controls use simulated role principals; no "
+                "authentication or independent-human claim"
             ),
             source_refs=(
                 "artifacts/agent/authority-b-advisory-v1.json",
@@ -874,7 +1206,8 @@ def _build_checks() -> tuple[M7AcceptanceCheck, ...]:
             check_id="workspace_modes",
             detail=(
                 "Complete, degraded, and invalid workspace behavior is explicitly "
-                "represented and read-only."
+                "represented; advisory tools remain read-only while structured controls "
+                "are scoped to the local synthetic experiment."
             ),
             source_refs=("artifacts/workspace/browser-smoke-v1.json",),
         ),
@@ -893,6 +1226,19 @@ def _build_checks() -> tuple[M7AcceptanceCheck, ...]:
                 "local synthetic command scope, and no console errors."
             ),
             source_refs=("artifacts/workspace/browser-smoke-v1.json",),
+        ),
+        M7AcceptanceCheck(
+            check_id="experiment_crash_recovery",
+            detail=(
+                "The offline runtime proof injects reservation and post-commit crashes, "
+                "then retries the same public command after reopening ExperimentSession "
+                "to prove one marker, one effect, truthful verification, and zero replay "
+                "delta; durable chat is reopened and retried without new tools or writes."
+            ),
+            source_refs=(
+                "src/the_missing_20/experiment/session.py",
+                "tests/contract/test_experiment_session_recovery.py",
+            ),
         ),
         M7AcceptanceCheck(
             check_id="truth_boundary_scan",
@@ -922,6 +1268,7 @@ def build_private_audit(repository_root: Path) -> M7PrivateAudit:
         _validate_lifecycle_and_workspaces(root)
         _validate_m6(root)
         _validate_browser_smoke(_read_json(root / "artifacts/workspace/browser-smoke-v1.json"))
+        _validate_experiment_crash_recovery(root)
         sources = _read_sources(root)
         audit = M7PrivateAudit(
             seven_step_story=_build_steps(),
@@ -978,7 +1325,15 @@ def regenerate_clean_state(repository_root: Path) -> M7PrivateAudit:
     root = repository_root.resolve()
     with tempfile.TemporaryDirectory(prefix="missing20-m7-clean-") as raw_directory:
         clean_root = Path(raw_directory)
-        for directory in ("artifacts", "fixtures", "workspace", "docs", "scripts"):
+        for directory in (
+            "artifacts",
+            "fixtures",
+            "workspace",
+            "docs",
+            "scripts",
+            "src",
+            "tests",
+        ):
             source = root / directory
             if source.is_dir():
                 shutil.copytree(source, clean_root / directory)
@@ -1008,6 +1363,7 @@ __all__ = [
     "M7_CUMULATIVE_COST_USD",
     "M7_COST_CAP_USD",
     "M7_DEMO_PATH",
+    "M7_AUDIT_RECORD_PATH",
     "M7_FIXED_SOURCE_DIGESTS",
     "M7_SCHEMA_VERSION",
     "M7_SOURCE_PATHS",

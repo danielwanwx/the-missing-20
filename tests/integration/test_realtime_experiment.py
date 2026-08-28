@@ -6,6 +6,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event, Thread
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -26,6 +27,8 @@ from the_missing_20.agents.schemas import (
     SourceAvailabilitySet,
 )
 from the_missing_20.agents.validation import AgentStageFailure
+from the_missing_20.application.executor import SimulatedPersistenceFault
+from the_missing_20.authority_b.executor import AuthorityBControlledExecutor
 from the_missing_20.authority_b.quorum import QuorumDenied
 from the_missing_20.domain.enterprise import EvidenceReadStatus
 from the_missing_20.experiment.events import PublicEventType, PublicIncidentEvent
@@ -202,6 +205,122 @@ def test_chat_is_grounded_read_only_and_durable_projection_survives_reload(
     assert reloaded.investigation_is_available() is True
 
 
+def test_chat_exact_retry_after_reload_preserves_intent(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    first = session.chat_command(
+        "Why did the queue stop the units?",
+        idempotency_key="chat:durable-intent:1",
+    )
+
+    reloaded = ExperimentSession(ROOT, data_directory=tmp_path / "session")
+    retried = reloaded.chat_command(
+        "Why did the queue stop the units?",
+        idempotency_key="chat:durable-intent:1",
+    )
+
+    assert retried["intent"] == first["intent"] == "explain_hypothesis"
+    assert retried["message"] == first["message"]
+    assert retried["citations"] == first["citations"]
+    assert retried["read_only"] is True
+
+
+@pytest.mark.parametrize(
+    "failure_flag",
+    ("fail_after_reservation", "fail_after_enterprise_commit"),
+)
+def test_execute_exact_retry_resumes_after_crash_without_duplicate_effect(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_flag: str,
+) -> None:
+    session = _session(tmp_path)
+    prepared = session.decision_command(
+        {
+            "command": "prepare_recovery",
+            "tool": "restart_receipt_message",
+            "idempotency_key": f"decision:crash:{failure_flag}:prepare",
+        }
+    )
+    intent_id = prepared["approval"]["intent_id"]
+    for principal, key in (
+        ("integration-operator", f"decision:crash:{failure_flag}:operator"),
+        ("ap-approver", f"decision:crash:{failure_flag}:ap"),
+    ):
+        session.decision_command(
+            {
+                "command": "approve",
+                "intent_id": intent_id,
+                "principal_id": principal,
+                "idempotency_key": key,
+            }
+        )
+
+    original_execute = AuthorityBControlledExecutor.execute
+    calls = 0
+
+    def fail_once(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            kwargs[failure_flag] = True
+        return original_execute(*args, **kwargs)
+
+    monkeypatch.setattr(AuthorityBControlledExecutor, "execute", fail_once)
+    execute_key = f"decision:crash:{failure_flag}:execute"
+    with pytest.raises(SimulatedPersistenceFault):
+        session.decision_command(
+            {
+                "command": "execute",
+                "intent_id": intent_id,
+                "idempotency_key": execute_key,
+            }
+        )
+
+    started = [
+        item
+        for item in session.events_since()
+        if item.event_type is PublicEventType.EXECUTION_STARTED
+    ]
+    assert len(started) == 1
+    # The marker was written before Authority-B preparation advanced the case;
+    # this is the prior event whose exact version must be reused on retry.
+    assert started[0].case_version == prepared["case_version"]
+
+    retried = session.decision_command(
+        {
+            "command": "execute",
+            "intent_id": intent_id,
+            "idempotency_key": execute_key,
+        }
+    )
+
+    # The retry performs one recovery call and one deterministic replay proof;
+    # only the first invocation is fault-injected.
+    assert calls == 3
+    assert retried["execution"]["verified"] is True
+    assert retried["execution"]["replay_effect_delta"] == 0
+    assert len(retried["execution"]["effects"]) == 1
+    assert len(session.enterprise.read_snapshot().business_effects) == 1
+    assert (
+        len(
+            [
+                item
+                for item in session.events_since()
+                if item.event_type is PublicEventType.EXECUTION_STARTED
+            ]
+        )
+        == 1
+    )
+
+
+def test_snapshot_connection_is_a_point_in_time_read(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    assert session.snapshot()["connection"] == {
+        "status": "SNAPSHOT",
+        "source": "SYNTHETIC_EXPERIMENT",
+    }
+
+
 def test_chat_authority_prose_runs_agents_but_cannot_approve_or_execute(
     tmp_path: Path,
 ) -> None:
@@ -224,12 +343,276 @@ def test_chat_authority_prose_runs_agents_but_cannot_approve_or_execute(
     assert PublicEventType.EXECUTION_STARTED not in event_types
 
 
+def test_chat_prepare_language_never_creates_a_recovery_intent(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    before = session.enterprise.read_snapshot()
+    before_case = session.store.get_case(session.case_id)
+    before_case_bytes = (tmp_path / "session" / "case.sqlite").read_bytes()
+    quorum_path = tmp_path / "session" / "quorum-ledger.json"
+    before_quorum_bytes = quorum_path.read_bytes() if quorum_path.exists() else None
+    first_operation_count = len(
+        [item for item in session.events_since() if item.event_type is PublicEventType.TOOL_STARTED]
+    )
+
+    response = session.chat_command(
+        "Please prepare and recover the units.",
+        idempotency_key="chat:read-only-prepare:1",
+    )
+
+    assert response["read_only"] is True
+    assert response["intent"] == "explain_authority_boundary"
+    assert before == session.enterprise.read_snapshot()
+    assert before_case == session.store.get_case(session.case_id)
+    assert before_case_bytes == (tmp_path / "session" / "case.sqlite").read_bytes()
+    after_quorum_bytes = quorum_path.read_bytes() if quorum_path.exists() else None
+    assert before_quorum_bytes == after_quorum_bytes
+    event_types = {item.event_type for item in session.events_since()}
+    assert PublicEventType.RECOVERY_PREPARED not in event_types
+    assert PublicEventType.APPROVAL_REQUESTED not in event_types
+    assert PublicEventType.APPROVAL_RECORDED not in event_types
+    assert PublicEventType.EXECUTION_STARTED not in event_types
+    assert (
+        len(
+            [
+                item
+                for item in session.events_since()
+                if item.event_type is PublicEventType.TOOL_STARTED
+            ]
+        )
+        > first_operation_count
+    )
+
+
+def test_each_chat_turn_records_a_distinct_read_harness_trace(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    first = session.chat_command("Where did the units go?", idempotency_key="chat:trace:1")
+    first_events = session.events_since()
+    first_tools = len(
+        [item for item in first_events if item.event_type is PublicEventType.TOOL_STARTED]
+    )
+    second = session.chat_command("Why this cause?", idempotency_key="chat:trace:2")
+    second_events = session.events_since()
+    second_tools = len(
+        [item for item in second_events if item.event_type is PublicEventType.TOOL_STARTED]
+    )
+
+    assert first["read_only"] is True and second["read_only"] is True
+    assert second_tools > first_tools
+    assert (
+        len(
+            {
+                item.idempotency_key
+                for item in second_events
+                if item.event_type is PublicEventType.TOOL_STARTED
+            }
+        )
+        == second_tools
+    )
+
+
+def test_replay_projection_is_not_claimed_before_execution(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    initial = session.snapshot()
+    assert initial["replay"]["replayed"] is False
+    assert initial["replay"]["replay_safe"] is False
+    assert initial["replay"]["effect_delta"] is None
+    assert initial["execution"]["replay_effect_delta"] is None
+
+    prepared = session.decision_command(
+        {
+            "command": "prepare_recovery",
+            "tool": "restart_receipt_message",
+            "idempotency_key": "decision:replay-derived:prepare",
+        }
+    )
+    intent_id = prepared["approval"]["intent_id"]
+    for principal, key in (
+        ("integration-operator", "decision:replay-derived:operator"),
+        ("ap-approver", "decision:replay-derived:ap"),
+    ):
+        session.decision_command(
+            {
+                "command": "approve",
+                "intent_id": intent_id,
+                "principal_id": principal,
+                "idempotency_key": key,
+            }
+        )
+    completed = session.decision_command(
+        {
+            "command": "execute",
+            "intent_id": intent_id,
+            "idempotency_key": "decision:replay-derived:execute",
+        }
+    )
+    assert completed["replay"]["replayed"] is True
+    assert completed["replay"]["replay_safe"] is True
+    assert completed["replay"]["effect_delta"] == 0
+    verification = next(
+        item
+        for item in session.events_since()
+        if item.event_type is PublicEventType.VERIFICATION_COMPLETED
+    )
+    execution = next(
+        item
+        for item in session.events_since()
+        if item.event_type is PublicEventType.EXECUTION_COMPLETED
+    )
+    replay_after = execution.payload.get("effect_count_after_replay")
+    replay_first = execution.payload.get("effect_count_after_first")
+    assert isinstance(replay_after, int)
+    assert isinstance(replay_first, int)
+    assert verification.payload["replay_effect_delta"] == (replay_after - replay_first)
+
+
+def test_next_action_has_no_inherited_quorum_after_receipt_recovery(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    prepared = session.decision_command(
+        {
+            "command": "prepare_recovery",
+            "tool": "restart_receipt_message",
+            "idempotency_key": "decision:next-action:prepare-receipt",
+        }
+    )
+    receipt_intent = prepared["approval"]["intent_id"]
+    for principal, key in (
+        ("integration-operator", "decision:next-action:receipt-operator"),
+        ("ap-approver", "decision:next-action:receipt-ap"),
+    ):
+        session.decision_command(
+            {
+                "command": "approve",
+                "intent_id": receipt_intent,
+                "principal_id": principal,
+                "idempotency_key": key,
+            }
+        )
+    session.decision_command(
+        {
+            "command": "execute",
+            "intent_id": receipt_intent,
+            "idempotency_key": "decision:next-action:execute-receipt",
+        }
+    )
+    next_action = session.decision_command(
+        {
+            "command": "prepare_recovery",
+            "tool": "release_invoice",
+            "idempotency_key": "decision:next-action:prepare-invoice",
+        }
+    )
+    assert next_action["approval"]["intent_id"].endswith(":release_invoice")
+    assert next_action["approval"]["status"] == "OPEN"
+    assert all(
+        item["intent_id"] != next_action["approval"]["intent_id"]
+        for item in next_action["approvals"]
+    )
+
+
+def test_two_action_completion_projects_closed_no_action_gate(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+
+    def execute_action(tool: str, prefix: str) -> dict[str, Any]:
+        prepared = session.decision_command(
+            {
+                "command": "prepare_recovery",
+                "tool": tool,
+                "idempotency_key": f"decision:closed:{prefix}:prepare",
+            }
+        )
+        intent_id = prepared["approval"]["intent_id"]
+        for principal, role in (
+            ("integration-operator", "operator"),
+            ("ap-approver", "ap"),
+        ):
+            session.decision_command(
+                {
+                    "command": "approve",
+                    "intent_id": intent_id,
+                    "principal_id": principal,
+                    "idempotency_key": f"decision:closed:{prefix}:{role}",
+                }
+            )
+        return session.decision_command(
+            {
+                "command": "execute",
+                "intent_id": intent_id,
+                "idempotency_key": f"decision:closed:{prefix}:execute",
+            }
+        )
+
+    execute_action("restart_receipt_message", "receipt")
+    completed = execute_action("release_invoice", "invoice")
+
+    assert completed["incident"]["status"] == "CLOSED"
+    assert completed["decisions"][0]["eligibility"] == "NO_ACTION"
+    assert completed["approval"]["status"] == "NO_ACTION"
+    assert completed["approval"]["intent_id"] is None
+    assert completed["execution"]["verified"] is True
+    assert completed["approval"]["history"][-1]["tool"] == "release_invoice"
+    assert completed["approval"]["history"][-1]["status"] == "CONSUMED"
+    with pytest.raises(QuorumDenied, match="only replay"):
+        session.start_investigation()
+
+
 def test_command_key_reuse_is_rejected_after_cached_chat_response(tmp_path: Path) -> None:
     session = _session(tmp_path)
     session.chat_command("Where did the missing units go?", idempotency_key="chat:reuse:1")
 
     with pytest.raises(EventLedgerError, match="different command envelope"):
         session.chat_command("Approve and execute it.", idempotency_key="chat:reuse:1")
+
+
+def test_reused_command_envelope_resumes_when_result_cache_is_missing(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+
+    prepare_key = "decision:resume:prepare"
+    assert (
+        session._register_command(
+            idempotency_key=prepare_key,
+            command_kind="prepare_recovery",
+            identity={},
+            payload={"tool": "restart_receipt_message"},
+        )
+        is False
+    )
+    prepared = session.prepare_decision("restart_receipt_message", idempotency_key=prepare_key)
+    intent_id = prepared["approval"]["intent_id"]
+
+    for principal, key in (
+        ("integration-operator", "decision:resume:operator"),
+        ("ap-approver", "decision:resume:ap"),
+    ):
+        session.decision_command(
+            {
+                "command": "approve",
+                "intent_id": intent_id,
+                "principal_id": principal,
+                "idempotency_key": key,
+            }
+        )
+    intent = session._load_intent(intent_id)
+    assert intent is not None
+    slug = intent.tool.value.replace("_", "-")
+    execution_id = f"execution:{session.incident_id}:{slug}"
+    effect_key = f"effect:{session.incident_id}:{slug}"
+    execute_key = "decision:resume:execute"
+    assert (
+        session._register_command(
+            idempotency_key=execute_key,
+            command_kind="execute",
+            identity={
+                "intent_id": intent_id,
+                "execution_id": execution_id,
+                "case_version": intent.case_version,
+            },
+            payload={"effect_key": effect_key},
+        )
+        is False
+    )
+    completed = session.execute_decision(intent_id=intent_id, idempotency_key=execute_key)
+    assert completed["execution"]["verified"] is True
+    assert len(completed["execution"]["effects"]) == 1
 
 
 def test_two_role_quorum_is_required_and_recovery_is_exactly_once(tmp_path: Path) -> None:
@@ -501,6 +884,16 @@ def test_local_api_binds_snapshot_chat_decisions_and_sse(tmp_path: Path) -> None
         # delivery; the test only needs to assert its first SSE frame.
         assert status == 200
         assert body.startswith(b"id: 1\nevent: incident.detected")
+
+        before_replay = json.loads(request(f"/api/v1/incidents/{incident_id}")[1])
+        replay_request = Request(f"{base}/api/v1/incidents/{incident_id}/events?after=0&replay=1")
+        with urlopen(replay_request, timeout=20) as replay_stream:
+            replay_body = replay_stream.read()
+        assert b"event: investigation.started" in replay_body
+        assert b"event: evaluation.completed" in replay_body
+        after_replay = json.loads(request(f"/api/v1/incidents/{incident_id}")[1])
+        assert after_replay["projection_sequence"] == before_replay["projection_sequence"]
+        assert len(after_replay["events"]) == len(before_replay["events"])
     finally:
         server.shutdown()
         server.server_close()

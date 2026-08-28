@@ -5,8 +5,10 @@
 The Missing 20 is a guided supply-chain incident replay. It starts with a simple
 problem: the warehouse expects 100 units, the ERP records 80, and nobody knows where
 the other 20 went. Specialized agents compare possible causes and surface evidence,
-while deterministic policy, two independent human roles, controlled execution, and
-verification keep AI output from directly changing operational state.
+while deterministic policy, two simulated role principals, controlled execution, and
+verification keep AI output from directly changing operational state. The local demo
+client is unauthenticated; its two role principals are scripted identities, not proof
+of independent human authentication.
 
 ![Live supply-path dashboard](artifacts/workspace/screenshots/dashboard-qa-refined.png)
 
@@ -24,20 +26,23 @@ PYTHONPATH=src .venv/bin/python scripts/decision_workspace_server.py
 ```
 
 Open the local URL printed by the server. The browser connects to the local experiment
-API and ordered SSE event ledger, renders all 100 unit records, and keeps two synchronized
-views:
+API and ordered SSE event ledger, then waits for an explicit **Start Investigation**
+click. The same start control is available on Dashboard and Agent Workspace; after a
+completed trace, **Replay Investigation** only re-emits its immutable ledger. A CLOSED
+incident cannot start a new investigation. The browser renders all 100 unit records and
+keeps two synchronized views:
 
-- **Dashboard:** watch units move through Warehouse, Message Queue, ERP, and Invoice as
-  authoritative API events arrive.
-- **Agent Workspace:** inspect the orchestrator, three investigators, tool calls,
-  evidence, handoffs, and the advisory Incident Copilot.
+- **Dashboard:** start or replay the trace, then watch units move through Warehouse,
+  Message Queue, ERP, and Invoice as authoritative API events arrive.
+- **Agent Workspace:** start or replay the trace, then inspect the orchestrator, three
+  investigators, tool calls, evidence, handoffs, and the advisory Incident Copilot.
 
 The complete interaction covers five stages:
 
 1. Detect the 20-unit gap.
 2. Compare competing agent hypotheses.
 3. Apply deterministic safety rules.
-4. Require approval from two distinct roles.
+4. Require approval from two distinct simulated role principals.
 5. Recover, verify, and prove replay creates no duplicate effect.
 
 The workspace also exposes two explicit failure views:
@@ -62,7 +67,7 @@ from authority:
 
 The Incident Copilot is advisory and read-only. Operational controls are a separate,
 fail-closed path limited to local synthetic state: prepare a deterministic proposal,
-collect approvals from two distinct human roles, execute through `ControlledExecutor`,
+collect approvals from two distinct simulated role principals, execute through `ControlledExecutor`,
 then verify the authoritative reread and replay. The local demo makes no provider call,
 loads no remote resource, and cannot write to an external system.
 

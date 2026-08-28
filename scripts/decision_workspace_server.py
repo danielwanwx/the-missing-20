@@ -12,10 +12,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from time import monotonic
+from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 if __package__ in {None, ""}:
@@ -44,7 +45,11 @@ STATIC_FILES = {
 }
 API_SCHEMA_VERSION = "missing20-experiment-api/v1"
 MAX_REQUEST_BYTES = 64 * 1024
-SSE_MAX_SECONDS = 15.0
+SSE_HEARTBEAT_SECONDS = 10.0
+# Delivering one real ledger frame at a time keeps the local judge experience
+# legible without inventing an event: every frame is still read directly from
+# the authoritative public ledger.
+SSE_EVENT_PACING_SECONDS = 0.12
 
 
 class APIRequestError(Exception):
@@ -249,6 +254,24 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         session = self._session(incident_id)
         snapshot = session.snapshot()
         if len(parts) == 1:
+            if query.get("compact") == ["1"]:
+                # Browser-smoke captures validate the authoritative projection,
+                # not the complete historical ledger. Keep the same lifecycle
+                # state while omitting large collections that the client does
+                # not need when ``smoke=1`` disables SSE and live operations.
+                lifecycle_tail = [
+                    event
+                    for event in snapshot.get("events", [])
+                    if event.get("event_type") in {"execution.completed", "verification.completed"}
+                ]
+                snapshot = {
+                    key: value
+                    for key, value in snapshot.items()
+                    if key not in {"activity", "events", "evidence", "units"}
+                }
+                snapshot["activity"] = lifecycle_tail
+                snapshot["events"] = lifecycle_tail
+                snapshot["evidence"] = []
             self._send_json(HTTPStatus.OK, snapshot)
             return
         if len(parts) != 2:
@@ -271,6 +294,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
 
     def _send_sse(self, session: ExperimentSession, query: dict[str, list[str]]) -> None:
         after = self._after_sequence(query, self.headers.get("Last-Event-ID"))
+        replay = query.get("replay") == ["1"]
         latest = session.ledger.latest_sequence(session.incident_id)
         if after > latest:
             raise APIRequestError(
@@ -283,9 +307,28 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             self.send_header(key, value)
         self.send_header("Connection", "keep-alive")
         self.end_headers()
-        deadline = monotonic() + SSE_MAX_SECONDS
         try:
-            while monotonic() < deadline:
+            # Keep the stream open for the lifetime of the browser subscription.
+            # A fixed-duration stream can leave the UI showing LIVE after the
+            # server has silently closed it; heartbeats keep idle connections
+            # observable while ``wait_for_events`` wakes immediately for later
+            # ledger appends.
+            while True:
+                current_latest = session.ledger.latest_sequence(session.incident_id)
+                if after > current_latest:
+                    # The durable ledger may have been rotated while a browser
+                    # connection was idle. Signal a typed reset instead of
+                    # leaving the old cursor subscribed forever.
+                    reset = {
+                        "incident_id": session.incident_id,
+                        "safe_cursor": current_latest,
+                        "reason": "ledger_cursor_reset",
+                    }
+                    self.wfile.write(
+                        b"event: stream.reset\n" + f"data: {canonical_json(reset)}\n\n".encode()
+                    )
+                    self.wfile.flush()
+                    return
                 events = session.events_since(after)
                 if events:
                     for event in events:
@@ -298,13 +341,15 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                         self.wfile.write(frame)
                         self.wfile.flush()
                         after = event.sequence
+                        time.sleep(SSE_EVENT_PACING_SECONDS)
                     continue
-                remaining = deadline - monotonic()
-                if remaining <= 0:
-                    break
-                session.wait_for_events(after, timeout=min(1.0, remaining))
-            self.wfile.write(b": heartbeat\n\n")
-            self.wfile.flush()
+                if replay:
+                    # A replay is a finite re-emission of the immutable ledger;
+                    # it must not remain subscribed as though it were a new run.
+                    return
+                if not session.wait_for_events(after, timeout=SSE_HEARTBEAT_SECONDS):
+                    self.wfile.write(b": heartbeat\n\n")
+                    self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             return
 
@@ -375,9 +420,17 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         session = self._session(unquote(parts[0]))
         resource = parts[1]
         if resource == "start":
-            session.start_investigation()
+            started = session.start_investigation()
             snapshot = session.snapshot()
-            self._send_json(HTTPStatus.OK, {**snapshot, "command": "investigation_started"})
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    **snapshot,
+                    "command": (
+                        "investigation_started" if started else "investigation_already_complete"
+                    ),
+                },
+            )
             return
         if resource == "chat":
             question = payload.get("question")
@@ -465,6 +518,14 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
     """Threaded loopback server carrying the repository and session registry."""
 
     allow_reuse_address = True
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        """Suppress only expected client-close noise from long-lived SSE streams."""
+
+        error = sys.exc_info()[1]
+        if isinstance(error, (BrokenPipeError, ConnectionResetError)):
+            return
+        super().handle_error(request, client_address)
 
     def __init__(
         self,

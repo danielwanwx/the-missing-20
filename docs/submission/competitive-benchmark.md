@@ -55,7 +55,8 @@ The product should not open as an audit report. The judge-facing path is:
 1. Detect the 20-unit discrepancy.
 2. Let agents compare plausible causes and surface evidence.
 3. Show deterministic policy selecting an eligible recovery action.
-4. Show two distinct roles approving that exact action.
+4. Show two distinct simulated role principals approving that exact action; the local demo
+   has no authentication or independent-human claim.
 5. Apply the bounded synthetic recovery and verify that the records reconcile.
 
 Detailed digests, claim classes, AWS evidence boundaries, and the immutable audit trail

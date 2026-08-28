@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import threading
 from collections.abc import Callable
 from copy import deepcopy
+from http.server import ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
 
-from scripts.decision_workspace_server import DecisionWorkspaceServer
+from scripts.decision_workspace_server import DecisionWorkspaceHandler, DecisionWorkspaceServer
 from the_missing_20.authority_b import workspace_demo
 from the_missing_20.authority_b.lifecycle import (
     LIFECYCLE_ARTIFACT_PATH,
@@ -27,6 +29,7 @@ from the_missing_20.authority_b.workspace_demo import (
     _hypotheses_from_golden,
     build_decision_workspace,
 )
+from the_missing_20.experiment.session import ExperimentSession
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -279,3 +282,153 @@ def test_workspace_server_is_local_with_scoped_synthetic_commands() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_server_suppresses_only_expected_sse_disconnect_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    forwarded: list[tuple[object, object]] = []
+
+    def record_error(_server: object, request: object, client_address: object) -> None:
+        forwarded.append((request, client_address))
+
+    monkeypatch.setattr(ThreadingHTTPServer, "handle_error", record_error)
+    server = object.__new__(DecisionWorkspaceServer)
+    request = object()
+    client_address = ("127.0.0.1", 1)
+
+    for error in (BrokenPipeError(), ConnectionResetError()):
+        try:
+            raise error
+        except (BrokenPipeError, ConnectionResetError):
+            server.handle_error(request, client_address)
+    assert forwarded == []
+
+    try:
+        raise RuntimeError("unexpected server failure")
+    except RuntimeError:
+        server.handle_error(request, client_address)
+    assert forwarded == [(request, client_address)]
+
+
+class _SSEStopBuffer(io.BytesIO):
+    """Stop a direct SSE handler probe after it emits the desired frames."""
+
+    def __init__(self, stop_after_flushes: int) -> None:
+        super().__init__()
+        self.flushes = 0
+        self.stop_after_flushes = stop_after_flushes
+
+    def flush(self) -> None:
+        self.flushes += 1
+        if self.flushes >= self.stop_after_flushes:
+            raise BrokenPipeError
+
+
+class _SSEProbeLedger:
+    def __init__(self) -> None:
+        self.latest = 1
+
+    def latest_sequence(self, _incident_id: str) -> int:
+        return self.latest
+
+
+class _SSEProbeSession:
+    incident_id = "probe-incident"
+
+    def __init__(self) -> None:
+        self.ledger = _SSEProbeLedger()
+        self.wait_calls = 0
+        self.timeouts: list[float] = []
+        self.first = type(
+            "ProbeEvent",
+            (),
+            {
+                "sequence": 1,
+                "event_type": type("ProbeEventType", (), {"value": "incident.detected"})(),
+                "model_dump": lambda self, mode: {
+                    "sequence": self.sequence,
+                    "event_type": self.event_type.value,
+                },
+            },
+        )()
+        self.second = type(
+            "ProbeEvent",
+            (),
+            {
+                "sequence": 2,
+                "event_type": type("ProbeEventType", (), {"value": "verification.completed"})(),
+                "model_dump": lambda self, mode: {
+                    "sequence": self.sequence,
+                    "event_type": self.event_type.value,
+                },
+            },
+        )()
+
+    def events_since(self, after: int) -> tuple[object, ...]:
+        if after < 1:
+            return (self.first,)
+        if after < 2 and self.ledger.latest >= 2:
+            return (self.second,)
+        return ()
+
+    def wait_for_events(self, _after: int, *, timeout: float) -> tuple[object, ...]:
+        self.wait_calls += 1
+        self.timeouts.append(timeout)
+        if self.wait_calls >= 2:
+            self.ledger.latest = 2
+        return ()
+
+
+class _SSEProbeHandler(DecisionWorkspaceHandler):
+    def __init__(self, buffer: io.BytesIO) -> None:
+        # The probe calls the handler method directly and never starts an HTTP
+        # request, so only the response sink and header lookup are required.
+        self.headers = cast(Any, {})
+        self.wfile = buffer
+
+    def send_response(self, _code: int, _message: str | None = None) -> None:
+        return
+
+    def send_header(self, _keyword: str, _value: str) -> None:
+        return
+
+    def end_headers(self) -> None:
+        return
+
+
+def _sse_probe_handler(buffer: io.BytesIO) -> _SSEProbeHandler:
+    return _SSEProbeHandler(buffer)
+
+
+def test_sse_stays_open_through_idle_heartbeats_then_delivers_event() -> None:
+    buffer = _SSEStopBuffer(stop_after_flushes=4)
+    session = _SSEProbeSession()
+    handler = _sse_probe_handler(buffer)
+
+    DecisionWorkspaceHandler._send_sse(handler, cast(ExperimentSession, session), {"after": ["0"]})
+
+    payload = buffer.getvalue().decode("utf-8")
+    assert payload.count(": heartbeat\n\n") == 2
+    assert "event: incident.detected" in payload
+    assert "event: verification.completed" in payload
+    assert session.wait_calls == 2
+
+
+def test_sse_emits_typed_reset_when_cursor_rewinds() -> None:
+    class ResetSession(_SSEProbeSession):
+        def wait_for_events(self, _after: int, *, timeout: float) -> tuple[object, ...]:
+            self.wait_calls += 1
+            self.timeouts.append(timeout)
+            self.ledger.latest = 0
+            return ()
+
+    buffer = io.BytesIO()
+    session = ResetSession()
+    handler = _sse_probe_handler(buffer)
+
+    DecisionWorkspaceHandler._send_sse(handler, cast(ExperimentSession, session), {"after": ["1"]})
+
+    payload = buffer.getvalue().decode("utf-8")
+    assert "event: stream.reset\n" in payload
+    assert '"safe_cursor":0' in payload

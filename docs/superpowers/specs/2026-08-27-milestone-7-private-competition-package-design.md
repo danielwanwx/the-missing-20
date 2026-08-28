@@ -12,14 +12,15 @@ advisory investigation, deterministic policy, two-role authorization, controlled
 execution, verification, and replay.
 
 **Inputs:** the independently validated M5 lifecycle and Decision Workspace artifacts,
-the M6 existing-evidence proof, Golden v2, the local read-only workspace assets, and
+the M6 existing-evidence proof, Golden v2, the local read/advisory workspace assets, and
 synthetic fixtures. No provider call, AWS call, network resource, employer material,
 credential, or public submission is in scope.
 
 **Execute:** freeze the seven-step story and evidence taxonomy in documentation, add a
 local judge-demo runner with a clean-state regeneration check, add a fail-closed package
 audit, and persist a redacted private audit manifest. The package is a judge-facing
-read path only; it does not add controls or change the executor.
+read/advisory path plus the already-scoped local synthetic structured controls; it does
+not add remote writes or change the controlled executor.
 
 **Checks:** package source and digest checks, lifecycle/workspace validation, M6 proof
 validation, Golden v2 safety and scripted-proof status, complete/degraded/invalid
@@ -50,7 +51,8 @@ an action, call `ControlledExecutor`, verify an effect, or alter replay semantic
 Deterministic code owns evidence identity and completeness, state classification,
 policy eligibility, authorization, execution, verification, and replay. Controlled
 effects require the distinct `INTEGRATION_OPERATOR` and `AP_APPROVER` roles for each
-action. The Decision Workspace exposes no active write controls.
+action. Copilot exposes no write controls; the separate structured rail can request
+only the local synthetic recovery path and remains fail-closed until the exact quorum.
 
 The package uses three non-interchangeable evidence classes:
 
