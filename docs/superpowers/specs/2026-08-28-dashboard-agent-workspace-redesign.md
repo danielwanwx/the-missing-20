@@ -18,6 +18,10 @@ The product has two persistent views:
 Both views share one incident session and one event stream. Changing views must not reset
 the investigation.
 
+This is a data-driven real-time interface, not a scripted animation. Every visible state
+must be derived from the experiment API or its authoritative event ledger. Animation only
+interpolates between two accepted backend states; it may not invent activity.
+
 ## Visual Targets
 
 - Dashboard target: `assets/dashboard-target.png`
@@ -148,6 +152,82 @@ The application must distinguish three modes without turning the hero into a dis
 The mode appears as a compact status control with details available on demand. The UI
 must never label scripted output as a successful live Nova run.
 
+## Data-to-Visual Truth Contract
+
+The browser contains no hard-coded incident outcome, agent result, chart series, unit
+count, approval, or recovery success. The experiment service is the source of truth.
+
+### Supply-chain entities
+
+The synthetic experiment creates 100 stable unit records with unique `unit_id` values.
+Each unit has an authoritative state and current stage. The live flow renders those 100
+records rather than drawing an unrelated decorative particle stream.
+
+- The 80 dots reaching ERP correspond to 80 unit records returned by the API as recorded.
+- The 20 dots stopped at Message Queue correspond to the exact 20 unit records referenced
+  by the active discrepancy and failed-message evidence.
+- Recovery moves only those 20 identifiers through the approved transition.
+- Verification reaches `100 / 100` only after the API confirms all 100 identifiers and
+  the effect ledger confirms no duplicate posting.
+
+The visualization may aggregate or cluster dots when space is constrained, but selecting
+an aggregate must reveal the underlying unit IDs and exact count. Aggregate labels must
+always equal the source-record cardinality.
+
+### Agent activity
+
+Agent nodes do not run on timers created by the frontend. Their state is projected from
+actual Strands harness events:
+
+- Agent start and completion.
+- Tool request and tool result.
+- Evidence identifiers read or returned.
+- Investigator-to-synthesis handoff.
+- Evaluation and proposal preparation.
+- Provider degradation or workflow failure.
+
+An animated tool-call edge appears only after `tool.started`; it completes only after the
+matching `tool.completed`. Evidence packets display the identifiers returned by that
+tool. Agent status cannot advance because a CSS animation duration elapsed.
+
+### Dashboard series
+
+Topology health, queue lag, expected-versus-recorded series, incident state, and active
+agent count come from API snapshots plus the shared event stream. Chart points include a
+source timestamp and sequence number. Dashboard and Agent Workspace must produce the same
+state when projected from the same last sequence number.
+
+### API surface
+
+The initial implementation exposes a small local experiment API:
+
+- `GET /api/v1/incidents` returns current incident summaries.
+- `GET /api/v1/incidents/{incident_id}` returns the authoritative snapshot and projection
+  sequence.
+- `GET /api/v1/incidents/{incident_id}/units` returns the 100 stable unit records.
+- `GET /api/v1/incidents/{incident_id}/events` streams ordered server-sent events.
+- `POST /api/v1/incidents/{incident_id}/chat` submits a bounded Copilot question.
+- `POST /api/v1/incidents/{incident_id}/decisions` prepares or records an explicitly
+  authorized decision transition.
+
+The exact transport may evolve during implementation, but the truth contract may not.
+Every response includes incident identity, trace identity, case version, and projection
+sequence. Events are idempotent and ordered. Reconnection resumes from the last accepted
+sequence and reconstructs the same projection.
+
+### Live, replay, and unavailable states
+
+- **Live experiment:** the backend is running the synthetic experiment and emitting new
+  events as they occur.
+- **Ledger replay:** the backend re-emits a recorded authoritative event sequence. Replay
+  controls change event position, not business truth.
+- **Unavailable:** if the API or event stream cannot be reached, live motion stops and the
+  UI shows a disconnected state. It must not continue a fake successful animation.
+
+The competition demo may use synthetic data, but it must use the real application API,
+Strands harness, event ledger, policy, approval, executor, and verification path. The UI
+must identify synthetic experiment data without presenting it as a live external ERP.
+
 ## End-to-End Interaction
 
 1. The Dashboard shows 100 units entering the flow and 80 recorded downstream.
@@ -194,6 +274,11 @@ All visible controls on the core demo path must work.
 - Tests for provider-degraded, missing-evidence, stale-version, and invalid-approval paths.
 - Browser tests for Dashboard, Agent Workspace, tab switching, agent filtering, chat,
   evidence inspection, decision preparation, approval, recovery, and verification.
+- Data-binding tests proving the 100 rendered units, the `80 + 20` split, chart values,
+  agent states, tool edges, and evidence packets match the API payload and event sequence.
+- Negative tests proving that a missing API response, dropped event, duplicated event,
+  mismatched sequence, or disconnected stream cannot produce forward progress or a
+  success state in the UI.
 - Visual checks at desktop and narrow layouts with no overflow or clipped controls.
 
 ### Required end-to-end proof
@@ -201,7 +286,8 @@ All visible controls on the core demo path must work.
 One deterministic synthetic run must execute the complete path from anomaly detection to
 verified `100 / 100` recovery. The proof must include the event ledger, agent and tool
 activity, immutable decision intent, two-role quorum, execution receipt, verification
-receipt, and final Dashboard state.
+receipt, the 100 stable unit records, and final Dashboard state. A browser test must
+compare the final DOM projection with the final API snapshot and fail on any mismatch.
 
 ### Acceptance
 
@@ -211,6 +297,9 @@ receipt, and final Dashboard state.
   explanatory paragraphs.
 - The user can ask a question and receive a grounded response tied to the visible incident.
 - Dashboard and Agent Workspace remain synchronized across navigation.
+- Every animated state is backed by an API snapshot or ordered event; no frontend-only
+  timer can create business progress.
+- The 100 visible units, 80 recorded units, 20 missing units, and recovered 100 units map
+  to the experiment's stable unit identifiers.
 - No advisory output can bypass deterministic policy or human approval.
 - The complete demo can be understood and completed in under three minutes.
-
