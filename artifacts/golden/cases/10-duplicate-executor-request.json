@@ -33,6 +33,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -139,6 +140,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -205,13 +207,13 @@
     {
       "case_id": "case-10-duplicate-executor-request",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_ff06c5a3d3836ebc1b81064a6546d3d2",
+      "event_id": "evt_d9aa847dd7733972ee2641e163d72a46",
       "idempotency_key": "assessment:10-duplicate-executor-request",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "b2d21864ac507b99b3d3da1dd6772562b512e63990bc9fe4cb01d54442b5678b",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-10-duplicate-executor-request:erp-receipt\",\"case-10-duplicate-executor-request:failed-message\",\"case-10-duplicate-executor-request:invoice\",\"case-10-duplicate-executor-request:material-documents\",\"case-10-duplicate-executor-request:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-10-duplicate-executor-request\",\"case_id\":\"case-10-duplicate-executor-request\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-10-duplicate-executor-request\",\"validated_evidence_ids\":[\"case-10-duplicate-executor-request:erp-receipt\",\"case-10-duplicate-executor-request:failed-message\",\"case-10-duplicate-executor-request:invoice\",\"case-10-duplicate-executor-request:material-documents\",\"case-10-duplicate-executor-request:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-10-duplicate-executor-request:erp-receipt\",\"case-10-duplicate-executor-request:failed-message\",\"case-10-duplicate-executor-request:invoice\",\"case-10-duplicate-executor-request:material-documents\",\"case-10-duplicate-executor-request:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-10-duplicate-executor-request\"}}",
+      "payload_digest": "37fbdf577da19e536a09956335c35d17bca070192b5523d35c402d68d5d5f53a",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-10-duplicate-executor-request:erp-receipt\",\"case-10-duplicate-executor-request:failed-message\",\"case-10-duplicate-executor-request:invoice\",\"case-10-duplicate-executor-request:material-documents\",\"case-10-duplicate-executor-request:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-10-duplicate-executor-request\",\"case_id\":\"case-10-duplicate-executor-request\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-10-duplicate-executor-request\",\"validated_evidence_ids\":[\"case-10-duplicate-executor-request:erp-receipt\",\"case-10-duplicate-executor-request:failed-message\",\"case-10-duplicate-executor-request:invoice\",\"case-10-duplicate-executor-request:material-documents\",\"case-10-duplicate-executor-request:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-10-duplicate-executor-request:erp-receipt\",\"case-10-duplicate-executor-request:failed-message\",\"case-10-duplicate-executor-request:invoice\",\"case-10-duplicate-executor-request:material-documents\",\"case-10-duplicate-executor-request:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-10-duplicate-executor-request\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-10-duplicate-executor-request"

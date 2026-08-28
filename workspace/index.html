@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="The Missing 20 deterministic decision workspace" />
+    <title>The Missing 20 — Decision Workspace</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body data-workspace-ready="false">
+    <a class="skip-link" href="#main-content">Skip to workspace</a>
+    <header class="site-header" aria-labelledby="page-title">
+      <div class="brand-lockup">
+        <p class="eyebrow">THE MISSING 20 <span aria-hidden="true">/</span> INCIDENT REPLAY</p>
+        <h1 id="page-title">Find the gap. Prove the cause. Close it safely.</h1>
+        <p class="lede">A five-step replay shows how the system finds a missing shipment, investigates it, and recovers it safely.</p>
+      </div>
+      <nav class="mode-nav" aria-label="Workspace mode">
+        <a data-mode-link="complete" href="/?mode=complete" aria-label="Complete scripted replay">Complete</a>
+        <a data-mode-link="degraded" href="/?mode=degraded" aria-label="Degraded provider replay">Degraded</a>
+        <a data-mode-link="invalid" href="/?mode=invalid" aria-label="Fail-closed invalid replay">Fail-closed</a>
+      </nav>
+    </header>
+
+    <main id="main-content" class="workspace-shell" aria-live="polite">
+      <div id="unavailable" class="unavailable" hidden role="alert">
+        <strong>Workspace unavailable.</strong>
+        <span id="unavailable-status" class="status-chip status-not-proven">UNAVAILABLE</span>
+        <span id="unavailable-detail">The persisted artifact failed closed.</span>
+      </div>
+
+      <section id="case-header" class="case-header panel" aria-labelledby="case-title">
+        <div>
+          <h2 id="case-title">Loading case…</h2>
+        </div>
+        <div class="metric-grid" aria-label="Discrepancy metrics">
+          <div class="metric"><strong id="expected">—</strong><span>expected</span></div>
+          <div class="metric"><strong id="observed">—</strong><span>recorded</span></div>
+          <div class="metric metric-alert"><strong id="missing">—</strong><span>missing</span></div>
+        </div>
+      </section>
+
+      <section id="replay-section" class="replay-panel panel" aria-labelledby="replay-title">
+        <div class="replay-header">
+          <h2 id="replay-title">See what the system did</h2>
+        </div>
+        <p id="replay-intro" class="replay-intro">Start the replay to follow the incident one step at a time.</p>
+        <ol id="stage-list" class="stage-list" aria-label="Incident replay stages"></ol>
+        <div id="replay-progress" class="replay-progress" role="progressbar" aria-label="Incident replay progress" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><span></span></div>
+        <div id="replay-stage" class="replay-stage" aria-live="polite" aria-atomic="true" tabindex="-1">
+          <p id="replay-step-label" class="replay-step-label">Ready to begin</p>
+          <h3 id="replay-stage-title">Start the replay</h3>
+          <p id="replay-stage-outcome">Press Start to see how the system found and fixed the problem.</p>
+          <p id="replay-stage-impact" class="replay-stage-impact">This is a read-only replay; nothing is changed.</p>
+        </div>
+        <div class="replay-controls" aria-label="Replay controls">
+          <input id="replay-start" class="control-button control-primary" type="button" value="Start replay" />
+          <input id="replay-previous" class="control-button" type="button" value="Previous" disabled />
+          <input id="replay-next" class="control-button" type="button" value="Next" disabled />
+          <input id="replay-restart" class="control-button control-quiet" type="button" value="Restart" disabled />
+        </div>
+      </section>
+
+      <details id="evidence-details" class="detail-disclosure">
+        <summary>Evidence &amp; architecture proof</summary>
+        <section class="evidence-section" aria-labelledby="evidence-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">EVIDENCE DISCLOSURE</p>
+              <h2 id="evidence-title">What this demo proves</h2>
+            </div>
+            <p id="mode-label" class="mode-callout">Loading evidence mode…</p>
+          </div>
+          <div id="evidence-taxonomy" class="taxonomy-grid"></div>
+        </section>
+
+        <section class="panel integration-panel" aria-labelledby="integration-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">M6 INTEGRATION BOUNDARY</p>
+              <h2 id="integration-title">Existing AWS evidence, honestly scoped</h2>
+            </div>
+            <span id="integration-status" class="status-chip status-neutral">Loading</span>
+          </div>
+          <p class="integration-intro">Read-only proof. Advisory output has NO WRITE AUTHORITY.</p>
+          <div id="integration-summary" class="integration-summary"></div>
+          <div id="integration-capabilities" class="capability-list"></div>
+          <div class="digest-block"><span>M6 proof digest</span><code id="integration-digest">—</code></div>
+        </section>
+      </details>
+
+      <details id="investigation-details" class="detail-disclosure">
+        <summary>Investigation &amp; safety decision</summary>
+        <div class="primary-grid">
+          <section class="panel advisory-panel" aria-labelledby="advisory-title">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">ADVISORY INVESTIGATION</p>
+                <h2 id="advisory-title">Competing hypotheses</h2>
+              </div>
+              <span id="advisory-status" class="status-chip status-neutral">Loading</span>
+            </div>
+            <div class="advisory-disclosure">
+              <span class="lock-mark" aria-hidden="true">◇</span>
+              <strong id="authority-label">Model output is advisory only.</strong>
+              <span>It cannot authorize, execute, verify, or replay an operational action.</span>
+            </div>
+            <div id="advisory-meta" class="meta-row"></div>
+            <div id="hypotheses" class="hypothesis-list"></div>
+            <div id="advisory-report" class="report-block"></div>
+            <div id="advisory-warnings" class="warning-list"></div>
+          </section>
+
+          <section class="panel decision-panel" aria-labelledby="decision-title">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">DETERMINISTIC AUTHORITY</p>
+                <h2 id="decision-title">Operational decision</h2>
+              </div>
+              <span class="status-chip status-proven">DETERMINISTIC</span>
+            </div>
+            <p class="decision-intro">The policy result is computed from admitted authoritative evidence. Advisory fields are not inputs.</p>
+            <dl id="decision-details" class="decision-details"></dl>
+            <div class="digest-block"><span>Decision digest</span><code id="decision-digest">—</code></div>
+            <div id="decision-reasons" class="reason-list"></div>
+            <div id="decision-invariants" class="invariant-list"></div>
+          </section>
+        </div>
+      </details>
+
+      <details id="controls-details" class="detail-disclosure">
+        <summary>Human approval &amp; controlled recovery</summary>
+        <section class="panel control-panel" aria-labelledby="control-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">HUMAN AUTHORIZATION</p>
+              <h2 id="control-title">Two roles before controlled effects</h2>
+            </div>
+            <span id="quorum-status" class="status-chip status-neutral">Loading</span>
+          </div>
+          <p id="approval-boundary" class="boundary-copy"></p>
+          <div id="role-approvals" class="roles-grid"></div>
+          <p class="read-only-note"><span aria-hidden="true">▣</span> Read-only projection. These controls never approve or execute anything.</p>
+        </section>
+
+        <section class="panel execution-panel" aria-labelledby="execution-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">CONTROLLED RECOVERY PROOF</p>
+              <h2 id="execution-title">Fresh read → effect → verification → replay</h2>
+            </div>
+            <span id="replay-status" class="status-chip status-neutral">Loading</span>
+          </div>
+          <div id="execution-summary" class="execution-summary"></div>
+          <div id="effects" class="effect-list"></div>
+          <div id="postconditions" class="postcondition-list"></div>
+        </section>
+      </details>
+
+      <details id="audit-details" class="detail-disclosure">
+        <summary>Audit trail</summary>
+        <section class="panel timeline-panel" aria-labelledby="timeline-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">AUDIT TRAIL</p>
+              <h2 id="timeline-title">Every step is linked to a persisted record</h2>
+            </div>
+            <span id="timeline-count" class="muted">—</span>
+          </div>
+          <ol id="audit-timeline" class="audit-timeline"></ol>
+        </section>
+      </details>
+
+      <details id="claims-details" class="detail-disclosure">
+        <summary>Claim ledger</summary>
+        <section class="panel claims-panel" aria-labelledby="claims-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">CLAIM LEDGER</p>
+              <h2 id="claims-title">No claim without a class</h2>
+            </div>
+            <span class="muted">Canonical artifact <code id="artifact-digest">—</code></span>
+          </div>
+          <div id="claims" class="claims-list"></div>
+        </section>
+      </details>
+    </main>
+
+    <footer class="site-footer">
+      <span>All data is synthetic and local.</span>
+      <span>Model output is advisory. Deterministic policy and human authorization own controlled actions.</span>
+    </footer>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

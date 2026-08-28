@@ -19,6 +19,7 @@
       "decision": "PROTECT",
       "evaluation": {
         "allowed_next_action": null,
+        "citation_closure": null,
         "decision": "REJECT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [
@@ -105,6 +106,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": null,
+      "citation_closure": null,
       "decision": "REJECT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [
@@ -157,13 +159,13 @@
     {
       "case_id": "case-04-genuine-short-shipment",
       "event": "ACTION_PROTECTED",
-      "event_id": "evt_e186a2f053ebda83dd9566741b7ebcbb",
+      "event_id": "evt_e2e3267fb52c5d5e4f5f4f607e073be8",
       "idempotency_key": "assessment:04-genuine-short-shipment",
       "new_status": "PROTECTED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "8ab4a8bdf12130c8bfb79c5bc1e65641c24882411dbed91d0d5b6f06a748015a",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-04-genuine-short-shipment:erp-receipt\",\"case-04-genuine-short-shipment:failed-message\",\"case-04-genuine-short-shipment:invoice\",\"case-04-genuine-short-shipment:material-documents\",\"case-04-genuine-short-shipment:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-04-genuine-short-shipment\",\"case_id\":\"case-04-genuine-short-shipment\",\"decision\":\"PROTECT\",\"evaluation\":{\"allowed_next_action\":null,\"decision\":\"REJECT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[\"physical_quantity_below_ordered_quantity\"],\"trace_id\":\"trace-04-genuine-short-shipment\",\"validated_evidence_ids\":[\"case-04-genuine-short-shipment:erp-receipt\",\"case-04-genuine-short-shipment:failed-message\",\"case-04-genuine-short-shipment:invoice\",\"case-04-genuine-short-shipment:material-documents\",\"case-04-genuine-short-shipment:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"GENUINE_SHORT_SHIPMENT\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-04-genuine-short-shipment:erp-receipt\",\"case-04-genuine-short-shipment:failed-message\",\"case-04-genuine-short-shipment:invoice\",\"case-04-genuine-short-shipment:material-documents\",\"case-04-genuine-short-shipment:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"PHYSICAL_SHORT_SHIPMENT\"],\"trace_id\":\"trace-04-genuine-short-shipment\"}}",
+      "payload_digest": "caf8b16d0b5fc995bd55ee7c86eafa20ee6703513c840c23a8346f34d8ccc174",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-04-genuine-short-shipment:erp-receipt\",\"case-04-genuine-short-shipment:failed-message\",\"case-04-genuine-short-shipment:invoice\",\"case-04-genuine-short-shipment:material-documents\",\"case-04-genuine-short-shipment:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-04-genuine-short-shipment\",\"case_id\":\"case-04-genuine-short-shipment\",\"decision\":\"PROTECT\",\"evaluation\":{\"allowed_next_action\":null,\"citation_closure\":null,\"decision\":\"REJECT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[\"physical_quantity_below_ordered_quantity\"],\"trace_id\":\"trace-04-genuine-short-shipment\",\"validated_evidence_ids\":[\"case-04-genuine-short-shipment:erp-receipt\",\"case-04-genuine-short-shipment:failed-message\",\"case-04-genuine-short-shipment:invoice\",\"case-04-genuine-short-shipment:material-documents\",\"case-04-genuine-short-shipment:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"GENUINE_SHORT_SHIPMENT\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-04-genuine-short-shipment:erp-receipt\",\"case-04-genuine-short-shipment:failed-message\",\"case-04-genuine-short-shipment:invoice\",\"case-04-genuine-short-shipment:material-documents\",\"case-04-genuine-short-shipment:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"PHYSICAL_SHORT_SHIPMENT\"],\"trace_id\":\"trace-04-genuine-short-shipment\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-04-genuine-short-shipment"

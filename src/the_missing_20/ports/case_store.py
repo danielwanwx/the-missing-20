@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from the_missing_20.authority_b.models import QuorumActionGrant
 from the_missing_20.domain.events import CaseEvent, TransitionCommand
 from the_missing_20.domain.execution import (
     DetectionGenesis,
@@ -85,3 +86,18 @@ class CaseStore(Protocol):
     def list_attempts(self, case_id: str) -> tuple[ExecutionAttempt, ...]: ...
 
     def get_genesis(self, case_id: str) -> DetectionGenesis: ...
+
+    def get_authority_b_binding(
+        self, intent_id: str
+    ) -> tuple[QuorumActionGrant, ActionGrant] | None: ...
+
+    def bind_and_reserve_authority_b_attempt(
+        self,
+        *,
+        grant: QuorumActionGrant,
+        bridge_grant: ActionGrant,
+        preparation_transitions: tuple[TransitionCommand, ...],
+        attempt: ExecutionAttempt,
+        decision: PolicyDecision,
+        execution_transition: TransitionCommand,
+    ) -> tuple[ActionGrant, bool]: ...

@@ -33,6 +33,7 @@
       "decision": "RECEIPT_ALREADY_POSTED",
       "evaluation": {
         "allowed_next_action": null,
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -162,6 +163,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": null,
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -230,13 +232,13 @@
     {
       "case_id": "case-02-receipt-already-posted",
       "event": "RECEIPT_ALREADY_POSTED",
-      "event_id": "evt_6668d88707eb182db5caf21fc179262b",
+      "event_id": "evt_791620baa2cc53ac4d8f644dc43ce1ef",
       "idempotency_key": "assessment:02-receipt-already-posted",
       "new_status": "RECEIPT_ALREADY_VERIFIED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "283fbbca4a0a972ff0be1e9cf3a3bd0ca4b1a3e8a8fad470433d10253eb96cb0",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-02-receipt-already-posted:erp-receipt\",\"case-02-receipt-already-posted:failed-message\",\"case-02-receipt-already-posted:invoice\",\"case-02-receipt-already-posted:material-documents\",\"case-02-receipt-already-posted:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-02-receipt-already-posted\",\"case_id\":\"case-02-receipt-already-posted\",\"decision\":\"RECEIPT_ALREADY_POSTED\",\"evaluation\":{\"allowed_next_action\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-02-receipt-already-posted\",\"validated_evidence_ids\":[\"case-02-receipt-already-posted:erp-receipt\",\"case-02-receipt-already-posted:failed-message\",\"case-02-receipt-already-posted:invoice\",\"case-02-receipt-already-posted:material-documents\",\"case-02-receipt-already-posted:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"ALREADY_POSTED\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-02-receipt-already-posted:erp-receipt\",\"case-02-receipt-already-posted:failed-message\",\"case-02-receipt-already-posted:invoice\",\"case-02-receipt-already-posted:material-documents\",\"case-02-receipt-already-posted:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RECEIPT_ALREADY_POSTED\"],\"trace_id\":\"trace-02-receipt-already-posted\"}}",
+      "payload_digest": "bbded1882f490ae0a78708af9c0407b7342ede48ef950702962ca141efb770b2",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-02-receipt-already-posted:erp-receipt\",\"case-02-receipt-already-posted:failed-message\",\"case-02-receipt-already-posted:invoice\",\"case-02-receipt-already-posted:material-documents\",\"case-02-receipt-already-posted:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-02-receipt-already-posted\",\"case_id\":\"case-02-receipt-already-posted\",\"decision\":\"RECEIPT_ALREADY_POSTED\",\"evaluation\":{\"allowed_next_action\":null,\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-02-receipt-already-posted\",\"validated_evidence_ids\":[\"case-02-receipt-already-posted:erp-receipt\",\"case-02-receipt-already-posted:failed-message\",\"case-02-receipt-already-posted:invoice\",\"case-02-receipt-already-posted:material-documents\",\"case-02-receipt-already-posted:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"ALREADY_POSTED\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-02-receipt-already-posted:erp-receipt\",\"case-02-receipt-already-posted:failed-message\",\"case-02-receipt-already-posted:invoice\",\"case-02-receipt-already-posted:material-documents\",\"case-02-receipt-already-posted:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RECEIPT_ALREADY_POSTED\"],\"trace_id\":\"trace-02-receipt-already-posted\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-02-receipt-already-posted"

@@ -45,6 +45,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -171,6 +172,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -251,13 +253,13 @@
     {
       "case_id": "case-16-crash-recovery",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_798616d35c57eac4ec0eb7d3b227179a",
+      "event_id": "evt_b5a9c9bd7594a31bca2a7f92a7d0baf4",
       "idempotency_key": "assessment:16-crash-recovery",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "ff93ea9e44bc6fa5d66f2857bf8faec345139f2350569c739380610a8474e3dc",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-16-crash-recovery:erp-receipt\",\"case-16-crash-recovery:failed-message\",\"case-16-crash-recovery:invoice\",\"case-16-crash-recovery:material-documents\",\"case-16-crash-recovery:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-16-crash-recovery\",\"case_id\":\"case-16-crash-recovery\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-16-crash-recovery\",\"validated_evidence_ids\":[\"case-16-crash-recovery:erp-receipt\",\"case-16-crash-recovery:failed-message\",\"case-16-crash-recovery:invoice\",\"case-16-crash-recovery:material-documents\",\"case-16-crash-recovery:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-16-crash-recovery:erp-receipt\",\"case-16-crash-recovery:failed-message\",\"case-16-crash-recovery:invoice\",\"case-16-crash-recovery:material-documents\",\"case-16-crash-recovery:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-16-crash-recovery\"}}",
+      "payload_digest": "e6c2e213e023e7a8af566290fdeb7a75dcf22055d5d2509dc77034856290f284",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-16-crash-recovery:erp-receipt\",\"case-16-crash-recovery:failed-message\",\"case-16-crash-recovery:invoice\",\"case-16-crash-recovery:material-documents\",\"case-16-crash-recovery:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-16-crash-recovery\",\"case_id\":\"case-16-crash-recovery\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-16-crash-recovery\",\"validated_evidence_ids\":[\"case-16-crash-recovery:erp-receipt\",\"case-16-crash-recovery:failed-message\",\"case-16-crash-recovery:invoice\",\"case-16-crash-recovery:material-documents\",\"case-16-crash-recovery:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-16-crash-recovery:erp-receipt\",\"case-16-crash-recovery:failed-message\",\"case-16-crash-recovery:invoice\",\"case-16-crash-recovery:material-documents\",\"case-16-crash-recovery:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-16-crash-recovery\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-16-crash-recovery"

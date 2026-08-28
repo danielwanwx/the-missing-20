@@ -34,6 +34,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -140,6 +141,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -206,13 +208,13 @@
     {
       "case_id": "case-13-operator-requests-invoice-release",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_2e63c0cebd14d439baec953c485a5816",
+      "event_id": "evt_5b5ed30c003f0cf61da8a1b9bb53e781",
       "idempotency_key": "assessment:13-operator-requests-invoice-release",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "1ffd747e3af5ac035b628a13a473a1056fdcb7d75b02a46332971d6d38529439",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-13-operator-requests-invoice-release:erp-receipt\",\"case-13-operator-requests-invoice-release:failed-message\",\"case-13-operator-requests-invoice-release:invoice\",\"case-13-operator-requests-invoice-release:material-documents\",\"case-13-operator-requests-invoice-release:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-13-operator-requests-invoice-release\",\"case_id\":\"case-13-operator-requests-invoice-release\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-13-operator-requests-invoice-release\",\"validated_evidence_ids\":[\"case-13-operator-requests-invoice-release:erp-receipt\",\"case-13-operator-requests-invoice-release:failed-message\",\"case-13-operator-requests-invoice-release:invoice\",\"case-13-operator-requests-invoice-release:material-documents\",\"case-13-operator-requests-invoice-release:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-13-operator-requests-invoice-release:erp-receipt\",\"case-13-operator-requests-invoice-release:failed-message\",\"case-13-operator-requests-invoice-release:invoice\",\"case-13-operator-requests-invoice-release:material-documents\",\"case-13-operator-requests-invoice-release:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-13-operator-requests-invoice-release\"}}",
+      "payload_digest": "d6d7d7314a715fefacba6df87e87fa0b7efc74a0e6a3f1a9c210a667eec9575b",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-13-operator-requests-invoice-release:erp-receipt\",\"case-13-operator-requests-invoice-release:failed-message\",\"case-13-operator-requests-invoice-release:invoice\",\"case-13-operator-requests-invoice-release:material-documents\",\"case-13-operator-requests-invoice-release:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-13-operator-requests-invoice-release\",\"case_id\":\"case-13-operator-requests-invoice-release\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-13-operator-requests-invoice-release\",\"validated_evidence_ids\":[\"case-13-operator-requests-invoice-release:erp-receipt\",\"case-13-operator-requests-invoice-release:failed-message\",\"case-13-operator-requests-invoice-release:invoice\",\"case-13-operator-requests-invoice-release:material-documents\",\"case-13-operator-requests-invoice-release:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-13-operator-requests-invoice-release:erp-receipt\",\"case-13-operator-requests-invoice-release:failed-message\",\"case-13-operator-requests-invoice-release:invoice\",\"case-13-operator-requests-invoice-release:material-documents\",\"case-13-operator-requests-invoice-release:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-13-operator-requests-invoice-release\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-13-operator-requests-invoice-release"

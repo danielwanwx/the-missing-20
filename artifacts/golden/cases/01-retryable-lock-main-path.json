@@ -45,6 +45,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -171,6 +172,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -251,13 +253,13 @@
     {
       "case_id": "case-01-retryable-lock-main-path",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_fbb40525eb55a805a2a66ae7f409f83e",
+      "event_id": "evt_cb30c8f71df2b24ac7e1e3b67cddaaee",
       "idempotency_key": "assessment:01-retryable-lock-main-path",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "3c00cf2d19bd1fd63debc1a73205dff1f6bde9ee114249780d0d069863c3797b",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-01-retryable-lock-main-path:erp-receipt\",\"case-01-retryable-lock-main-path:failed-message\",\"case-01-retryable-lock-main-path:invoice\",\"case-01-retryable-lock-main-path:material-documents\",\"case-01-retryable-lock-main-path:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-01-retryable-lock-main-path\",\"case_id\":\"case-01-retryable-lock-main-path\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-01-retryable-lock-main-path\",\"validated_evidence_ids\":[\"case-01-retryable-lock-main-path:erp-receipt\",\"case-01-retryable-lock-main-path:failed-message\",\"case-01-retryable-lock-main-path:invoice\",\"case-01-retryable-lock-main-path:material-documents\",\"case-01-retryable-lock-main-path:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-01-retryable-lock-main-path:erp-receipt\",\"case-01-retryable-lock-main-path:failed-message\",\"case-01-retryable-lock-main-path:invoice\",\"case-01-retryable-lock-main-path:material-documents\",\"case-01-retryable-lock-main-path:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-01-retryable-lock-main-path\"}}",
+      "payload_digest": "72dd54faf5d9449f6501989cf6f7c2a2a4c2e449d7664d97d90ce17f679582e2",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-01-retryable-lock-main-path:erp-receipt\",\"case-01-retryable-lock-main-path:failed-message\",\"case-01-retryable-lock-main-path:invoice\",\"case-01-retryable-lock-main-path:material-documents\",\"case-01-retryable-lock-main-path:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-01-retryable-lock-main-path\",\"case_id\":\"case-01-retryable-lock-main-path\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-01-retryable-lock-main-path\",\"validated_evidence_ids\":[\"case-01-retryable-lock-main-path:erp-receipt\",\"case-01-retryable-lock-main-path:failed-message\",\"case-01-retryable-lock-main-path:invoice\",\"case-01-retryable-lock-main-path:material-documents\",\"case-01-retryable-lock-main-path:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-01-retryable-lock-main-path:erp-receipt\",\"case-01-retryable-lock-main-path:failed-message\",\"case-01-retryable-lock-main-path:invoice\",\"case-01-retryable-lock-main-path:material-documents\",\"case-01-retryable-lock-main-path:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-01-retryable-lock-main-path\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-01-retryable-lock-main-path"

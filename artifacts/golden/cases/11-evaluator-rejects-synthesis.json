@@ -19,6 +19,7 @@
       "decision": "EVALUATOR_REJECTED",
       "evaluation": {
         "allowed_next_action": null,
+        "citation_closure": null,
         "decision": "REJECT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [
@@ -105,6 +106,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": null,
+      "citation_closure": null,
       "decision": "REJECT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [
@@ -157,13 +159,13 @@
     {
       "case_id": "case-11-evaluator-rejects-synthesis",
       "event": "INVESTIGATION_ASSESSED",
-      "event_id": "evt_3bef86d64c4b2eb109a7800b5ae54dae",
+      "event_id": "evt_c1c50af329b62a2d2d293ec355945497",
       "idempotency_key": "assessment:11-evaluator-rejects-synthesis",
       "new_status": "INVESTIGATING",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "779f2f585591c79f2e20d20d5e9922b6e829d058726aba5737fc497442301608",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-11-evaluator-rejects-synthesis:erp-receipt\",\"case-11-evaluator-rejects-synthesis:failed-message\",\"case-11-evaluator-rejects-synthesis:invoice\",\"case-11-evaluator-rejects-synthesis:material-documents\",\"case-11-evaluator-rejects-synthesis:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-11-evaluator-rejects-synthesis\",\"case_id\":\"case-11-evaluator-rejects-synthesis\",\"decision\":\"EVALUATOR_REJECTED\",\"evaluation\":{\"allowed_next_action\":null,\"decision\":\"REJECT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[\"independent_evaluator_disagrees\"],\"trace_id\":\"trace-11-evaluator-rejects-synthesis\",\"validated_evidence_ids\":[\"case-11-evaluator-rejects-synthesis:erp-receipt\",\"case-11-evaluator-rejects-synthesis:failed-message\",\"case-11-evaluator-rejects-synthesis:invoice\",\"case-11-evaluator-rejects-synthesis:material-documents\",\"case-11-evaluator-rejects-synthesis:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-11-evaluator-rejects-synthesis:erp-receipt\",\"case-11-evaluator-rejects-synthesis:failed-message\",\"case-11-evaluator-rejects-synthesis:invoice\",\"case-11-evaluator-rejects-synthesis:material-documents\",\"case-11-evaluator-rejects-synthesis:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"EVALUATOR_REJECTED\"],\"trace_id\":\"trace-11-evaluator-rejects-synthesis\"}}",
+      "payload_digest": "b9d25dfacdf3400a9d0d7f4a7d1dfbbfe648cf3d792e5551708f7ea3bfd4579f",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-11-evaluator-rejects-synthesis:erp-receipt\",\"case-11-evaluator-rejects-synthesis:failed-message\",\"case-11-evaluator-rejects-synthesis:invoice\",\"case-11-evaluator-rejects-synthesis:material-documents\",\"case-11-evaluator-rejects-synthesis:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-11-evaluator-rejects-synthesis\",\"case_id\":\"case-11-evaluator-rejects-synthesis\",\"decision\":\"EVALUATOR_REJECTED\",\"evaluation\":{\"allowed_next_action\":null,\"citation_closure\":null,\"decision\":\"REJECT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[\"independent_evaluator_disagrees\"],\"trace_id\":\"trace-11-evaluator-rejects-synthesis\",\"validated_evidence_ids\":[\"case-11-evaluator-rejects-synthesis:erp-receipt\",\"case-11-evaluator-rejects-synthesis:failed-message\",\"case-11-evaluator-rejects-synthesis:invoice\",\"case-11-evaluator-rejects-synthesis:material-documents\",\"case-11-evaluator-rejects-synthesis:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-11-evaluator-rejects-synthesis:erp-receipt\",\"case-11-evaluator-rejects-synthesis:failed-message\",\"case-11-evaluator-rejects-synthesis:invoice\",\"case-11-evaluator-rejects-synthesis:material-documents\",\"case-11-evaluator-rejects-synthesis:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"EVALUATOR_REJECTED\"],\"trace_id\":\"trace-11-evaluator-rejects-synthesis\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-11-evaluator-rejects-synthesis"

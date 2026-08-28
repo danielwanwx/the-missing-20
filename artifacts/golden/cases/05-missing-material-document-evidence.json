@@ -18,6 +18,7 @@
       "decision": "REQUIRE_EVIDENCE",
       "evaluation": {
         "allowed_next_action": null,
+        "citation_closure": null,
         "decision": "MORE_EVIDENCE",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [
@@ -96,6 +97,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": null,
+      "citation_closure": null,
       "decision": "MORE_EVIDENCE",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [
@@ -138,13 +140,13 @@
     {
       "case_id": "case-05-missing-material-document-evidence",
       "event": "EVIDENCE_REQUIRED",
-      "event_id": "evt_73c01e60abac5ad32b7b46ac6a6ca0fc",
+      "event_id": "evt_920323cb67df85706e28840442d476b1",
       "idempotency_key": "assessment:05-missing-material-document-evidence",
       "new_status": "NEEDS_EVIDENCE",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "3cc373af99ba3fd9b656136bbdaa439ac0050acd9ba6ef1102f1fab17ab818f6",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-05-missing-material-document-evidence:erp-receipt\",\"case-05-missing-material-document-evidence:failed-message\",\"case-05-missing-material-document-evidence:invoice\",\"case-05-missing-material-document-evidence:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-05-missing-material-document-evidence\",\"case_id\":\"case-05-missing-material-document-evidence\",\"decision\":\"REQUIRE_EVIDENCE\",\"evaluation\":{\"allowed_next_action\":null,\"decision\":\"MORE_EVIDENCE\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[\"required_evidence_missing\"],\"trace_id\":\"trace-05-missing-material-document-evidence\",\"validated_evidence_ids\":[]},\"hypothesis\":{\"conclusion\":\"NEEDS_EVIDENCE\",\"confidence_band\":\"LOW\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[\"MATERIAL_DOCUMENT\"],\"supporting_evidence_ids\":[]},\"missing_evidence_sources\":[\"MATERIAL_DOCUMENT\"],\"reason_codes\":[\"SOURCE_UNAVAILABLE\"],\"trace_id\":\"trace-05-missing-material-document-evidence\"}}",
+      "payload_digest": "c3a54342aadbdbbeb10ef6d90aa3c24138acb75b23031fbf172d352c84bda5d0",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-05-missing-material-document-evidence:erp-receipt\",\"case-05-missing-material-document-evidence:failed-message\",\"case-05-missing-material-document-evidence:invoice\",\"case-05-missing-material-document-evidence:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-05-missing-material-document-evidence\",\"case_id\":\"case-05-missing-material-document-evidence\",\"decision\":\"REQUIRE_EVIDENCE\",\"evaluation\":{\"allowed_next_action\":null,\"citation_closure\":null,\"decision\":\"MORE_EVIDENCE\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[\"required_evidence_missing\"],\"trace_id\":\"trace-05-missing-material-document-evidence\",\"validated_evidence_ids\":[]},\"hypothesis\":{\"conclusion\":\"NEEDS_EVIDENCE\",\"confidence_band\":\"LOW\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[\"MATERIAL_DOCUMENT\"],\"supporting_evidence_ids\":[]},\"missing_evidence_sources\":[\"MATERIAL_DOCUMENT\"],\"reason_codes\":[\"SOURCE_UNAVAILABLE\"],\"trace_id\":\"trace-05-missing-material-document-evidence\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-05-missing-material-document-evidence"

@@ -20,6 +20,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -104,6 +105,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -154,13 +156,13 @@
     {
       "case_id": "case-14-ap-requests-receipt-restart",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_9d50de7aee66596bbadbf0f3fd1d676a",
+      "event_id": "evt_24f967fb94ca566727e59fff06157c5f",
       "idempotency_key": "assessment:14-ap-requests-receipt-restart",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "0a4962d2e1752017ea96cba5f7e8635dd20f08d4175c8ff822d2206dff0b8ef8",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-14-ap-requests-receipt-restart:erp-receipt\",\"case-14-ap-requests-receipt-restart:failed-message\",\"case-14-ap-requests-receipt-restart:invoice\",\"case-14-ap-requests-receipt-restart:material-documents\",\"case-14-ap-requests-receipt-restart:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-14-ap-requests-receipt-restart\",\"case_id\":\"case-14-ap-requests-receipt-restart\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-14-ap-requests-receipt-restart\",\"validated_evidence_ids\":[\"case-14-ap-requests-receipt-restart:erp-receipt\",\"case-14-ap-requests-receipt-restart:failed-message\",\"case-14-ap-requests-receipt-restart:invoice\",\"case-14-ap-requests-receipt-restart:material-documents\",\"case-14-ap-requests-receipt-restart:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-14-ap-requests-receipt-restart:erp-receipt\",\"case-14-ap-requests-receipt-restart:failed-message\",\"case-14-ap-requests-receipt-restart:invoice\",\"case-14-ap-requests-receipt-restart:material-documents\",\"case-14-ap-requests-receipt-restart:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-14-ap-requests-receipt-restart\"}}",
+      "payload_digest": "b408ecc18eb91db376b79144d0ed4a3bca9aaee3873d7df8cd913f24330dfcc3",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-14-ap-requests-receipt-restart:erp-receipt\",\"case-14-ap-requests-receipt-restart:failed-message\",\"case-14-ap-requests-receipt-restart:invoice\",\"case-14-ap-requests-receipt-restart:material-documents\",\"case-14-ap-requests-receipt-restart:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-14-ap-requests-receipt-restart\",\"case_id\":\"case-14-ap-requests-receipt-restart\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-14-ap-requests-receipt-restart\",\"validated_evidence_ids\":[\"case-14-ap-requests-receipt-restart:erp-receipt\",\"case-14-ap-requests-receipt-restart:failed-message\",\"case-14-ap-requests-receipt-restart:invoice\",\"case-14-ap-requests-receipt-restart:material-documents\",\"case-14-ap-requests-receipt-restart:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-14-ap-requests-receipt-restart:erp-receipt\",\"case-14-ap-requests-receipt-restart:failed-message\",\"case-14-ap-requests-receipt-restart:invoice\",\"case-14-ap-requests-receipt-restart:material-documents\",\"case-14-ap-requests-receipt-restart:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-14-ap-requests-receipt-restart\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-14-ap-requests-receipt-restart"

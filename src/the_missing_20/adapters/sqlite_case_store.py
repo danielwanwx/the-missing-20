@@ -8,6 +8,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from the_missing_20.authority_b.models import QuorumActionGrant
 from the_missing_20.domain.assessment import validate_investigation_assessment
 from the_missing_20.domain.errors import IdempotencyConflict, InvalidEventPayload, VersionConflict
 from the_missing_20.domain.events import CaseEvent, TransitionCommand
@@ -102,6 +103,14 @@ class SQLiteCaseStore:
                     trace_id TEXT NOT NULL,
                     status TEXT NOT NULL,
                     grant_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS authority_b_bindings (
+                    intent_id TEXT PRIMARY KEY,
+                    grant_digest TEXT NOT NULL UNIQUE,
+                    grant_json TEXT NOT NULL,
+                    bridge_authorization_id TEXT NOT NULL UNIQUE,
+                    bridge_grant_json TEXT NOT NULL,
+                    bound_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS policy_decisions (
                     decision_id TEXT PRIMARY KEY,
@@ -503,6 +512,272 @@ class SQLiteCaseStore:
                 ),
             )
             return updated, event
+
+    def bind_authority_b_grant(
+        self,
+        *,
+        grant: QuorumActionGrant,
+        bridge_grant: ActionGrant,
+        preparation_transitions: tuple[TransitionCommand, ...] = (),
+    ) -> ActionGrant:
+        """Atomically bind a verified quorum to the existing execution ledger.
+
+        Authority-B keeps its two-role grant in its own contract and ledger.  The
+        historical ``ControlledExecutor`` still uses the ``ActionGrant``-shaped
+        execution record, so this method creates one private bridge record in the
+        same SQLite transaction as the case authorization transition.  The bridge is
+        never accepted by the Authority-B boundary itself; callers can only create it
+        after they have validated a ``QuorumActionGrant``.  Preparation transitions
+        (used when a deterministic decision starts at ``INVESTIGATING``) and the
+        bridge insertion are one transaction, preventing a crash from leaving a
+        partially advanced case without a durable binding.
+        """
+
+        if not (
+            bridge_grant.authorization_id == f"authority-b:{grant.grant_id}"
+            and bridge_grant.case_id == grant.case_id
+            and bridge_grant.trace_id == grant.trace_id
+            and bridge_grant.tool is grant.tool
+            and bridge_grant.complete_parameters == grant.complete_parameters
+            and bridge_grant.expires_at == grant.expires_at
+        ):
+            raise InvalidEventPayload("Authority-B bridge grant is not bound to the quorum")
+        try:
+            validate_role_tool_pair(bridge_grant.role, bridge_grant.tool)
+        except ValueError as exc:
+            raise InvalidEventPayload(
+                "Authority-B bridge role and tool are not authorized"
+            ) from exc
+        for transition in preparation_transitions:
+            if transition.case_id != grant.case_id or transition.trace_id != grant.trace_id:
+                raise InvalidEventPayload("Authority-B preparation context does not match grant")
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT grant_digest, grant_json, bridge_grant_json "
+                "FROM authority_b_bindings WHERE intent_id = ?",
+                (grant.intent_id,),
+            ).fetchone()
+            if existing is not None:
+                if (
+                    existing["grant_digest"] != grant.grant_digest
+                    or existing["grant_json"] != grant.model_dump_json()
+                    or existing["bridge_grant_json"] != bridge_grant.model_dump_json()
+                ):
+                    raise IdempotencyConflict("Authority-B intent is already bound differently")
+                return ActionGrant.model_validate_json(existing["bridge_grant_json"])
+
+            row = connection.execute(
+                "SELECT case_version, case_json FROM case_projection WHERE case_id = ?",
+                (grant.case_id,),
+            ).fetchone()
+            if row is None:
+                raise LookupError(f"unknown case {grant.case_id}")
+            current = Case.model_validate_json(row["case_json"])
+            if current.case_version != grant.case_version:
+                raise VersionConflict("Authority-B intent was created for a stale case version")
+            for transition in preparation_transitions:
+                current, _event = self._apply_transition(connection, transition)
+
+            expected_status = {
+                "restart_receipt_message": "RECEIPT_ACTION_AUTHORIZED",
+                "release_invoice": "INVOICE_ACTION_AUTHORIZED",
+            }[grant.tool.value]
+            if current.status.value != expected_status:
+                raise InvalidEventPayload(
+                    "Authority-B binding did not reach the controlled action state"
+                )
+            if bridge_grant.case_version != current.case_version:
+                raise InvalidEventPayload(
+                    "Authority-B bridge version does not match the authorized case"
+                )
+            bridge_row = connection.execute(
+                "SELECT grant_json FROM grants WHERE authorization_id = ?",
+                (bridge_grant.authorization_id,),
+            ).fetchone()
+            if bridge_row is not None:
+                if bridge_row["grant_json"] != bridge_grant.model_dump_json():
+                    raise IdempotencyConflict("Authority-B bridge authorization ID is reused")
+                return ActionGrant.model_validate_json(bridge_row["grant_json"])
+            connection.execute(
+                "INSERT INTO grants VALUES (?, ?, ?, ?, ?)",
+                (
+                    bridge_grant.authorization_id,
+                    bridge_grant.case_id,
+                    bridge_grant.trace_id,
+                    GrantStatus.ISSUED.value,
+                    bridge_grant.model_dump_json(),
+                ),
+            )
+            connection.execute(
+                "INSERT INTO authority_b_bindings VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    grant.intent_id,
+                    grant.grant_digest,
+                    grant.model_dump_json(),
+                    bridge_grant.authorization_id,
+                    bridge_grant.model_dump_json(),
+                    grant.issued_at.isoformat(),
+                ),
+            )
+            return bridge_grant
+
+    def get_authority_b_binding(
+        self, intent_id: str
+    ) -> tuple[QuorumActionGrant, ActionGrant] | None:
+        """Load an Authority-B quorum/bridge binding after process restart."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT grant_json, bridge_grant_json FROM authority_b_bindings "
+                "WHERE intent_id = ?",
+                (intent_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            return (
+                QuorumActionGrant.model_validate_json(row["grant_json"]),
+                ActionGrant.model_validate_json(row["bridge_grant_json"]),
+            )
+
+    def bind_and_reserve_authority_b_attempt(
+        self,
+        *,
+        grant: QuorumActionGrant,
+        bridge_grant: ActionGrant,
+        preparation_transitions: tuple[TransitionCommand, ...],
+        attempt: ExecutionAttempt,
+        decision: PolicyDecision,
+        execution_transition: TransitionCommand,
+    ) -> tuple[ActionGrant, bool]:
+        """Bind a quorum and reserve its first execution in one SQLite transaction.
+
+        This is the Authority-B entry point used by the typed executor.  The private
+        bridge, any deterministic lifecycle preparation, the execution-start event,
+        policy record, and reserved attempt are committed together.  A returned
+        ``False`` means an earlier binding already exists; the caller then uses the
+        historical executor's normal idempotent recovery path.
+        """
+
+        if not (
+            bridge_grant.authorization_id == f"authority-b:{grant.grant_id}"
+            and bridge_grant.case_id == grant.case_id
+            and bridge_grant.trace_id == grant.trace_id
+            and bridge_grant.tool is grant.tool
+            and bridge_grant.complete_parameters == grant.complete_parameters
+            and bridge_grant.expires_at == grant.expires_at
+            and attempt.authorization_id == bridge_grant.authorization_id
+            and attempt.case_id == bridge_grant.case_id
+            and attempt.trace_id == bridge_grant.trace_id
+            and attempt.tool is bridge_grant.tool
+            and decision.authorization_id == bridge_grant.authorization_id
+            and decision.case_id == bridge_grant.case_id
+            and decision.trace_id == bridge_grant.trace_id
+            and decision.execution_id == attempt.execution_id
+            and decision.tool is bridge_grant.tool
+            and execution_transition.case_id == grant.case_id
+            and execution_transition.trace_id == grant.trace_id
+        ):
+            raise InvalidEventPayload("Authority-B reservation records are not bound")
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT grant_digest, grant_json, bridge_grant_json "
+                "FROM authority_b_bindings WHERE intent_id = ?",
+                (grant.intent_id,),
+            ).fetchone()
+            if existing is not None:
+                if (
+                    existing["grant_digest"] != grant.grant_digest
+                    or existing["grant_json"] != grant.model_dump_json()
+                    or existing["bridge_grant_json"] != bridge_grant.model_dump_json()
+                ):
+                    raise IdempotencyConflict("Authority-B intent is already bound differently")
+                return ActionGrant.model_validate_json(existing["bridge_grant_json"]), False
+            row = connection.execute(
+                "SELECT case_version, case_json FROM case_projection WHERE case_id = ?",
+                (grant.case_id,),
+            ).fetchone()
+            if row is None:
+                raise LookupError(f"unknown case {grant.case_id}")
+            current = Case.model_validate_json(row["case_json"])
+            if current.case_version != grant.case_version:
+                raise VersionConflict("Authority-B intent was created for a stale case version")
+            for transition in preparation_transitions:
+                current, _event = self._apply_transition(connection, transition)
+            expected_status = {
+                "restart_receipt_message": "RECEIPT_ACTION_AUTHORIZED",
+                "release_invoice": "INVOICE_ACTION_AUTHORIZED",
+            }[grant.tool.value]
+            if current.status.value != expected_status:
+                raise InvalidEventPayload(
+                    "Authority-B reservation did not reach the controlled action state"
+                )
+            if bridge_grant.case_version != current.case_version:
+                raise InvalidEventPayload(
+                    "Authority-B bridge version does not match the authorized case"
+                )
+            if execution_transition.expected_version != current.case_version:
+                raise VersionConflict("Authority-B execution transition has a stale version")
+            if attempt.status is not ExecutionAttemptStatus.RESERVED:
+                raise InvalidEventPayload("Authority-B initial attempt must be RESERVED")
+            if decision.decision is not PolicyOutcome.ALLOW:
+                raise InvalidEventPayload("Authority-B reservation requires an allow decision")
+            grant_row = connection.execute(
+                "SELECT grant_json FROM grants WHERE authorization_id = ?",
+                (bridge_grant.authorization_id,),
+            ).fetchone()
+            if grant_row is not None:
+                raise IdempotencyConflict("Authority-B bridge authorization ID is reused")
+            connection.execute(
+                "INSERT INTO grants VALUES (?, ?, ?, ?, ?)",
+                (
+                    bridge_grant.authorization_id,
+                    bridge_grant.case_id,
+                    bridge_grant.trace_id,
+                    GrantStatus.ISSUED.value,
+                    bridge_grant.model_dump_json(),
+                ),
+            )
+            updated, _event = self._apply_transition(connection, execution_transition)
+            del updated
+            connection.execute(
+                "INSERT INTO policy_decisions VALUES (?, ?, ?, ?)",
+                (
+                    decision.decision_id,
+                    decision.case_id,
+                    decision.trace_id,
+                    decision.model_dump_json(),
+                ),
+            )
+            connection.execute(
+                "INSERT INTO execution_attempts VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    attempt.execution_id,
+                    attempt.authorization_id,
+                    attempt.case_id,
+                    attempt.trace_id,
+                    attempt.idempotency_key,
+                    attempt.command_digest,
+                    attempt.model_dump_json(),
+                ),
+            )
+            connection.execute(
+                "UPDATE grants SET status = ? WHERE authorization_id = ?",
+                (GrantStatus.RESERVED.value, bridge_grant.authorization_id),
+            )
+            connection.execute(
+                "INSERT INTO authority_b_bindings VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    grant.intent_id,
+                    grant.grant_digest,
+                    grant.model_dump_json(),
+                    bridge_grant.authorization_id,
+                    bridge_grant.model_dump_json(),
+                    grant.issued_at.isoformat(),
+                ),
+            )
+            return bridge_grant, True
 
     def save_policy_decision(self, decision: PolicyDecision) -> None:
         with self._connect() as connection:

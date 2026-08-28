@@ -45,6 +45,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -171,6 +172,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -252,13 +254,13 @@
     {
       "case_id": "case-03-receipt-posted-after-approval",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_2f55fea396859c88a9effce9e4283648",
+      "event_id": "evt_cd2481df35f1044bc3d04718326c7a96",
       "idempotency_key": "assessment:03-receipt-posted-after-approval",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "61772ca09b8f8533c6b5609c7c9b5a25fc1adb65cce2a4f37885b3e0816ed7c8",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-03-receipt-posted-after-approval:erp-receipt\",\"case-03-receipt-posted-after-approval:failed-message\",\"case-03-receipt-posted-after-approval:invoice\",\"case-03-receipt-posted-after-approval:material-documents\",\"case-03-receipt-posted-after-approval:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-03-receipt-posted-after-approval\",\"case_id\":\"case-03-receipt-posted-after-approval\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-03-receipt-posted-after-approval\",\"validated_evidence_ids\":[\"case-03-receipt-posted-after-approval:erp-receipt\",\"case-03-receipt-posted-after-approval:failed-message\",\"case-03-receipt-posted-after-approval:invoice\",\"case-03-receipt-posted-after-approval:material-documents\",\"case-03-receipt-posted-after-approval:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-03-receipt-posted-after-approval:erp-receipt\",\"case-03-receipt-posted-after-approval:failed-message\",\"case-03-receipt-posted-after-approval:invoice\",\"case-03-receipt-posted-after-approval:material-documents\",\"case-03-receipt-posted-after-approval:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-03-receipt-posted-after-approval\"}}",
+      "payload_digest": "e98f46eceb9e58b058c78e4b17a2d5722917e959749d7892a9df928ef6007c75",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-03-receipt-posted-after-approval:erp-receipt\",\"case-03-receipt-posted-after-approval:failed-message\",\"case-03-receipt-posted-after-approval:invoice\",\"case-03-receipt-posted-after-approval:material-documents\",\"case-03-receipt-posted-after-approval:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-03-receipt-posted-after-approval\",\"case_id\":\"case-03-receipt-posted-after-approval\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-03-receipt-posted-after-approval\",\"validated_evidence_ids\":[\"case-03-receipt-posted-after-approval:erp-receipt\",\"case-03-receipt-posted-after-approval:failed-message\",\"case-03-receipt-posted-after-approval:invoice\",\"case-03-receipt-posted-after-approval:material-documents\",\"case-03-receipt-posted-after-approval:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-03-receipt-posted-after-approval:erp-receipt\",\"case-03-receipt-posted-after-approval:failed-message\",\"case-03-receipt-posted-after-approval:invoice\",\"case-03-receipt-posted-after-approval:material-documents\",\"case-03-receipt-posted-after-approval:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-03-receipt-posted-after-approval\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-03-receipt-posted-after-approval"

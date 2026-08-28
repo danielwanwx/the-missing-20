@@ -166,6 +166,7 @@ class HypothesisResult(ContractModel):
 class EvaluationResult(ContractModel):
     decision: EvaluationDecision
     validated_evidence_ids: tuple[NonEmptyStr, ...]
+    citation_closure: Annotated[dict[NonEmptyStr, JsonValue], Field(min_length=1)] | None = None
     failed_invariants: tuple[NonEmptyStr, ...]
     allowed_next_action: ActionTool | None
     evaluator_version: NonEmptyStr

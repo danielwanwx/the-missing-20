@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from the_missing_20.domain.errors import InvalidEventPayload
 from the_missing_20.domain.models import (
     ActionTool,
@@ -26,6 +28,24 @@ def validate_investigation_assessment(
     validated_ids = set(assessment.evaluation.validated_evidence_ids)
     supporting_ids = set(assessment.hypothesis.supporting_evidence_ids)
     contradicting_ids = set(assessment.hypothesis.contradicting_evidence_ids)
+    closure = assessment.evaluation.citation_closure
+    raw_closure_ids = closure.get("validated_evidence_ids") if isinstance(closure, dict) else None
+    closure_ids = (
+        set(cast(list[str] | tuple[str, ...], raw_closure_ids))
+        if isinstance(raw_closure_ids, (list, tuple))
+        and all(isinstance(item, str) for item in raw_closure_ids)
+        else None
+    )
+    closure_identity_valid = closure is None or (
+        closure.get("case_id") == assessment.case_id
+        and closure.get("trace_id") == trace_id
+        and closure_ids == validated_ids
+        and closure.get("all_admitted_evidence_covered") is True
+        if assessment.evaluation.decision is EvaluationDecision.ACCEPT
+        else closure.get("case_id") == assessment.case_id
+        and closure.get("trace_id") == trace_id
+        and closure_ids == validated_ids
+    )
     supporting_sources = {
         item.source_type for item in admitted_evidence if item.evidence_id in supporting_ids
     }
@@ -41,6 +61,7 @@ def validate_investigation_assessment(
         or not supporting_ids.issubset(admitted_ids)
         or not contradicting_ids.issubset(admitted_ids)
         or set(assessment.missing_evidence_sources) != set(assessment.hypothesis.missing_evidence)
+        or not closure_identity_valid
     ):
         raise InvalidEventPayload("assessment does not match current admitted evidence")
     compatible = {

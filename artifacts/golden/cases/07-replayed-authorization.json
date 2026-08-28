@@ -34,6 +34,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -140,6 +141,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -206,13 +208,13 @@
     {
       "case_id": "case-07-replayed-authorization",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_6a74f48793173ee4ebe561cc8af1b8b7",
+      "event_id": "evt_ee8d178feae712b876b7e8e477c78112",
       "idempotency_key": "assessment:07-replayed-authorization",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "efe19f42b5317ee26417ee72c039b5045cea82fadb29a34d6984cf69f0401f99",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-07-replayed-authorization:erp-receipt\",\"case-07-replayed-authorization:failed-message\",\"case-07-replayed-authorization:invoice\",\"case-07-replayed-authorization:material-documents\",\"case-07-replayed-authorization:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-07-replayed-authorization\",\"case_id\":\"case-07-replayed-authorization\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-07-replayed-authorization\",\"validated_evidence_ids\":[\"case-07-replayed-authorization:erp-receipt\",\"case-07-replayed-authorization:failed-message\",\"case-07-replayed-authorization:invoice\",\"case-07-replayed-authorization:material-documents\",\"case-07-replayed-authorization:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-07-replayed-authorization:erp-receipt\",\"case-07-replayed-authorization:failed-message\",\"case-07-replayed-authorization:invoice\",\"case-07-replayed-authorization:material-documents\",\"case-07-replayed-authorization:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-07-replayed-authorization\"}}",
+      "payload_digest": "cc1d1cc5ceb145077d774216aff0187de19bba570e367aa6e6ee1d2688798b00",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-07-replayed-authorization:erp-receipt\",\"case-07-replayed-authorization:failed-message\",\"case-07-replayed-authorization:invoice\",\"case-07-replayed-authorization:material-documents\",\"case-07-replayed-authorization:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-07-replayed-authorization\",\"case_id\":\"case-07-replayed-authorization\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-07-replayed-authorization\",\"validated_evidence_ids\":[\"case-07-replayed-authorization:erp-receipt\",\"case-07-replayed-authorization:failed-message\",\"case-07-replayed-authorization:invoice\",\"case-07-replayed-authorization:material-documents\",\"case-07-replayed-authorization:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-07-replayed-authorization:erp-receipt\",\"case-07-replayed-authorization:failed-message\",\"case-07-replayed-authorization:invoice\",\"case-07-replayed-authorization:material-documents\",\"case-07-replayed-authorization:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-07-replayed-authorization\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-07-replayed-authorization"

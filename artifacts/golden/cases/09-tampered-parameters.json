@@ -35,6 +35,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -119,6 +120,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -169,13 +171,13 @@
     {
       "case_id": "case-09-tampered-parameters",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_7d46e3d457b2cfcb65938a4501fc349a",
+      "event_id": "evt_f65f92dfb8ae97bab7a4b10b19136df6",
       "idempotency_key": "assessment:09-tampered-parameters",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "8fee68a784429e3e691c173e58eb8894afccf39bda28f9070d02e83fcb7db9ac",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-09-tampered-parameters:erp-receipt\",\"case-09-tampered-parameters:failed-message\",\"case-09-tampered-parameters:invoice\",\"case-09-tampered-parameters:material-documents\",\"case-09-tampered-parameters:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-09-tampered-parameters\",\"case_id\":\"case-09-tampered-parameters\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-09-tampered-parameters\",\"validated_evidence_ids\":[\"case-09-tampered-parameters:erp-receipt\",\"case-09-tampered-parameters:failed-message\",\"case-09-tampered-parameters:invoice\",\"case-09-tampered-parameters:material-documents\",\"case-09-tampered-parameters:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-09-tampered-parameters:erp-receipt\",\"case-09-tampered-parameters:failed-message\",\"case-09-tampered-parameters:invoice\",\"case-09-tampered-parameters:material-documents\",\"case-09-tampered-parameters:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-09-tampered-parameters\"}}",
+      "payload_digest": "0402a65d053695cb5edc7027c88fff7cecb9e67e6c39149c6ef163ed6786af30",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-09-tampered-parameters:erp-receipt\",\"case-09-tampered-parameters:failed-message\",\"case-09-tampered-parameters:invoice\",\"case-09-tampered-parameters:material-documents\",\"case-09-tampered-parameters:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-09-tampered-parameters\",\"case_id\":\"case-09-tampered-parameters\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-09-tampered-parameters\",\"validated_evidence_ids\":[\"case-09-tampered-parameters:erp-receipt\",\"case-09-tampered-parameters:failed-message\",\"case-09-tampered-parameters:invoice\",\"case-09-tampered-parameters:material-documents\",\"case-09-tampered-parameters:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-09-tampered-parameters:erp-receipt\",\"case-09-tampered-parameters:failed-message\",\"case-09-tampered-parameters:invoice\",\"case-09-tampered-parameters:material-documents\",\"case-09-tampered-parameters:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-09-tampered-parameters\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-09-tampered-parameters"

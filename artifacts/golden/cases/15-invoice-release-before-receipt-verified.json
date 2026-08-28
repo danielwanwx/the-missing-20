@@ -20,6 +20,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -104,6 +105,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -154,13 +156,13 @@
     {
       "case_id": "case-15-invoice-release-before-receipt-verified",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_3fe9fbda78e065be57ae3277bbd30979",
+      "event_id": "evt_7b65cfc50324c70d077b38b4e251bd96",
       "idempotency_key": "assessment:15-invoice-release-before-receipt-verified",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "5b7a87e9d809cf37c20408dace4aaee6345877b770d1162b1472648fd5466608",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-15-invoice-release-before-receipt-verified:erp-receipt\",\"case-15-invoice-release-before-receipt-verified:failed-message\",\"case-15-invoice-release-before-receipt-verified:invoice\",\"case-15-invoice-release-before-receipt-verified:material-documents\",\"case-15-invoice-release-before-receipt-verified:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-15-invoice-release-before-receipt-verified\",\"case_id\":\"case-15-invoice-release-before-receipt-verified\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-15-invoice-release-before-receipt-verified\",\"validated_evidence_ids\":[\"case-15-invoice-release-before-receipt-verified:erp-receipt\",\"case-15-invoice-release-before-receipt-verified:failed-message\",\"case-15-invoice-release-before-receipt-verified:invoice\",\"case-15-invoice-release-before-receipt-verified:material-documents\",\"case-15-invoice-release-before-receipt-verified:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-15-invoice-release-before-receipt-verified:erp-receipt\",\"case-15-invoice-release-before-receipt-verified:failed-message\",\"case-15-invoice-release-before-receipt-verified:invoice\",\"case-15-invoice-release-before-receipt-verified:material-documents\",\"case-15-invoice-release-before-receipt-verified:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-15-invoice-release-before-receipt-verified\"}}",
+      "payload_digest": "85ff8661811d59849380039663cddc9d3fe8cfc1ea486bf644fffc27919f2a5b",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-15-invoice-release-before-receipt-verified:erp-receipt\",\"case-15-invoice-release-before-receipt-verified:failed-message\",\"case-15-invoice-release-before-receipt-verified:invoice\",\"case-15-invoice-release-before-receipt-verified:material-documents\",\"case-15-invoice-release-before-receipt-verified:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-15-invoice-release-before-receipt-verified\",\"case_id\":\"case-15-invoice-release-before-receipt-verified\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-15-invoice-release-before-receipt-verified\",\"validated_evidence_ids\":[\"case-15-invoice-release-before-receipt-verified:erp-receipt\",\"case-15-invoice-release-before-receipt-verified:failed-message\",\"case-15-invoice-release-before-receipt-verified:invoice\",\"case-15-invoice-release-before-receipt-verified:material-documents\",\"case-15-invoice-release-before-receipt-verified:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-15-invoice-release-before-receipt-verified:erp-receipt\",\"case-15-invoice-release-before-receipt-verified:failed-message\",\"case-15-invoice-release-before-receipt-verified:invoice\",\"case-15-invoice-release-before-receipt-verified:material-documents\",\"case-15-invoice-release-before-receipt-verified:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-15-invoice-release-before-receipt-verified\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-15-invoice-release-before-receipt-verified"

@@ -1,0 +1,1 @@
+{"claim_id":"18b61df49d6f419a9660498b79e51fa1","error_code":"ADVISORY_PROVIDER_FAILURE","estimated_cost_usd":"0.014116","input_tokens":11073,"model":"us.amazon.nova-pro-v1:0","output_tokens":1643,"provider":"bedrock","request_count":6,"schema_version":"authority-b-outcome/v1","status":"DEGRADED","usefulness_status":"FAIL"}

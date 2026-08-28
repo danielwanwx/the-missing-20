@@ -20,3 +20,4 @@ cdk.out/
 .terraform/
 *.tfstate
 *.tfstate.*
+research-runs/

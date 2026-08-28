@@ -34,6 +34,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -140,6 +141,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -206,13 +208,13 @@
     {
       "case_id": "case-12-receipt-postcondition-fails",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_b5d4110d663ca77391216b34edcd4d48",
+      "event_id": "evt_0d6e0e6b096e2585cee21ca67cd5b07c",
       "idempotency_key": "assessment:12-receipt-postcondition-fails",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "76095e6f78038bae106057a6f2d2128785c0b46e35f3f1535d12b0ed8b064144",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-12-receipt-postcondition-fails:erp-receipt\",\"case-12-receipt-postcondition-fails:failed-message\",\"case-12-receipt-postcondition-fails:invoice\",\"case-12-receipt-postcondition-fails:material-documents\",\"case-12-receipt-postcondition-fails:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-12-receipt-postcondition-fails\",\"case_id\":\"case-12-receipt-postcondition-fails\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-12-receipt-postcondition-fails\",\"validated_evidence_ids\":[\"case-12-receipt-postcondition-fails:erp-receipt\",\"case-12-receipt-postcondition-fails:failed-message\",\"case-12-receipt-postcondition-fails:invoice\",\"case-12-receipt-postcondition-fails:material-documents\",\"case-12-receipt-postcondition-fails:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-12-receipt-postcondition-fails:erp-receipt\",\"case-12-receipt-postcondition-fails:failed-message\",\"case-12-receipt-postcondition-fails:invoice\",\"case-12-receipt-postcondition-fails:material-documents\",\"case-12-receipt-postcondition-fails:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-12-receipt-postcondition-fails\"}}",
+      "payload_digest": "33cca4dbc47806602710ee5ed225787aec18cf103d7223ac8d995a8aa2bf4532",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-12-receipt-postcondition-fails:erp-receipt\",\"case-12-receipt-postcondition-fails:failed-message\",\"case-12-receipt-postcondition-fails:invoice\",\"case-12-receipt-postcondition-fails:material-documents\",\"case-12-receipt-postcondition-fails:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-12-receipt-postcondition-fails\",\"case_id\":\"case-12-receipt-postcondition-fails\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-12-receipt-postcondition-fails\",\"validated_evidence_ids\":[\"case-12-receipt-postcondition-fails:erp-receipt\",\"case-12-receipt-postcondition-fails:failed-message\",\"case-12-receipt-postcondition-fails:invoice\",\"case-12-receipt-postcondition-fails:material-documents\",\"case-12-receipt-postcondition-fails:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-12-receipt-postcondition-fails:erp-receipt\",\"case-12-receipt-postcondition-fails:failed-message\",\"case-12-receipt-postcondition-fails:invoice\",\"case-12-receipt-postcondition-fails:material-documents\",\"case-12-receipt-postcondition-fails:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-12-receipt-postcondition-fails\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-12-receipt-postcondition-fails"

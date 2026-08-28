@@ -286,7 +286,7 @@
     "replay_created_effects": 0
   },
   "schema_version": "golden-suite/v1",
-  "source_revision": "dc7a40cb449369d0d76c43ece43b2b51ee00f92d",
+  "source_revision": "c169bfc35a7d20ce86d031fb6371a9f75e7f4386",
   "status": "PASS",
   "suite_id": "f9219a605b650ffcb14f239fb18b5e8c9ab202062bb37f588d657f313325344c"
 }

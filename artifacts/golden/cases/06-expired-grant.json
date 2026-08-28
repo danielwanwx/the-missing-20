@@ -33,6 +33,7 @@
       "decision": "RECOMMEND_RECEIPT_RESTART",
       "evaluation": {
         "allowed_next_action": "restart_receipt_message",
+        "citation_closure": null,
         "decision": "ACCEPT",
         "evaluator_version": "deterministic-v1",
         "failed_invariants": [],
@@ -117,6 +118,7 @@
   "diagnosis": {
     "evaluation": {
       "allowed_next_action": "restart_receipt_message",
+      "citation_closure": null,
       "decision": "ACCEPT",
       "evaluator_version": "deterministic-v1",
       "failed_invariants": [],
@@ -167,13 +169,13 @@
     {
       "case_id": "case-06-expired-grant",
       "event": "RECEIPT_RESTART_RECOMMENDED",
-      "event_id": "evt_726d7a833cdc713c127f5023a539d2a4",
+      "event_id": "evt_c05193f122d2681b4449b25c21c3435a",
       "idempotency_key": "assessment:06-expired-grant",
       "new_status": "RECEIPT_RESTART_RECOMMENDED",
       "new_version": 2,
       "occurred_at": "2026-08-25T17:00:00Z",
-      "payload_digest": "bce9a9a35b646141d5a1b56cd8f64b451ad893da87a348687daad6b0ddc7a215",
-      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-06-expired-grant:erp-receipt\",\"case-06-expired-grant:failed-message\",\"case-06-expired-grant:invoice\",\"case-06-expired-grant:material-documents\",\"case-06-expired-grant:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-06-expired-grant\",\"case_id\":\"case-06-expired-grant\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-06-expired-grant\",\"validated_evidence_ids\":[\"case-06-expired-grant:erp-receipt\",\"case-06-expired-grant:failed-message\",\"case-06-expired-grant:invoice\",\"case-06-expired-grant:material-documents\",\"case-06-expired-grant:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-06-expired-grant:erp-receipt\",\"case-06-expired-grant:failed-message\",\"case-06-expired-grant:invoice\",\"case-06-expired-grant:material-documents\",\"case-06-expired-grant:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-06-expired-grant\"}}",
+      "payload_digest": "9aff559dc1c36b3cf6d58677524b04d558346f231792e766fdc60b8aa0db011d",
+      "payload_json": "{\"assessment\":{\"admitted_evidence_ids\":[\"case-06-expired-grant:erp-receipt\",\"case-06-expired-grant:failed-message\",\"case-06-expired-grant:invoice\",\"case-06-expired-grant:material-documents\",\"case-06-expired-grant:warehouse\"],\"assessed_at\":\"2026-08-25T17:00:00Z\",\"assessment_id\":\"assessment-06-expired-grant\",\"case_id\":\"case-06-expired-grant\",\"decision\":\"RECOMMEND_RECEIPT_RESTART\",\"evaluation\":{\"allowed_next_action\":\"restart_receipt_message\",\"citation_closure\":null,\"decision\":\"ACCEPT\",\"evaluator_version\":\"deterministic-v1\",\"failed_invariants\":[],\"trace_id\":\"trace-06-expired-grant\",\"validated_evidence_ids\":[\"case-06-expired-grant:erp-receipt\",\"case-06-expired-grant:failed-message\",\"case-06-expired-grant:invoice\",\"case-06-expired-grant:material-documents\",\"case-06-expired-grant:warehouse\"]},\"hypothesis\":{\"conclusion\":\"SUPPORTED\",\"confidence_band\":\"HIGH\",\"contradicting_evidence_ids\":[],\"hypothesis_type\":\"RETRYABLE_MESSAGE\",\"missing_evidence\":[],\"supporting_evidence_ids\":[\"case-06-expired-grant:erp-receipt\",\"case-06-expired-grant:failed-message\",\"case-06-expired-grant:invoice\",\"case-06-expired-grant:material-documents\",\"case-06-expired-grant:warehouse\"]},\"missing_evidence_sources\":[],\"reason_codes\":[\"RETRYABLE_MESSAGE\"],\"trace_id\":\"trace-06-expired-grant\"}}",
       "prior_status": "INVESTIGATING",
       "prior_version": 1,
       "trace_id": "trace-06-expired-grant"

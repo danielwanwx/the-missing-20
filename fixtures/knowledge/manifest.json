@@ -1,0 +1,55 @@
+{
+  "schema_version": "knowledge-manifest/v1",
+  "corpus_version": "knowledge-v1",
+  "corpus_digest": "3454976042514622608e32050e7297de568347366bc20e8926e358332446c53d",
+  "records": [
+    {
+      "knowledge_id": "duplicate-posting-rule",
+      "version": "knowledge-v1",
+      "title": "Duplicate receipt posting rule",
+      "allowed_use": "ERROR_DEFINITION_ONLY",
+      "path": "fixtures/knowledge/duplicate-posting-rule.md",
+      "content_sha256": "319c0133b6d9fe674d1e0aeaad6c8932d044e055163235aeb65256a7f62852f2"
+    },
+    {
+      "knowledge_id": "evidence-source-glossary",
+      "version": "knowledge-v1",
+      "title": "Evidence source glossary",
+      "allowed_use": "ERROR_DEFINITION_ONLY",
+      "path": "fixtures/knowledge/evidence-source-glossary.md",
+      "content_sha256": "d9136c10e6c2ae7ce18385c21ad9916c292fef90fa7999992a4303cd53a8408c"
+    },
+    {
+      "knowledge_id": "invoice-release-prerequisite",
+      "version": "knowledge-v1",
+      "title": "Invoice release prerequisite",
+      "allowed_use": "PROCEDURE_ONLY",
+      "path": "fixtures/knowledge/invoice-release-prerequisite.md",
+      "content_sha256": "dfe4b7ecf09fccdbf637c11fbd70bacf25f4d43c132ad1248947ce7675e76fb6"
+    },
+    {
+      "knowledge_id": "receipt-message-recovery",
+      "version": "knowledge-v1",
+      "title": "Receipt message recovery procedure",
+      "allowed_use": "PROCEDURE_ONLY",
+      "path": "fixtures/knowledge/receipt-message-recovery.md",
+      "content_sha256": "2e30d3dbf5479cc4ff8a92d774ff8dbac62665567779976a27c13d3770dfab04"
+    },
+    {
+      "knowledge_id": "retryable-document-lock",
+      "version": "knowledge-v1",
+      "title": "Retryable document lock definition",
+      "allowed_use": "ERROR_DEFINITION_ONLY",
+      "path": "fixtures/knowledge/retryable-document-lock.md",
+      "content_sha256": "fcf4e80a0780dd07421f9b8e1a8168d2168fa94829f96bcc89a4ab2440ac14d4"
+    },
+    {
+      "knowledge_id": "short-shipment-rule",
+      "version": "knowledge-v1",
+      "title": "Genuine short shipment rule",
+      "allowed_use": "PROCEDURE_ONLY",
+      "path": "fixtures/knowledge/short-shipment-rule.md",
+      "content_sha256": "8b74d24744a9d6d91bfbe811b36348b3ac91b112d6c0b73549159b6bbf4e3c66"
+    }
+  ]
+}
