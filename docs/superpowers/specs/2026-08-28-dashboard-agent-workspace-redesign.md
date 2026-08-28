@@ -1,6 +1,6 @@
 # The Missing 20 Dashboard and Agent Workspace Redesign
 
-**Status:** Approved direction, awaiting written-spec review  
+**Status:** Direction C approved, awaiting written-spec review
 **Date:** 2026-08-28
 
 ## Purpose
@@ -22,6 +22,30 @@ This is a data-driven real-time interface, not a scripted animation. Every visib
 must be derived from the experiment API or its authoritative event ledger. Animation only
 interpolates between two accepted backend states; it may not invent activity.
 
+The approved product direction is **Live Digital Twin + Agent Mission Control**. Motion is
+part of the information architecture across both views. It must make live connectivity,
+data movement, anomaly location, agent work, handoffs, and recovery visible without
+requiring the judge to read explanatory prose.
+
+## Research Basis
+
+The design responds directly to the 2026 Agents for Humans judging criteria: technical
+implementation, complete product design, potential impact, creativity, and end-to-end
+presentation are equally weighted. The current competition gallery is not yet public, so
+the design does not claim knowledge of unpublished 2026 submissions.
+
+The interaction model is informed by:
+
+- Grafana stat panels, sparklines, status history, and state timelines.
+- Datadog real-time status boards, topology maps, query values, and event streams.
+- EcoLafaek's immediate animated product introduction followed by a live dashboard and
+  agent chat.
+- Norn's WebSocket-backed agent, tool-call, alert, and handoff visibility.
+- NovaGuard's live pipeline stepper, evidence cards, human review, and verification view.
+
+The product must borrow the legibility of operational dashboards, not their generic
+visual identity. The Missing 20 remains a distinct supply-chain incident product.
+
 ## Visual Targets
 
 - Dashboard target: `assets/dashboard-target.png`
@@ -35,7 +59,23 @@ the primary experience.
 ## Product Structure
 
 The persistent header contains only the product name, the `Dashboard / Agent Workspace`
-switch, the current incident identity, and a compact connection or demo-source status.
+switch, the current incident identity, a compact connection status, and the scenario
+control described below.
+
+### Scenario control
+
+The user can switch among three explicit states without reloading the page:
+
+- **Normal** starts or resets the synthetic experiment to a healthy `100 / 100` flow.
+- **Incident** creates the governed twenty-unit queue discrepancy through the experiment
+  API and ordered event ledger.
+- **Recovery** becomes available only after the required proposal and approval state. It
+  cannot skip Authority B or ControlledExecutor.
+
+The control is not a frontend theme toggle. Each selection invokes a real local experiment
+transition and the browser renders the resulting API and SSE state. A fourth control,
+**Run Golden Incident**, plays the complete judge path from healthy flow through verified
+recovery. The user may pause the guided playback and continue manually at any point.
 
 ### Dashboard
 
@@ -47,9 +87,17 @@ The Dashboard is the default entry point. It contains:
 - A compact topology showing source health and the affected queue.
 - A reconciliation chart showing expected, recorded, and missing units over time.
 - A small persistent indicator showing which investigators are working.
+- A compact, continuously moving time cursor across the latest metric window, even when
+  the value is flat. The value itself must not change unless the API changes.
 
 The Dashboard does not explain the full investigation. Selecting the incident or its
 primary action opens the same incident in Agent Workspace.
+
+The first viewport is dominated by the live supply path, not a hero paragraph. In the
+healthy state, path packets and node heartbeats communicate that the system is live. In
+the incident state, eighty unit records continue into ERP while the exact twenty affected
+records stop and cluster at Message Queue. In recovery, only approved unit records resume
+movement. The main statement is limited to one line such as `20 units stopped before ERP`.
 
 ### Agent Workspace
 
@@ -66,6 +114,18 @@ The Agent Workspace makes the agent system the main product surface.
 - Selecting any agent or tool filters the activity stream and evidence trail.
 - A replay scrubber lets a judge move between detection, investigation, decision,
   approval, execution, and verification without losing the live-state model.
+
+Agent states use a compact visual language:
+
+- **Ready:** low-amplitude green heartbeat.
+- **Working:** stronger lime pulse plus an active path to the current tool.
+- **Waiting:** quiet neutral indicator with no active edge.
+- **Blocked or failed:** coral pulse on the affected node and edge.
+- **Complete:** steady verified state without continued work animation.
+
+Tool-call light travels away from an investigator only after `tool.started`. Evidence
+travels back only after the matching tool result is admitted. An investigator handoff
+animates toward the Orchestrator only after the corresponding ledger event.
 
 ### Incident Copilot
 
@@ -86,6 +146,82 @@ the competition demo reliable, while free-text input remains available.
 The Copilot may investigate, explain, compare hypotheses, and prepare an action. It may
 not authorize or execute a recovery. Approval is accepted only through the structured
 decision control bound to the deterministic Authority B lifecycle.
+
+The conversation panel shows the current actor and tool status while a response is being
+prepared. It does not reveal private chain-of-thought. It may show bounded public stages
+such as `Reading queue evidence`, `Comparing hypotheses`, and `Preparing explanation` when
+those stages are backed by real public harness events.
+
+## Ambient Motion Contract
+
+The product must feel alive immediately after load, including before an incident begins.
+Ambient motion communicates connectivity and direction; it never fabricates business
+progress.
+
+Allowed ambient motion:
+
+- A heartbeat around connected system and agent nodes.
+- A subtle directional current on active data paths.
+- A moving present-time cursor on a flat metric window.
+- Connection and SSE heartbeat indicators.
+- Gentle entry and focus transitions when the user changes views or selects a node.
+
+State-changing motion is allowed only when backed by a new snapshot or ordered event:
+
+- Unit movement between business systems.
+- Counts, sparklines, queue depth, incident status, and recovery state.
+- Agent work, tool calls, evidence return, handoff, synthesis, approval, execution, and
+  verification.
+
+When the stream disconnects, data movement and agent-work animation stop. The browser may
+continue a neutral reconnect indicator but may not imply continuing progress. Motion must
+honor `prefers-reduced-motion`, pause in hidden tabs, and avoid rapid flashing.
+
+## Information Density and Copy Contract
+
+The primary interface must remove at least half of the current explanatory microcopy.
+The first viewport follows these rules:
+
+- One component gets one heading, one value or state, and at most one primary action.
+- Do not repeat a label, badge, subtitle, and gray explanation for the same fact.
+- Status badges contain states only: `LIVE`, `WORKING`, `BLOCKED`, `VERIFIED`.
+- Internal implementation terms are not used as first-level product copy.
+- Avoid em dashes, colon-heavy summaries, and generated-sounding prose.
+- Technical boundaries and provenance live in an on-demand `How it works` drawer.
+- Tooltips and detail drawers explain unfamiliar terms only after user intent.
+
+The decision rail uses only four visible stage nouns:
+
+`Prepare -> Approve -> Execute -> Verify`
+
+Phrases such as `Deterministic proposal`, `Two simulated role principals`, `Controlled
+executor`, and `Fresh read and replay` move out of the primary rail. Their accurate
+technical explanations remain available in the detail drawer and documentation.
+
+## Observability Integration
+
+The native Dashboard remains the required, zero-dependency judge experience. It cannot
+depend on Grafana being installed, authenticated, or reachable.
+
+The repository additionally provides an optional local observability profile:
+
+- The experiment service exposes a Prometheus-compatible metrics endpoint for counts,
+  queue depth, flow throughput, incident phase, active investigators, tool activity,
+  event sequence, verification state, and SSE health.
+- Docker Compose provisions Prometheus and Grafana OSS with version-controlled data-source
+  and dashboard definitions.
+- A compact `Observability` action opens the provisioned Grafana dashboard in a separate
+  local tab. It does not replace Dashboard or Agent Workspace.
+- The Grafana dashboard uses the same source metrics and trace identities as the native
+  product, allowing a judge to verify that the product view is not driven by invented
+  frontend numbers.
+- Grafana is optional and fail-soft. If it is unavailable, the product shows
+  `Observability unavailable` only inside the on-demand observability control.
+
+Direct iframe embedding is not the default. Grafana Open Source can support embedded
+panels, but it adds anonymous-access and frame-configuration complexity that weakens the
+portable judge path. The default integration therefore opens the local provisioned
+dashboard in a separate tab. An iframe may be enabled only as a local development option.
 
 ## Agent and Tool Architecture
 
@@ -230,8 +366,9 @@ must identify synthetic experiment data without presenting it as a live external
 
 ## End-to-End Interaction
 
-1. The Dashboard shows 100 units entering the flow and 80 recorded downstream.
-2. The Message Queue node emits a twenty-unit anomaly and creates an incident.
+1. The Dashboard opens in Normal mode and shows 100 units traversing the healthy path.
+2. The user selects Incident or starts the Golden Incident. The Message Queue emits the
+   twenty-unit anomaly through the experiment API and creates an incident.
 3. `Open Agent Investigation` switches to the same incident in Agent Workspace.
 4. The Orchestrator launches the three investigators in parallel.
 5. Tool calls and evidence returns update the operations map and Copilot in real time.
@@ -241,6 +378,22 @@ must identify synthetic experiment data without presenting it as a live external
 9. ControlledExecutor performs the approved synthetic recovery.
 10. Verification confirms `100 / 100` and no duplicate effect.
 11. Returning to Dashboard shows the repaired path and resolved incident without reset.
+
+### Golden Incident pacing
+
+The guided path targets 75 to 90 seconds and preserves interactive control:
+
+1. Healthy flow establishes `100 / 100`.
+2. Queue failure visibly stops twenty unit records.
+3. The Orchestrator launches three investigators.
+4. Tool and evidence paths illuminate from real harness events.
+5. Synthesis presents the root cause and bounded recommendation.
+6. The judge performs the two structured role approvals.
+7. Controlled recovery executes and returns receipts.
+8. Verification restores `100 / 100` and proves no duplicate effect.
+
+The guided path may focus or scroll the current view, but it must not fake clicks,
+approvals, API results, or state transitions.
 
 ## Failure Behavior
 
@@ -280,6 +433,13 @@ All visible controls on the core demo path must work.
   mismatched sequence, or disconnected stream cannot produce forward progress or a
   success state in the UI.
 - Visual checks at desktop and narrow layouts with no overflow or clipped controls.
+- Motion-contract tests proving ambient animation does not alter counts or phases, live
+  activity corresponds to ordered events, disconnected state stops progress animation,
+  and reduced-motion mode remains understandable.
+- Scenario tests for Normal, Incident, Recovery eligibility, Golden Incident pause/resume,
+  and reset isolation.
+- Optional observability tests proving exported metrics match the authoritative snapshot
+  and that the provisioned Grafana dashboard queries those metrics when the profile runs.
 
 ### Required end-to-end proof
 
@@ -303,3 +463,23 @@ compare the final DOM projection with the final API snapshot and fail on any mis
   to the experiment's stable unit identifiers.
 - No advisory output can bypass deterministic policy or human approval.
 - The complete demo can be understood and completed in under three minutes.
+- Within five seconds of opening either view, a judge can see that the system is live and
+  identify whether data, an investigator, or a recovery stage is active.
+- A judge can switch Normal, Incident, and Recovery without seeing a frontend-only fake
+  state.
+- Primary-screen copy follows the density contract and exposes implementation detail only
+  on demand.
+- The optional Grafana view corroborates the native product metrics without becoming a
+  prerequisite for the core demo.
+
+## Public References
+
+- [Agents for Humans judging criteria](https://agentsforhumans.devpost.com/rules)
+- [AWS AI Agent Global Hackathon winners](https://aws-agent-hackathon.devpost.com/updates/38140-congratulations-to-the-winners-of-the-aws-ai-agent-global-hackathon)
+- [EcoLafaek](https://devpost.com/software/ecolafaek)
+- [Norn](https://devpost.com/software/phantomguard)
+- [NovaGuard](https://devpost.com/software/novaguard-c1e4kr)
+- [Grafana visualizations](https://grafana.com/docs/grafana/latest/visualizations/panels-visualizations/visualizations/)
+- [Grafana provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/)
+- [Grafana Prometheus data source](https://grafana.com/docs/grafana/latest/datasources/prometheus/)
+- [Datadog dashboard widgets](https://docs.datadoghq.com/dashboards/widgets/)
