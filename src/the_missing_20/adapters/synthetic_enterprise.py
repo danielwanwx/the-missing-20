@@ -22,6 +22,9 @@ from the_missing_20.domain.enterprise import (
     MessageStatus,
     PurchaseOrderLine,
     ScenarioFixture,
+    SupplyUnit,
+    SupplyUnitStage,
+    SupplyUnitStatus,
     WarehouseReceipt,
 )
 from the_missing_20.domain.execution import (
@@ -101,6 +104,43 @@ class SyntheticEnterprise:
                     invoice.released_by_execution_id,
                 ),
             )
+            units = fixture.supply_units or cls._units_for_fixture(fixture)
+            if len(units) != fixture.purchase_order.ordered_quantity:
+                raise ValueError("synthetic fixture must contain one unit per ordered item")
+            if len({item.unit_id for item in units}) != len(units):
+                raise ValueError("synthetic fixture unit IDs must be unique")
+            failed_units = tuple(
+                item for item in units if item.status is SupplyUnitStatus.QUEUE_FAILED
+            )
+            recorded_units = tuple(
+                item for item in units if item.status is SupplyUnitStatus.ERP_RECORDED
+            )
+            if len(failed_units) != fixture.failed_message.quantity:
+                raise ValueError("synthetic fixture units must bind the exact failed quantity")
+            if len(recorded_units) + len(failed_units) != len(units):
+                raise ValueError("synthetic fixture units contain an unsupported status")
+            if any(
+                item.source_message_id != fixture.failed_message.message_id for item in failed_units
+            ):
+                raise ValueError("queue-failed units must bind the failed message")
+            for unit in units:
+                if (
+                    unit.purchase_order_id != fixture.purchase_order.purchase_order_id
+                    or unit.line_id != fixture.purchase_order.line_id
+                ):
+                    raise ValueError("synthetic fixture units must share the purchase-order line")
+                connection.execute(
+                    "INSERT INTO supply_units VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        unit.unit_id,
+                        unit.purchase_order_id,
+                        unit.line_id,
+                        unit.current_stage.value,
+                        unit.status.value,
+                        unit.source_message_id,
+                        unit.revision,
+                    ),
+                )
             for document in fixture.material_documents:
                 connection.execute(
                     "INSERT INTO material_documents VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -130,6 +170,43 @@ class SyntheticEnterprise:
                     ),
                 )
         return adapter
+
+    @staticmethod
+    def _units_for_fixture(fixture: ScenarioFixture) -> tuple[SupplyUnit, ...]:
+        """Expand the aggregate fixture into stable unit records.
+
+        The fixture's failed-message quantity is the exact Missing 20 set.  Unit
+        IDs are deterministic and portable across a fresh database, so a client
+        can safely correlate a visual unit with the recovery transaction.
+        """
+
+        ordered = fixture.purchase_order.ordered_quantity
+        missing = fixture.failed_message.quantity
+        recorded = ordered - missing
+        if recorded < 0:
+            raise ValueError("failed-message quantity cannot exceed ordered quantity")
+        return tuple(
+            SupplyUnit(
+                unit_id=(
+                    f"{fixture.purchase_order.purchase_order_id}-"
+                    f"{fixture.purchase_order.line_id}-unit-{index:03d}"
+                ),
+                purchase_order_id=fixture.purchase_order.purchase_order_id,
+                line_id=fixture.purchase_order.line_id,
+                current_stage=(
+                    SupplyUnitStage.ERP if index <= recorded else SupplyUnitStage.MESSAGE_QUEUE
+                ),
+                status=(
+                    SupplyUnitStatus.ERP_RECORDED
+                    if index <= recorded
+                    else SupplyUnitStatus.QUEUE_FAILED
+                ),
+                source_message_id=(
+                    None if index <= recorded else fixture.failed_message.message_id
+                ),
+            )
+            for index in range(1, ordered + 1)
+        )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
@@ -184,6 +261,15 @@ class SyntheticEnterprise:
                     other_blocking_holds_json TEXT NOT NULL,
                     released_by_execution_id TEXT
                 );
+                CREATE TABLE IF NOT EXISTS supply_units (
+                    unit_id TEXT PRIMARY KEY,
+                    purchase_order_id TEXT NOT NULL,
+                    line_id TEXT NOT NULL,
+                    current_stage TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    source_message_id TEXT,
+                    revision INTEGER NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS material_documents (
                     material_document_id TEXT PRIMARY KEY,
                     source_message_id TEXT NOT NULL UNIQUE,
@@ -210,6 +296,13 @@ class SyntheticEnterprise:
     def read_snapshot(self) -> EnterpriseSnapshot:
         with self._connect() as connection:
             return self._snapshot(connection)
+
+    def list_units(self) -> tuple[SupplyUnit, ...]:
+        """Return the authoritative unit records in stable ID order."""
+
+        with self._connect() as connection:
+            rows = connection.execute("SELECT * FROM supply_units ORDER BY unit_id").fetchall()
+            return tuple(self._unit(row) for row in rows)
 
     def read_material_documents(self) -> MaterialDocumentRead:
         if self._material_document_unavailable_reason is not None:
@@ -250,6 +343,7 @@ class SyntheticEnterprise:
         effects = connection.execute(
             "SELECT * FROM business_effects ORDER BY committed_at, effect_id"
         ).fetchall()
+        units = connection.execute("SELECT * FROM supply_units ORDER BY unit_id").fetchall()
         return EnterpriseSnapshot(
             purchase_order=PurchaseOrderLine(
                 purchase_order_id=po["purchase_order_id"],
@@ -292,8 +386,21 @@ class SyntheticEnterprise:
                 other_blocking_holds=tuple(json.loads(invoice["other_blocking_holds_json"])),
                 released_by_execution_id=invoice["released_by_execution_id"],
             ),
+            supply_units=tuple(self._unit(row) for row in units),
             material_documents=tuple(self._document(row) for row in documents),
             business_effects=tuple(self._effect(row) for row in effects),
+        )
+
+    @staticmethod
+    def _unit(row: sqlite3.Row) -> SupplyUnit:
+        return SupplyUnit(
+            unit_id=row["unit_id"],
+            purchase_order_id=row["purchase_order_id"],
+            line_id=row["line_id"],
+            current_stage=SupplyUnitStage(row["current_stage"]),
+            status=SupplyUnitStatus(row["status"]),
+            source_message_id=row["source_message_id"],
+            revision=row["revision"],
         )
 
     @staticmethod
@@ -387,6 +494,13 @@ class SyntheticEnterprise:
                 and source_effects[0].trace_id == trace_id
                 and source_effects[0].result_record_ids
                 == (source_documents[0].material_document_id,)
+                and len(pre_state.supply_units) == pre_state.purchase_order.ordered_quantity
+                and all(
+                    unit.status is SupplyUnitStatus.ERP_RECORDED
+                    and unit.current_stage is SupplyUnitStage.ERP
+                    and unit.source_message_id is None
+                    for unit in pre_state.supply_units
+                )
             )
             if externally_completed:
                 return EnterpriseMutationResult(
@@ -410,6 +524,14 @@ class SyntheticEnterprise:
                 and message.lock_cleared
                 and not pre_state.material_documents
                 and erp.quantity + parameters.quantity == pre_state.purchase_order.ordered_quantity
+                and len(pre_state.supply_units) == pre_state.purchase_order.ordered_quantity
+                and sum(
+                    unit.status is SupplyUnitStatus.QUEUE_FAILED
+                    and unit.current_stage is SupplyUnitStage.MESSAGE_QUEUE
+                    and unit.source_message_id == parameters.message_id
+                    for unit in pre_state.supply_units
+                )
+                == parameters.quantity
             )
             if not expected:
                 raise EnterprisePreconditionFailed(
@@ -428,6 +550,31 @@ class SyntheticEnterprise:
                 "WHERE purchase_order_id = ? AND line_id = ?",
                 (parameters.quantity, parameters.purchase_order_id, parameters.line_id),
             )
+            missing_units = tuple(
+                unit
+                for unit in pre_state.supply_units
+                if unit.status is SupplyUnitStatus.QUEUE_FAILED
+                and unit.current_stage is SupplyUnitStage.MESSAGE_QUEUE
+                and unit.source_message_id == parameters.message_id
+            )
+            for unit in missing_units:
+                changed = connection.execute(
+                    "UPDATE supply_units SET current_stage = ?, status = ?, "
+                    "source_message_id = NULL, revision = revision + 1 "
+                    "WHERE unit_id = ? AND revision = ? AND status = ? "
+                    "AND current_stage = ? AND source_message_id = ?",
+                    (
+                        SupplyUnitStage.ERP.value,
+                        SupplyUnitStatus.ERP_RECORDED.value,
+                        unit.unit_id,
+                        unit.revision,
+                        SupplyUnitStatus.QUEUE_FAILED.value,
+                        SupplyUnitStage.MESSAGE_QUEUE.value,
+                        parameters.message_id,
+                    ),
+                ).rowcount
+                if changed != 1:
+                    raise RuntimeError("receipt mutation could not update the exact unit set")
             connection.execute(
                 "INSERT INTO material_documents VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
@@ -462,6 +609,31 @@ class SyntheticEnterprise:
             post_state = self._snapshot(connection)
             if erp.quantity + parameters.quantity != post_state.erp_receipt.quantity:
                 raise RuntimeError("receipt mutation did not produce the expected quantity")
+            post_by_id = {unit.unit_id: unit for unit in post_state.supply_units}
+            recovered_ids = {item.unit_id for item in missing_units}
+            if (
+                len(post_by_id) != len(pre_state.supply_units)
+                or any(
+                    post_by_id[unit.unit_id].status is not SupplyUnitStatus.ERP_RECORDED
+                    or post_by_id[unit.unit_id].current_stage is not SupplyUnitStage.ERP
+                    or post_by_id[unit.unit_id].source_message_id is not None
+                    or post_by_id[unit.unit_id].revision != unit.revision + 1
+                    for unit in missing_units
+                )
+                or not all(
+                    post_by_id[unit.unit_id] == unit
+                    for unit in pre_state.supply_units
+                    if unit.unit_id not in recovered_ids
+                )
+            ):
+                raise RuntimeError("receipt mutation changed an unexpected unit")
+            if (
+                sum(
+                    unit.status is SupplyUnitStatus.ERP_RECORDED for unit in post_state.supply_units
+                )
+                != pre_state.purchase_order.ordered_quantity
+            ):
+                raise RuntimeError("receipt mutation did not reconcile all units")
             return EnterpriseMutationResult(
                 outcome=EnterpriseActionOutcome.EXECUTED,
                 effect=effect,

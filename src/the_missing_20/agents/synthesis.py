@@ -7,6 +7,11 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from the_missing_20.agents.events import (
+    AgentEventSink,
+    AgentOperationEvent,
+    AgentOperationEventType,
+)
 from the_missing_20.agents.schemas import (
     InvestigatorResult,
     KnowledgeCitation,
@@ -51,6 +56,8 @@ async def run_synthesis(
     investigator_read_evidence_ids: tuple[tuple[str, ...], ...] | None = None,
     case_id: str,
     trace_id: str,
+    event_sink: AgentEventSink | None = None,
+    operation_id: str | None = None,
     system_prompt: str | None = None,
     timeout_seconds: float = 45.0,
 ) -> SynthesisRun:
@@ -97,23 +104,72 @@ async def run_synthesis(
             )
         ],
     }
-    result = await asyncio.wait_for(
-        agent.invoke_async(
-            "Synthesize these validated investigator results:\n"
-            + json.dumps(context, sort_keys=True),
-            structured_output_model=SynthesisResult,
-            structured_output_prompt="Return the complete synthesis result now.",
-            limits=Limits(
-                turns=5,
-                output_tokens=MAX_OUTPUT_TOKENS_PER_REQUEST,
-                total_tokens=8_000,
+    operation_id = operation_id or f"synthesis:{trace_id}"
+    if event_sink is not None:
+        event_sink.emit(
+            AgentOperationEvent(
+                event_type=AgentOperationEventType.SYNTHESIS_STARTED,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor="synthesis",
+                operation_id=operation_id,
+                status="RUNNING",
+                correlation_id=trace_id,
+                stage=AgentStage.SYNTHESIS.value,
+            )
+        )
+    try:
+        result = await asyncio.wait_for(
+            agent.invoke_async(
+                "Synthesize these validated investigator results:\n"
+                + json.dumps(context, sort_keys=True),
+                structured_output_model=SynthesisResult,
+                structured_output_prompt="Return the complete synthesis result now.",
+                limits=Limits(
+                    turns=5,
+                    output_tokens=MAX_OUTPUT_TOKENS_PER_REQUEST,
+                    total_tokens=8_000,
+                ),
             ),
-        ),
-        timeout=timeout_seconds,
-    )
-    structured = getattr(result, "structured_output", None)
-    if not isinstance(structured, SynthesisResult):
-        raise ValueError("synthesis did not return structured output")
+            timeout=timeout_seconds,
+        )
+        structured = getattr(result, "structured_output", None)
+        if not isinstance(structured, SynthesisResult):
+            raise ValueError("synthesis did not return structured output")
+    except Exception as exc:
+        if event_sink is not None:
+            event_sink.emit(
+                AgentOperationEvent(
+                    event_type=AgentOperationEventType.SYNTHESIS_COMPLETED,
+                    case_id=case_id,
+                    trace_id=trace_id,
+                    actor="synthesis",
+                    operation_id=operation_id,
+                    status="FAILED",
+                    correlation_id=trace_id,
+                    stage=AgentStage.SYNTHESIS.value,
+                    payload={"error_code": type(exc).__name__},
+                )
+            )
+        raise
+    if event_sink is not None:
+        event_sink.emit(
+            AgentOperationEvent(
+                event_type=AgentOperationEventType.SYNTHESIS_COMPLETED,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor="synthesis",
+                operation_id=operation_id,
+                status="COMPLETED",
+                correlation_id=trace_id,
+                stage=AgentStage.SYNTHESIS.value,
+                payload={
+                    "selected_hypothesis": structured.selected_hypothesis.value,
+                    "conclusion": structured.conclusion.value,
+                    "claim_ids": [item.claim_id for item in structured.factual_claims],
+                },
+            )
+        )
     return SynthesisRun(
         result=structured,
         model_result=result,

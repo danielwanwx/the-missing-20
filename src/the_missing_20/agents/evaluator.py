@@ -7,6 +7,11 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from the_missing_20.agents.events import (
+    AgentEventSink,
+    AgentOperationEvent,
+    AgentOperationEventType,
+)
 from the_missing_20.agents.schemas import (
     AgentEvaluationResult,
     KnowledgeCitation,
@@ -48,6 +53,8 @@ async def run_evaluator(
     source_types: tuple[str, ...],
     case_id: str,
     trace_id: str,
+    event_sink: AgentEventSink | None = None,
+    operation_id: str | None = None,
     source_availability: SourceAvailabilitySet,
     preserved_dissent: tuple[PreservedDissent, ...] | None = None,
     system_prompt: str | None = None,
@@ -101,18 +108,67 @@ async def run_evaluator(
             "knowledge_is_not_current_state_proof",
         ],
     }
-    result = await asyncio.wait_for(
-        agent.invoke_async(
-            "Evaluate this independently assembled record:\n" + json.dumps(context, sort_keys=True),
-            structured_output_model=AgentEvaluationResult,
-            structured_output_prompt="Return the complete evaluator result now.",
-            limits=Limits(turns=5, output_tokens=1_500, total_tokens=8_000),
-        ),
-        timeout=timeout_seconds,
-    )
-    structured = getattr(result, "structured_output", None)
-    if not isinstance(structured, AgentEvaluationResult):
-        raise ValueError("evaluator did not return structured output")
+    operation_id = operation_id or f"evaluator:{trace_id}"
+    if event_sink is not None:
+        event_sink.emit(
+            AgentOperationEvent(
+                event_type=AgentOperationEventType.EVALUATION_STARTED,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor="evaluator",
+                operation_id=operation_id,
+                status="RUNNING",
+                correlation_id=trace_id,
+                stage=AgentStage.EVALUATOR.value,
+            )
+        )
+    try:
+        result = await asyncio.wait_for(
+            agent.invoke_async(
+                "Evaluate this independently assembled record:\n"
+                + json.dumps(context, sort_keys=True),
+                structured_output_model=AgentEvaluationResult,
+                structured_output_prompt="Return the complete evaluator result now.",
+                limits=Limits(turns=5, output_tokens=1_500, total_tokens=8_000),
+            ),
+            timeout=timeout_seconds,
+        )
+        structured = getattr(result, "structured_output", None)
+        if not isinstance(structured, AgentEvaluationResult):
+            raise ValueError("evaluator did not return structured output")
+    except Exception as exc:
+        if event_sink is not None:
+            event_sink.emit(
+                AgentOperationEvent(
+                    event_type=AgentOperationEventType.EVALUATION_COMPLETED,
+                    case_id=case_id,
+                    trace_id=trace_id,
+                    actor="evaluator",
+                    operation_id=operation_id,
+                    status="FAILED",
+                    correlation_id=trace_id,
+                    stage=AgentStage.EVALUATOR.value,
+                    payload={"error_code": type(exc).__name__},
+                )
+            )
+        raise
+    if event_sink is not None:
+        event_sink.emit(
+            AgentOperationEvent(
+                event_type=AgentOperationEventType.EVALUATION_COMPLETED,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor="evaluator",
+                operation_id=operation_id,
+                status=structured.decision.value,
+                correlation_id=trace_id,
+                stage=AgentStage.EVALUATOR.value,
+                payload={
+                    "decision": structured.decision.value,
+                    "failed_invariants": list(structured.failed_invariants),
+                },
+            )
+        )
     return EvaluationRun(
         result=structured,
         model_result=result,

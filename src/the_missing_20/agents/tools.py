@@ -9,6 +9,11 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from the_missing_20.agents.events import (
+    AgentEventSink,
+    AgentOperationEvent,
+    AgentOperationEventType,
+)
 from the_missing_20.agents.schemas import (
     REQUIRED_AUTHORITATIVE_SOURCES,
     KnowledgeCitation,
@@ -66,6 +71,40 @@ class ToolAudit:
     """Normalized tool-call audit data; no raw prompts or model history are retained."""
 
     calls: list[dict[str, Any]] = field(default_factory=list)
+    event_sink: AgentEventSink | None = None
+    case_id: str | None = None
+    trace_id: str | None = None
+    actor: str = "agent"
+    stage: str = "investigator"
+    _next_operation: int = field(default=1, init=False, repr=False)
+
+    def start(self, *, name: str, arguments: dict[str, Any]) -> str:
+        """Emit a start event before an audited tool body is entered.
+
+        Tool implementations call this before validation and before any repository
+        read.  Returning the operation id lets the later audit record bind its
+        completion to the exact invocation, including concurrent calls.
+        """
+
+        operation_id = f"tool:{self.stage}:{self._next_operation:04d}"
+        self._next_operation += 1
+        if self.event_sink is not None:
+            if self.case_id is None or self.trace_id is None:
+                raise ValueError("an event sink requires immutable case and trace identity")
+            self.event_sink.emit(
+                AgentOperationEvent(
+                    event_type=AgentOperationEventType.TOOL_STARTED,
+                    case_id=self.case_id,
+                    trace_id=self.trace_id,
+                    actor=self.actor,
+                    operation_id=operation_id,
+                    status="RUNNING",
+                    correlation_id=operation_id,
+                    stage=self.stage,
+                    payload={"tool": name, "arguments": _public_arguments(arguments)},
+                )
+            )
+        return operation_id
 
     def record(
         self,
@@ -77,25 +116,75 @@ class ToolAudit:
         result_digest: str | None = None,
         error_code: str | None = None,
         duration_ms: int = 0,
+        operation_id: str | None = None,
     ) -> None:
         if error_code is not None and result_knowledge_records:
             raise KnowledgeProvenanceError("failed knowledge search cannot retain result records")
         normalized_knowledge_records = tuple(
             _normalize_knowledge_record(item) for item in result_knowledge_records
         )
-        self.calls.append(
-            {
-                "tool": name,
-                "arguments": json.loads(_canonical(arguments)),
-                "result_evidence_ids": list(result_evidence_ids),
-                "result_knowledge_records": [
-                    json.loads(_canonical(item)) for item in normalized_knowledge_records
-                ],
-                "result_digest": result_digest,
-                "error_code": error_code,
-                "duration_ms": max(0, duration_ms),
-            }
-        )
+        call = {
+            "tool": name,
+            "arguments": json.loads(_canonical(arguments)),
+            "result_evidence_ids": list(result_evidence_ids),
+            "result_knowledge_records": [
+                json.loads(_canonical(item)) for item in normalized_knowledge_records
+            ],
+            "result_digest": result_digest,
+            "error_code": error_code,
+            "duration_ms": max(0, duration_ms),
+        }
+        self.calls.append(call)
+        if self.event_sink is not None:
+            if self.case_id is None or self.trace_id is None:
+                raise ValueError("an event sink requires immutable case and trace identity")
+            operation_id = operation_id or f"tool:{self.stage}:audit-{len(self.calls):04d}"
+            evidence_ids = tuple(str(item) for item in result_evidence_ids)
+            knowledge_ids = tuple(
+                str(item["knowledge_id"])
+                for item in normalized_knowledge_records
+                if "knowledge_id" in item
+            )
+            self.event_sink.emit(
+                AgentOperationEvent(
+                    event_type=AgentOperationEventType.TOOL_COMPLETED,
+                    case_id=self.case_id,
+                    trace_id=self.trace_id,
+                    actor=self.actor,
+                    operation_id=operation_id,
+                    status="FAILED" if error_code else "COMPLETED",
+                    correlation_id=operation_id,
+                    stage=self.stage,
+                    payload={
+                        "tool": name,
+                        "result_evidence_ids": list(evidence_ids),
+                        "result_knowledge_ids": list(knowledge_ids),
+                        "error_code": error_code,
+                    },
+                )
+            )
+            if evidence_ids:
+                self.event_sink.emit(
+                    AgentOperationEvent(
+                        event_type=AgentOperationEventType.EVIDENCE_RETURNED,
+                        case_id=self.case_id,
+                        trace_id=self.trace_id,
+                        actor=self.actor,
+                        operation_id=f"{operation_id}:evidence",
+                        status="ADMITTED",
+                        correlation_id=operation_id,
+                        stage=self.stage,
+                        payload={"evidence_ids": list(evidence_ids)},
+                    )
+                )
+
+
+def _public_arguments(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Retain only safe identifiers in public operation events."""
+
+    return {
+        key: value for key, value in arguments.items() if key in {"evidence_id", "version", "query"}
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,12 +241,14 @@ def make_read_admitted_evidence_tool(scope: ToolScope, audit: ToolAudit) -> Any:
         nonlocal reads
         started = time.monotonic()
         arguments = {"evidence_id": evidence_id}
+        operation_id = audit.start(name="read_admitted_evidence", arguments=arguments)
         if reads >= scope.max_evidence_reads:
             audit.record(
                 name="read_admitted_evidence",
                 arguments=arguments,
                 error_code="TOOL_BUDGET_EXHAUSTED",
                 duration_ms=round((time.monotonic() - started) * 1000),
+                operation_id=operation_id,
             )
             raise ValueError("evidence read budget exhausted")
         if evidence_id not in scope.allowed_evidence_ids:
@@ -166,6 +257,7 @@ def make_read_admitted_evidence_tool(scope: ToolScope, audit: ToolAudit) -> Any:
                 arguments=arguments,
                 error_code="EVIDENCE_NOT_ALLOWLISTED",
                 duration_ms=round((time.monotonic() - started) * 1000),
+                operation_id=operation_id,
             )
             raise ValueError("evidence ID is not allowlisted for this invocation")
         item = by_id.get(evidence_id)
@@ -175,6 +267,7 @@ def make_read_admitted_evidence_tool(scope: ToolScope, audit: ToolAudit) -> Any:
                 arguments=arguments,
                 error_code="EVIDENCE_NOT_FOUND",
                 duration_ms=round((time.monotonic() - started) * 1000),
+                operation_id=operation_id,
             )
             raise ValueError("evidence ID is not admitted to this case")
         reads += 1
@@ -192,6 +285,7 @@ def make_read_admitted_evidence_tool(scope: ToolScope, audit: ToolAudit) -> Any:
             result_evidence_ids=(item.evidence_id,),
             result_digest=_digest(result),
             duration_ms=round((time.monotonic() - started) * 1000),
+            operation_id=operation_id,
         )
         return result
 
@@ -220,12 +314,14 @@ def make_search_synthetic_knowledge_tool(scope: ToolScope, audit: ToolAudit) -> 
         nonlocal searches
         started = time.monotonic()
         arguments = {"query": query, "version": version}
+        operation_id = audit.start(name="search_synthetic_knowledge", arguments=arguments)
         if searches >= scope.max_knowledge_searches:
             audit.record(
                 name="search_synthetic_knowledge",
                 arguments=arguments,
                 error_code="TOOL_BUDGET_EXHAUSTED",
                 duration_ms=round((time.monotonic() - started) * 1000),
+                operation_id=operation_id,
             )
             raise ValueError("knowledge search budget exhausted")
         if version != scope.knowledge_version:
@@ -234,6 +330,7 @@ def make_search_synthetic_knowledge_tool(scope: ToolScope, audit: ToolAudit) -> 
                 arguments=arguments,
                 error_code="KNOWLEDGE_VERSION_MISMATCH",
                 duration_ms=round((time.monotonic() - started) * 1000),
+                operation_id=operation_id,
             )
             raise ValueError("knowledge version does not match the immutable invocation")
         searches += 1
@@ -245,6 +342,7 @@ def make_search_synthetic_knowledge_tool(scope: ToolScope, audit: ToolAudit) -> 
                 arguments=arguments,
                 error_code="KNOWLEDGE_SEARCH_FAILED",
                 duration_ms=round((time.monotonic() - started) * 1000),
+                operation_id=operation_id,
             )
             raise
         result = {
@@ -276,6 +374,7 @@ def make_search_synthetic_knowledge_tool(scope: ToolScope, audit: ToolAudit) -> 
             ),
             result_digest=_digest(result),
             duration_ms=round((time.monotonic() - started) * 1000),
+            operation_id=operation_id,
         )
         return result
 

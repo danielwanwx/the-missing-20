@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from the_missing_20.agents.events import AgentEventSink
 from the_missing_20.agents.schemas import (
     HYPOTHESIS_TO_INVESTIGATOR,
     InvestigatorID,
@@ -91,6 +92,8 @@ async def run_investigator(
     tool_plan: tuple[dict[str, Any], ...],
     scope: ToolScope,
     source_availability: SourceAvailabilitySet,
+    event_sink: AgentEventSink | None = None,
+    operation_prefix: str | None = None,
     system_prompt: str | None = None,
     timeout_seconds: float = 45.0,
 ) -> InvestigatorRun:
@@ -102,7 +105,13 @@ async def run_investigator(
     except ImportError as exc:  # pragma: no cover - before dependency bootstrap
         raise RuntimeError("strands-agents is required for the agent harness") from exc
 
-    audit = ToolAudit()
+    audit = ToolAudit(
+        event_sink=event_sink,
+        case_id=scope.case_id,
+        trace_id=scope.trace_id,
+        actor=role.value,
+        stage=stage.value if operation_prefix is None else operation_prefix,
+    )
     tools = [
         make_read_admitted_evidence_tool(scope, audit),
         make_search_synthetic_knowledge_tool(scope, audit),

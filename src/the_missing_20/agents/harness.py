@@ -11,7 +11,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from the_missing_20.agents.evaluator import run_evaluator
+from the_missing_20.agents.evaluator import EvaluationRun, run_evaluator
+from the_missing_20.agents.events import (
+    AgentEventSink,
+    AgentOperationEvent,
+    AgentOperationEventType,
+)
 from the_missing_20.agents.investigators import (
     InvestigatorRun,
     default_tool_plan,
@@ -44,7 +49,7 @@ from the_missing_20.agents.schemas import (
     public_investigator_result,
     public_synthesis_result,
 )
-from the_missing_20.agents.synthesis import run_synthesis
+from the_missing_20.agents.synthesis import SynthesisRun, run_synthesis
 from the_missing_20.agents.tools import ToolScope
 from the_missing_20.agents.tracing import NormalizedTrace, normalize_stage_trace
 from the_missing_20.agents.validation import (
@@ -399,6 +404,7 @@ class AgentHarness:
         budget: AgentBudget | None = None,
         prompt_root: Path | None = None,
         allow_stage_retries: bool = True,
+        event_sink: AgentEventSink | None = None,
     ) -> None:
         self.model_factory = model_factory
         self.knowledge = knowledge
@@ -406,6 +412,38 @@ class AgentHarness:
         self.budget = budget or AgentBudget()
         self.prompt_root = prompt_root
         self.allow_stage_retries = allow_stage_retries
+        self.event_sink = event_sink
+
+    def _emit(
+        self,
+        *,
+        event_type: AgentOperationEventType,
+        case_id: str,
+        trace_id: str,
+        actor: str,
+        operation_id: str,
+        status: str,
+        correlation_id: str,
+        stage: AgentStage | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        """Forward one actual-operation event to the configured durable sink."""
+
+        if self.event_sink is None:
+            return
+        self.event_sink.emit(
+            AgentOperationEvent(
+                event_type=event_type,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor=actor,
+                operation_id=operation_id,
+                status=status,
+                correlation_id=correlation_id,
+                stage=stage.value if stage is not None else None,
+                payload=payload or {},
+            )
+        )
 
     async def run_async(
         self,
@@ -451,27 +489,100 @@ class AgentHarness:
         )
 
         async def invoke(role: InvestigatorID, stage: AgentStage) -> InvestigatorRun:
+            attempt = 0
+            operation_id = f"agent:{stage.value}:attempt:1"
+            self._emit(
+                event_type=AgentOperationEventType.AGENT_STARTED,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor=role.value,
+                operation_id=operation_id,
+                status="RUNNING",
+                correlation_id=trace_id,
+                stage=stage,
+                payload={"stage": stage.value, "mode": "SCRIPTED_SYNTHETIC"},
+            )
+
+            async def operation() -> InvestigatorRun:
+                nonlocal attempt
+                attempt += 1
+                operation_id = f"agent:{stage.value}:attempt:{attempt}"
+                if attempt > 1:
+                    self._emit(
+                        event_type=AgentOperationEventType.AGENT_STARTED,
+                        case_id=case_id,
+                        trace_id=trace_id,
+                        actor=role.value,
+                        operation_id=operation_id,
+                        status="RUNNING",
+                        correlation_id=trace_id,
+                        stage=stage,
+                        payload={"stage": stage.value, "mode": "SCRIPTED_SYNTHETIC"},
+                    )
+                return await run_investigator(
+                    role=role,
+                    stage=stage,
+                    model_factory=self.model_factory,
+                    output_payload=scripted_outputs[role],
+                    tool_plan=default_tool_plan(scope),
+                    scope=scope,
+                    source_availability=self.source_availability,
+                    event_sink=self.event_sink,
+                    operation_prefix=f"{stage.value}:attempt:{attempt}",
+                    system_prompt=prompts.investigator,
+                    timeout_seconds=self.budget.per_call_timeout_seconds,
+                )
+
             try:
                 run, _ = await _run_checked_once(
-                    lambda: run_investigator(
-                        role=role,
-                        stage=stage,
-                        model_factory=self.model_factory,
-                        output_payload=scripted_outputs[role],
-                        tool_plan=default_tool_plan(scope),
-                        scope=scope,
-                        source_availability=self.source_availability,
-                        system_prompt=prompts.investigator,
-                        timeout_seconds=self.budget.per_call_timeout_seconds,
-                    ),
+                    operation,
                     lambda result: validator.validate_investigator(
                         result.result,
                         read_evidence_ids=result.read_evidence_ids,
                     ),
                     allow_retry=self.allow_stage_retries,
                 )
+                self._emit(
+                    event_type=AgentOperationEventType.AGENT_COMPLETED,
+                    case_id=case_id,
+                    trace_id=trace_id,
+                    actor=role.value,
+                    operation_id=f"agent:{stage.value}:attempt:{attempt}",
+                    status="COMPLETED",
+                    correlation_id=trace_id,
+                    stage=stage,
+                    payload={
+                        "read_evidence_ids": list(run.read_evidence_ids),
+                        "knowledge_citation_count": len(run.knowledge_citations),
+                    },
+                )
+                self._emit(
+                    event_type=AgentOperationEventType.AGENT_HANDOFF,
+                    case_id=case_id,
+                    trace_id=trace_id,
+                    actor=role.value,
+                    operation_id=f"handoff:{stage.value}:attempt:{attempt}",
+                    status="HANDED_OFF",
+                    correlation_id=trace_id,
+                    stage=stage,
+                    payload={
+                        "target": AgentStage.SYNTHESIS.value,
+                        "evidence_ids": list(run.read_evidence_ids),
+                    },
+                )
                 return run
             except Exception as error:
+                self._emit(
+                    event_type=AgentOperationEventType.AGENT_COMPLETED,
+                    case_id=case_id,
+                    trace_id=trace_id,
+                    actor=role.value,
+                    operation_id=f"agent:{stage.value}:attempt:{max(attempt, 1)}",
+                    status="FAILED",
+                    correlation_id=trace_id,
+                    stage=stage,
+                    payload={"error_code": type(error).__name__},
+                )
                 raise _stage_failure(error, stage=stage, role=role) from error
 
         # The fixed topology is application-owned; the three independent agents are the
@@ -495,8 +606,12 @@ class AgentHarness:
             run.knowledge_citations for run in investigator_runs
         )
         try:
-            synthesis_run, synthesis = await _run_checked_once(
-                lambda: run_synthesis(
+            synthesis_attempt = 0
+
+            async def synthesis_operation() -> SynthesisRun:
+                nonlocal synthesis_attempt
+                synthesis_attempt += 1
+                return await run_synthesis(
                     model_factory=self.model_factory,
                     output_payload=synthesis_payload,
                     investigators=validated_investigators,
@@ -507,17 +622,26 @@ class AgentHarness:
                     investigator_read_evidence_ids=tuple(
                         run.read_evidence_ids for run in investigator_runs
                     ),
+                    event_sink=self.event_sink,
+                    operation_id=f"synthesis:{trace_id}:attempt:{synthesis_attempt}",
                     system_prompt=prompts.synthesis,
                     timeout_seconds=self.budget.per_call_timeout_seconds,
-                ),
+                )
+
+            synthesis_run, synthesis = await _run_checked_once(
+                synthesis_operation,
                 lambda result: validator.validate_synthesis(result.result, validated_investigators),
                 allow_retry=self.allow_stage_retries,
             )
         except Exception as error:
             raise _stage_failure(error, stage=AgentStage.SYNTHESIS) from error
         try:
-            evaluation_run, evaluation = await _run_checked_once(
-                lambda: run_evaluator(
+            evaluator_attempt = 0
+
+            async def evaluator_operation() -> EvaluationRun:
+                nonlocal evaluator_attempt
+                evaluator_attempt += 1
+                return await run_evaluator(
                     model_factory=self.model_factory,
                     output_payload=evaluator_payload,
                     synthesis=synthesis,
@@ -530,10 +654,15 @@ class AgentHarness:
                     case_id=case_id,
                     trace_id=trace_id,
                     source_availability=self.source_availability,
+                    event_sink=self.event_sink,
+                    operation_id=f"evaluator:{trace_id}:attempt:{evaluator_attempt}",
                     preserved_dissent=derive_preserved_dissent(validated_investigators),
                     system_prompt=prompts.evaluator,
                     timeout_seconds=self.budget.per_call_timeout_seconds,
-                ),
+                )
+
+            evaluation_run, evaluation = await _run_checked_once(
+                evaluator_operation,
                 lambda result: validator.validate_evaluator(result.result, synthesis),
                 allow_retry=self.allow_stage_retries,
             )

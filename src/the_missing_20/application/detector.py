@@ -49,6 +49,7 @@ class DiscrepancyDetector:
         case_id: str,
         trace_id: str,
         fixture_path: Path,
+        failed_unit_ids: tuple[str, ...] = (),
     ) -> tuple[Case, tuple[EvidenceItem, ...]]:
         occurred_at = self.clock.now()
         fixture = ScenarioFixture.model_validate_json(fixture_path.read_text(encoding="utf-8"))
@@ -56,6 +57,11 @@ class DiscrepancyDetector:
         expected = snapshot.purchase_order.ordered_quantity
         observed = snapshot.erp_receipt.quantity
         missing = expected - observed
+        if failed_unit_ids and (
+            len(failed_unit_ids) != snapshot.failed_message.quantity
+            or len(set(failed_unit_ids)) != len(failed_unit_ids)
+        ):
+            raise ValueError("failed-message evidence must bind the exact failed unit set")
         if (
             missing < 0
             or snapshot.invoice.quantity != expected
@@ -68,6 +74,14 @@ class DiscrepancyDetector:
             collection_method="fresh-read",
             collected_by="deterministic-detector",
         )
+        failed_message_fields = snapshot.failed_message.model_dump(mode="json")
+        if failed_unit_ids:
+            # The per-unit expansion is an experiment read model.  Keep it opt-in so
+            # legacy signed Authority-B detector evidence remains byte-identical.
+            failed_message_fields = {
+                **failed_message_fields,
+                "failed_unit_ids": list(failed_unit_ids),
+            }
         evidence_specs = [
             (
                 f"{case_id}:warehouse",
@@ -85,7 +99,7 @@ class DiscrepancyDetector:
                 f"{case_id}:failed-message",
                 EvidenceSourceType.FAILED_MESSAGE_QUEUE,
                 snapshot.failed_message.message_id,
-                snapshot.failed_message.model_dump(mode="json"),
+                failed_message_fields,
             ),
             (
                 f"{case_id}:invoice",

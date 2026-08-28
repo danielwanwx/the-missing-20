@@ -30,6 +30,53 @@ class EvidenceReadStatus(StrEnum):
     UNAVAILABLE = "UNAVAILABLE"
 
 
+class SupplyUnitStage(StrEnum):
+    """Authoritative stage of one synthetic unit in the supply flow."""
+
+    WAREHOUSE = "WAREHOUSE"
+    MESSAGE_QUEUE = "MESSAGE_QUEUE"
+    ERP = "ERP"
+
+
+class SupplyUnitStatus(StrEnum):
+    """Business state shown for one unit, kept separate from its stage."""
+
+    ERP_RECORDED = "ERP_RECORDED"
+    QUEUE_FAILED = "QUEUE_FAILED"
+
+
+class SupplyUnit(ContractModel):
+    """Stable, addressable synthetic supply-chain unit.
+
+    The demo deliberately models each ordered unit as a record.  Aggregate
+    quantities are still retained for compatibility with the existing enterprise
+    contracts, but the unit list is the authoritative source for the visual flow
+    and for the exact Missing 20 recovery set.
+    """
+
+    unit_id: NonEmptyStr
+    purchase_order_id: NonEmptyStr
+    line_id: NonEmptyStr
+    current_stage: SupplyUnitStage
+    status: SupplyUnitStatus
+    source_message_id: NonEmptyStr | None = None
+    revision: NonNegativeInt = 0
+
+    @model_validator(mode="after")
+    def source_matches_status(self) -> SupplyUnit:
+        if self.status is SupplyUnitStatus.QUEUE_FAILED:
+            if self.current_stage is not SupplyUnitStage.MESSAGE_QUEUE:
+                raise ValueError("queue-failed units must be at the message queue")
+            if self.source_message_id is None:
+                raise ValueError("queue-failed units must reference their source message")
+        elif self.status is SupplyUnitStatus.ERP_RECORDED:
+            if self.current_stage is not SupplyUnitStage.ERP:
+                raise ValueError("ERP-recorded units must be at ERP")
+            if self.source_message_id is not None:
+                raise ValueError("ERP-recorded units cannot reference a failed message")
+        return self
+
+
 class PurchaseOrderLine(ContractModel):
     purchase_order_id: NonEmptyStr
     line_id: NonEmptyStr
@@ -104,6 +151,12 @@ class EnterpriseSnapshot(ContractModel):
     failed_message: FailedReceiptMessage
     erp_receipt: ErpReceipt
     invoice: Invoice
+    # Unit truth belongs to the experiment-specific ``list_units`` read model.  Keep
+    # the optional in-memory projection for callers that need to inspect it, but do
+    # not include it in the legacy snapshot wire/canonical representation: signed
+    # Authority-B artifacts predate per-unit visualization and must retain their
+    # exact digest.
+    supply_units: tuple[SupplyUnit, ...] = Field(default=(), exclude=True)
     material_documents: tuple[MaterialDocument, ...] = Field(default=())
     business_effects: tuple[BusinessEffect, ...] = Field(default=())
 
@@ -115,6 +168,9 @@ class ScenarioFixture(ContractModel):
     failed_message: FailedReceiptMessage
     erp_receipt: ErpReceipt
     invoice: Invoice
+    # See ``EnterpriseSnapshot.supply_units``: this experiment-only expansion is
+    # intentionally excluded from legacy fixture serialization and signed digests.
+    supply_units: tuple[SupplyUnit, ...] = Field(default=(), exclude=True)
     material_documents: tuple[MaterialDocument, ...] = Field(default=())
     business_effects: tuple[BusinessEffect, ...] = Field(default=())
 

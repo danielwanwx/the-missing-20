@@ -10,6 +10,7 @@ from the_missing_20.domain.enterprise import (
     EnterpriseMutationResult,
     EnterpriseSnapshot,
     MaterialDocumentRead,
+    SupplyUnit,
 )
 from the_missing_20.domain.execution import (
     ReleaseInvoiceParameters,
@@ -19,6 +20,8 @@ from the_missing_20.domain.execution import (
 
 class EnterpriseSystems(Protocol):
     def read_snapshot(self) -> EnterpriseSnapshot: ...
+
+    def list_units(self) -> tuple[SupplyUnit, ...]: ...
 
     def read_material_documents(self) -> MaterialDocumentRead: ...
 
