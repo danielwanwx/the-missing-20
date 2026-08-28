@@ -2,8 +2,8 @@
 
 **Development status:** ready to be judged locally; video and Devpost submission are not ready.
 **Data:** synthetic only.
-**Runtime:** local read-only Decision Workspace; no AWS/provider call is made by the
-demo runner.
+**Runtime:** local synthetic incident API, ordered SSE ledger, Dashboard, and Agent
+Workspace; no AWS/provider call is made by the demo runner.
 
 ## Before the timer
 
@@ -15,18 +15,19 @@ make judge-demo
 
 The command performs a clean-state regeneration in a temporary directory and validates
 the persisted audit. It does not trust a stale successful JSON artifact. To inspect
-the read-only UI, run:
+the interactive UI, run:
 
 ```bash
 PYTHONPATH=src .venv/bin/python scripts/decision_workspace_server.py
 ```
 
-Then open the local root URL printed by the server. Choose **Start replay** and use
-**Next** to let the product lead the story. The five visual stages cover detection,
-agent investigation, safety policy, human approval, and verified recovery. Use the
-collapsed proof sections only when a judge asks for technical evidence. The server
-exposes only GET routes and no active write control. `make m7-audit` runs the direct
-package audit.
+Then open the local root URL printed by the server. The Dashboard receives the same
+ordered events as the backend and renders every unit. Open **Agent Workspace** to watch
+the orchestrator, investigators, tools, evidence, and handoffs. Ask the Copilot a
+question, prepare recovery, approve it as the two required roles, execute, and verify
+the 100/100 result. Operational controls are restricted to local synthetic state;
+Copilot remains advisory and no route can write to an external system. `make m7-audit`
+runs the direct package audit.
 
 ## Seven timed beats across five visual stages (5:00 maximum)
 
@@ -35,12 +36,12 @@ what to say, and the evidence boundary a judge should retain.
 
 | Time | Step | Show and say | Evidence |
 | --- | --- | --- | --- |
-| 0:00–0:35 | 1. Detect the gap | Click **Start replay**. “The warehouse expects 100 units, while ERP records 80. The system catches the missing 20 before changing anything.” | `PROVEN`: lifecycle evidence and detector genesis. |
-| 0:35–1:25 | 2. Investigate in parallel | Click **Next**. “Three bounded investigators compare a retryable message, a genuine short shipment, and a duplicate posting.” | `SCRIPTED_PROVEN`: four-profile scripted Strands trace; synthetic only. |
-| 1:25–2:00 | 3. Keep AI advisory | Briefly open **Investigation & safety decision**. “Agents explain likely causes, but they cannot grant or execute an action. The real Nova failure remains visible.” | Real Nova `PROVEN` only for connectivity/degraded observability; stable usefulness `NOT_PROVEN`. |
-| 2:00–2:35 | 4. Decide deterministically | Return to the replay and click **Next**. “Code checks authoritative facts and permits only a recovery that cannot create a duplicate.” | `PROVEN`: policy, case/version, source and invariant checks. |
-| 2:35–3:35 | 5. Authorize and execute | Click **Next**. “Every controlled step needs two different roles. Neither AI nor one person can act alone.” | `PROVEN`: quorum, signed grant, ControlledExecutor, effect ledger. |
-| 3:35–4:20 | 6. Verify and replay | Click **Next**. “The system rereads the result, verifies the missing records, closes the case, and proves a second run makes no duplicate change.” | `PROVEN`: receipt/effect/snapshot closure and replay delta `0`. |
+| 0:00–0:35 | 1. Detect the gap | On **Dashboard**, point to 100 warehouse records, 80 ERP records, and the 20 exact IDs held at the queue. | `PROVEN`: local API, ordered ledger, lifecycle evidence, detector genesis. |
+| 0:35–1:25 | 2. Investigate in parallel | Open **Agent Workspace**. Watch three bounded investigators call tools, collect evidence, and hand results to the orchestrator. | `SCRIPTED_PROVEN`: scripted Strands trace; synthetic only. |
+| 1:25–2:00 | 3. Keep AI advisory | Ask Copilot which evidence proves the gap. “The agent explains and cites; it cannot approve or execute.” | Real Nova `PROVEN` only for connectivity/degraded observability; stable usefulness `NOT_PROVEN`. |
+| 2:00–2:35 | 4. Decide deterministically | Choose **Prepare recovery**. “Code checks authoritative facts and permits only a recovery that cannot create a duplicate.” | `PROVEN`: policy, case/version, source and invariant checks. |
+| 2:35–3:35 | 5. Authorize and execute | Approve with the two distinct roles, then choose **Execute approved recovery**. “Neither AI nor one person can act alone.” | `PROVEN`: quorum, signed grant, ControlledExecutor, effect ledger. |
+| 3:35–4:20 | 6. Verify and replay | Return to **Dashboard** and show 100/100. “The system rereads the result and proves replay creates no duplicate change.” | `PROVEN`: receipt/effect/snapshot closure and replay delta `0`. |
 | 4:20–5:00 | 7. State the limits | Switch to `degraded`, then `invalid`. “AI can fail without weakening safety; missing authoritative evidence fails closed.” | Explicit `PROVEN`, `SCRIPTED_PROVEN`, `NOT_PROVEN`; no public submission claim. |
 
 ## Closing line

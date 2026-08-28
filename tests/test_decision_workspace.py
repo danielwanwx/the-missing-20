@@ -241,7 +241,7 @@ def _request(url: str, method: str = "GET") -> tuple[int, bytes, dict[str, str]]
         return exc.code, exc.read(), dict(exc.headers.items())
 
 
-def test_workspace_server_is_read_only_and_local() -> None:
+def test_workspace_server_is_local_with_scoped_synthetic_commands() -> None:
     try:
         server = DecisionWorkspaceServer(("127.0.0.1", 0), ROOT)
     except PermissionError:
@@ -270,7 +270,11 @@ def test_workspace_server_is_read_only_and_local() -> None:
         assert status == 400
         status, body, _headers = _request(f"{base}/healthz")
         assert status == 200
-        assert json.loads(body)["read_only"] is True
+        health = json.loads(body)
+        assert health["local_synthetic_commands"] is True
+        assert health["provider_calls"] is False
+        assert health["write_scope"] == "local_synthetic_only"
+        assert health["advisory_tools_read_only"] is True
     finally:
         server.shutdown()
         server.server_close()

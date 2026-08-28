@@ -40,6 +40,7 @@ STATIC_FILES = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
 API_SCHEMA_VERSION = "missing20-experiment-api/v1"
 MAX_REQUEST_BYTES = 64 * 1024
@@ -316,7 +317,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                 HTTPStatus.OK,
                 {
                     "status": "ok",
-                    "read_only": True,
+                    "local_synthetic_commands": True,
+                    "provider_calls": False,
+                    "write_scope": "local_synthetic_only",
+                    "advisory_tools_read_only": True,
                     "schema_version": WORKSPACE_SCHEMA_VERSION,
                     "experiment_api": API_SCHEMA_VERSION,
                 },

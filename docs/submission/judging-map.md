@@ -9,18 +9,18 @@ official competition criteria.
 | Design | Step 3: advisory/operational separation | `PROVEN`: model output has no operational or write authority; deterministic policy has no advisory-shaped input. |
 | Potential impact | Steps 1–4: investigate a discrepancy and choose a safe next action | Demonstrates a repeatable operations pattern on synthetic data; no production impact metric or deployment claim is made. |
 | Creativity and originality | Steps 2, 5, and 7: competing investigators, per-action quorum, explicit degraded disclosure | `SCRIPTED_PROVEN` for advisory usefulness; the safety architecture is the differentiator. Stable real Nova usefulness and AgentCore are `NOT_PROVEN`. |
-| Presentation | Five-stage guided replay and seven timed narration beats | The product leads the judge through one incident; dense proof stays collapsed until requested. Complete/degraded/invalid views make success, degradation, and fail-closed behavior legible. |
+| Presentation | Live Dashboard, Agent Workspace, and seven timed narration beats | The product leads the judge from the 100/80/20 gap through visible agent work, evidence-backed Copilot answers, human approval, controlled recovery, and 100/100 verification. |
 
 ## What a judge should verify
 
 1. `make judge-demo` succeeds from the current checkout and reports a clean
    regeneration rather than only reading a stale result.
-2. **Start replay**, **Next**, **Previous**, and **Restart** guide the five-stage story;
-   the detailed proof remains available in collapsed sections.
+2. The Dashboard renders exactly 100 API-backed unit records and the Agent Workspace
+   exposes actual tool calls, evidence IDs, handoffs, and ordered event sequence.
 3. The lifecycle shows two different actions and roles, authoritative after-reads,
    verification, and replay delta `0`.
-4. The degraded and invalid branches remain honest and hide fabricated operational
-   state.
+4. Copilot cannot approve or execute; local synthetic recovery requires two distinct
+   roles and fails closed when the live stream or authoritative lifecycle is absent.
 
 ## Claims intentionally withheld
 

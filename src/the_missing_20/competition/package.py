@@ -40,6 +40,27 @@ M7_TOTAL_DURATION_SECONDS: Final[int] = 300
 M7_CUMULATIVE_COST_USD: Final[str] = "0.1250496"
 M7_COST_CAP_USD: Final[str] = "0.60"
 
+# This is an auditor-owned contract, not a claim supplied by the browser smoke
+# artifact. The event ledger may contain additional implementation events, but
+# it must always preserve this minimum live agent/lifecycle trace.
+M7_REQUIRED_BROWSER_EVENT_TYPES: Final[tuple[str, ...]] = (
+    "investigation.started",
+    "agent.started",
+    "tool.started",
+    "tool.completed",
+    "evidence.returned",
+    "agent.handoff",
+    "synthesis.completed",
+    "evaluation.completed",
+    "copilot.message",
+    "recovery.prepared",
+    "approval.requested",
+    "approval.recorded",
+    "execution.started",
+    "execution.completed",
+    "verification.completed",
+)
+
 M7_DEMO_PATH: Final[str] = "docs/demo/five-minute-demo.md"
 M7_SPEC_PATH: Final[str] = (
     "docs/superpowers/specs/2026-08-27-milestone-7-private-competition-package-design.md"
@@ -91,9 +112,9 @@ M7_SOURCE_PATHS: Final[tuple[str, ...]] = tuple(
 # in a mutated package cannot turn a changed deterministic proof into accepted input.
 M7_FIXED_SOURCE_DIGESTS: Final[Mapping[str, str]] = {
     "artifacts/golden/golden-v2.json": (
-        "7910ca6b51d8a14c55b280fd3ddeb3c647ef2a213f45a05df7df1dd165a5857e"
+        "d275470cfe5748105630f22d3c08c9c962001cf3957e62735b63d8b406352e69"
     ),
-    M6_PROOF_ARTIFACT_PATH: ("3f714bd730c8a8562f2f6c9ceb7e5c1951c29bdeb51e756990f018707f638f8a"),
+    M6_PROOF_ARTIFACT_PATH: ("063aa1bc07d1f26930e3e16b8801a6e10c5708fb294eb97d77e6a9fee843e492"),
     "artifacts/workspace/authority-b-lifecycle-v1.json": (
         "670b525cc5bfd9f673fd63de660a44d9db5ae000ce2cecb49fc053cacf4d7512"
     ),
@@ -392,6 +413,64 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
         raise M7PackageError("M7 browser smoke records a remote resource")
     if network.get("provider_calls") != 0:
         raise M7PackageError("M7 browser smoke records a provider call")
+    incident = value.get("incident")
+    if not isinstance(incident, dict):
+        raise M7PackageError("M7 browser smoke incident proof is missing")
+    if not isinstance(incident.get("incident_id"), str) or not incident.get("incident_id"):
+        raise M7PackageError("M7 browser smoke incident identity is missing")
+    initial_counts = incident.get("initial_counts")
+    final_counts = incident.get("final_counts")
+    if initial_counts != {"total": 100, "erp_recorded": 80, "queue_failed": 20}:
+        raise M7PackageError("M7 browser smoke does not prove the initial 100/80/20 state")
+    if final_counts != {"total": 100, "erp_recorded": 100, "queue_failed": 0}:
+        raise M7PackageError("M7 browser smoke does not prove the final 100/100/0 state")
+    server = value.get("server")
+    if not isinstance(server, dict):
+        raise M7PackageError("M7 browser smoke server boundary is missing")
+    if server.get("local_synthetic_commands") is not True:
+        raise M7PackageError("M7 browser smoke server is not local synthetic-only")
+    if server.get("provider_calls") is not False:
+        raise M7PackageError("M7 browser smoke server records a provider call")
+    if server.get("write_scope") != "local_synthetic_only":
+        raise M7PackageError("M7 browser smoke server write scope is not local synthetic-only")
+    if server.get("advisory_tools_read_only") is not True:
+        raise M7PackageError("M7 browser smoke advisory tools are not read-only")
+    event_ledger = value.get("event_ledger")
+    if not isinstance(event_ledger, dict):
+        raise M7PackageError("M7 browser smoke event ledger proof is missing")
+    required_ledger_flags = {
+        "actual_agent_events": "actual agent events",
+        "sse_live": "live SSE",
+        "ordered_sequence_advance": "ordered SSE sequence advancement",
+        "two_role_quorum": "two-role quorum",
+        "controlled_executor": "ControlledExecutor",
+        "verification": "verification",
+        "replay": "replay",
+    }
+    for field, label in required_ledger_flags.items():
+        if event_ledger.get(field) is not True:
+            raise M7PackageError(f"M7 browser smoke does not prove {label}")
+    if event_ledger.get("bound_failed_unit_ids") != 20:
+        raise M7PackageError("M7 browser smoke does not bind the twenty failed units")
+    if event_ledger.get("exactly_once_effects") != 1:
+        raise M7PackageError("M7 browser smoke does not prove one exactly-once effect")
+    if event_ledger.get("replay_effect_delta") != 0:
+        raise M7PackageError("M7 browser smoke replay changed the effect count")
+    observed_sequences = event_ledger.get("observed_sequences")
+    if not isinstance(observed_sequences, list) or len(observed_sequences) < 2:
+        raise M7PackageError("M7 browser smoke is missing observed SSE sequences")
+    if any(not isinstance(item, int) or item < 1 for item in observed_sequences):
+        raise M7PackageError("M7 browser smoke observed an invalid SSE sequence")
+    if observed_sequences != list(range(observed_sequences[0], observed_sequences[-1] + 1)):
+        raise M7PackageError("M7 browser smoke SSE sequence is not contiguous")
+    observed_types = event_ledger.get("observed_event_types")
+    required_types = event_ledger.get("required_event_types")
+    if not isinstance(observed_types, list) or not isinstance(required_types, list):
+        raise M7PackageError("M7 browser smoke event type proof is missing")
+    if required_types != list(M7_REQUIRED_BROWSER_EVENT_TYPES):
+        raise M7PackageError("M7 browser smoke required event contract is invalid")
+    if any(event_type not in observed_types for event_type in M7_REQUIRED_BROWSER_EVENT_TYPES):
+        raise M7PackageError("M7 browser smoke omitted a required agent or lifecycle event")
     modes = value.get("modes")
     if not isinstance(modes, list) or [item.get("mode") for item in modes] != [
         "complete",
@@ -402,10 +481,62 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
     for mode in modes:
         if not isinstance(mode, dict) or mode.get("status") != "PASS":
             raise M7PackageError("M7 browser smoke mode is not PASS")
-        if mode.get("remote_resources") != 0 or mode.get("active_write_controls") != 0:
+        if mode.get("remote_resources") != 0:
             raise M7PackageError("M7 browser smoke exposes an unsafe browser capability")
+        if mode.get("provider_calls") != 0:
+            raise M7PackageError("M7 browser smoke records a provider call")
+        if mode.get("local_synthetic_commands") is not True:
+            raise M7PackageError("M7 browser smoke is not local synthetic-only")
+        if mode.get("write_scope") != "local_synthetic_only":
+            raise M7PackageError("M7 browser smoke write scope is not local synthetic-only")
         if mode.get("console_errors") != []:
             raise M7PackageError("M7 browser smoke contains console errors")
+    views = value.get("views")
+    if not isinstance(views, list) or {
+        item.get("view") for item in views if isinstance(item, dict)
+    } != {
+        "dashboard",
+        "agent",
+    }:
+        raise M7PackageError("M7 browser smoke view coverage is incomplete")
+    for view in views:
+        if not isinstance(view, dict) or view.get("status") != "PASS":
+            raise M7PackageError("M7 browser smoke view is not PASS")
+        if view.get("ui_driven") is not True or view.get("sse_live") is not True:
+            raise M7PackageError("M7 browser smoke view is not driven by live SSE UI state")
+        if view.get("ready_marker") is not True:
+            raise M7PackageError("M7 browser smoke view is missing its ready marker")
+        if view.get("api_units") != 100 or view.get("dom_units") != 100:
+            raise M7PackageError("M7 browser smoke view does not render exactly 100 units")
+        start = view.get("sequence_start")
+        end = view.get("sequence_end")
+        samples = view.get("sequence_samples")
+        if (
+            not isinstance(start, int)
+            or not isinstance(end, int)
+            or end <= start
+            or samples != observed_sequences
+        ):
+            raise M7PackageError("M7 browser smoke view does not preserve ordered SSE evidence")
+        if view.get("console_errors") != []:
+            raise M7PackageError("M7 browser smoke view contains console errors")
+    ui_flow = value.get("ui_flow")
+    if not isinstance(ui_flow, dict):
+        raise M7PackageError("M7 browser smoke UI flow proof is missing")
+    required_ui_actions = {
+        "dashboard_loaded",
+        "agent_workspace_opened",
+        "copilot_queried",
+        "recovery_prepared",
+        "operator_approved",
+        "ap_approved",
+        "controlled_executor",
+        "verified",
+    }
+    if any(ui_flow.get(action) is not True for action in required_ui_actions):
+        raise M7PackageError("M7 browser smoke UI flow is incomplete")
+    if ui_flow.get("replay_effect_delta") != 0:
+        raise M7PackageError("M7 browser smoke UI replay changed the effect count")
 
 
 _REMOTE_URL = re.compile(r"https?://(?!127\.0\.0\.1|localhost)", re.IGNORECASE)
@@ -639,8 +770,8 @@ def _build_evidence() -> tuple[M7EvidenceRecord, ...]:
             evidence_class=M7EvidenceClass.PROVEN,
             status="PASS",
             scope=(
-                "local browser smoke with zero remote resources, zero active write controls, "
-                "and explicit unavailable state"
+                "local browser smoke with zero remote resources and provider calls, "
+                "local synthetic recovery scope, and explicit unavailable state"
             ),
             source_refs=(
                 "artifacts/workspace/browser-smoke-v1.json",
@@ -758,8 +889,8 @@ def _build_checks() -> tuple[M7AcceptanceCheck, ...]:
         M7AcceptanceCheck(
             check_id="browser_safety",
             detail=(
-                "Headless local smoke records zero remote resources, provider calls, active "
-                "write controls, and console errors."
+                "Headless local smoke records zero remote resources and provider calls, "
+                "local synthetic command scope, and no console errors."
             ),
             source_refs=("artifacts/workspace/browser-smoke-v1.json",),
         ),

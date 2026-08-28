@@ -1,328 +1,886 @@
-/* Read-only M5 renderer. It renders persisted values; it never creates a lifecycle fact. */
+/* The Missing 20 live client. Business state comes from the experiment API and SSE ledger. */
 (function () {
   "use strict";
 
-  const body = document.body;
-  const requestedMode = new URLSearchParams(window.location.search).get("mode");
-  const mode = requestedMode === "degraded" || requestedMode === "invalid" ? requestedMode : "complete";
   const $ = (id) => document.getElementById(id);
-  const text = (value) => String(value == null ? "" : value);
-  const replay = { artifact: null, stages: [], current: -1, started: false };
+  const query = new URLSearchParams(window.location.search);
+  const smokeCapture = query.get("smoke") === "1";
+  const deferStart = query.get("autostart") === "0";
+  const EVENT_TYPES = [
+    "incident.detected",
+    "investigation.started",
+    "agent.started",
+    "agent.completed",
+    "tool.started",
+    "tool.completed",
+    "evidence.returned",
+    "agent.handoff",
+    "synthesis.started",
+    "synthesis.completed",
+    "evaluation.started",
+    "evaluation.completed",
+    "recovery.prepared",
+    "approval.requested",
+    "approval.recorded",
+    "execution.started",
+    "execution.completed",
+    "verification.completed",
+    "copilot.message",
+    "provider.degraded",
+    "workflow.blocked",
+  ];
+  const OPERATION_TYPES = new Set([
+    "agent.started",
+    "agent.completed",
+    "tool.started",
+    "tool.completed",
+    "evidence.returned",
+    "agent.handoff",
+    "synthesis.started",
+    "synthesis.completed",
+    "evaluation.started",
+    "evaluation.completed",
+  ]);
+  const AGENT_DEFS = [
+    {
+      id: "retryable_message_investigator",
+      name: "Receipt retry",
+      focus: "Failed message path",
+    },
+    {
+      id: "short_shipment_investigator",
+      name: "Shipment check",
+      focus: "Physical quantity",
+    },
+    {
+      id: "duplicate_posting_investigator",
+      name: "Duplicate check",
+      focus: "Existing postings",
+    },
+  ];
+  const ROLE_DEFS = [
+    { role: "INTEGRATION_OPERATOR", principal: "integration-operator", name: "Integration operator" },
+    { role: "AP_APPROVER", principal: "ap-approver", name: "AP approver" },
+  ];
 
-  function setStatus(node, value, className) {
-    node.textContent = text(value);
-    node.className = `status-chip ${className || "status-neutral"}`;
+  const state = {
+    view: new URLSearchParams(window.location.search).get("view") === "agent" ? "agent" : "dashboard",
+    incidentId: "",
+    snapshot: null,
+    units: new Map(),
+    events: [],
+    lastSequence: 0,
+    connection: "connecting",
+    streamError: "",
+    source: null,
+    reconnectTimer: null,
+    loaded: false,
+    startIssued: false,
+    selectedUnitId: "",
+    selectedAgentId: "",
+    movingIds: new Set(),
+    activeEdges: new Set(),
+    chatMessages: [],
+    chatHydrated: false,
+    chatPending: false,
+    commandBusy: false,
+    commandError: "",
+    refreshPromise: Promise.resolve(),
+  };
+
+  function value(value) {
+    return String(value == null ? "" : value);
   }
 
-  function evidenceClass(value) {
-    if (value === "PROVEN") return "status-proven";
-    if (value === "SCRIPTED SYNTHETIC PROOF") return "status-scripted";
-    if (value === "NOT PROVEN") return "status-not-proven";
-    return "status-neutral";
+  function number(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
-  function chip(value) {
-    const span = document.createElement("span");
-    span.className = `status-chip ${evidenceClass(value)}`;
-    span.textContent = text(value);
-    return span;
+  function slug(raw) {
+    return value(raw).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   }
 
-  function stageData(artifact) {
-    const incident = artifact.case;
-    const advisory = artifact.advisory;
-    const human = artifact.human_control;
-    const unit = incident.unit === "EA" ? "units" : incident.unit;
-    const expected = `${incident.expected_quantity} ${unit}`;
-    const recorded = `${incident.observed_quantity} ${unit}`;
-    const missing = `${incident.missing_quantity} ${unit}`;
-    const roles = new Set(human.approvals.map((item) => item.role)).size;
-    const isComplete = artifact.mode === "complete";
-    const citedEvidence = new Set(
-      advisory.hypotheses.flatMap((item) => [
-        ...item.supporting_evidence_ids,
-        ...item.contradicting_evidence_ids,
-      ])
-    ).size;
-    return [
-      {
-        title: "Detect the gap",
-        outcome: expected + " expected. " + recorded + " recorded. " + missing + " missing.",
-        impact: "The system records the problem before changing anything.",
-      },
-      {
-        title: "Agents investigate",
-        outcome: isComplete
-          ? advisory.hypotheses.length + " AI investigators compare possible causes using " + citedEvidence + " persisted records."
-          : "The AI service failed, so the system shows no made-up answer.",
-        impact: isComplete
-          ? "AI narrows the search; it does not make the decision."
-          : "The safety rules still work when AI is unavailable.",
-      },
-      {
-        title: "Safety decision",
-        outcome: "The safety rules confirm that the missing record can be recovered without creating a duplicate.",
-        impact: "Recovery is allowed, but nothing can happen before human approval.",
-      },
-      {
-        title: "Two roles approve",
-        outcome: roles + " required roles independently approve each controlled step.",
-        impact: "Neither the AI nor one person can authorize a change alone.",
-      },
-      {
-        title: "Recover and verify",
-        outcome: "The missing records are recovered, verified, and the incident is closed.",
-        impact: "Running the same recovery again makes no duplicate change.",
-      },
-    ];
+  function human(raw) {
+    return value(raw).replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 
-  function renderReplay(artifact) {
-    replay.artifact = artifact;
-    replay.stages = stageData(artifact);
-    replay.current = -1;
-    replay.started = false;
-    const list = $("stage-list");
-    list.replaceChildren();
-    replay.stages.forEach((stage, index) => {
-      const item = document.createElement("li");
-      item.className = "stage-item";
-      const control = document.createElement("input");
-      control.type = "button";
-      control.className = "stage-button";
-      control.value = `${index + 1}. ${stage.title}`;
-      control.dataset.stage = String(index);
-      control.setAttribute("aria-label", `Replay stage ${index + 1}: ${stage.title}`);
-      control.addEventListener("click", () => setStage(index));
-      item.append(control);
-      list.append(item);
-    });
-
-    const start = $("replay-start");
-    const previous = $("replay-previous");
-    const next = $("replay-next");
-    const restart = $("replay-restart");
-    const stagePanel = $("replay-stage");
-
-    function update() {
-      const active = replay.started ? replay.current : -1;
-      [...list.querySelectorAll(".stage-item")].forEach((item, index) => {
-        const control = item.querySelector(".stage-button");
-        item.classList.toggle("is-active", index === active);
-        item.classList.toggle("is-complete", active >= 0 && index < active);
-        item.classList.toggle("is-upcoming", active < 0 || index > active);
-        if (index === active) {
-          control.setAttribute("aria-current", "step");
-        } else {
-          control.removeAttribute("aria-current");
-        }
-      });
-      const progress = $("replay-progress").firstElementChild;
-      progress.style.width = `${active < 0 ? 0 : ((active + 1) / replay.stages.length) * 100}%`;
-      $("replay-progress").setAttribute("aria-valuenow", String(active < 0 ? 0 : active + 1));
-      if (active < 0) {
-        $("replay-step-label").textContent = "Ready to begin";
-        $("replay-stage-title").textContent = "Start the replay";
-        $("replay-stage-outcome").textContent = "Press Start to see how the system found and fixed the problem.";
-        $("replay-stage-impact").textContent = "This is a read-only replay; nothing is changed.";
-        $("replay-intro").textContent = "Start here. The replay explains the incident one step at a time.";
-      } else {
-        const stage = replay.stages[active];
-        $("replay-step-label").textContent = `Step ${active + 1} of ${replay.stages.length}`;
-        $("replay-stage-title").textContent = stage.title;
-        $("replay-stage-outcome").textContent = stage.outcome;
-        $("replay-stage-impact").textContent = stage.impact;
-        $("replay-intro").textContent = "Follow the evidence in order. These controls only replay saved data.";
-      }
-      start.disabled = replay.started;
-      previous.disabled = !replay.started || replay.current === 0;
-      next.disabled = !replay.started || replay.current === replay.stages.length - 1;
-      restart.disabled = !replay.started;
-      start.hidden = replay.started;
-      previous.hidden = !replay.started;
-      next.hidden = !replay.started;
-      restart.hidden = !replay.started;
+  function stateClass(raw) {
+    const status = value(raw).toUpperCase();
+    if (["HEALTHY", "COMPLETE", "COMPLETED", "PASS", "GRANTED", "APPROVED", "ERP_RECORDED", "VERIFIED"].includes(status)) {
+      return "state-lime";
     }
-
-    function setStage(index) {
-      if (index < 0 || index >= replay.stages.length) return;
-      replay.started = true;
-      replay.current = index;
-      update();
-      stagePanel.focus({ preventScroll: true });
+    if (["RUNNING", "INVESTIGATING", "STARTED", "ADMITTED", "HANDED_OFF", "SCRIPTED_SYNTHETIC_PROOF"].includes(status)) {
+      return "state-cyan";
     }
-
-    start.addEventListener("click", () => setStage(0));
-    previous.addEventListener("click", () => setStage(replay.current - 1));
-    next.addEventListener("click", () => setStage(replay.current + 1));
-    restart.addEventListener("click", () => {
-      replay.started = false;
-      replay.current = -1;
-      update();
-      start.focus();
-    });
-    update();
+    if (["ANOMALY", "QUEUE_FAILED", "HELD", "FAILED", "BLOCKED", "DEGRADED", "NOT_PROVEN", "NOT PROVEN", "PENDING_APPROVAL"].includes(status)) {
+      return "state-coral";
+    }
+    return "state-neutral";
   }
 
-  function render(artifact) {
-    if (artifact.status === "UNAVAILABLE") {
-      document.querySelectorAll("#case-header, #replay-section, .detail-disclosure").forEach((node) => { node.hidden = true; });
-      $("unavailable").hidden = false;
-      $("unavailable-status").textContent = text(artifact.status);
-      $("unavailable-detail").textContent = `${artifact.reason_code}: ${artifact.detail}`;
-      body.dataset.workspaceReady = "true";
-      document.title = "The Missing 20 — Workspace unavailable";
+  function makeKey(prefix) {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return `${prefix}:${window.crypto.randomUUID()}`;
+    }
+    return `${prefix}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`;
+  }
+
+  function create(tag, className, content) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (content != null) node.textContent = content;
+    return node;
+  }
+
+  function setBadge(node, label, rawState) {
+    if (!node) return;
+    node.className = `state-badge ${stateClass(rawState)}`;
+    node.textContent = value(label);
+  }
+
+  function setConnection(connection, detail) {
+    state.connection = connection;
+    const labels = { live: "LIVE", connecting: "CONNECTING", paused: "PAUSED" };
+    $("connection-label").textContent = labels[connection] || "PAUSED";
+    $("connection-dot").className = `status-dot ${connection === "live" ? "status-dot-lime" : connection === "paused" ? "status-dot-danger" : "status-dot-cyan"}`;
+    $("sequence-label").textContent = `seq ${state.lastSequence || "—"}`;
+    $("footer-status").textContent = detail || (connection === "live" ? "Connected to the authoritative event ledger." : "Live movement is paused until the stream reconnects.");
+    document.body.dataset.connection = connection;
+  }
+
+  function streamIsLive() {
+    return state.connection === "live";
+  }
+
+  function showUnavailable(detail, visible) {
+    $("unavailable").hidden = !visible;
+    if (visible) $("unavailable-detail").textContent = value(detail || "The local experiment did not return a usable state.");
+  }
+
+  async function requestJSON(path, options) {
+    const init = { credentials: "same-origin", ...options };
+    if (init.body && typeof init.body !== "string") {
+      init.body = JSON.stringify(init.body);
+    }
+    const response = await fetch(path, init);
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_error) {
+      payload = null;
+    }
+    if (!response.ok) {
+      const detail = payload && payload.error ? payload.error.detail || payload.error.code : `request returned ${response.status}`;
+      throw new Error(value(detail));
+    }
+    return payload;
+  }
+
+  function mergeInitialEvents(rows) {
+    const ordered = (Array.isArray(rows) ? rows : [])
+      .filter((item) => item && Number.isInteger(Number(item.sequence)))
+      .map((item) => ({ ...item, sequence: Number(item.sequence), event_type: value(item.event_type || item.event) }))
+      .sort((a, b) => a.sequence - b.sequence);
+    state.events = ordered;
+    state.lastSequence = ordered.length ? ordered[ordered.length - 1].sequence : 0;
+  }
+
+  function applySnapshot(snapshot, unitRows, initial) {
+    if (!snapshot || !snapshot.incident_id) return;
+    const previousUnits = state.units;
+    const rows = Array.isArray(unitRows) ? unitRows : Array.isArray(snapshot.units) ? snapshot.units : [];
+    const nextUnits = new Map();
+    rows.forEach((item) => {
+      if (item && item.unit_id) nextUnits.set(value(item.unit_id), item);
+    });
+    if (!initial && state.snapshot && number(snapshot.projection_sequence) < state.lastSequence) {
       return;
     }
-    const incident = artifact.case;
-    const decision = artifact.deterministic_decision;
-    const advisory = artifact.advisory;
-    const execution = artifact.execution;
-    const m6Proof = artifact.m6_aws_proof;
-    const displayUnit = incident.unit === "EA" ? "units" : incident.unit;
-    document.title = `The Missing 20 — ${incident.case_id}`;
-    document.querySelectorAll("[data-mode-link]").forEach((link) => {
-      link.removeAttribute("aria-current");
-      if (link.dataset.modeLink === artifact.mode) link.setAttribute("aria-current", "page");
-    });
-    $("case-title").textContent = `${incident.missing_quantity} ${displayUnit} disappeared between two systems`;
-    $("expected").textContent = `${incident.expected_quantity} ${displayUnit}`;
-    $("observed").textContent = `${incident.observed_quantity} ${displayUnit}`;
-    $("missing").textContent = `${incident.missing_quantity} ${displayUnit}`;
-    renderReplay(artifact);
-
-    $("mode-label").textContent = artifact.mode === "complete"
-      ? "Complete scripted advisory trace · synthetic only"
-      : "Real provider outcome · degraded; usefulness NOT PROVEN";
-
-    const taxonomy = $("evidence-taxonomy");
-    taxonomy.replaceChildren();
-    artifact.evidence_taxonomy.forEach((item) => {
-      const card = document.createElement("article");
-      card.className = "taxonomy-card";
-      card.append(chip(item.label));
-      const heading = document.createElement("strong");
-      heading.textContent = item.label;
-      const count = document.createElement("span");
-      count.className = "count";
-      count.textContent = text(item.count);
-      heading.append(count);
-      card.append(heading);
-      const detail = document.createElement("p");
-      detail.textContent = item.detail;
-      card.append(detail);
-      taxonomy.append(card);
-    });
-
-    setStatus($("integration-status"), m6Proof.status, "status-proven");
-    const integrationSummary = $("integration-summary");
-    integrationSummary.replaceChildren();
-    const stableUsefulness = m6Proof.capabilities.find((item) => item.capability_id === "stable_real_nova_usefulness");
-    const agentCoreCount = m6Proof.capabilities.filter((item) => item.capability_id.startsWith("agentcore_")).length;
-    [["Local lifecycle", m6Proof.lifecycle.status], ["Real integration", `${m6Proof.real_provider_integration.outcome_status} · CONNECTIVITY_AND_DEGRADATION_OBSERVABILITY`], ["Stable real AI", stableUsefulness ? stableUsefulness.status : "NOT PROVEN"]].forEach(([label, value]) => {
-      const card = document.createElement("div"); card.className = "integration-stat";
-      const span = document.createElement("span"); span.textContent = label;
-      const strong = document.createElement("strong"); strong.textContent = text(value);
-      card.append(span, strong); integrationSummary.append(card);
-    });
-    const capabilities = $("integration-capabilities");
-    capabilities.replaceChildren();
-    m6Proof.capabilities.forEach((item) => {
-      const row = document.createElement("div"); row.className = "capability-row";
-      const name = document.createElement("span"); name.className = "capability-name"; name.textContent = item.capability_id;
-      const scope = document.createElement("span"); scope.className = "capability-scope"; scope.textContent = item.scope;
-      row.append(name, scope, chip(item.evidence_class === "SCRIPTED_PROVEN" ? "SCRIPTED SYNTHETIC PROOF" : item.evidence_class));
-      capabilities.append(row);
-    });
-    const coreNote = document.createElement("p"); coreNote.className = "muted"; coreNote.textContent = `${agentCoreCount} AgentCore capabilities remain NOT PROVEN.`;
-    capabilities.append(coreNote);
-    $("integration-digest").textContent = m6Proof.proof_digest;
-
-    setStatus($("advisory-status"), `${advisory.status} · ${advisory.usefulness_status}`, advisory.mode === "complete" ? "status-scripted" : "status-not-proven");
-    $("authority-label").textContent = advisory.authority_label;
-    const meta = $("advisory-meta");
-    meta.replaceChildren();
-    [["Provider", advisory.provider || "—"], ["Model", advisory.model || "—"], ["Requests", advisory.usage.request_count], ["Latency", `${advisory.usage.latency_ms} ms`], ["Cost", `$${Number(advisory.usage.estimated_cost_usd).toFixed(6)}`]].forEach(([label, value]) => {
-      const item = document.createElement("span");
-      item.className = "meta-item";
-      item.textContent = `${label}: ${value}`;
-      meta.append(item);
-    });
-    const hypotheses = $("hypotheses");
-    hypotheses.replaceChildren();
-    if (!advisory.hypotheses.length) {
-      const empty = document.createElement("p");
-      empty.className = "muted";
-      empty.textContent = "No hypothesis was fabricated after the provider failure.";
-      hypotheses.append(empty);
-    } else {
-      advisory.hypotheses.forEach((item) => {
-        const card = document.createElement("article");
-        card.className = "hypothesis-card";
-        const top = document.createElement("div");
-        top.className = "hypothesis-top";
-        const heading = document.createElement("h3");
-        heading.textContent = item.hypothesis_type;
-        top.append(heading, chip(item.conclusion));
-        card.append(top);
-        const explanation = document.createElement("p");
-        explanation.textContent = item.explanation;
-        card.append(explanation);
-        const evidence = document.createElement("small");
-        evidence.textContent = `${item.supporting_evidence_ids.length} records support this; ${item.contradicting_evidence_ids.length} rule it out.`;
-        card.append(evidence);
-        hypotheses.append(card);
+    if (!initial) {
+      nextUnits.forEach((item, id) => {
+        const prior = previousUnits.get(id);
+        if (prior && prior.status !== item.status && item.status === "ERP_RECORDED") {
+          state.movingIds.add(id);
+        }
       });
     }
-    $("advisory-report").textContent = advisory.incident_report || "Provider failure was persisted as degraded; no incident report was invented.";
-    const warnings = $("advisory-warnings");
-    warnings.replaceChildren();
-    advisory.warnings.forEach((item) => { const span = document.createElement("span"); span.textContent = `Warning: ${item}`; warnings.append(span); });
-
-    const detail = $("decision-details");
-    detail.replaceChildren();
-    [["Classification", decision.classification], ["Initial eligibility", decision.eligibility], ["Allowed action", decision.allowed_action || "NO ACTION"], ["Policy status", decision.policy_status], ["Authoritative sources", decision.authoritative_source_types.join(" · ")], ["Evidence IDs", `${decision.authoritative_evidence_ids.length} admitted records`], ["Lifecycle decisions", (artifact.deterministic_decisions || []).map((item) => `${item.classification} → ${item.allowed_action || "NO ACTION"}`).join(" · ")]].forEach(([label, value]) => {
-      const dt = document.createElement("dt"); dt.textContent = label;
-      const dd = document.createElement("dd"); dd.textContent = text(value);
-      detail.append(dt, dd);
-    });
-    $("decision-digest").textContent = decision.decision_digest;
-    const reasons = $("decision-reasons"); reasons.replaceChildren();
-    decision.reason_codes.forEach((item) => { const span = document.createElement("span"); span.className = "reason-code"; span.textContent = item; reasons.append(span); });
-    const invariants = $("decision-invariants"); invariants.replaceChildren();
-    decision.invariants.forEach((item) => {
-      const row = document.createElement("div"); row.className = "invariant";
-      const name = document.createElement("span"); name.textContent = text(item.name);
-      const result = document.createElement("strong"); result.className = "pass"; result.textContent = item.passed ? "PASS" : "FAIL";
-      row.append(name, result); invariants.append(row);
-    });
-
-    setStatus($("quorum-status"), artifact.human_control.quorum_state, "status-proven");
-    $("approval-boundary").textContent = artifact.human_control.approval_boundary;
-    const roles = $("role-approvals"); roles.replaceChildren();
-    artifact.human_control.approvals.forEach((item) => {
-      const card = document.createElement("article"); card.className = "role-card";
-      const role = document.createElement("span"); role.className = "role-name"; role.textContent = item.role; card.append(role);
-      const principal = document.createElement("strong"); principal.textContent = item.principal_id; card.append(principal);
-      const stage = document.createElement("p"); stage.textContent = `${item.action_id} · ${item.status}`; card.append(stage);
-      roles.append(card);
-    });
-
-    setStatus($("replay-status"), `${execution.replay_status} · Δ effects ${execution.replay_effect_delta}`, "status-proven");
-    const summary = $("execution-summary"); summary.replaceChildren();
-    [["Fresh read", execution.fresh_read_status], ["Effects", execution.controlled_effects.length], ["Verification", execution.verification_status], ["Replay", execution.replay_status], ["Final state", execution.final_authoritative_state]].forEach(([label, value]) => { const card = document.createElement("div"); card.className = "execution-stat"; const span = document.createElement("span"); span.textContent = label; const strong = document.createElement("strong"); strong.textContent = text(value); card.append(span, strong); summary.append(card); });
-    const effects = $("effects"); effects.replaceChildren(); execution.controlled_effects.forEach((item) => { const card = document.createElement("article"); card.className = "effect-card"; const strong = document.createElement("strong"); strong.textContent = item.effect_type; const span = document.createElement("span"); span.textContent = `${item.execution_id} · idempotency ${item.idempotency_key}`; card.append(strong, span); effects.append(card); });
-    const checks = $("postconditions"); checks.replaceChildren(); execution.postconditions.forEach((item) => { const row = document.createElement("div"); row.className = "postcondition"; const check = document.createElement("span"); check.className = "check"; check.textContent = item.status === "PASS" ? "✓" : "!"; const label = document.createElement("span"); label.textContent = `${item.execution_id}: ${item.check}`; row.append(check, label); checks.append(row); });
-
-    const timeline = $("audit-timeline"); timeline.replaceChildren(); $("timeline-count").textContent = `${artifact.audit_timeline.length} immutable records`;
-    artifact.audit_timeline.forEach((item) => { const row = document.createElement("li"); row.className = "audit-item"; const number = document.createElement("span"); number.className = "audit-number"; number.textContent = String(item.sequence).padStart(2, "0"); const type = document.createElement("span"); type.className = "audit-type"; type.textContent = item.record_type; const label = document.createElement("span"); label.className = "audit-label"; label.textContent = item.label; const reference = document.createElement("code"); reference.textContent = item.reference; row.append(number, type, label, reference); timeline.append(row); });
-    $("artifact-digest").textContent = artifact.artifact_digest;
-    const claims = $("claims"); claims.replaceChildren(); artifact.claims.forEach((item) => { const row = document.createElement("article"); row.className = "claim-row"; const copy = document.createElement("div"); const p = document.createElement("p"); p.textContent = item.statement; const refs = document.createElement("small"); refs.textContent = item.source_refs.join(" · "); copy.append(p, refs); row.append(copy, chip(item.evidence_class)); claims.append(row); });
-    body.dataset.workspaceReady = "true";
+    state.snapshot = snapshot;
+    state.incidentId = value(snapshot.incident_id);
+    state.units = nextUnits;
+    if (initial) mergeInitialEvents(snapshot.events || snapshot.activity);
+    state.loaded = state.units.size > 0;
+    renderAll();
   }
 
-  fetch(`/api/workspace?mode=${encodeURIComponent(mode)}`, { method: "GET", credentials: "same-origin" })
-    .then((response) => { if (!response.ok) throw new Error(`artifact request returned ${response.status}`); return response.json(); })
-    .then(render)
-    .catch((error) => { $("unavailable").hidden = false; $("unavailable-detail").textContent = error.message; body.dataset.workspaceReady = "false"; });
+  function queueRefresh() {
+    if (!state.incidentId) return state.refreshPromise;
+    state.refreshPromise = state.refreshPromise.then(async () => {
+      const snapshot = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}`);
+      const units = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}/units`);
+      applySnapshot(snapshot, units.units, false);
+    }).catch((error) => {
+      setConnection("paused", `Snapshot refresh failed: ${error.message}`);
+    });
+    return state.refreshPromise;
+  }
+
+  function eventType(event) {
+    return value(event && (event.event_type || event.event));
+  }
+
+  function pauseStream(reason) {
+    state.streamError = reason || "The event stream is unavailable.";
+    if (state.source) {
+      state.source.close();
+      state.source = null;
+    }
+    setConnection("paused", `${state.streamError} Live movement is paused.`);
+    if (state.reconnectTimer == null) {
+      state.reconnectTimer = window.setTimeout(() => {
+        state.reconnectTimer = null;
+        connectEvents();
+      }, 1500);
+    }
+    renderAll();
+  }
+
+  function acceptEvent(event) {
+    const sequence = Number(event && event.sequence);
+    const type = eventType(event);
+    if (!Number.isInteger(sequence) || sequence < 1 || !type) {
+      pauseStream("The event stream returned an invalid event.");
+      return;
+    }
+    if (sequence <= state.lastSequence) return;
+    if (sequence !== state.lastSequence + 1) {
+      pauseStream(`Event sequence gap at ${state.lastSequence + 1}.`);
+      return;
+    }
+    state.lastSequence = sequence;
+    state.events.push({ ...event, sequence, event_type: type });
+    state.activeEdges.clear();
+    if (type === "execution.started") state.activeEdges.add("message-queue->erp");
+    $("sequence-label").textContent = `seq ${state.lastSequence}`;
+    renderAll();
+    if (["execution.completed", "verification.completed"].includes(type)) queueRefresh();
+  }
+
+  function connectEvents() {
+    if (!state.incidentId || state.source) return;
+    setConnection("connecting", "Opening the authoritative event stream.");
+    const url = `/api/v1/incidents/${encodeURIComponent(state.incidentId)}/events?after=${state.lastSequence}`;
+    const source = new EventSource(url);
+    state.source = source;
+    const receive = (message) => {
+      try {
+        acceptEvent(JSON.parse(message.data));
+      } catch (_error) {
+        pauseStream("The event stream returned invalid JSON.");
+      }
+    };
+    EVENT_TYPES.forEach((type) => source.addEventListener(type, receive));
+    source.onopen = () => {
+      state.streamError = "";
+      setConnection("live");
+      renderAll();
+    };
+    source.onerror = () => {
+      pauseStream("The event stream disconnected.");
+    };
+  }
+
+  function setView(view) {
+    state.view = view === "agent" ? "agent" : "dashboard";
+    document.body.dataset.view = state.view;
+    const query = new URLSearchParams(window.location.search);
+    query.set("view", state.view);
+    window.history.replaceState(null, "", `/?${query.toString()}`);
+    $("dashboard-view").hidden = state.view !== "dashboard";
+    $("agent-view").hidden = state.view !== "agent";
+    $("tab-dashboard").classList.toggle("is-selected", state.view === "dashboard");
+    $("tab-agent").classList.toggle("is-selected", state.view === "agent");
+    $("tab-dashboard").setAttribute("aria-selected", String(state.view === "dashboard"));
+    $("tab-agent").setAttribute("aria-selected", String(state.view === "agent"));
+    renderAll();
+  }
+
+  function agentDefinition(id) {
+    return AGENT_DEFS.find((item) => item.id === id) || { id, name: human(id), focus: "Investigation path" };
+  }
+
+  function agentState(id) {
+    const events = state.events.filter((item) => item.actor === id || value(item.payload && item.payload.stage).startsWith(id));
+    const started = [...events].reverse().find((item) => eventType(item) === "agent.started");
+    const completed = [...events].reverse().find((item) => eventType(item) === "agent.completed");
+    const latestStartedSequence = started ? started.sequence : 0;
+    const latestCompletedSequence = completed ? completed.sequence : 0;
+    const status = latestStartedSequence && latestCompletedSequence >= latestStartedSequence ? "COMPLETE" : latestStartedSequence ? "RUNNING" : "IDLE";
+    const tools = events.filter((item) => eventType(item) === "tool.completed").length;
+    const evidence = new Set(events.flatMap((item) => Array.isArray(item.payload && item.payload.evidence_ids) ? item.payload.evidence_ids : Array.isArray(item.payload && item.payload.result_evidence_ids) ? item.payload.result_evidence_ids : [])).size;
+    const handoff = events.some((item) => eventType(item) === "agent.handoff");
+    return { ...agentDefinition(id), status, tools, evidence, handoff };
+  }
+
+  function allAgentStates() {
+    const ids = new Set(AGENT_DEFS.map((item) => item.id));
+    state.events.forEach((event) => {
+      if (eventType(event).startsWith("agent.") && event.actor && event.actor !== "orchestrator") ids.add(value(event.actor));
+    });
+    return [...ids].map(agentState);
+  }
+
+  function orchestratorStatus() {
+    if (allAgentStates().some((item) => item.status === "RUNNING")) return { label: "Investigating", raw: "RUNNING", detail: "Three investigators are reading admitted evidence" };
+    const lifecycleTypes = new Set([
+      "investigation.started",
+      "agent.started",
+      "agent.completed",
+      "tool.started",
+      "tool.completed",
+      "evidence.returned",
+      "agent.handoff",
+      "synthesis.started",
+      "synthesis.completed",
+      "evaluation.started",
+      "evaluation.completed",
+      "execution.started",
+      "execution.completed",
+      "verification.completed",
+      "provider.degraded",
+      "workflow.blocked",
+    ]);
+    const latest = [...state.events].reverse().find((item) => lifecycleTypes.has(eventType(item)));
+    const latestType = eventType(latest);
+    if (latestType === "verification.completed") return { label: "Verified", raw: "VERIFIED", detail: "Recovery verified by the API" };
+    if (latestType === "evaluation.completed") return { label: "Ready for decision", raw: "COMPLETE", detail: "Evaluation returned; deterministic policy owns the next step" };
+    if (latestType === "provider.degraded") return { label: "Advisory degraded", raw: "DEGRADED", detail: "The advisory result is visible; operational controls remain closed" };
+    if (latestType === "workflow.blocked") return { label: "Stopped safely", raw: "BLOCKED", detail: "The deterministic workflow stopped without an effect" };
+    if (latestType === "execution.started") return { label: "Recovering", raw: "RUNNING", detail: "Controlled execution is in progress" };
+    if (["investigation.started", "agent.started", "agent.completed", "tool.started", "tool.completed", "evidence.returned", "agent.handoff", "synthesis.started", "synthesis.completed", "evaluation.started", "execution.completed"].includes(latestType)) {
+      return { label: "Investigating", raw: "RUNNING", detail: "The event ledger is advancing the investigation" };
+    }
+    return { label: "Idle", raw: "IDLE", detail: "Start the investigation to launch the agents" };
+  }
+
+  function eventLabel(event) {
+    const type = eventType(event);
+    const payload = event.payload || {};
+    const actor = event.actor && event.actor !== "orchestrator" ? agentDefinition(value(event.actor)).name : "Orchestrator";
+    if (type === "incident.detected") return "Reconciliation gap detected";
+    if (type === "investigation.started") return "Investigation started";
+    if (type === "agent.started") return `${actor} started`;
+    if (type === "agent.completed") return `${actor} completed`;
+    if (type === "agent.handoff") return `${actor} handed evidence to synthesis`;
+    if (type === "tool.started") return `${actor} called ${human(payload.tool || "read tool")}`;
+    if (type === "tool.completed") return `${actor} received ${human(payload.tool || "tool result")}`;
+    if (type === "evidence.returned") return `${actor} returned an evidence packet`;
+    if (type === "synthesis.started") return "Synthesis started";
+    if (type === "synthesis.completed") return "Synthesis selected a hypothesis";
+    if (type === "evaluation.started") return "Evaluation started";
+    if (type === "evaluation.completed") return `Evaluation ${human(event.status || payload.decision || "completed")}`;
+    if (type === "copilot.message") return "Copilot answered from the investigation";
+    if (type === "recovery.prepared") return "Recovery proposal prepared";
+    if (type === "approval.requested") return "Two-role approval requested";
+    if (type === "approval.recorded") return `${human(payload.role || "Role")} recorded approval`;
+    if (type === "execution.started") return "Controlled recovery started";
+    if (type === "execution.completed") return "Controlled recovery committed";
+    if (type === "verification.completed") return "Fresh read verified the effect";
+    if (type === "provider.degraded") return "Provider became degraded";
+    if (type === "workflow.blocked") return "Workflow stopped safely";
+    return human(type || "event");
+  }
+
+  function eventDetail(event) {
+    const payload = event.payload || {};
+    const type = eventType(event);
+    if (type === "incident.detected") return `${number(payload.missing_quantity)} units stopped at the message queue.`;
+    if (type === "tool.started") return `${number(event.sequence)} · read-only operation in progress`;
+    if (type === "tool.completed") return `${(payload.result_evidence_ids || []).length} evidence IDs returned`;
+    if (type === "evidence.returned") return `${(payload.evidence_ids || []).length} admitted IDs available to the workflow`;
+    if (type === "agent.handoff") return `${(payload.evidence_ids || []).length} evidence IDs handed off`;
+    if (type === "evaluation.completed") return value(payload.decision || event.status);
+    if (type === "approval.recorded") return value(payload.principal_id || payload.role);
+    if (type === "execution.completed") return "One effect recorded; executor returned a receipt.";
+    if (type === "verification.completed") return `${number(payload.recorded_units)} / ${number(payload.expected_units)} units · replay delta ${number(payload.replay_effect_delta)}`;
+    if (type === "provider.degraded") return "The advisory path is visible; controlled actions remain deterministic.";
+    return value(event.status || "recorded");
+  }
+
+  function shortTime(raw) {
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? "—" : parsed.toISOString().slice(11, 19);
+  }
+
+  function unitNodeId(unit) {
+    if (value(unit.status) === "QUEUE_FAILED" || value(unit.current_stage) === "MESSAGE_QUEUE") return "message-queue";
+    if (value(unit.current_stage) === "WAREHOUSE") return "warehouse";
+    return "erp";
+  }
+
+  function renderHeader() {
+    const snapshot = state.snapshot;
+    if (!snapshot) return;
+    const incident = snapshot.incident || {};
+    const counts = snapshot.unit_counts || {};
+    const expected = number(incident.expected_quantity, number(counts.total));
+    const recorded = number(incident.recorded_quantity, number(counts.erp_recorded));
+    const missing = number(incident.missing_quantity, number(counts.queue_failed));
+    const unit = incident.unit === "EA" ? "units" : value(incident.unit || "records");
+    $("incident-title").textContent = missing ? `${missing} ${unit} stopped before ERP` : `All ${expected} ${unit} are accounted for`;
+    $("incident-subtitle").textContent = missing ? "A message-queue exception is holding the invoice. The system is investigating the exact records before any recovery." : "The controlled recovery is verified. The same incident session remains available for replay.";
+    $("incident-id").textContent = `Incident ${value(snapshot.incident_id)}`;
+    $("trace-id").textContent = `Trace ${value(snapshot.trace_id)}`;
+    $("missing-count").textContent = String(missing);
+    $("expected-count").textContent = String(expected);
+    $("recorded-count").textContent = String(recorded);
+    $("queue-count").textContent = String(missing);
+    const heroLabel = document.querySelector(".hero-count span");
+    if (heroLabel) heroLabel.textContent = missing ? "stopped at queue" : "verified in ERP";
+    const mode = value(snapshot.mode);
+    const execution = snapshot.execution || {};
+    document.body.dataset.recovered = String(missing === 0 && execution.verified === true);
+    const isScripted = mode === "SCRIPTED_SYNTHETIC";
+    $("mode-label").textContent = isScripted ? "Scripted synthetic experiment" : human(mode || "Experiment");
+    $("mode-detail").textContent = isScripted ? "Real API · synthetic records only" : "Provider state from API";
+    $("mode-dot").className = `status-dot ${isScripted ? "status-dot-lime" : "status-dot-cyan"}`;
+    $("sequence-label").textContent = `seq ${state.lastSequence || number(snapshot.projection_sequence) || "—"}`;
+  }
+
+  function renderFlow() {
+    const snapshot = state.snapshot;
+    if (!snapshot) return;
+    const flow = snapshot.flow || { nodes: [], edges: [] };
+    const map = $("flow-map");
+    map.replaceChildren();
+    const nodes = Array.isArray(flow.nodes) ? flow.nodes : [];
+    const edges = Array.isArray(flow.edges) ? flow.edges : [];
+    nodes.forEach((item, index) => {
+      const column = create("div", "flow-column");
+      const node = create("article", `flow-node ${stateClass(item.status)}`, null);
+      node.dataset.nodeId = value(item.id);
+      const header = create("div", "flow-node-header");
+      const dot = create("span", "node-dot", null);
+      dot.setAttribute("aria-hidden", "true");
+      header.append(dot, create("span", "flow-node-label", value(item.label)));
+      const badge = create("span", "state-badge", value(item.status));
+      badge.classList.add(stateClass(item.status));
+      header.append(badge);
+      const count = create("strong", "flow-node-count", String(number(item.count)));
+      const countLabel = create("span", "flow-node-count-label", "records");
+      const cluster = create("div", "unit-cluster");
+      cluster.dataset.nodeId = value(item.id);
+      state.units.forEach((unit) => {
+        if (unitNodeId(unit) !== value(item.id)) return;
+        const entity = create("button", `unit-entity ${slug(unit.status)}${state.movingIds.has(unit.unit_id) ? " is-moving" : ""}`, value(unit.unit_id).split("-").pop());
+        entity.type = "button";
+        entity.dataset.unitId = value(unit.unit_id);
+        entity.dataset.unitStatus = value(unit.status);
+        entity.dataset.unitStage = value(unit.current_stage);
+        entity.setAttribute("aria-label", `${value(unit.unit_id)}, ${human(unit.status)}, stage ${human(unit.current_stage)}`);
+        entity.title = value(unit.unit_id);
+        entity.addEventListener("click", () => {
+          state.selectedUnitId = value(unit.unit_id);
+          renderUnitDetail();
+        });
+        entity.addEventListener("animationend", () => {
+          state.movingIds.delete(value(unit.unit_id));
+          entity.classList.remove("is-moving");
+        }, { once: true });
+        cluster.append(entity);
+      });
+      node.append(header, count, countLabel, cluster);
+      column.append(node);
+      if (index < nodes.length - 1) {
+        const next = nodes[index + 1];
+        const edge = edges.find((candidate) => candidate.from === item.id && candidate.to === next.id);
+        if (edge) {
+          const link = create("div", `flow-link${state.activeEdges.has(`${edge.from}->${edge.to}`) ? " is-active" : ""}`);
+          link.dataset.edge = `${edge.from}->${edge.to}`;
+          link.append(create("span", "flow-link-line"));
+          column.append(link);
+        }
+      }
+      map.append(column);
+    });
+    const pathNode = nodes.find((item) => item.id === "message-queue");
+    setBadge($("path-status"), pathNode ? (pathNode.status === "ANOMALY" ? "Attention needed" : pathNode.status) : "Waiting", pathNode ? pathNode.status : "IDLE");
+    const detail = state.units.get(state.selectedUnitId);
+    const detailNode = $("unit-detail");
+    detailNode.replaceChildren();
+    if (!detail) {
+      detailNode.append(create("span", "detail-placeholder", "Select a unit to inspect its authoritative record."));
+    } else {
+      const title = create("strong", "unit-detail-title", value(detail.unit_id));
+      const fields = create("div", "unit-detail-fields");
+      [["Stage", human(detail.current_stage)], ["State", human(detail.status)], ["Revision", value(detail.revision)], ["Message", detail.source_message_id || "No source message"]].forEach(([label, field]) => {
+        const item = create("span", "unit-detail-field");
+        item.append(create("small", null, label), create("strong", null, value(field)));
+        fields.append(item);
+      });
+      detailNode.append(title, fields);
+    }
+  }
+
+  function renderAgentCard(item, compact) {
+    const active = item.status === "RUNNING";
+    const card = create("button", `agent-card${compact ? " agent-card-compact" : ""}${state.selectedAgentId === item.id ? " is-selected" : ""}`);
+    card.type = "button";
+    card.dataset.agentId = item.id;
+    card.setAttribute("aria-label", `${item.name}, ${human(item.status)}`);
+    const top = create("div", "agent-card-top");
+    const mark = create("span", `agent-mark ${active ? "is-active" : ""}`, null);
+    mark.setAttribute("aria-hidden", "true");
+    top.append(mark, create("strong", "agent-card-name", item.name));
+    const badge = create("span", `state-badge ${stateClass(item.status)}`, item.status === "IDLE" ? "WAITING" : item.status);
+    top.append(badge);
+    card.append(top, create("span", "agent-card-focus", item.focus));
+    const stats = create("span", "agent-card-stats", `${item.tools} tools · ${item.evidence} evidence IDs${item.handoff ? " · handed off" : ""}`);
+    card.append(stats);
+    card.addEventListener("click", () => {
+      state.selectedAgentId = state.selectedAgentId === item.id ? "" : item.id;
+      renderAll();
+    });
+    return card;
+  }
+
+  function renderDashboardAgents() {
+    const agents = allAgentStates();
+    const dashboard = $("dashboard-agents");
+    dashboard.replaceChildren();
+    agents.forEach((item) => dashboard.append(renderAgentCard(item, true)));
+    const active = agents.filter((item) => item.status === "RUNNING").length;
+    setBadge($("active-agent-count"), `${active} active`, active ? "RUNNING" : "IDLE");
+  }
+
+  function renderAgentGraph() {
+    const agents = allAgentStates();
+    const container = $("agent-nodes");
+    container.replaceChildren();
+    agents.forEach((item) => container.append(renderAgentCard(item, false)));
+    const links = $("agent-graph-links");
+    links.replaceChildren();
+    agents.forEach((item) => {
+      const link = create("span", `agent-link${item.status === "RUNNING" ? " is-active" : ""}`);
+      link.dataset.agentId = item.id;
+      links.append(link);
+    });
+    const orchestration = orchestratorStatus();
+    const pulse = document.querySelector(".node-pulse");
+    if (pulse) pulse.classList.toggle("is-active", orchestration.raw === "RUNNING");
+    setBadge($("orchestrator-status"), orchestration.label, orchestration.raw);
+    $("orchestrator-detail").textContent = orchestration.detail;
+    setBadge($("workspace-state"), orchestration.label, orchestration.raw);
+    const operations = state.events.filter((item) => OPERATION_TYPES.has(eventType(item)) || ["copilot.message", "provider.degraded", "workflow.blocked"].includes(eventType(item)));
+    $("operation-count").textContent = `${operations.length} records`;
+    const feed = $("operation-feed");
+    feed.replaceChildren();
+    const filtered = state.selectedAgentId ? operations.filter((item) => item.actor === state.selectedAgentId || value(item.payload && item.payload.stage).startsWith(state.selectedAgentId)) : operations;
+    filtered.slice(-18).reverse().forEach((item) => {
+      const row = create("li", `operation-item operation-${slug(eventType(item))}`);
+      const dot = create("span", `operation-dot ${stateClass(item.status)}`, null);
+      dot.setAttribute("aria-hidden", "true");
+      const copy = create("div", "operation-copy");
+      copy.append(create("strong", null, eventLabel(item)), create("span", null, eventDetail(item)));
+      const meta = create("span", "operation-meta", `#${value(item.sequence).padStart(2, "0")} · ${shortTime(item.occurred_at)}`);
+      row.append(dot, copy, meta);
+      feed.append(row);
+    });
+    if (!filtered.length) feed.append(create("li", "empty-state", "No agent operations yet. Start the investigation to see actual tools and handoffs."));
+    renderEvidencePackets();
+  }
+
+  function renderEvidencePackets() {
+    const container = $("evidence-packets");
+    container.replaceChildren();
+    const evidenceEvents = state.events.filter((item) => eventType(item) === "evidence.returned");
+    if (!evidenceEvents.length) return;
+    const heading = create("div", "evidence-heading");
+    heading.append(create("span", "panel-label", "EVIDENCE PACKETS"), create("span", "sequence-label", `${evidenceEvents.length} returned`));
+    container.append(heading);
+    evidenceEvents.slice(-6).reverse().forEach((event) => {
+      const ids = Array.isArray(event.payload && event.payload.evidence_ids) ? event.payload.evidence_ids : [];
+      const card = create("article", "evidence-packet");
+      const top = create("div", "evidence-packet-top");
+      top.append(create("strong", null, agentDefinition(event.actor).name), create("span", "state-badge state-cyan", `${ids.length} IDs`));
+      const list = create("div", "evidence-id-list");
+      ids.slice(0, 5).forEach((id) => list.append(create("code", null, id)));
+      card.append(top, list);
+      container.append(card);
+    });
+  }
+
+  function renderLatestEvent() {
+    const latest = state.events[state.events.length - 1];
+    const latestNode = $("latest-event");
+    latestNode.replaceChildren();
+    if (!latest) {
+      latestNode.append(create("strong", null, "Waiting for the incident stream"), create("span", null, "Actual agent and tool events will appear here."));
+      $("latest-event-sequence").textContent = "—";
+      return;
+    }
+    latestNode.append(create("strong", null, eventLabel(latest)), create("span", null, eventDetail(latest)));
+    $("latest-event-sequence").textContent = `#${value(latest.sequence).padStart(2, "0")}`;
+  }
+
+  function renderDashboard() {
+    renderFlow();
+    renderDashboardAgents();
+    renderLatestEvent();
+  }
+
+  function renderDecision() {
+    const snapshot = state.snapshot;
+    if (!snapshot) return;
+    const approval = snapshot.approval || {};
+    const approvals = Array.isArray(snapshot.approvals) ? snapshot.approvals : [];
+    const execution = snapshot.execution || {};
+    const intent = value(approval.intent_id);
+    const prepared = Boolean(intent);
+    const requiredRoles = Array.isArray(approval.required_roles) && approval.required_roles.length
+      ? approval.required_roles.map((role) => value(role))
+      : ROLE_DEFS.map((definition) => definition.role);
+    const approvedRoles = new Set(
+      approvals
+        .filter((item) => value(item.intent_id) === intent && value(item.status) === "APPROVED")
+        .map((item) => value(item.role))
+        .filter((role) => requiredRoles.includes(role)),
+    );
+    const approvalCount = approvedRoles.size;
+    const quorumApproved = value(approval.status) === "GRANTED" && approvalCount === requiredRoles.length;
+    const verified = Boolean(execution.verified);
+    const hasExecution = value(execution.status) === "COMPLETE" || state.events.some((event) => eventType(event) === "execution.completed");
+    const hasProposal = prepared || state.events.some((event) => eventType(event) === "recovery.prepared");
+    const hasApproval = quorumApproved;
+    const steps = { proposal: hasProposal, approval: hasApproval, execution: hasExecution, verification: verified };
+    Object.entries(steps).forEach(([name, done]) => {
+      const node = document.querySelector(`[data-decision-step="${name}"]`);
+      node.classList.toggle("is-done", done);
+      node.classList.toggle("is-current", !done && (name === "proposal" || steps[Object.keys(steps)[Object.keys(steps).indexOf(name) - 1]]));
+    });
+    let status = "Not prepared";
+    let rawStatus = "IDLE";
+    if (verified) { status = "VERIFIED"; rawStatus = "VERIFIED"; }
+    else if (value(execution.status) === "COMPLETE") { status = "RECOVERED"; rawStatus = "COMPLETE"; }
+    else if (quorumApproved) { status = "APPROVED"; rawStatus = "GRANTED"; }
+    else if (approvalCount) { status = `${approvalCount} of ${requiredRoles.length} approved`; rawStatus = "PENDING_APPROVAL"; }
+    else if (prepared) { status = "Awaiting two roles"; rawStatus = "PENDING_APPROVAL"; }
+    setBadge($("decision-status"), status, rawStatus);
+    const intentNode = $("decision-intent");
+    intentNode.replaceChildren();
+    if (!prepared) {
+      intentNode.append(create("span", "detail-placeholder", "Prepare a recovery proposal after the investigation returns."));
+    } else {
+      const decision = Array.isArray(snapshot.decisions) ? snapshot.decisions[snapshot.decisions.length - 1] : null;
+      intentNode.append(create("span", "intent-label", "IMMUTABLE ACTION INTENT"), create("strong", "intent-action", human((decision && decision.allowed_action) || "restart_receipt_message")));
+      const meta = create("div", "intent-meta");
+      meta.append(create("span", null, intent), create("span", null, `Case v${value(snapshot.case_version)}`));
+      intentNode.append(meta);
+    }
+    const roles = $("approval-roles");
+    roles.replaceChildren();
+    if (prepared) {
+      ROLE_DEFS.forEach((definition) => {
+        const approved = approvals.some((item) => value(item.principal_id) === definition.principal && value(item.status) === "APPROVED");
+        const card = create("div", `approval-role${approved ? " is-approved" : ""}`);
+        const copy = create("div", "approval-role-copy");
+        copy.append(create("strong", null, definition.name), create("span", null, definition.role));
+        card.append(copy);
+        if (approved) card.append(create("span", "state-badge state-lime", "APPROVED"));
+        else {
+          const button = create("button", "button button-approval", `Approve as ${definition.name}`);
+          button.type = "button";
+          button.disabled = state.commandBusy || !streamIsLive() || quorumApproved || verified;
+          button.dataset.approvalPrincipal = definition.principal;
+          button.addEventListener("click", () => recordApproval(definition.principal));
+          card.append(button);
+        }
+        roles.append(card);
+      });
+    }
+    $("prepare-button").disabled = state.commandBusy || !streamIsLive() || verified || value(execution.status) === "COMPLETE";
+    $("execute-button").disabled = state.commandBusy || !streamIsLive() || !quorumApproved || verified || value(execution.status) === "COMPLETE";
+    if (state.commandError) {
+      roles.append(create("p", "command-error", state.commandError));
+    }
+  }
+
+  async function sendDecision(payload) {
+    if (!state.incidentId || state.commandBusy || !streamIsLive()) return;
+    state.commandBusy = true;
+    state.commandError = "";
+    renderDecision();
+    try {
+      const response = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      applySnapshot(response, response.units, false);
+      await queueRefresh();
+    } catch (error) {
+      state.commandError = error.message;
+      setConnection(state.connection, `Command stopped safely: ${error.message}`);
+    } finally {
+      state.commandBusy = false;
+      renderAll();
+    }
+  }
+
+  function prepareRecovery() {
+    sendDecision({ command: "prepare_recovery", tool: "restart_receipt_message", idempotency_key: makeKey("prepare") });
+  }
+
+  function recordApproval(principal) {
+    const intent = state.snapshot && state.snapshot.approval && state.snapshot.approval.intent_id;
+    if (!intent) return;
+    sendDecision({ command: "approve", intent_id: intent, principal_id: principal, idempotency_key: makeKey("approve") });
+  }
+
+  function executeRecovery() {
+    const intent = state.snapshot && state.snapshot.approval && state.snapshot.approval.intent_id;
+    if (!intent) return;
+    sendDecision({ command: "execute", intent_id: intent, idempotency_key: makeKey("execute") });
+  }
+
+  function syncDurableChat() {
+    if (state.chatHydrated) return;
+    const replies = state.events.filter((item) => eventType(item) === "copilot.message");
+    replies.forEach((event) => {
+      state.chatMessages.push({ role: "assistant", message: value(event.payload && event.payload.message), citations: Array.isArray(event.payload && event.payload.citations) ? event.payload.citations : [] });
+    });
+    state.chatHydrated = true;
+  }
+
+  function renderChat() {
+    syncDurableChat();
+    const log = $("chat-log");
+    log.replaceChildren();
+    if (!state.chatMessages.length) {
+      log.append(create("div", "chat-empty", "Ask where the units stopped, why the agents chose a cause, or which evidence supports it."));
+    }
+    state.chatMessages.slice(-12).forEach((item) => {
+      const row = create("article", `chat-message chat-${item.role}`);
+      row.append(create("span", "chat-role", item.role === "user" ? "YOU" : "COPILOT"), create("p", null, item.message));
+      if (item.citations && item.citations.length) {
+        const refs = create("div", "chat-citations");
+        refs.append(create("span", "chat-citation-label", "Cites"));
+        item.citations.slice(0, 6).forEach((citation) => {
+          const button = create("button", "citation", citation);
+          button.type = "button";
+          button.addEventListener("click", () => focusEvidence(citation));
+          refs.append(button);
+        });
+        row.append(refs);
+      }
+      log.append(row);
+    });
+    if (state.chatPending) log.append(create("div", "chat-message chat-assistant chat-pending", "The agents are reading the admitted records…"));
+    const chatDisabled = state.chatPending || !streamIsLive();
+    $("chat-input").disabled = chatDisabled;
+    $("chat-submit").disabled = chatDisabled;
+    document.querySelectorAll(".suggestion").forEach((button) => {
+      button.disabled = chatDisabled;
+    });
+  }
+
+  function focusEvidence(evidenceId) {
+    const packet = [...document.querySelectorAll(".evidence-packet code")].find((node) => node.textContent === evidenceId);
+    if (packet) {
+      packet.closest(".evidence-packet").classList.add("is-focused");
+      packet.closest(".evidence-packet").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+
+  async function askQuestion(question) {
+    const textValue = value(question).trim();
+    if (!textValue || state.chatPending || !state.incidentId || !streamIsLive()) return;
+    state.chatMessages.push({ role: "user", message: textValue, citations: [] });
+    state.chatPending = true;
+    renderChat();
+    try {
+      const response = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: { question: textValue, idempotency_key: makeKey("chat") } });
+      state.chatMessages.push({ role: "assistant", message: value(response.message), citations: Array.isArray(response.citations) ? response.citations : [] });
+      await queueRefresh();
+    } catch (error) {
+      state.chatMessages.push({ role: "assistant", message: `The read-only investigation stopped safely: ${error.message}`, citations: [] });
+    } finally {
+      state.chatPending = false;
+      renderAll();
+    }
+  }
+
+  function renderAgentView() {
+    renderAgentGraph();
+    renderDecision();
+    renderChat();
+  }
+
+  function renderAll() {
+    if (!state.snapshot) return;
+    renderHeader();
+    renderDashboard();
+    renderAgentView();
+    $("dashboard-view").hidden = state.view !== "dashboard";
+    $("agent-view").hidden = state.view !== "agent";
+    bodyReady();
+  }
+
+  function bodyReady() {
+    document.body.dataset.workspaceReady = state.loaded && state.units.size > 0 ? "true" : "false";
+    $("unavailable").hidden = true;
+  }
+
+  async function bootstrap() {
+    try {
+      const listing = await requestJSON("/api/v1/incidents");
+      const first = Array.isArray(listing.incidents) ? listing.incidents[0] : null;
+      if (!first || !first.incident_id) throw new Error("No synthetic incident is available");
+      const id = value(first.incident_id);
+      const [snapshot, units] = await Promise.all([
+        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}`),
+        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}/units`),
+      ]);
+      applySnapshot(snapshot, units.units, true);
+      showUnavailable("", false);
+      setView(state.view);
+      if (!smokeCapture) connectEvents();
+      if (!deferStart && !state.startIssued && value(snapshot.incident && snapshot.incident.status) !== "RECEIPT_VERIFIED") {
+        state.startIssued = true;
+        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: {} })
+          .then((response) => applySnapshot(response, response.units, false))
+          .catch((error) => { state.commandError = error.message; setConnection("paused", `Investigation could not start: ${error.message}`); renderAll(); });
+      }
+    } catch (error) {
+      state.loaded = false;
+      showUnavailable(error.message, true);
+      setConnection("paused", `Incident unavailable: ${error.message}`);
+      document.body.dataset.workspaceReady = "false";
+    }
+  }
+
+  $("retry-button").addEventListener("click", () => {
+    if (state.source) { state.source.close(); state.source = null; }
+    state.streamError = "";
+    if (state.loaded) {
+      connectEvents();
+      queueRefresh();
+    } else bootstrap();
+  });
+  document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+  $("open-agent").addEventListener("click", () => setView("agent"));
+  $("dashboard-to-agent").addEventListener("click", () => setView("agent"));
+  $("prepare-button").addEventListener("click", prepareRecovery);
+  $("execute-button").addEventListener("click", executeRecovery);
+  $("chat-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = $("chat-input");
+    const question = input.value.trim();
+    input.value = "";
+    askQuestion(question);
+  });
+  document.querySelectorAll("[data-question]").forEach((button) => button.addEventListener("click", () => askQuestion(button.dataset.question)));
+
+  window.addEventListener("beforeunload", () => {
+    if (state.source) state.source.close();
+    if (state.reconnectTimer != null) window.clearTimeout(state.reconnectTimer);
+  });
+
+  bootstrap();
 })();

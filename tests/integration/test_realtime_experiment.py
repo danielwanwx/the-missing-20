@@ -458,6 +458,14 @@ def test_local_api_binds_snapshot_chat_decisions_and_sse(tmp_path: Path) -> None
         assert status == 200
         assert json.loads(body)["read_only"] is True
 
+        status, body = request("/healthz")
+        assert status == 200
+        health = json.loads(body)
+        assert health["local_synthetic_commands"] is True
+        assert health["provider_calls"] is False
+        assert health["write_scope"] == "local_synthetic_only"
+        assert health["advisory_tools_read_only"] is True
+
         # The local boundary is intentionally strict: browser commands need JSON,
         # same-origin (or absent) Origin, and an SSE cursor that already exists.
         status, body = request(

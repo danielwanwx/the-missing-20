@@ -11,6 +11,7 @@ import pytest
 from the_missing_20.authority_b.models import canonical_json
 from the_missing_20.competition.package import (
     M7_AUDIT_ARTIFACT_PATH,
+    M7_REQUIRED_BROWSER_EVENT_TYPES,
     M7_SOURCE_PATHS,
     M7PackageError,
     M7PrivateAudit,
@@ -53,6 +54,133 @@ def test_m7_private_audit_is_truthful_and_byte_stable() -> None:
     }
     assert first.audit_digest
     assert tuple(item.path for item in first.source_artifacts) == M7_SOURCE_PATHS
+
+
+def test_browser_smoke_allows_local_synthetic_recovery_controls(tmp_path: Path) -> None:
+    _copy_package_inputs(tmp_path)
+    path = tmp_path / "artifacts/workspace/browser-smoke-v1.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    modes = payload["modes"]
+    assert isinstance(modes, list)
+    for mode in modes:
+        assert isinstance(mode, dict)
+        mode["active_write_controls"] = 1
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    audit = build_private_audit(tmp_path)
+
+    assert audit.status == "PASS"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("status", "LIVE", "not PASS"),
+        ("remote_resources", 1, "unsafe browser capability"),
+        ("provider_calls", 1, "provider call"),
+        ("local_synthetic_commands", False, "local synthetic"),
+        ("write_scope", "remote", "write scope"),
+    ),
+)
+def test_browser_smoke_safety_boundary_fails_closed(
+    tmp_path: Path, field: str, value: object, message: str
+) -> None:
+    _copy_package_inputs(tmp_path)
+    path = tmp_path / "artifacts/workspace/browser-smoke-v1.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    modes = payload["modes"]
+    assert isinstance(modes, list) and isinstance(modes[0], dict)
+    modes[0][field] = value
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(M7PackageError, match=message):
+        build_private_audit(tmp_path)
+
+
+def test_browser_smoke_server_boundary_fails_closed(tmp_path: Path) -> None:
+    _copy_package_inputs(tmp_path)
+    path = tmp_path / "artifacts/workspace/browser-smoke-v1.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict) and isinstance(payload["server"], dict)
+    payload["server"]["write_scope"] = "remote"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(M7PackageError, match="server write scope"):
+        build_private_audit(tmp_path)
+
+
+@pytest.mark.parametrize("field", ("incident", "event_ledger", "views"))
+def test_browser_smoke_required_proof_deletion_fails_closed(tmp_path: Path, field: str) -> None:
+    _copy_package_inputs(tmp_path)
+    path = tmp_path / "artifacts/workspace/browser-smoke-v1.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    del payload[field]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(M7PackageError):
+        build_private_audit(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("two_role_quorum", False, "two-role quorum"),
+        ("controlled_executor", False, "ControlledExecutor"),
+        ("verification", False, "verification"),
+        ("replay", False, "replay"),
+    ),
+)
+def test_browser_smoke_lifecycle_proof_tamper_fails_closed(
+    tmp_path: Path, field: str, value: object, message: str
+) -> None:
+    _copy_package_inputs(tmp_path)
+    path = tmp_path / "artifacts/workspace/browser-smoke-v1.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict) and isinstance(payload["event_ledger"], dict)
+    payload["event_ledger"][field] = value
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(M7PackageError, match=message):
+        build_private_audit(tmp_path)
+
+
+@pytest.mark.parametrize("event_type", M7_REQUIRED_BROWSER_EVENT_TYPES)
+def test_browser_smoke_required_event_deletion_fails_closed(
+    tmp_path: Path, event_type: str
+) -> None:
+    _copy_package_inputs(tmp_path)
+    path = tmp_path / "artifacts/workspace/browser-smoke-v1.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict) and isinstance(payload["event_ledger"], dict)
+    event_ledger = payload["event_ledger"]
+    for field in ("required_event_types", "observed_event_types"):
+        values = event_ledger[field]
+        assert isinstance(values, list)
+        values.remove(event_type)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(M7PackageError):
+        build_private_audit(tmp_path)
+
+
+@pytest.mark.parametrize("field", ("required_event_types", "observed_event_types"))
+def test_browser_smoke_unknown_event_replacement_fails_closed(tmp_path: Path, field: str) -> None:
+    _copy_package_inputs(tmp_path)
+    path = tmp_path / "artifacts/workspace/browser-smoke-v1.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict) and isinstance(payload["event_ledger"], dict)
+    values = payload["event_ledger"][field]
+    assert isinstance(values, list)
+    values[:] = [
+        "agent.unknown" if event_type == "agent.handoff" else event_type for event_type in values
+    ]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(M7PackageError):
+        build_private_audit(tmp_path)
 
 
 def test_m7_private_audit_loads_with_digest_and_source_validation(tmp_path: Path) -> None:

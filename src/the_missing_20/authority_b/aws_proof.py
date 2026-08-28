@@ -39,7 +39,7 @@ M6_COST_CAP_USD: Final[str] = "0.60"
 # build time.  A source file must be both present and equal to the reviewed artifact.
 M6_APPROVED_SOURCE_DIGESTS: Final[Mapping[str, str]] = {
     "artifacts/golden/golden-v2.json": (
-        "7910ca6b51d8a14c55b280fd3ddeb3c647ef2a213f45a05df7df1dd165a5857e"
+        "d275470cfe5748105630f22d3c08c9c962001cf3957e62735b63d8b406352e69"
     ),
     "artifacts/agent/authority-b-preflight-v1.json": (
         "309cacde4419a6a975bf71e9cad27992e690cbc7810e9bea1e9b1113b2660a52"

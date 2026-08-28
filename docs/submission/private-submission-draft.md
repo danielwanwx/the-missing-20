@@ -20,8 +20,10 @@ separate deterministic decisions for receipt restart and invoice release, obtain
 exact per-action two-role quorum, executes controlled effects, rereads authoritative
 state, verifies postconditions, and replays without creating a second effect.
 
-The read-only Decision Workspace exposes complete, provider-degraded, and
-fail-closed/unavailable views. It intentionally has no write control.
+The local product exposes a live Dashboard and Agent Workspace. Its Copilot is
+read-only and advisory. Separate operational controls can affect only the local
+synthetic experiment, require an exact two-role quorum, and execute through the
+deterministic `ControlledExecutor`; no provider or external write is available.
 
 ## Truthful evidence statement
 
@@ -48,7 +50,8 @@ against a `$0.60` hard cap.
 
 ## Suggested judge path
 
-Run `make judge-demo`, open the local read-only workspace, choose **Start replay**, and follow
+Run `make judge-demo`, open the local Dashboard, then follow the live unit path into
+Agent Workspace, Copilot, two-role approval, controlled recovery, and verification as described in
 [`docs/demo/five-minute-demo.md`](../demo/five-minute-demo.md). Use
 [`evidence-matrix.md`](evidence-matrix.md), [`judging-map.md`](judging-map.md), and
 [`known-limitations.md`](known-limitations.md) to distinguish demonstrated behavior

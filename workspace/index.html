@@ -3,192 +3,254 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="The Missing 20 deterministic decision workspace" />
-    <title>The Missing 20 — Decision Workspace</title>
+    <meta
+      name="description"
+      content="The Missing 20 live incident investigation and controlled recovery workspace"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>The Missing 20 | Incident command</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
-  <body data-workspace-ready="false">
-    <a class="skip-link" href="#main-content">Skip to workspace</a>
-    <header class="site-header" aria-labelledby="page-title">
-      <div class="brand-lockup">
-        <p class="eyebrow">THE MISSING 20 <span aria-hidden="true">/</span> INCIDENT REPLAY</p>
-        <h1 id="page-title">Find the gap. Prove the cause. Close it safely.</h1>
-        <p class="lede">A five-step replay shows how the system finds a missing shipment, investigates it, and recovers it safely.</p>
-      </div>
-      <nav class="mode-nav" aria-label="Workspace mode">
-        <a data-mode-link="complete" href="/?mode=complete" aria-label="Complete scripted replay">Complete</a>
-        <a data-mode-link="degraded" href="/?mode=degraded" aria-label="Degraded provider replay">Degraded</a>
-        <a data-mode-link="invalid" href="/?mode=invalid" aria-label="Fail-closed invalid replay">Fail-closed</a>
+  <body data-workspace-ready="false" data-connection="connecting">
+    <a class="skip-link" href="#main-content">Skip to incident command</a>
+
+    <header class="topbar">
+      <a class="brand" href="/?view=dashboard" aria-label="The Missing 20 dashboard">
+        <span>
+          <strong>The Missing 20</strong>
+          <small>Incident command</small>
+        </span>
+      </a>
+      <nav class="view-tabs" aria-label="Incident views" role="tablist">
+        <button
+          id="tab-dashboard"
+          class="view-tab is-selected"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="dashboard-view"
+          data-view="dashboard"
+        >
+          Dashboard
+        </button>
+        <button
+          id="tab-agent"
+          class="view-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="agent-view"
+          data-view="agent"
+        >
+          Agent Workspace
+        </button>
       </nav>
+      <div class="connection-control" aria-live="polite">
+        <span id="connection-dot" class="status-dot" aria-hidden="true"></span>
+        <span id="connection-label">Connecting</span>
+        <span id="sequence-label" class="sequence-label">seq —</span>
+      </div>
     </header>
 
-    <main id="main-content" class="workspace-shell" aria-live="polite">
+    <main id="main-content" class="app-shell">
       <div id="unavailable" class="unavailable" hidden role="alert">
-        <strong>Workspace unavailable.</strong>
-        <span id="unavailable-status" class="status-chip status-not-proven">UNAVAILABLE</span>
-        <span id="unavailable-detail">The persisted artifact failed closed.</span>
+        <span class="status-dot status-dot-danger" aria-hidden="true"></span>
+        <div>
+          <strong>Incident stream unavailable</strong>
+          <p id="unavailable-detail">The local experiment did not return a usable state.</p>
+        </div>
+        <button id="retry-button" class="button button-quiet" type="button">Reconnect</button>
       </div>
 
-      <section id="case-header" class="case-header panel" aria-labelledby="case-title">
-        <div>
-          <h2 id="case-title">Loading case…</h2>
+      <section class="incident-hero" aria-labelledby="incident-title">
+        <div class="hero-copy">
+          <p class="kicker">LIVE SYNTHETIC INCIDENT</p>
+          <h1 id="incident-title">Finding the missing units</h1>
+          <p id="incident-subtitle">Loading the authoritative supply path…</p>
+          <div class="hero-meta">
+            <span id="incident-id">Incident —</span>
+            <span class="meta-divider" aria-hidden="true"></span>
+            <span id="trace-id">Trace —</span>
+          </div>
         </div>
-        <div class="metric-grid" aria-label="Discrepancy metrics">
-          <div class="metric"><strong id="expected">—</strong><span>expected</span></div>
-          <div class="metric"><strong id="observed">—</strong><span>recorded</span></div>
-          <div class="metric metric-alert"><strong id="missing">—</strong><span>missing</span></div>
-        </div>
-      </section>
-
-      <section id="replay-section" class="replay-panel panel" aria-labelledby="replay-title">
-        <div class="replay-header">
-          <h2 id="replay-title">See what the system did</h2>
-        </div>
-        <p id="replay-intro" class="replay-intro">Start the replay to follow the incident one step at a time.</p>
-        <ol id="stage-list" class="stage-list" aria-label="Incident replay stages"></ol>
-        <div id="replay-progress" class="replay-progress" role="progressbar" aria-label="Incident replay progress" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><span></span></div>
-        <div id="replay-stage" class="replay-stage" aria-live="polite" aria-atomic="true" tabindex="-1">
-          <p id="replay-step-label" class="replay-step-label">Ready to begin</p>
-          <h3 id="replay-stage-title">Start the replay</h3>
-          <p id="replay-stage-outcome">Press Start to see how the system found and fixed the problem.</p>
-          <p id="replay-stage-impact" class="replay-stage-impact">This is a read-only replay; nothing is changed.</p>
-        </div>
-        <div class="replay-controls" aria-label="Replay controls">
-          <input id="replay-start" class="control-button control-primary" type="button" value="Start replay" />
-          <input id="replay-previous" class="control-button" type="button" value="Previous" disabled />
-          <input id="replay-next" class="control-button" type="button" value="Next" disabled />
-          <input id="replay-restart" class="control-button control-quiet" type="button" value="Restart" disabled />
+        <div class="hero-count" aria-label="Missing unit count">
+          <strong id="missing-count">—</strong>
+          <span>stopped at queue</span>
         </div>
       </section>
 
-      <details id="evidence-details" class="detail-disclosure">
-        <summary>Evidence &amp; architecture proof</summary>
-        <section class="evidence-section" aria-labelledby="evidence-title">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">EVIDENCE DISCLOSURE</p>
-              <h2 id="evidence-title">What this demo proves</h2>
-            </div>
-            <p id="mode-label" class="mode-callout">Loading evidence mode…</p>
-          </div>
-          <div id="evidence-taxonomy" class="taxonomy-grid"></div>
-        </section>
-
-        <section class="panel integration-panel" aria-labelledby="integration-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">M6 INTEGRATION BOUNDARY</p>
-              <h2 id="integration-title">Existing AWS evidence, honestly scoped</h2>
-            </div>
-            <span id="integration-status" class="status-chip status-neutral">Loading</span>
-          </div>
-          <p class="integration-intro">Read-only proof. Advisory output has NO WRITE AUTHORITY.</p>
-          <div id="integration-summary" class="integration-summary"></div>
-          <div id="integration-capabilities" class="capability-list"></div>
-          <div class="digest-block"><span>M6 proof digest</span><code id="integration-digest">—</code></div>
-        </section>
-      </details>
-
-      <details id="investigation-details" class="detail-disclosure">
-        <summary>Investigation &amp; safety decision</summary>
-        <div class="primary-grid">
-          <section class="panel advisory-panel" aria-labelledby="advisory-title">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">ADVISORY INVESTIGATION</p>
-                <h2 id="advisory-title">Competing hypotheses</h2>
-              </div>
-              <span id="advisory-status" class="status-chip status-neutral">Loading</span>
-            </div>
-            <div class="advisory-disclosure">
-              <span class="lock-mark" aria-hidden="true">◇</span>
-              <strong id="authority-label">Model output is advisory only.</strong>
-              <span>It cannot authorize, execute, verify, or replay an operational action.</span>
-            </div>
-            <div id="advisory-meta" class="meta-row"></div>
-            <div id="hypotheses" class="hypothesis-list"></div>
-            <div id="advisory-report" class="report-block"></div>
-            <div id="advisory-warnings" class="warning-list"></div>
-          </section>
-
-          <section class="panel decision-panel" aria-labelledby="decision-title">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">DETERMINISTIC AUTHORITY</p>
-                <h2 id="decision-title">Operational decision</h2>
-              </div>
-              <span class="status-chip status-proven">DETERMINISTIC</span>
-            </div>
-            <p class="decision-intro">The policy result is computed from admitted authoritative evidence. Advisory fields are not inputs.</p>
-            <dl id="decision-details" class="decision-details"></dl>
-            <div class="digest-block"><span>Decision digest</span><code id="decision-digest">—</code></div>
-            <div id="decision-reasons" class="reason-list"></div>
-            <div id="decision-invariants" class="invariant-list"></div>
-          </section>
+      <div class="truth-strip" aria-live="polite">
+        <div class="truth-mode">
+          <span id="mode-dot" class="status-dot status-dot-lime" aria-hidden="true"></span>
+          <strong id="mode-label">Synthetic experiment</strong>
+          <span id="mode-detail">API-backed state</span>
         </div>
-      </details>
+        <div class="truth-boundary">
+          <span>Agents investigate. Deterministic policy and two human roles control effects.</span>
+        </div>
+      </div>
 
-      <details id="controls-details" class="detail-disclosure">
-        <summary>Human approval &amp; controlled recovery</summary>
-        <section class="panel control-panel" aria-labelledby="control-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">HUMAN AUTHORIZATION</p>
-              <h2 id="control-title">Two roles before controlled effects</h2>
-            </div>
-            <span id="quorum-status" class="status-chip status-neutral">Loading</span>
+      <section id="dashboard-view" class="view-panel" role="tabpanel" aria-labelledby="tab-dashboard">
+        <div class="section-heading">
+          <div>
+            <p class="kicker">OPERATIONS</p>
+            <h2>Follow every unit through the supply path</h2>
+            <p class="section-note">The diagram moves only when the incident API confirms a state change.</p>
           </div>
-          <p id="approval-boundary" class="boundary-copy"></p>
-          <div id="role-approvals" class="roles-grid"></div>
-          <p class="read-only-note"><span aria-hidden="true">▣</span> Read-only projection. These controls never approve or execute anything.</p>
-        </section>
+          <button id="open-agent" class="button button-primary" type="button">Open Agent Workspace</button>
+        </div>
 
-        <section class="panel execution-panel" aria-labelledby="execution-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">CONTROLLED RECOVERY PROOF</p>
-              <h2 id="execution-title">Fresh read → effect → verification → replay</h2>
+        <div class="dashboard-layout">
+          <article class="panel flow-panel" aria-labelledby="flow-title">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-label">SUPPLY PATH</span>
+                <h3 id="flow-title">Where the records are now</h3>
+              </div>
+              <span id="path-status" class="state-badge state-neutral">Loading</span>
             </div>
-            <span id="replay-status" class="status-chip status-neutral">Loading</span>
-          </div>
-          <div id="execution-summary" class="execution-summary"></div>
-          <div id="effects" class="effect-list"></div>
-          <div id="postconditions" class="postcondition-list"></div>
-        </section>
-      </details>
+            <div id="flow-map" class="flow-map" aria-label="Warehouse to queue to ERP to invoice"></div>
+            <div class="flow-summary">
+              <div class="summary-stat">
+                <span>Expected</span>
+                <strong id="expected-count">—</strong>
+              </div>
+              <div class="summary-stat">
+                <span>Recorded</span>
+                <strong id="recorded-count">—</strong>
+              </div>
+              <div class="summary-stat summary-alert">
+                <span>Queue exception</span>
+                <strong id="queue-count">—</strong>
+              </div>
+            </div>
+            <div id="unit-detail" class="unit-detail" aria-live="polite">
+              <span class="detail-placeholder">Select a unit to inspect its authoritative record.</span>
+            </div>
+          </article>
 
-      <details id="audit-details" class="detail-disclosure">
-        <summary>Audit trail</summary>
-        <section class="panel timeline-panel" aria-labelledby="timeline-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">AUDIT TRAIL</p>
-              <h2 id="timeline-title">Every step is linked to a persisted record</h2>
+          <aside class="panel live-panel" aria-labelledby="live-title">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-label">LIVE AGENTS</span>
+                <h3 id="live-title">Investigation in motion</h3>
+              </div>
+              <span id="active-agent-count" class="state-badge state-cyan">0 active</span>
             </div>
-            <span id="timeline-count" class="muted">—</span>
-          </div>
-          <ol id="audit-timeline" class="audit-timeline"></ol>
-        </section>
-      </details>
+            <div id="dashboard-agents" class="agent-list"></div>
+            <div class="panel-divider"></div>
+            <div class="latest-event-heading">
+              <span class="panel-label">LATEST EVENT</span>
+              <span id="latest-event-sequence" class="sequence-label">—</span>
+            </div>
+            <div id="latest-event" class="latest-event">
+              <strong>Waiting for the incident stream</strong>
+              <span>Actual agent and tool events will appear here.</span>
+            </div>
+            <button id="dashboard-to-agent" class="button button-secondary full-width" type="button">
+              Inspect the investigation
+            </button>
+          </aside>
+        </div>
+      </section>
 
-      <details id="claims-details" class="detail-disclosure">
-        <summary>Claim ledger</summary>
-        <section class="panel claims-panel" aria-labelledby="claims-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">CLAIM LEDGER</p>
-              <h2 id="claims-title">No claim without a class</h2>
-            </div>
-            <span class="muted">Canonical artifact <code id="artifact-digest">—</code></span>
+      <section id="agent-view" class="view-panel" role="tabpanel" aria-labelledby="tab-agent" hidden>
+        <div class="section-heading workspace-heading">
+          <div>
+            <p class="kicker">AGENT WORKSPACE</p>
+            <h2>Watch the investigation, then make the decision</h2>
+            <p class="section-note">Every node and evidence packet below is projected from the ordered event ledger.</p>
           </div>
-          <div id="claims" class="claims-list"></div>
-        </section>
-      </details>
+          <span id="workspace-state" class="state-badge state-neutral">Waiting</span>
+        </div>
+
+        <div class="workspace-layout">
+          <article class="panel agent-system-panel" aria-labelledby="agent-system-title">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-label">MULTI-AGENT INVESTIGATION</span>
+                <h3 id="agent-system-title">Orchestrator and investigators</h3>
+              </div>
+              <span id="orchestrator-status" class="state-badge state-neutral">Idle</span>
+            </div>
+            <div id="agent-graph" class="agent-graph" aria-label="Orchestrator and investigator graph">
+              <div class="orchestrator-node" data-agent-id="orchestrator">
+                <span class="node-pulse" aria-hidden="true"></span>
+                <span class="node-type">ORCHESTRATOR</span>
+                <strong>Incident coordinator</strong>
+                <span id="orchestrator-detail">Waiting for investigation.started</span>
+              </div>
+              <div id="agent-graph-links" class="agent-graph-links" aria-hidden="true"></div>
+              <div id="agent-nodes" class="agent-nodes"></div>
+            </div>
+            <div class="operations-heading">
+              <div>
+                <span class="panel-label">ACTUAL OPERATIONS</span>
+                <h3>Tool calls and handoffs</h3>
+              </div>
+              <span id="operation-count" class="sequence-label">0 records</span>
+            </div>
+            <ol id="operation-feed" class="operation-feed" aria-live="polite"></ol>
+            <div id="evidence-packets" class="evidence-packets"></div>
+          </article>
+
+          <aside class="agent-sidebar">
+            <section class="panel copilot-panel" aria-labelledby="copilot-title">
+              <div class="panel-heading">
+                <div>
+                  <span class="panel-label">INCIDENT COPILOT</span>
+                  <h3 id="copilot-title">Ask the investigation</h3>
+                </div>
+                <span class="state-badge state-cyan">READ ONLY</span>
+              </div>
+              <p class="copilot-intro">Questions run through the real scripted agent and its read-only tools. Chat cannot approve or execute.</p>
+              <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Copilot conversation">
+                <div class="chat-empty">Ask where the units stopped, why the agents chose a cause, or which evidence supports it.</div>
+              </div>
+              <div class="suggestion-row" aria-label="Suggested questions">
+                <button class="suggestion" type="button" data-question="Where did the missing units go?">Where did they go?</button>
+                <button class="suggestion" type="button" data-question="Why did the agents choose this cause?">Why this cause?</button>
+                <button class="suggestion" type="button" data-question="Compare the alternative hypotheses.">Compare causes</button>
+              </div>
+              <form id="chat-form" class="chat-form">
+                <label class="sr-only" for="chat-input">Ask the incident copilot</label>
+                <textarea id="chat-input" rows="2" maxlength="2000" placeholder="Ask about this incident…"></textarea>
+                <button id="chat-submit" class="button button-primary" type="submit">Ask Copilot</button>
+              </form>
+            </section>
+
+            <section class="panel decision-panel" aria-labelledby="decision-title">
+              <div class="panel-heading">
+                <div>
+                  <span class="panel-label">CONTROLLED RECOVERY</span>
+                  <h3 id="decision-title">Human decision gate</h3>
+                </div>
+                <span id="decision-status" class="state-badge state-neutral">Not prepared</span>
+              </div>
+              <div class="decision-rail" aria-label="Recovery lifecycle">
+                <div class="decision-step" data-decision-step="proposal"><span class="step-number">1</span><span><strong>Prepare</strong><small>Deterministic proposal</small></span></div>
+                <div class="decision-step" data-decision-step="approval"><span class="step-number">2</span><span><strong>Approve</strong><small>Two distinct roles</small></span></div>
+                <div class="decision-step" data-decision-step="execution"><span class="step-number">3</span><span><strong>Recover</strong><small>Controlled executor</small></span></div>
+                <div class="decision-step" data-decision-step="verification"><span class="step-number">4</span><span><strong>Verify</strong><small>Fresh read and replay</small></span></div>
+              </div>
+              <div id="decision-intent" class="decision-intent">
+                <span class="detail-placeholder">Prepare a recovery proposal after the investigation returns.</span>
+              </div>
+              <div id="approval-roles" class="approval-roles"></div>
+              <div class="decision-actions">
+                <button id="prepare-button" class="button button-secondary" type="button">Prepare recovery</button>
+                <button id="execute-button" class="button button-primary" type="button" disabled>Execute approved recovery</button>
+              </div>
+              <p class="decision-note">Chat is advisory. Only these structured controls can request a human-gated effect.</p>
+            </section>
+          </aside>
+        </div>
+      </section>
     </main>
 
     <footer class="site-footer">
-      <span>All data is synthetic and local.</span>
-      <span>Model output is advisory. Deterministic policy and human authorization own controlled actions.</span>
+      <span>All records are synthetic and local.</span>
+      <span id="footer-status">Waiting for the authoritative event ledger.</span>
     </footer>
     <script src="/app.js" defer></script>
   </body>

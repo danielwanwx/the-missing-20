@@ -8,7 +8,9 @@ the other 20 went. Specialized agents compare possible causes and surface eviden
 while deterministic policy, two independent human roles, controlled execution, and
 verification keep AI output from directly changing operational state.
 
-![Guided incident replay](artifacts/workspace/screenshots/complete.png)
+![Live supply-path dashboard](artifacts/workspace/screenshots/dashboard-qa-refined.png)
+
+![Agent investigation workspace](artifacts/workspace/screenshots/agent-qa-refined.png)
 
 ## Try the guided replay
 
@@ -21,8 +23,16 @@ make workspace
 PYTHONPATH=src .venv/bin/python scripts/decision_workspace_server.py
 ```
 
-Open the local URL printed by the server and choose **Start replay**. The product leads
-the viewer through five stages:
+Open the local URL printed by the server. The browser connects to the local experiment
+API and ordered SSE event ledger, renders all 100 unit records, and keeps two synchronized
+views:
+
+- **Dashboard:** watch units move through Warehouse, Message Queue, ERP, and Invoice as
+  authoritative API events arrive.
+- **Agent Workspace:** inspect the orchestrator, three investigators, tool calls,
+  evidence, handoffs, and the advisory Incident Copilot.
+
+The complete interaction covers five stages:
 
 1. Detect the 20-unit gap.
 2. Compare competing agent hypotheses.
@@ -50,8 +60,11 @@ from authority:
 - The executor rereads authoritative state, applies a bounded idempotent effect,
   verifies postconditions, and records a zero-effect replay.
 
-The browser is a read-only projection of persisted synthetic evidence. It never grants
-approval or executes an action.
+The Incident Copilot is advisory and read-only. Operational controls are a separate,
+fail-closed path limited to local synthetic state: prepare a deterministic proposal,
+collect approvals from two distinct human roles, execute through `ControlledExecutor`,
+then verify the authoritative reread and replay. The local demo makes no provider call,
+loads no remote resource, and cannot write to an external system.
 
 ## Evidence boundary
 
