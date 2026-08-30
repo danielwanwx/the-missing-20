@@ -1,6 +1,10 @@
 # Devpost Submission Draft — The Missing 20
 
-**State:** `PRIVATE_DRAFT — NOT PUBLIC / NOT SUBMITTED`
+**State:** `DEVPOST DRAFT CREATED — NOT PUBLIC / NOT SUBMITTED`
+
+Devpost draft: `submission 1162519` under the official Agents for Humans Hackathon.
+Project overview is saved; project details remain intentionally incomplete until the
+required public demo video is available. Public repository version: commit `a4df5bf`.
 
 This is a field-ready English draft for the Agents for Humans Devpost form. Replace
 the marked placeholders only after the repository, video, and testing access have
