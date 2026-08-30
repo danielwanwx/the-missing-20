@@ -1,9 +1,13 @@
 # Private Submission Draft — The Missing 20
 
 **State:** `PRIVATE_READY_TO_BE_JUDGED`
-**Submission state:** `NOT_READY_TO_SUBMIT`
+**Submission state:** `NOT_READY_TO_SUBMIT` — field-ready, still private
 **Audience:** internal product/judge review only. Do not publish or submit.
 **Data:** synthetic only.
+
+The complete field-by-field English draft is in
+[`devpost-submission-draft.md`](devpost-submission-draft.md). This document keeps
+the internal evidence narrative and release boundary.
 
 ## One-line pitch
 
@@ -24,14 +28,22 @@ The local product exposes a live Dashboard and Agent Workspace. Its Copilot is
 read-only and advisory. Separate operational controls can affect only the local
 synthetic experiment, require an exact two-role quorum from scripted simulated
 principals (the demo client has no authentication), and execute through the
-deterministic `ControlledExecutor`; no provider or external write is available.
+deterministic `ControlledExecutor`; no external write is available. The configured
+real AgentCore Runtime path is separately evidenced and remains read-only.
+
+Strands is visible in the hero path: one orchestrator coordinates three fixed
+investigators, audited read tools, structured findings, evidence handoffs, and
+synthesis/evaluation. The real Runtime proof additionally includes a role-specific
+read-only chat and an explicit refusal to prepare, approve, authorize, or execute.
 
 ## Truthful evidence statement
 
 The local deterministic lifecycle is `PROVEN`. The four-profile scripted advisory
-trace is `SCRIPTED_PROVEN` and synthetic. The previously consumed real Nova record is
-`PROVEN` only for connectivity and degraded-outcome observability; stable real Nova
-usefulness is `NOT_PROVEN`. Every AgentCore capability is `NOT_PROVEN`. Model output is
+trace is `SCRIPTED_PROVEN` and synthetic. The redacted real run is `PROVEN` for the
+AgentCore Runtime deployment/invocation/observability boundary and `PARTIAL` for Nova
+advisory usefulness (AI citation coverage 1/5; application validation 5/5). Stable
+real Nova usefulness is `NOT_PROVEN`; AgentCore Gateway and Policy are `NOT_PROVEN`.
+Role chat is real-provider-backed but read-only. Model output is
 `ADVISORY — NOT AN OPERATIONAL DECISION` and has `NO WRITE AUTHORITY`.
 
 ## Why this is useful
@@ -45,9 +57,12 @@ human a compact, auditable decision surface.
 ## Private review state
 
 The package is ready for a human to judge locally. It is not a public release, not a
-video, not a Devpost entry, and not a claim of deployed AgentCore. No new AWS/provider
-call is part of this package; the cumulative estimated prior cost remains `$0.1250496`
-against a `$0.60` hard cap.
+video, and not a Devpost entry. The redacted proof includes a deployed AgentCore
+Runtime boundary; it does not claim Gateway, Policy, stable model usefulness, or
+production business impact. The separate 2026-08-30 acceptance run added an estimated
+`$0.0491432` for one real multi-agent investigation and one real read-only role chat.
+The cumulative known engineering estimate is `$0.2240576`; transport cycles are not
+described as model calls. The hard cap remains `$0.60`.
 
 ## Suggested judge path
 

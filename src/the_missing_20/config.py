@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from the_missing_20.ports.agent_model import AgentProvider
+
 
 class ConfigurationError(ValueError):
     """Raised when configuration would make an unsafe or ambiguous run possible."""
@@ -23,6 +25,15 @@ class Settings:
     cleanup_manifest: Path = Path("artifacts/aws/cleanup-manifest.json")
     max_aws_spend_usd: Decimal = Decimal("5.00")
     allow_aws_mutations: bool = False
+    agent_provider: AgentProvider = AgentProvider.SCRIPTED
+    agentcore_runtime_arn: str | None = None
+    agentcore_qualifier: str = "DEFAULT"
+
+    @property
+    def provider_mode(self) -> AgentProvider:
+        """Compatibility/readability alias for the explicit agent provider mode."""
+
+        return self.agent_provider
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -41,6 +52,11 @@ class Settings:
             ),
             max_aws_spend_usd=_parse_decimal(values.get("MISSING20_MAX_AWS_SPEND_USD", "5.00")),
             allow_aws_mutations=_parse_bool(values.get("MISSING20_ALLOW_AWS_MUTATIONS", "0")),
+            agent_provider=AgentProvider.parse(
+                values.get("MISSING20_AGENT_PROVIDER", AgentProvider.SCRIPTED.value)
+            ),
+            agentcore_runtime_arn=_optional(values.get("MISSING20_AGENTCORE_RUNTIME_ARN")),
+            agentcore_qualifier=values.get("MISSING20_AGENTCORE_QUALIFIER", "DEFAULT").strip(),
         )
         settings.validate()
         return settings
@@ -62,6 +78,12 @@ class Settings:
             raise ConfigurationError("cleanup manifest must not escape the repository")
         if self.max_aws_spend_usd <= 0 or self.max_aws_spend_usd > Decimal("20.00"):
             raise ConfigurationError("AWS experiment budget must be greater than 0 and at most $20")
+        try:
+            AgentProvider.parse(self.agent_provider)
+        except ValueError as exc:
+            raise ConfigurationError(str(exc)) from exc
+        if not self.agentcore_qualifier:
+            raise ConfigurationError("MISSING20_AGENTCORE_QUALIFIER must not be empty")
 
 
 def _optional(value: str | None) -> str | None:

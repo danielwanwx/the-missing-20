@@ -1,0 +1,272 @@
+{
+  "approval_before_prepare": {
+    "decision_eligibility": "PENDING_APPROVAL",
+    "decision_id": null,
+    "history": [],
+    "intent_id": null,
+    "required_roles": [
+      "INTEGRATION_OPERATOR",
+      "AP_APPROVER"
+    ],
+    "status": "NOT_REQUESTED",
+    "tool": null
+  },
+  "case_status": "INVESTIGATING",
+  "console_errors": [],
+  "early": {
+    "replayHidden": true,
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/v1/scenarios"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/incidents/missing-20-normal"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/incidents/missing-20-normal/units"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/live-sources"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/live-sources/events?after=0"
+      },
+      {
+        "method": "POST",
+        "url": "/api/v1/scenarios"
+      }
+    ],
+    "status": "Standing by"
+  },
+  "effects_before_approval": [],
+  "evaluation_completed": true,
+  "event_count": 71,
+  "event_sequences": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71
+  ],
+  "event_types": [
+    "telemetry.observed",
+    "source.condition.injected",
+    "incident.detected",
+    "investigation.started",
+    "telemetry.observed",
+    "agent.started",
+    "agent.started",
+    "agent.started",
+    "tool.started",
+    "tool.started",
+    "tool.started",
+    "tool.completed",
+    "tool.completed",
+    "evidence.returned",
+    "evidence.returned",
+    "tool.completed",
+    "tool.started",
+    "evidence.returned",
+    "tool.started",
+    "tool.completed",
+    "tool.started",
+    "tool.completed",
+    "tool.completed",
+    "evidence.returned",
+    "evidence.returned",
+    "tool.started",
+    "evidence.returned",
+    "tool.started",
+    "tool.completed",
+    "tool.started",
+    "tool.completed",
+    "evidence.returned",
+    "evidence.returned",
+    "tool.completed",
+    "tool.started",
+    "tool.started",
+    "tool.completed",
+    "evidence.returned",
+    "tool.completed",
+    "tool.started",
+    "evidence.returned",
+    "evidence.returned",
+    "tool.completed",
+    "evidence.returned",
+    "tool.started",
+    "tool.started",
+    "tool.completed",
+    "tool.completed",
+    "tool.started",
+    "evidence.returned",
+    "evidence.returned",
+    "tool.completed",
+    "tool.started",
+    "evidence.returned",
+    "tool.completed",
+    "tool.started",
+    "tool.started",
+    "tool.completed",
+    "tool.completed",
+    "agent.completed",
+    "agent.handoff",
+    "agent.completed",
+    "agent.handoff",
+    "agent.completed",
+    "agent.handoff",
+    "synthesis.started",
+    "synthesis.completed",
+    "evaluation.started",
+    "evaluation.completed",
+    "telemetry.observed",
+    "telemetry.observed"
+  ],
+  "incident_id": "missing-20-001-run-1",
+  "investigation_started_count": 1,
+  "network_urls": [
+    "http://127.0.0.1:62057/assets/phosphor-regular.css",
+    "http://127.0.0.1:62057/style.css",
+    "http://127.0.0.1:62057/assets/phosphor-bold.css",
+    "http://127.0.0.1:62057/app.js",
+    "http://127.0.0.1:62057/api/v1/scenarios",
+    "http://127.0.0.1:62057/assets/Phosphor-Bold.woff2",
+    "http://127.0.0.1:62057/assets/Phosphor.woff2",
+    "http://127.0.0.1:62057/favicon.svg",
+    "http://127.0.0.1:62057/api/v1/incidents/missing-20-normal",
+    "http://127.0.0.1:62057/api/v1/incidents/missing-20-normal/units",
+    "http://127.0.0.1:62057/api/v1/live-sources",
+    "http://127.0.0.1:62057/api/v1/live-sources/events?after=0",
+    "http://127.0.0.1:62057/api/v1/incidents/missing-20-normal/events?after=1",
+    "http://127.0.0.1:62057/api/v1/scenarios",
+    "http://127.0.0.1:62057/api/v1/scenarios"
+  ],
+  "order": {
+    "detected": 2,
+    "source": 1,
+    "started": 3
+  },
+  "ui": {
+    "agents": [
+      {
+        "id": "retryable_message_investigator",
+        "text": "Receipt retryCOMPLETEFailed message path2 tools \u00b7 5 evidences \u00b7 handoff"
+      },
+      {
+        "id": "short_shipment_investigator",
+        "text": "Shipment checkCOMPLETEPhysical quantity2 tools \u00b7 5 evidences \u00b7 handoff"
+      },
+      {
+        "id": "duplicate_posting_investigator",
+        "text": "Duplicate checkCOMPLETEExisting postings2 tools \u00b7 5 evidences \u00b7 handoff"
+      }
+    ],
+    "connection": "live",
+    "consoleText": "Evaluation ACCEPTACCEPT#69 \u00b7 18:28:18Evaluation startedRUNNING#68 \u00b7 18:28:17Synthesis selected a hypothesisCOMPLETED#67 \u00b7 18:28:16Synthesis startedRUNNING#66 \u00b7 18:28:15Shipment check handed evidence to synthesis5 evidence handed off#65 \u00b7 18:28:14Shipment check completedCOMPLETED#64 \u00b7 18:28:13Duplicate check handed evidence to synthesis5 evidence handed off#63 \u00b7 18:28:12Duplicate check completedCOMPLETED#62 \u00b7 18:28:11",
+    "incidentId": "missing-20-001-run-1",
+    "operationCount": 8,
+    "orchestrator": "Ready for decision",
+    "replayVisible": true,
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/v1/scenarios"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/incidents/missing-20-normal"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/incidents/missing-20-normal/units"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/live-sources"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/live-sources/events?after=0"
+      },
+      {
+        "method": "POST",
+        "url": "/api/v1/scenarios"
+      },
+      {
+        "method": "GET",
+        "url": "/api/v1/scenarios"
+      }
+    ],
+    "visibleStartButtons": []
+  }
+}

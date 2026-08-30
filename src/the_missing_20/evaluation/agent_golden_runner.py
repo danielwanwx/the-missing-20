@@ -24,7 +24,7 @@ from the_missing_20.adapters.local_signer import LocalSigner
 from the_missing_20.adapters.sqlite_case_store import SQLiteCaseStore
 from the_missing_20.adapters.strands_models import ScriptedStrandsFactory, require_strands
 from the_missing_20.adapters.synthetic_enterprise import SyntheticEnterprise
-from the_missing_20.agents.harness import AgentHarness
+from the_missing_20.agents.harness import AgentHarness, HarnessRun
 from the_missing_20.agents.policy import POLICY_VERSION
 from the_missing_20.agents.prompts import PromptSet
 from the_missing_20.agents.schemas import (
@@ -256,6 +256,10 @@ class AgentGoldenRunner:
                 prompt_root=self.repository_root,
             )
             first = harness.run(case_id=case_id, trace_id=trace_id, evidence=evidence)
+            if not isinstance(first, HarnessRun):
+                raise AgentValidationError(
+                    "golden runner requires a fully validated harness result"
+                )
             first_bytes = _canonical(first.public())
             second_bytes: bytes | None = None
             byte_identical: bool | None = None

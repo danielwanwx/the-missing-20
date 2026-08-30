@@ -152,6 +152,57 @@ class SQLiteCaseStore:
                 (case.case_id, case.case_version, case.model_dump_json()),
             )
 
+    def create_detected_case(
+        self,
+        case: Case,
+        genesis: DetectionGenesis,
+        evidence: tuple[EvidenceItem, ...],
+        transition: TransitionCommand,
+    ) -> tuple[Case, CaseEvent]:
+        """Persist detection genesis, evidence, and first transition atomically."""
+
+        if case.case_id != genesis.case_id or transition.case_id != case.case_id:
+            raise InvalidEventPayload("detection records do not share a case")
+        if transition.trace_id != genesis.trace_id:
+            raise InvalidEventPayload("detection records do not share a trace")
+        if case.model_dump_json() != genesis.initial_case_json:
+            raise InvalidEventPayload("genesis initial projection does not match the case")
+        if tuple(item.evidence_id for item in evidence) != genesis.detector_evidence_ids:
+            raise InvalidEventPayload("detector evidence does not match immutable genesis")
+        if any(
+            item.case_id != case.case_id or item.trace_id != genesis.trace_id
+            for item in evidence
+        ):
+            raise InvalidEventPayload("detector evidence identity does not match genesis")
+
+        genesis_json = genesis.model_dump_json()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "INSERT INTO case_genesis VALUES (?, ?, ?, ?)",
+                (
+                    case.case_id,
+                    genesis.trace_id,
+                    genesis_json,
+                    _digest(json.loads(genesis_json)),
+                ),
+            )
+            connection.execute(
+                "INSERT INTO case_projection VALUES (?, ?, ?)",
+                (case.case_id, case.case_version, case.model_dump_json()),
+            )
+            for item in evidence:
+                connection.execute(
+                    "INSERT INTO evidence VALUES (?, ?, ?, ?)",
+                    (
+                        item.evidence_id,
+                        item.case_id,
+                        item.trace_id,
+                        item.model_dump_json(),
+                    ),
+                )
+            return self._apply_transition(connection, transition)
+
     def get_case(self, case_id: str) -> Case:
         with self._connect() as connection:
             row = connection.execute(

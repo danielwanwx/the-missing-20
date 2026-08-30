@@ -1,0 +1,78 @@
+{
+  "closed_1280": {
+    "bodyScroll": 1280,
+    "consoleReady": "true",
+    "documentScroll": 1280,
+    "intent": "COMPLETED ACTION INTENTInvoice ReleaseVerified; approvals are not carried into the next action.",
+    "replayVisible": true,
+    "startHidden": true,
+    "status": "VERIFIED \u00b7 CLOSED",
+    "width": 1280,
+    "words": 330
+  },
+  "closed_1440": {
+    "bodyScroll": 1440,
+    "consoleReady": "true",
+    "documentScroll": 1440,
+    "intent": "COMPLETED ACTION INTENTInvoice ReleaseVerified; approvals are not carried into the next action.",
+    "replayVisible": true,
+    "startHidden": true,
+    "status": "VERIFIED \u00b7 CLOSED",
+    "width": 1440,
+    "words": 330
+  },
+  "closed_390": {
+    "bodyScroll": 395,
+    "consoleReady": "true",
+    "documentScroll": 395,
+    "intent": "COMPLETED ACTION INTENTInvoice ReleaseVerified; approvals are not carried into the next action.",
+    "replayVisible": true,
+    "startHidden": true,
+    "status": "VERIFIED \u00b7 CLOSED",
+    "width": 395,
+    "words": 307
+  },
+  "closed_768": {
+    "bodyScroll": 768,
+    "consoleReady": "true",
+    "documentScroll": 768,
+    "intent": "COMPLETED ACTION INTENTInvoice ReleaseVerified; approvals are not carried into the next action.",
+    "replayVisible": true,
+    "startHidden": true,
+    "status": "VERIFIED \u00b7 CLOSED",
+    "width": 768,
+    "words": 330
+  },
+  "closed_chat": {
+    "answer": "AGENT TEAM \u00b7 COPILOTThe case is closed and reconciled: 100 of 100 units are now recorded. During the incident, 20 units stopped at the queue; the recovery path restored them. Evidence is available in case:missing-20-001-run-1:refresh-4:erp-receipt and case:missing-20-001-run-1:refresh-4:failed-message.Citescase:missing-20-001-run-1:refresh-4:erp-receiptcase:missing-20-001-run-1:refresh-4:failed-messagecase:missing-20-001-run-1:refresh-4:invoicecase:missing-20-001-run-1:refresh-4:material-documentscase:missing-20-001-run-1:refresh-4:warehouse",
+    "citations": [
+      "case:missing-20-001-run-1:refresh-4:erp-receipt",
+      "case:missing-20-001-run-1:refresh-4:failed-message",
+      "case:missing-20-001-run-1:refresh-4:invoice",
+      "case:missing-20-001-run-1:refresh-4:material-documents",
+      "case:missing-20-001-run-1:refresh-4:warehouse"
+    ]
+  },
+  "closed_replay": {
+    "completed": true,
+    "console_errors": []
+  },
+  "closed_snapshot": {
+    "counts": {
+      "erp_recorded": 100,
+      "queue_failed": 0,
+      "total": 100
+    },
+    "effects": [
+      "RECEIPT_RESTART",
+      "INVOICE_RELEASE"
+    ],
+    "status": "CLOSED",
+    "verified": true
+  },
+  "reduced_motion": {
+    "animationDuration": "",
+    "animationName": "",
+    "hasLine": false
+  }
+}

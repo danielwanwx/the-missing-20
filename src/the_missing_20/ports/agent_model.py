@@ -29,6 +29,33 @@ class AgentProvider(StrEnum):
 
     SCRIPTED = "scripted"
     BEDROCK = "bedrock"
+    AGENTCORE = "agentcore"
+
+    @classmethod
+    def parse(cls, value: str | AgentProvider) -> AgentProvider:
+        """Parse the explicit provider mode without silently falling back.
+
+        Provider selection is a deployment boundary.  A typo must therefore fail
+        closed instead of accidentally routing a request to the local scripted
+        implementation (or to a cloud provider).
+        """
+
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("agent provider mode must be scripted, bedrock, or agentcore")
+        normalized = value.strip().lower()
+        try:
+            return cls(normalized)
+        except ValueError as exc:
+            raise ValueError(
+                "agent provider mode must be one of: scripted, bedrock, agentcore"
+            ) from exc
+
+
+# More descriptive spelling for configuration and API callers.  Keep the enum
+# name above for compatibility with the existing provider evidence scripts.
+AgentProviderMode = AgentProvider
 
 
 class AgentStage(StrEnum):
@@ -113,6 +140,15 @@ class AgentBudget:
 
 class AgentBudgetExceeded(RuntimeError):
     """A model request or its reported usage would cross a frozen budget."""
+
+
+class AgentProviderUnavailable(RuntimeError):
+    """A selected real provider cannot be reached or is not configured.
+
+    This error is intentionally distinct from a validation error.  The application
+    records it as a visible advisory degradation and never treats it as an
+    operational decision or an invitation to use an unapproved fallback provider.
+    """
 
 
 @dataclass(frozen=True, slots=True)

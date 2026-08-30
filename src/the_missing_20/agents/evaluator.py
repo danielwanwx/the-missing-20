@@ -32,6 +32,24 @@ class EvaluationRun:
     retry_count: int = 0
 
 
+def _evaluator_prompt(context: dict[str, Any]) -> str:
+    """Build the bounded semantic-evaluation instruction around validated context."""
+
+    return (
+        "Evaluate this independently assembled record. The evaluator judges semantic "
+        "claim quality only. Application code owns evidence identity, evidence integrity, "
+        "source coverage, citation closure, policy, authorization, and execution. ACCEPT "
+        "means every synthesis claim ID appears exactly once in validated_claim_ids and "
+        "failed_invariants is empty. REJECT means do not validate unsupported claims and "
+        "identify the semantic failures. MORE_EVIDENCE is allowed only when the supplied "
+        "synthesis conclusion is NEEDS_EVIDENCE; do not use it for a SUPPORTED or REJECTED "
+        "synthesis. Never invent claim IDs or evidence IDs; never recommend, authorize, "
+        "or execute. Emit only the AgentEvaluationResult contract."
+        "\n\nVALIDATED EVALUATION CONTEXT:\n"
+        + json.dumps(context, sort_keys=True)
+    )
+
+
 def _structured_retry_count(result: Any) -> int:
     metrics = getattr(result, "metrics", None)
     tool_metrics = getattr(metrics, "tool_metrics", {}) if metrics is not None else {}
@@ -125,8 +143,7 @@ async def run_evaluator(
     try:
         result = await asyncio.wait_for(
             agent.invoke_async(
-                "Evaluate this independently assembled record:\n"
-                + json.dumps(context, sort_keys=True),
+                _evaluator_prompt(context),
                 structured_output_model=AgentEvaluationResult,
                 structured_output_prompt="Return the complete evaluator result now.",
                 limits=Limits(turns=5, output_tokens=1_500, total_tokens=8_000),

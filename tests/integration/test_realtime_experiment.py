@@ -6,6 +6,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event, Thread
+from time import monotonic
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -15,6 +16,7 @@ import pytest
 from scripts.decision_workspace_server import DecisionWorkspaceServer
 from the_missing_20.adapters.local_knowledge import LocalKnowledgeRepository
 from the_missing_20.adapters.strands_models import ScriptedStrandsFactory
+from the_missing_20.adapters.synthetic_enterprise import SyntheticEnterprise
 from the_missing_20.agents.events import (
     AgentEventSink,
     AgentOperationEvent,
@@ -34,6 +36,7 @@ from the_missing_20.domain.enterprise import EvidenceReadStatus
 from the_missing_20.experiment.events import PublicEventType, PublicIncidentEvent
 from the_missing_20.experiment.ledger import EventLedgerError, PublicEventLedger
 from the_missing_20.experiment.session import ExperimentSession
+from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -97,6 +100,562 @@ def test_experiment_starts_with_exact_stable_unit_split(tmp_path: Path) -> None:
     assert {item["status"] for item in units[80:]} == {"QUEUE_FAILED"}
     assert {item["source_message_id"] for item in units[80:]} == {"RECEIPT-MESSAGE-020"}
     assert all(item["source_message_id"] is None for item in units[:80])
+
+
+def test_normal_flow_telemetry_is_ordered_and_snapshot_derived(tmp_path: Path) -> None:
+    """Normal Operations receives durable observations without changing business state."""
+
+    session = ExperimentSession(
+        ROOT,
+        data_directory=tmp_path / "normal",
+        incident_id="missing-20-normal",
+        fixture_path=ROOT / "fixtures/scenarios/healthy-flow.json",
+        telemetry_enabled=True,
+    )
+    session.stop_telemetry()
+    initial = session.snapshot()
+    assert initial["operational_state"] == "NORMAL"
+    assert initial["health"] == "HEALTHY"
+    assert initial["incident"]["status"] == "NORMAL"
+    assert initial["incident"]["health"] == "HEALTHY"
+    assert not any(
+        event.event_type is PublicEventType.INCIDENT_DETECTED
+        for event in session.events_since()
+    )
+    first = initial["telemetry"]["latest"]
+    assert first is not None
+    assert first["source_stage"] == "WAREHOUSE_TO_ERP"
+    assert first["throughput_window"] == 60
+    assert first["queue_depth"] == 0
+    assert first["unit_counts"] == initial["unit_counts"]
+    assert first["throughput_units"] == len(first["observed_unit_ids"])
+    assert 0 < first["throughput_units"] < initial["unit_counts"]["total"]
+    known_unit_ids = {item["unit_id"] for item in initial["units"]}
+    assert set(first["observed_unit_ids"]).issubset(known_unit_ids)
+
+    event = session.publish_telemetry()
+    assert event is not None
+    after = session.snapshot()
+    latest = after["telemetry"]["latest"]
+    assert latest is not None
+    assert latest["sequence"] == event.sequence
+    assert latest["observed_at"] == event.occurred_at.isoformat()
+    assert latest["observation_id"].endswith("telemetry:000002")
+    assert latest["unit_counts"] == after["unit_counts"]
+    assert latest["throughput_units"] == len(latest["observed_unit_ids"])
+    assert event.sequence == initial["projection_sequence"] + 1
+    assert latest["observed_at"] > first["observed_at"]
+
+
+def test_registry_normal_stream_advances_without_client_timer(tmp_path: Path) -> None:
+    """The normal scenario producer advances the same cursor consumed by SSE."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    registry = ExperimentRegistry(ROOT, data_directory=tmp_path / "registry")
+    session = registry.get("missing-20-normal")
+    try:
+        baseline = session.snapshot()
+        # The demo producer intentionally uses a human-readable cadence; allow
+        # one complete interval plus scheduler jitter instead of racing it.
+        events = session.wait_for_events(baseline["projection_sequence"], timeout=5.5)
+        telemetry = tuple(
+            event for event in events if event.event_type is PublicEventType.TELEMETRY_OBSERVED
+        )
+        assert telemetry
+        current = session.snapshot()
+        assert current["projection_sequence"] > baseline["projection_sequence"]
+        assert current["telemetry"]["latest"]["sequence"] == current["projection_sequence"]
+        assert (
+            current["telemetry"]["latest"]["observed_at"]
+            > baseline["telemetry"]["latest"]["observed_at"]
+        )
+        assert current["unit_counts"] == {"total": 100, "erp_recorded": 100, "queue_failed": 0}
+    finally:
+        session.stop_telemetry()
+
+
+def test_persisted_normal_telemetry_index_continues_after_restart(tmp_path: Path) -> None:
+    """A reopened ledger continues observation IDs without rescanning on every tick."""
+
+    data_directory = tmp_path / "normal-restart"
+    first = ExperimentSession(
+        ROOT,
+        data_directory=data_directory,
+        incident_id="missing-20-normal",
+        fixture_path=ROOT / "fixtures/scenarios/healthy-flow.json",
+        telemetry_enabled=True,
+    )
+    first.stop_telemetry()
+    first_event = first.publish_telemetry()
+    assert first_event is not None
+    assert first_event.payload["observation_index"] == 2
+
+    second = ExperimentSession(
+        ROOT,
+        data_directory=data_directory,
+        incident_id="missing-20-normal",
+        fixture_path=ROOT / "fixtures/scenarios/healthy-flow.json",
+        telemetry_enabled=True,
+    )
+    try:
+        latest = second.snapshot()["telemetry"]["latest"]
+        assert latest is not None
+        assert latest["observation_index"] == 3
+        assert latest["observation_id"].endswith("telemetry:000003")
+        resumed_event = second.publish_telemetry()
+        assert resumed_event is not None
+        assert resumed_event.payload["observation_index"] == 4
+    finally:
+        second.stop_telemetry()
+
+
+def test_registry_close_stops_normal_telemetry_producer(tmp_path: Path) -> None:
+    """Registry shutdown joins the producer instead of relying on daemon exit."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    registry = ExperimentRegistry(ROOT, data_directory=tmp_path / "registry-close")
+    session = registry.get("missing-20-normal")
+    producer = session._telemetry_thread
+    assert producer is not None
+    assert producer.is_alive()
+
+    registry.close()
+
+    assert session._telemetry_thread is None
+    assert not producer.is_alive()
+
+
+def test_scenario_lab_source_event_precedes_authoritative_detection(tmp_path: Path) -> None:
+    """The Scenario Lab changes the source before the detector creates a case."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    registry = ExperimentRegistry(ROOT, data_directory=tmp_path / "scenario-lab")
+    try:
+        session = registry.fresh_injected_incident()
+        events = session.events_since()
+        assert [event.event_type for event in events[:2]] == [
+            PublicEventType.SOURCE_CONDITION_INJECTED,
+            PublicEventType.INCIDENT_DETECTED,
+        ]
+        source = events[0]
+        detected = events[1]
+        assert source.payload["condition"] == "retryable_document_lock"
+        assert source.payload["observed_unit_ids"]
+        assert detected.payload["failed_unit_ids"] == source.payload["observed_unit_ids"]
+    finally:
+        registry.close()
+
+
+def test_scenario_lab_starts_healthy_and_commits_exact_source_transition(
+    tmp_path: Path,
+) -> None:
+    """The source transaction is the only path from healthy flow to detection."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    registry = ExperimentRegistry(ROOT, data_directory=tmp_path / "source-transition")
+    try:
+        session = registry.fresh_incident(defer_detection=True)
+        before = session.snapshot()
+        assert before["unit_counts"] == {"total": 100, "erp_recorded": 100, "queue_failed": 0}
+        assert before["incident"]["status"] == "NORMAL"
+        assert before["execution"]["effects"] == []
+        assert before["events"] == []
+        assert before["telemetry"]["status"] == "WAITING"
+
+        source_event = session.inject_source_condition()
+        after = session.snapshot()
+        events = session.events_since()
+        assert [item.event_type for item in events[:2]] == [
+            PublicEventType.SOURCE_CONDITION_INJECTED,
+            PublicEventType.INCIDENT_DETECTED,
+        ]
+        assert after["unit_counts"] == {"total": 100, "erp_recorded": 80, "queue_failed": 20}
+        assert source_event.payload["transaction_status"] == "COMMITTED"
+        assert source_event.payload["pre_state"]["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 100,
+            "queue_failed": 0,
+        }
+        assert source_event.payload["post_state"]["unit_counts"] == after["unit_counts"]
+        assert source_event.payload["post_state"]["failed_message"]["status"] == "FAILED"
+        assert source_event.payload["post_state"]["erp_receipt"]["quantity"] == 80
+        assert source_event.payload["post_state"]["invoice"]["state"] == "HELD"
+        assert source_event.payload["post_state"]["failed_unit_ids"] == (
+            events[1].payload["failed_unit_ids"]
+        )
+    finally:
+        registry.close()
+
+
+def test_incident_telemetry_captures_healthy_to_fault_transition(tmp_path: Path) -> None:
+    """Telemetry proves the source change without using a client-side tick."""
+
+    session = ExperimentSession(
+        ROOT,
+        data_directory=tmp_path / "incident-telemetry",
+        incident_id="missing-20-telemetry-incident",
+        fixture_path=ROOT / "fixtures/scenarios/healthy-flow.json",
+        telemetry_enabled=True,
+        defer_detection=True,
+    )
+    session.stop_telemetry()
+    try:
+        baseline = session.snapshot()
+        baseline_point = baseline["telemetry"]["latest"]
+        assert baseline_point is not None
+        assert baseline_point["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 100,
+            "queue_failed": 0,
+        }
+
+        source_event = session.inject_source_condition()
+        after = session.snapshot()
+        telemetry_points = after["telemetry"]["history"]
+        assert len(telemetry_points) >= 2
+        assert telemetry_points[0]["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 100,
+            "queue_failed": 0,
+        }
+        assert telemetry_points[-1]["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 80,
+            "queue_failed": 20,
+        }
+
+        events = session.events_since()
+        detected_event = next(
+            event for event in events if event.event_type is PublicEventType.INCIDENT_DETECTED
+        )
+        fault_point = telemetry_points[-1]
+        assert baseline_point["sequence"] < source_event.sequence < detected_event.sequence
+        assert detected_event.sequence < fault_point["sequence"]
+    finally:
+        session.stop_telemetry()
+
+
+def test_source_transition_outbox_recovers_after_ledger_append_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A source commit is recoverable when public publication fails afterward."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    registry = ExperimentRegistry(ROOT, data_directory=tmp_path / "source-outbox")
+    try:
+        session = registry.fresh_incident(defer_detection=True)
+        original_append = session.ledger.append
+
+        def fail_source_publication(*args: Any, **kwargs: Any) -> Any:
+            event_type = kwargs.get("event_type")
+            if event_type is None and args:
+                # PublicEventLedger.append is keyword-only today; retain this
+                # guard so the fault remains scoped if its adapter signature is
+                # relaxed later.
+                event_type = args[0]
+            if event_type is PublicEventType.SOURCE_CONDITION_INJECTED:
+                raise RuntimeError("public ledger unavailable")
+            return original_append(*args, **kwargs)
+
+        monkeypatch.setattr(session.ledger, "append", fail_source_publication)
+        with pytest.raises(RuntimeError, match="public ledger unavailable"):
+            session.inject_source_condition()
+
+        # The enterprise mutation and its complete envelope commit together,
+        # while no public event is visible yet.
+        assert session.events_since() == ()
+        assert session.enterprise.read_snapshot().erp_receipt.quantity == 80
+        outbox = session.enterprise.read_source_condition_outbox()
+        assert outbox is not None
+        assert outbox.pre_state.erp_receipt.quantity == 100
+        assert outbox.post_state.erp_receipt.quantity == 80
+
+        monkeypatch.undo()
+        recovered_source = session.inject_source_condition()
+        events = session.events_since()
+        assert [event.sequence for event in events[:2]] == [1, 2]
+        assert [event.event_type for event in events[:2]] == [
+            PublicEventType.SOURCE_CONDITION_INJECTED,
+            PublicEventType.INCIDENT_DETECTED,
+        ]
+        assert recovered_source.payload["post_state"] == session.events_since()[0].payload[
+            "post_state"
+        ]
+        assert session.inject_source_condition() == recovered_source
+        assert len(
+            [
+                event
+                for event in session.events_since()
+                if event.event_type is PublicEventType.SOURCE_CONDITION_INJECTED
+            ]
+        ) == 1
+
+        # A new registry instance recovers the same durable envelope rather than
+        # allocating a second mutation or publishing a different source state.
+        reopened = ExperimentRegistry(ROOT, data_directory=tmp_path / "source-outbox")
+        try:
+            resumed = reopened.get(session.incident_id)
+            resumed_events = resumed.events_since()
+            assert [event.sequence for event in resumed_events[:2]] == [1, 2]
+            assert resumed_events[0].payload == recovered_source.payload
+            assert resumed.enterprise.read_snapshot().erp_receipt.quantity == 80
+        finally:
+            reopened.close()
+    finally:
+        registry.close()
+
+
+def test_source_event_reopen_completes_detection_in_timestamp_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A crash after source publication cannot timestamp detection before it."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    registry = ExperimentRegistry(ROOT, data_directory=tmp_path / "source-reopen-order")
+    try:
+        session = registry.fresh_incident(defer_detection=True)
+        # Simulate the narrow crash window after the durable source event but
+        # before the detector can publish its fresh read.
+        monkeypatch.setattr(session, "_ensure_detection", lambda **_: None)
+        source_event = session.inject_source_condition()
+        assert session.events_since() == (source_event,)
+    finally:
+        registry.close()
+
+    reopened = ExperimentRegistry(ROOT, data_directory=tmp_path / "source-reopen-order")
+    try:
+        events = reopened.get(session.incident_id).events_since()
+        lifecycle_events = tuple(
+            event for event in events if event.event_type is not PublicEventType.TELEMETRY_OBSERVED
+        )
+        assert [event.event_type for event in lifecycle_events[:2]] == [
+            PublicEventType.SOURCE_CONDITION_INJECTED,
+            PublicEventType.INCIDENT_DETECTED,
+        ]
+        assert lifecycle_events[1].occurred_at > lifecycle_events[0].occurred_at
+        assert lifecycle_events[2].event_type is PublicEventType.INVESTIGATION_STARTED
+        assert lifecycle_events[2].occurred_at > lifecycle_events[1].occurred_at
+    finally:
+        reopened.close()
+
+
+def test_detection_handoff_is_exactly_once_across_duplicate_and_reopen(
+    tmp_path: Path,
+) -> None:
+    """A repeated source command or persisted reopen cannot launch a second run."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    data_directory = tmp_path / "auto-handoff"
+    registry = ExperimentRegistry(ROOT, data_directory=data_directory)
+    try:
+        session = registry.select_incident()
+        incident_id = session.incident_id
+        first_source = session.inject_source_condition()
+        assert first_source.event_type is PublicEventType.SOURCE_CONDITION_INJECTED
+        assert session.inject_source_condition() == first_source
+        deadline = monotonic() + 10
+        while monotonic() < deadline and not any(
+            event.event_type is PublicEventType.EVALUATION_COMPLETED
+            for event in session.events_since()
+        ):
+            session.wait_for_events(session.ledger.latest_sequence(incident_id), timeout=0.25)
+        first_events = session.events_since()
+        assert sum(
+            event.event_type is PublicEventType.INVESTIGATION_STARTED
+            for event in first_events
+        ) == 1
+    finally:
+        registry.close()
+
+    reopened_registry = ExperimentRegistry(ROOT, data_directory=data_directory)
+    try:
+        reopened = reopened_registry.get(incident_id)
+        reopened_events = reopened.events_since()
+        assert sum(
+            event.event_type is PublicEventType.INVESTIGATION_STARTED
+            for event in reopened_events
+        ) == 1
+        assert sum(
+            event.event_type is PublicEventType.SOURCE_CONDITION_INJECTED
+            for event in reopened_events
+        ) == 1
+        assert any(
+            event.event_type is PublicEventType.EVALUATION_COMPLETED
+            for event in reopened_events
+        )
+    finally:
+        reopened_registry.close()
+
+
+def test_detection_event_recovers_after_case_store_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A crash after atomic detection state cannot strand the public event stream."""
+
+    from the_missing_20.experiment.session import ExperimentRegistry
+
+    data_directory = tmp_path / "detection-publication-recovery"
+    registry = ExperimentRegistry(ROOT, data_directory=data_directory)
+    session = registry.fresh_incident(defer_detection=True)
+    incident_id = session.incident_id
+    original_append = session.ledger.append
+    failed = False
+
+    def fail_detection_append(**kwargs: object) -> object:
+        nonlocal failed
+        if kwargs.get("event_type") is PublicEventType.INCIDENT_DETECTED and not failed:
+            failed = True
+            raise EventLedgerError("simulated detection publication failure")
+        return original_append(**kwargs)
+
+    monkeypatch.setattr(session.ledger, "append", fail_detection_append)
+    with pytest.raises(EventLedgerError, match="simulated detection publication failure"):
+        session.inject_source_condition()
+
+    assert [item.event_type for item in session.events_since()] == [
+        PublicEventType.SOURCE_CONDITION_INJECTED
+    ]
+    assert session.store.get_case(session.case_id).case_version == 1
+    assert session.store.list_evidence(session.case_id)
+    registry.close()
+
+    reopened = ExperimentRegistry(ROOT, data_directory=data_directory)
+    try:
+        recovered = reopened.get(incident_id)
+        events = recovered.events_since()
+        assert [item.event_type for item in events[:2]] == [
+            PublicEventType.SOURCE_CONDITION_INJECTED,
+            PublicEventType.INCIDENT_DETECTED,
+        ]
+        assert recovered.store.get_case(recovered.case_id).case_version == 1
+        assert recovered.snapshot()["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 80,
+            "queue_failed": 20,
+        }
+    finally:
+        reopened.close()
+
+
+def test_source_transition_fails_closed_on_stale_or_unexpected_preconditions(
+    tmp_path: Path,
+) -> None:
+    """A second or differently targeted injection cannot partially mutate source state."""
+
+    enterprise = SyntheticEnterprise.seed_from_fixture(
+        tmp_path / "enterprise.sqlite",
+        ROOT / "fixtures/scenarios/healthy-flow.json",
+    )
+    first = enterprise.inject_retryable_document_lock()
+    assert first.pre_state.erp_receipt.quantity == 100
+    assert first.post_state.erp_receipt.quantity == 80
+    with pytest.raises(EnterprisePreconditionFailed):
+        enterprise.inject_retryable_document_lock()
+    with pytest.raises(EnterprisePreconditionFailed):
+        enterprise.inject_retryable_document_lock(quantity=19)
+    current = enterprise.read_snapshot()
+    assert current.erp_receipt.quantity == 80
+    assert current.failed_message.status.value == "FAILED"
+    assert sum(item.status.value == "QUEUE_FAILED" for item in current.supply_units) == 20
+
+
+def test_normal_telemetry_uses_unique_flow_record_ids(tmp_path: Path) -> None:
+    """Observed records are distinct event records, not recycled inventory IDs."""
+
+    session = ExperimentSession(
+        ROOT,
+        data_directory=tmp_path / "normal-unique-records",
+        incident_id="missing-20-normal",
+        fixture_path=ROOT / "fixtures/scenarios/healthy-flow.json",
+        telemetry_enabled=True,
+    )
+    try:
+        session.stop_telemetry()
+        first = session.snapshot()["telemetry"]["latest"]
+        second_event = session.publish_telemetry()
+        assert first is not None
+        assert second_event is not None
+        second = second_event.payload
+        assert first["batch_id"] != second["batch_id"]
+        assert set(first["batch_record_ids"]).isdisjoint(second["batch_record_ids"])
+        assert first["observed_record_count"] == len(first["batch_record_ids"])
+        assert second["observed_record_count"] == len(second["batch_record_ids"])
+        assert first["observed_unit_ids"] != second["batch_record_ids"]
+    finally:
+        session.stop_telemetry()
+
+
+def test_telemetry_occurred_at_uses_capture_clock_not_event_tick(tmp_path: Path) -> None:
+    """Telemetry timestamps represent capture cadence while ledger order stays intact."""
+
+    from datetime import UTC, datetime, timedelta
+
+    capture_times = iter(
+        (
+            datetime(2026, 8, 28, 12, 0, 10, tzinfo=UTC),
+            datetime(2026, 8, 28, 12, 0, 16, tzinfo=UTC),
+        )
+    )
+    session = ExperimentSession(
+        ROOT,
+        data_directory=tmp_path / "telemetry-capture-clock",
+        incident_id="missing-20-normal",
+        fixture_path=ROOT / "fixtures/scenarios/healthy-flow.json",
+        telemetry_enabled=True,
+        telemetry_clock=lambda: next(capture_times),
+    )
+    try:
+        session.stop_telemetry()
+        first = session.snapshot()["telemetry"]["latest"]
+        second_event = session.publish_telemetry()
+        assert first is not None
+        assert second_event is not None
+        assert first["observed_at"] == "2026-08-28T12:00:10+00:00"
+        assert second_event.occurred_at.isoformat() == "2026-08-28T12:00:16+00:00"
+        assert (
+            second_event.occurred_at
+            - datetime.fromisoformat(first["observed_at"])
+            == timedelta(seconds=6)
+        )
+        assert second_event.sequence == first["sequence"] + 1
+        assert first["observation_id"] != second_event.payload["observation_id"]
+    finally:
+        session.stop_telemetry()
+
+
+def test_ledger_tail_ends_at_latest_sequence_beyond_replay_limit(tmp_path: Path) -> None:
+    """Tail restoration must not return the stale first ten thousand events."""
+
+    from datetime import UTC, datetime, timedelta
+
+    ledger = PublicEventLedger(tmp_path / "tail.sqlite")
+    base = datetime(2026, 8, 28, tzinfo=UTC)
+    for sequence in range(1, 10_006):
+        ledger.append(
+            incident_id="tail-test",
+            trace_id="trace:tail-test",
+            case_version=0,
+            event_type=PublicEventType.TELEMETRY_OBSERVED,
+            actor="synthetic-enterprise-source",
+            status="OBSERVED",
+            correlation_id="trace:tail-test",
+            idempotency_key=f"tail:{sequence}",
+            occurred_at=base + timedelta(seconds=sequence),
+            payload={"observation_index": sequence},
+        )
+    tail = ledger.tail_events("tail-test", limit=2)
+    assert [event.sequence for event in tail] == [10_004, 10_005]
+    assert [event.payload["observation_index"] for event in tail] == [10_004, 10_005]
 
 
 def test_session_publishes_ordered_real_harness_events(tmp_path: Path) -> None:
@@ -408,6 +967,144 @@ def test_each_chat_turn_records_a_distinct_read_harness_trace(tmp_path: Path) ->
         )
         == second_tools
     )
+
+
+def test_case_console_answers_current_case_and_exposes_typed_next_actions(
+    tmp_path: Path,
+) -> None:
+    """Every Case Console choice is grounded and leaves an auditable boundary."""
+
+    session = _session(tmp_path)
+    initial_actions = {item["id"]: item for item in session._case_console_actions()}
+    assert set(initial_actions) == {
+        "continue_investigation",
+        "compare_causes",
+        "show_evidence",
+        "explain_decision",
+        "prepare_recovery",
+    }
+    assert initial_actions["continue_investigation"]["enabled"] is True
+    assert initial_actions["prepare_recovery"]["enabled"] is False
+
+    status = session.chat_command(
+        "What is happening now?",
+        idempotency_key="case-console:status",
+    )
+    assert "100 expected" in status["message"]
+    assert "80 recorded in ERP" in status["message"]
+    assert "20 stopped at the queue" in status["message"]
+    assert "Case v1" in status["message"]
+    assert status["read_only"] is True
+    assert {item["id"] for item in status["next_actions"]} == set(initial_actions)
+    assert {item["id"]: item for item in status["next_actions"]}["continue_investigation"][
+        "enabled"
+    ] is False
+    assert {item["id"]: item for item in status["next_actions"]}["prepare_recovery"][
+        "enabled"
+    ] is True
+    chat_event = next(
+        item
+        for item in reversed(session.events_since())
+        if item.event_type is PublicEventType.CHAT_MESSAGE
+    )
+    assert chat_event.payload["next_actions"] == status["next_actions"]
+
+    next_step = session.chat_command(
+        "What should we do next?",
+        idempotency_key="case-console:next-step",
+    )
+    assert "Case v1" in next_step["message"]
+    assert "prepare" in next_step["message"]
+    compare = session.chat_command(
+        "Compare causes for this case.",
+        idempotency_key="case-console:compare",
+    )
+    assert compare["intent"] == "compare_hypotheses"
+    assert compare["citations"]
+    evidence = session.chat_command(
+        "Show the evidence supporting the case.",
+        idempotency_key="case-console:evidence",
+    )
+    assert evidence["intent"] == "retrieve_evidence"
+    assert evidence["citations"]
+    explanation = session.chat_command(
+        "Explain the evaluator decision.",
+        idempotency_key="case-console:evaluator",
+    )
+    assert explanation["intent"] == "explain_evaluator_decision"
+    assert "evaluator returned" in explanation["message"]
+
+    prepared = session.decision_command(
+        {
+            "command": "prepare_recovery",
+            "tool": "restart_receipt_message",
+            "idempotency_key": "case-console:prepare",
+        }
+    )
+    assert prepared["approval"]["status"] == "OPEN"
+    event_types = {item.event_type for item in session.events_since()}
+    assert PublicEventType.RECOVERY_PREPARED in event_types
+    assert PublicEventType.APPROVAL_REQUESTED in event_types
+    assert PublicEventType.APPROVAL_RECORDED not in event_types
+    assert PublicEventType.EXECUTION_STARTED not in event_types
+
+
+def test_case_console_cannot_revive_a_durably_degraded_advisory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider failure stays terminal for chat but not deterministic preparation."""
+
+    session = _session(tmp_path)
+    session._append(
+        PublicEventType.PROVIDER_DEGRADED,
+        actor="orchestrator",
+        status="DEGRADED",
+        case_version=session._current_case_version(),
+        correlation_id=session.trace_id,
+        idempotency_key="test:provider-degraded",
+        payload={"provider": "scripted", "error_code": "SIMULATED_FAILURE"},
+    )
+    session._append(
+        PublicEventType.WORKFLOW_BLOCKED,
+        actor="deterministic-workflow",
+        status="BLOCKED",
+        case_version=session._current_case_version(),
+        correlation_id=session.case_id,
+        idempotency_key="test:workflow-blocked",
+        payload={"reason": "ADVISORY_UNAVAILABLE", "operational_effect": "NONE"},
+    )
+
+    def unexpected_harness(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("terminally degraded case must not rerun the harness")
+
+    monkeypatch.setattr(session, "_run_read_only_harness", unexpected_harness)
+    with pytest.raises(QuorumDenied, match="durably degraded"):
+        session.chat_command(
+            "What is happening now?",
+            idempotency_key="degraded:chat",
+        )
+    prepared = session.decision_command(
+        {
+            "command": "prepare_recovery",
+            "tool": "restart_receipt_message",
+            "idempotency_key": "degraded:prepare",
+        }
+    )
+    assert prepared["approval"]["status"] == "OPEN"
+
+    actions = {item["id"]: item for item in session._case_console_actions()}
+    assert actions["prepare_recovery"]["enabled"] is False
+    assert all(
+        item["enabled"] is False
+        for key, item in actions.items()
+        if key != "prepare_recovery"
+    )
+    event_types = [item.event_type for item in session.events_since()]
+    assert PublicEventType.EVALUATION_COMPLETED not in event_types
+    assert PublicEventType.RECOVERY_PREPARED in event_types
+    assert PublicEventType.APPROVAL_REQUESTED in event_types
+    assert PublicEventType.EXECUTION_STARTED not in event_types
 
 
 def test_replay_projection_is_not_claimed_before_execution(tmp_path: Path) -> None:
@@ -894,6 +1591,435 @@ def test_local_api_binds_snapshot_chat_decisions_and_sse(tmp_path: Path) -> None
         after_replay = json.loads(request(f"/api/v1/incidents/{incident_id}")[1])
         assert after_replay["projection_sequence"] == before_replay["projection_sequence"]
         assert len(after_replay["events"]) == len(before_replay["events"])
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_live_scenario_and_metrics_routes_use_authoritative_session_state(
+    tmp_path: Path,
+) -> None:
+    """Scenario controls and the observability scrape share the session projection."""
+
+    try:
+        server = DecisionWorkspaceServer(
+            ("127.0.0.1", 0), ROOT, runtime_directory=tmp_path / "runtime"
+        )
+    except PermissionError:
+        pytest.skip("the managed test sandbox disallows loopback sockets")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+
+    def request(
+        path: str,
+        *,
+        method: str = "GET",
+        payload: object | None = None,
+    ) -> tuple[int, bytes]:
+        body = None if payload is None else json.dumps(payload).encode()
+        headers = {"Content-Type": "application/json"} if body is not None else {}
+        request_value = Request(base + path, method=method, data=body, headers=headers)
+        try:
+            with urlopen(request_value, timeout=5) as response:
+                return response.status, response.read()
+        except HTTPError as exc:
+            return exc.code, exc.read()
+
+    try:
+        status, raw = request("/api/v1/scenarios")
+        assert status == 200
+        scenarios = json.loads(raw)
+        assert [item["id"] for item in scenarios["scenarios"]] == [
+            "normal",
+            "incident",
+            "recovery",
+        ]
+        assert scenarios["scenarios"][0]["status"] == "READY"
+        assert scenarios["scenarios"][2]["status"] == "LOCKED"
+        catalog_incident_id = scenarios["scenarios"][1]["incident_id"]
+        assert catalog_incident_id != "missing-20-001"
+
+        status, raw = request(
+            "/api/v1/scenarios", method="POST", payload={"scenario": "normal"}
+        )
+        assert status == 200
+        normal = json.loads(raw)
+        assert normal["scenario"] == "normal"
+        assert normal["incident_id"] == "missing-20-normal"
+        assert normal["unit_counts"] == {"total": 100, "erp_recorded": 100, "queue_failed": 0}
+        flow_nodes = {item["id"]: item for item in normal["flow"]["nodes"]}
+        assert flow_nodes["warehouse"]["count"] == 100
+        assert flow_nodes["message-queue"]["count"] == 0
+        assert flow_nodes["erp"]["count"] == 100
+        assert flow_nodes["invoice"]["status"] == "RELEASED"
+        assert normal["flow"]["summary"] == {
+            "expected": 100,
+            "recorded": 100,
+            "queue_exception": 0,
+            "invoice": 100,
+            "healthy_nodes": 4,
+        }
+        assert normal["topology"]["nodes"][-1] == {
+            "id": "invoice",
+            "label": "Invoice",
+            "health": "RELEASED",
+        }
+        assert normal["command"] == "scenario_selected"
+
+        status, raw = request(
+            "/api/v1/scenarios",
+            method="POST",
+            payload={"scenario": "incident", "incident_id": catalog_incident_id},
+        )
+        assert status == 200
+        incident = json.loads(raw)
+        assert incident["incident_id"] == catalog_incident_id
+        assert incident["projection_sequence"] >= 4
+        event_types = [event["event_type"] for event in incident["events"]]
+        source_index = event_types.index("source.condition.injected")
+        detected_index = event_types.index("incident.detected")
+        assert source_index < detected_index
+        telemetry = [
+            event for event in incident["events"] if event["event_type"] == "telemetry.observed"
+        ]
+        assert len(telemetry) >= 2
+        assert telemetry[0]["payload"]["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 100,
+            "queue_failed": 0,
+        }
+        assert telemetry[-1]["payload"]["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 80,
+            "queue_failed": 20,
+        }
+
+        # Detection is the handoff boundary: no browser /start command is
+        # issued, yet the same durable session advances through the local
+        # multi-agent harness and its scripted evaluation.
+        incident_session = server.registry.get(catalog_incident_id)
+        deadline = monotonic() + 10
+        while monotonic() < deadline and not any(
+            event.event_type is PublicEventType.EVALUATION_COMPLETED
+            for event in incident_session.events_since()
+        ):
+            incident_session.wait_for_events(
+                incident_session.ledger.latest_sequence(catalog_incident_id),
+                timeout=0.25,
+            )
+        incident_events = incident_session.events_since()
+        incident_types = [event.event_type for event in incident_events]
+        source_index = incident_types.index(PublicEventType.SOURCE_CONDITION_INJECTED)
+        detected_index = incident_types.index(PublicEventType.INCIDENT_DETECTED)
+        started_index = incident_types.index(PublicEventType.INVESTIGATION_STARTED)
+        assert source_index < detected_index < started_index
+        assert sum(
+            event.event_type is PublicEventType.INVESTIGATION_STARTED
+            for event in incident_events
+        ) == 1
+        assert any(
+            event.event_type is PublicEventType.AGENT_STARTED for event in incident_events
+        )
+        assert any(
+            event.event_type is PublicEventType.EVALUATION_COMPLETED for event in incident_events
+        )
+        assert incident_session.snapshot()["execution"]["effects"] == []
+
+        status, raw = request(
+            "/api/v1/scenarios",
+            method="POST",
+            payload={"scenario": "incident", "incident_id": catalog_incident_id},
+        )
+        assert status == 409
+        assert json.loads(raw)["error"]["code"] == "scenario_transition_required"
+
+        status, raw = request("/api/v1/scenarios")
+        assert status == 200
+        active_catalog = json.loads(raw)
+        active_incident = next(
+            item for item in active_catalog["scenarios"] if item["id"] == "incident"
+        )
+        assert active_incident["incident_id"] == catalog_incident_id
+
+        status, raw = request("/api/v1/incidents/missing-20-normal/metrics")
+        assert status == 200
+        metrics = json.loads(raw)
+        assert metrics["source"] == "authoritative_snapshot_and_public_ledger"
+        assert metrics["expected_units"] == metrics["recorded_units"] == 100
+        assert metrics["queue_units"] == 0
+        assert metrics["projection_sequence"] == metrics["sse"]["latest_sequence"]
+
+        status, raw = request("/metrics")
+        assert status == 200
+        prometheus = raw.decode()
+        assert 'missing20_expected_units{incident_id="missing-20-normal"} 100' in prometheus
+        assert 'missing20_queue_units{incident_id="missing-20-normal"} 0' in prometheus
+
+        status, raw = request(
+            "/api/v1/scenarios", method="POST", payload={"scenario": "unsupported"}
+        )
+        assert status == 400
+        assert json.loads(raw)["error"]["code"] == "invalid_scenario"
+
+        status, raw = request(
+            "/api/v1/scenarios", method="POST", payload={"scenario": "recovery"}
+        )
+        assert status == 409
+        assert json.loads(raw)["error"]["code"] == "scenario_not_ready"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_unknown_incident_lookup_is_fail_closed_and_does_not_seed_a_session(
+    tmp_path: Path,
+) -> None:
+    """A bad deep link is a lookup failure, never an implicit Scenario Lab write."""
+
+    try:
+        server = DecisionWorkspaceServer(
+            ("127.0.0.1", 0), ROOT, runtime_directory=tmp_path / "runtime"
+        )
+    except PermissionError:
+        pytest.skip("the managed test sandbox disallows loopback sockets")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with pytest.raises(HTTPError) as error_info, urlopen(
+            Request(f"{base}/api/v1/incidents/does-not-exist"), timeout=5
+        ) as response:
+            response.read()
+        assert error_info.value.code == 404
+        payload = json.loads(error_info.value.read())
+        assert payload["error"]["code"] == "incident_not_found"
+        assert "does-not-exist" in payload["error"]["detail"]
+        assert "does-not-exist" not in server.registry._sessions
+        assert not (tmp_path / "runtime" / "does-not-exist").exists()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_copilot_answers_retryable_queue_evidence_with_exact_citation(tmp_path: Path) -> None:
+    """The supported retryability question names the authoritative queue record."""
+
+    session = _session(tmp_path)
+    response = session.chat_command(
+        "Which evidence proves the queue message is retryable?",
+        idempotency_key="chat:retryable-evidence:1",
+    )
+
+    assert response["intent"] == "retrieve_evidence"
+    assert len(response["citations"]) == 1
+    citation = str(response["citations"][0])
+    assert citation.endswith(":failed-message")
+    assert citation in response["message"]
+    assert "error_code=DOCUMENT_LOCKED_RETRYABLE" in response["message"]
+    assert "retry_eligible=True" in response["message"]
+    assert "lock_cleared=True" in response["message"]
+
+
+def test_scenario_reentry_after_recovery_uses_a_fresh_authoritative_incident(
+    tmp_path: Path,
+) -> None:
+    """Recovery stays inspectable while a later Incident starts a new ledger."""
+
+    try:
+        server = DecisionWorkspaceServer(
+            ("127.0.0.1", 0), ROOT, runtime_directory=tmp_path / "runtime"
+        )
+    except PermissionError:
+        pytest.skip("the managed test sandbox disallows loopback sockets")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+
+    def request(
+        path: str,
+        *,
+        method: str = "GET",
+        payload: object | None = None,
+    ) -> tuple[int, bytes]:
+        body = None if payload is None else json.dumps(payload).encode()
+        headers = {"Content-Type": "application/json"} if body is not None else {}
+        request_value = Request(base + path, method=method, data=body, headers=headers)
+        try:
+            with urlopen(request_value, timeout=10) as response:
+                return response.status, response.read()
+        except HTTPError as exc:
+            return exc.code, exc.read()
+
+    def post(path: str, payload: object) -> dict[str, Any]:
+        status, raw = request(path, method="POST", payload=payload)
+        assert status == 200, raw
+        parsed = json.loads(raw)
+        assert isinstance(parsed, dict)
+        return parsed
+
+    try:
+        first = post("/api/v1/scenarios", {"scenario": "incident"})
+        first_id = str(first["incident_id"])
+        assert first["unit_counts"] == {"total": 100, "erp_recorded": 80, "queue_failed": 20}
+
+        first_session = server.registry.get(first_id)
+        first_session.run_investigation()
+        command_url = f"/api/v1/incidents/{first_id}/decisions"
+        prepared = post(
+            command_url,
+            {
+                "command": "prepare_recovery",
+                "tool": "restart_receipt_message",
+                "idempotency_key": "scenario-reentry:prepare",
+            },
+        )
+        intent_id = str(prepared["approval"]["intent_id"])
+        for principal in ("integration-operator", "ap-approver"):
+            post(
+                command_url,
+                {
+                    "command": "approve",
+                    "intent_id": intent_id,
+                    "principal_id": principal,
+                    "idempotency_key": f"scenario-reentry:approve:{principal}",
+                },
+            )
+        post(
+            command_url,
+            {
+                "command": "execute",
+                "intent_id": intent_id,
+                "idempotency_key": "scenario-reentry:execute",
+            },
+        )
+        invoice_prepared = post(
+            command_url,
+            {
+                "command": "prepare_recovery",
+                "tool": "release_invoice",
+                "idempotency_key": "scenario-reentry:invoice:prepare",
+            },
+        )
+        invoice_intent_id = str(invoice_prepared["approval"]["intent_id"])
+        for principal in ("integration-operator", "ap-approver"):
+            post(
+                command_url,
+                {
+                    "command": "approve",
+                    "intent_id": invoice_intent_id,
+                    "principal_id": principal,
+                    "idempotency_key": f"scenario-reentry:invoice:approve:{principal}",
+                },
+            )
+        post(
+            command_url,
+            {
+                "command": "execute",
+                "intent_id": invoice_intent_id,
+                "idempotency_key": "scenario-reentry:invoice:execute",
+            },
+        )
+        recovered = first_session.snapshot()
+        assert recovered["incident"]["status"] == "CLOSED"
+        assert recovered["execution"]["verified"] is True
+
+        recovery = post("/api/v1/scenarios", {"scenario": "recovery"})
+        assert recovery["incident_id"] == first_id
+        assert recovery["execution"]["verified"] is True
+
+        # A fresh incident is an explicit reset transition, not an implicit
+        # replacement of the active run. The old recovery remains inspectable.
+        post("/api/v1/scenarios", {"scenario": "normal"})
+        fresh = post("/api/v1/scenarios", {"scenario": "incident"})
+        fresh_id = str(fresh["incident_id"])
+        assert fresh_id != first_id
+        assert fresh["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 80,
+            "queue_failed": 20,
+        }
+        assert fresh["execution"]["verified"] is False
+        assert fresh["incident"]["status"] != "CLOSED"
+        fresh_events = [event for event in fresh["events"] if isinstance(event, dict)]
+        fresh_sequences = [
+            int(event["sequence"])
+            for event in fresh_events
+            if isinstance(event.get("sequence"), (int, float))
+        ]
+        assert isinstance(fresh["projection_sequence"], int)
+        assert fresh_sequences == list(range(1, fresh["projection_sequence"] + 1))
+        fresh_by_type = {
+            event_type: next(
+                int(event["sequence"])
+                for event in fresh_events
+                if event.get("event_type") == event_type
+            )
+            for event_type in ("source.condition.injected", "incident.detected")
+        }
+        assert fresh_by_type["source.condition.injected"] < fresh_by_type["incident.detected"]
+        fresh_telemetry = fresh["telemetry"]["history"]
+        assert len(fresh_telemetry) >= 2
+        assert fresh_telemetry[0]["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 100,
+            "queue_failed": 0,
+        }
+        assert fresh_telemetry[-1]["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 80,
+            "queue_failed": 20,
+        }
+
+        fresh_session = server.registry.get(fresh_id)
+        fresh_session.run_investigation()
+        chat = fresh_session.chat_command(
+            "Where did the missing units go?",
+            idempotency_key="scenario-reentry:chat",
+        )
+        assert chat["citations"]
+        fresh_evidence_ids = {
+            item.evidence_id for item in fresh_session.store.list_evidence(fresh_session.case_id)
+        }
+        assert set(chat["citations"]).issubset(fresh_evidence_ids)
+
+        post("/api/v1/scenarios", {"scenario": "normal"})
+        golden = post("/api/v1/scenarios", {"scenario": "golden"})
+        assert golden["incident_id"] not in {first_id, fresh_id}
+        assert golden["unit_counts"] == {
+            "total": 100,
+            "erp_recorded": 80,
+            "queue_failed": 20,
+        }
+        assert golden["execution"]["verified"] is False
+        golden_session = server.registry.get(str(golden["incident_id"]))
+        deadline = monotonic() + 10
+        golden_snapshot = golden_session.snapshot()
+        while not any(
+            event.get("event_type") == "evaluation.completed"
+            for event in golden_snapshot.get("events", [])
+            if isinstance(event, dict)
+        ) and monotonic() < deadline:
+            Event().wait(0.05)
+            golden_snapshot = golden_session.snapshot()
+        assert any(
+            event.get("event_type") == "evaluation.completed"
+            for event in golden_snapshot.get("events", [])
+            if isinstance(event, dict)
+        ), {
+            "incident_id": golden_snapshot.get("incident_id"),
+            "projection_sequence": golden_snapshot.get("projection_sequence"),
+            "events": [
+                event.get("event_type")
+                for event in golden_snapshot.get("events", [])
+                if isinstance(event, dict)
+            ],
+        }
+        assert golden_snapshot["advisory"]["status"] == "COMPLETE"
+        assert golden_snapshot["execution"]["verified"] is False
     finally:
         server.shutdown()
         server.server_close()

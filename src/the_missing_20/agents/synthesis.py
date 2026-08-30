@@ -36,6 +36,32 @@ class SynthesisRun:
     retry_count: int = 0
 
 
+def _synthesis_prompt(context: dict[str, Any]) -> str:
+    """Build the bounded synthesis instruction around validated agent records."""
+
+    return (
+        "Synthesize these validated investigator results. Preserve exactly one record "
+        "for each fixed investigator in the supplied context, but select only one "
+        "hypothesis. Never upgrade a REJECTED or NEEDS_EVIDENCE investigator to "
+        "SUPPORTED. When the synthesis conclusion is SUPPORTED, factual_claims may "
+        "include evidence-backed SUPPORTS_HYPOTHESIS and CONTEXT_ONLY claims for the "
+        "selected hypothesis, but must contain zero CONTRADICTS_HYPOTHESIS claims. "
+        "Rejected investigators' contradictory claims are application-owned dissent "
+        "and must not be copied into supported synthesis factual_claims. NEEDS_EVIDENCE "
+        "is allowed only when detector source availability contains an unavailable "
+        "authoritative source; when all sources are AVAILABLE, do not use NEEDS_EVIDENCE. "
+        "Every admitted evidence ID present in the validated investigator context or its "
+        "read_evidence_ids must be cited at least once in synthesis factual_claims. For a "
+        "selected SUPPORTED hypothesis, evidence that does not directly support it may be "
+        "represented only by a truthful CONTEXT_ONLY claim; never invent a claim or change "
+        "a relation merely to fill coverage. Claim IDs must be unique, and evidence IDs "
+        "must be copied exactly from the supplied validated context. "
+        "Remain advisory and read-only; never recommend, authorize, or execute an action."
+        "\n\nVALIDATED INVESTIGATOR CONTEXT:\n"
+        + json.dumps(context, sort_keys=True)
+    )
+
+
 def _structured_retry_count(result: Any) -> int:
     metrics = getattr(result, "metrics", None)
     tool_metrics = getattr(metrics, "tool_metrics", {}) if metrics is not None else {}
@@ -121,8 +147,7 @@ async def run_synthesis(
     try:
         result = await asyncio.wait_for(
             agent.invoke_async(
-                "Synthesize these validated investigator results:\n"
-                + json.dumps(context, sort_keys=True),
+                _synthesis_prompt(context),
                 structured_output_model=SynthesisResult,
                 structured_output_prompt="Return the complete synthesis result now.",
                 limits=Limits(

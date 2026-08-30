@@ -1,0 +1,724 @@
+{
+  "active": {
+    "agent_context": {
+      "bodyScroll": 1440,
+      "connection": "live",
+      "consoleReady": "true",
+      "documentScroll": 1440,
+      "recovered": "false",
+      "view": "agent",
+      "viewport": 1440,
+      "visibleButtons": [
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-dashboard",
+          "text": "Dashboard"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "tab-agent",
+          "text": "Agent Workspace"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-scenario",
+          "text": "Scenario Lab"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "agent-replay-investigation",
+          "text": "Replay Investigation"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Receipt retryCOMPLETEFailed message path2 tools \u00b7 5 evidences \u00b7 handoff"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Shipment checkCOMPLETEPhysical quantity2 tools \u00b7 5 evidences \u00b7 handoff"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Duplicate checkCOMPLETEExisting postings2 tools \u00b7 5 evidences \u00b7 handoff"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "rail-tab-context",
+          "text": "Context"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "rail-tab-chat",
+          "text": "Chat"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "rail-tab-decision",
+          "text": "Decision"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Compare causes"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Show evidence"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Explain decision"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Prepare recovery"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Where did they go?"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "What proves it?"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Compare causes"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "chat-submit",
+          "text": "Ask"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "prepare-button",
+          "text": "Prepare Receipt Message Restart"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": true,
+          "id": "execute-button",
+          "text": "Execute"
+        }
+      ],
+      "words": 323
+    },
+    "agent_decision": {
+      "bodyScroll": 1440,
+      "connection": "live",
+      "consoleReady": "true",
+      "documentScroll": 1440,
+      "recovered": "false",
+      "view": "agent",
+      "viewport": 1440,
+      "visibleButtons": [
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-dashboard",
+          "text": "Dashboard"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "tab-agent",
+          "text": "Agent Workspace"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-scenario",
+          "text": "Scenario Lab"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "agent-replay-investigation",
+          "text": "Replay Investigation"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Receipt retryRUNNINGFailed message path2 tools \u00b7 5 evidences \u00b7 handoff"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Shipment checkRUNNINGPhysical quantity2 tools \u00b7 5 evidences \u00b7 handoff"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Duplicate checkRUNNINGExisting postings2 tools \u00b7 5 evidences \u00b7 handoff"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "rail-tab-context",
+          "text": "Context"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "rail-tab-chat",
+          "text": "Chat"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "rail-tab-decision",
+          "text": "Decision"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "case:missing-20-001-run-1:erp-receipt"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "case:missing-20-001-run-1:failed-message"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "case:missing-20-001-run-1:invoice"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "case:missing-20-001-run-1:material-documents"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "case:missing-20-001-run-1:warehouse"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Compare causes"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Show evidence"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Explain decision"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Prepare recovery"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Where did they go?"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "What proves it?"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "Compare causes"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "chat-submit",
+          "text": "Ask"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "prepare-button",
+          "text": "Prepare Receipt Message Restart"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": null,
+          "disabled": true,
+          "id": "execute-button",
+          "text": "Execute"
+        }
+      ],
+      "words": 548
+    },
+    "dashboard": {
+      "bodyScroll": 1440,
+      "connection": "live",
+      "consoleReady": "true",
+      "documentScroll": 1440,
+      "recovered": "false",
+      "view": "dashboard",
+      "viewport": 1440,
+      "visibleButtons": [
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "tab-dashboard",
+          "text": "Dashboard"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-agent",
+          "text": "Agent Workspace"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-scenario",
+          "text": "Scenario Lab"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "081"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "082"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "083"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "084"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "085"
+        },
+        {
+          "ariaPressed": "false",
+          "ariaSelected": null,
+          "disabled": false,
+          "id": "",
+          "text": "086"
+        }
+      ],
+      "words": 162
+    }
+  },
+  "citation_checks": [
+    {
+      "clicked": true,
+      "drawerOpen": true,
+      "focused": false,
+      "found": true,
+      "id": "case:missing-20-001-run-1:erp-receipt",
+      "status": ""
+    },
+    {
+      "clicked": true,
+      "drawerOpen": true,
+      "focused": false,
+      "found": true,
+      "id": "case:missing-20-001-run-1:failed-message",
+      "status": ""
+    },
+    {
+      "clicked": true,
+      "drawerOpen": true,
+      "focused": false,
+      "found": true,
+      "id": "case:missing-20-001-run-1:invoice",
+      "status": ""
+    },
+    {
+      "clicked": true,
+      "drawerOpen": true,
+      "focused": false,
+      "found": true,
+      "id": "case:missing-20-001-run-1:material-documents",
+      "status": ""
+    },
+    {
+      "clicked": true,
+      "drawerOpen": true,
+      "focused": false,
+      "found": true,
+      "id": "case:missing-20-001-run-1:warehouse",
+      "status": ""
+    }
+  ],
+  "console_errors": [],
+  "network_urls": [
+    "http://127.0.0.1:8765/assets/phosphor-regular.css",
+    "http://127.0.0.1:8765/style.css",
+    "http://127.0.0.1:8765/assets/phosphor-bold.css",
+    "http://127.0.0.1:8765/app.js",
+    "http://127.0.0.1:8765/api/v1/scenarios",
+    "http://127.0.0.1:8765/assets/Phosphor-Bold.woff2",
+    "http://127.0.0.1:8765/assets/Phosphor.woff2",
+    "http://127.0.0.1:8765/api/v1/incidents/missing-20-normal",
+    "http://127.0.0.1:8765/api/v1/incidents/missing-20-normal/units",
+    "http://127.0.0.1:8765/api/v1/live-sources/events?after=0",
+    "http://127.0.0.1:8765/api/v1/live-sources",
+    "http://127.0.0.1:8765/api/v1/incidents/missing-20-normal/events?after=5",
+    "http://127.0.0.1:8765/api/v1/scenarios",
+    "http://127.0.0.1:8765/api/v1/scenarios",
+    "http://127.0.0.1:8765/api/v1/incidents/missing-20-001-run-1/start",
+    "http://127.0.0.1:8765/api/v1/incidents/missing-20-001-run-1/chat",
+    "http://127.0.0.1:8765/api/v1/incidents/missing-20-001-run-1"
+  ],
+  "rail_decision": {
+    "active": "tab-dashboard",
+    "intent": "CURRENT ACTION \u00b7 NOT PREPAREDReceipt Message RestartCurrent deterministic decision \u00b7 Case v1",
+    "selected": "rail-tab-decision",
+    "status": "Not prepared"
+  },
+  "rail_keyboard_chat": {
+    "active": "tab-dashboard",
+    "selected": "rail-tab-context"
+  },
+  "responsive": {
+    "1280": {
+      "bodyScroll": 1280,
+      "connection": "live",
+      "consoleReady": "true",
+      "documentScroll": 1280,
+      "recovered": "false",
+      "view": "dashboard",
+      "viewport": 1280,
+      "visibleButtons": [
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "tab-dashboard",
+          "text": "Dashboard"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-agent",
+          "text": "Agent Workspace"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-scenario",
+          "text": "Scenario Lab"
+        }
+      ],
+      "words": 149
+    },
+    "1440": {
+      "bodyScroll": 1440,
+      "connection": "live",
+      "consoleReady": "true",
+      "documentScroll": 1440,
+      "recovered": "false",
+      "view": "dashboard",
+      "viewport": 1440,
+      "visibleButtons": [
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "tab-dashboard",
+          "text": "Dashboard"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-agent",
+          "text": "Agent Workspace"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-scenario",
+          "text": "Scenario Lab"
+        }
+      ],
+      "words": 149
+    },
+    "390": {
+      "bodyScroll": 390,
+      "connection": "live",
+      "consoleReady": "true",
+      "documentScroll": 390,
+      "recovered": "false",
+      "view": "dashboard",
+      "viewport": 390,
+      "visibleButtons": [
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "tab-dashboard",
+          "text": "Dashboard"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-agent",
+          "text": "Agent Workspace"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-scenario",
+          "text": "Scenario Lab"
+        }
+      ],
+      "words": 142
+    },
+    "768": {
+      "bodyScroll": 768,
+      "connection": "live",
+      "consoleReady": "true",
+      "documentScroll": 768,
+      "recovered": "false",
+      "view": "dashboard",
+      "viewport": 768,
+      "visibleButtons": [
+        {
+          "ariaPressed": null,
+          "ariaSelected": "true",
+          "disabled": false,
+          "id": "tab-dashboard",
+          "text": "Dashboard"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-agent",
+          "text": "Agent Workspace"
+        },
+        {
+          "ariaPressed": null,
+          "ariaSelected": "false",
+          "disabled": false,
+          "id": "tab-scenario",
+          "text": "Scenario Lab"
+        }
+      ],
+      "words": 149
+    }
+  },
+  "role_checks": [
+    {
+      "evidence": "15 evidences",
+      "links": 0,
+      "role": "Agent team",
+      "selected": "orchestrator",
+      "task": "Evaluation returned; deterministic policy owns the next step",
+      "title": "Ask the agent team",
+      "tools": "6 tool results"
+    },
+    {
+      "evidence": "15 evidences",
+      "links": 0,
+      "role": "Agent team",
+      "selected": "orchestrator",
+      "task": "Evaluation returned; deterministic policy owns the next step",
+      "title": "Ask the agent team",
+      "tools": "6 tool results"
+    },
+    {
+      "evidence": "15 evidences",
+      "links": 0,
+      "role": "Agent team",
+      "selected": "orchestrator",
+      "task": "Evaluation returned; deterministic policy owns the next step",
+      "title": "Ask the agent team",
+      "tools": "6 tool results"
+    },
+    {
+      "evidence": "15 evidences",
+      "links": 6,
+      "role": "Agent team",
+      "selected": "orchestrator",
+      "task": "Evaluation returned; deterministic policy owns the next step",
+      "title": "Ask the agent team",
+      "tools": "6 tool results"
+    }
+  ],
+  "scenario_lab": {
+    "bodyScroll": 1440,
+    "connection": "live",
+    "consoleReady": "true",
+    "documentScroll": 1440,
+    "recovered": "false",
+    "view": "scenario",
+    "viewport": 1440,
+    "visibleButtons": [
+      {
+        "ariaPressed": null,
+        "ariaSelected": "false",
+        "disabled": false,
+        "id": "tab-dashboard",
+        "text": "Dashboard"
+      },
+      {
+        "ariaPressed": null,
+        "ariaSelected": "false",
+        "disabled": false,
+        "id": "tab-agent",
+        "text": "Agent Workspace"
+      },
+      {
+        "ariaPressed": null,
+        "ariaSelected": "true",
+        "disabled": false,
+        "id": "tab-scenario",
+        "text": "Scenario Lab"
+      },
+      {
+        "ariaPressed": "true",
+        "ariaSelected": null,
+        "disabled": true,
+        "id": "scenario-normal",
+        "text": "Normal"
+      },
+      {
+        "ariaPressed": "false",
+        "ariaSelected": null,
+        "disabled": false,
+        "id": "scenario-incident",
+        "text": "Inject incident"
+      },
+      {
+        "ariaPressed": "false",
+        "ariaSelected": null,
+        "disabled": true,
+        "id": "scenario-recovery",
+        "text": "Recovery"
+      },
+      {
+        "ariaPressed": null,
+        "ariaSelected": null,
+        "disabled": false,
+        "id": "golden-incident",
+        "text": "Run Golden Incident"
+      }
+    ],
+    "words": 25
+  },
+  "sse_events": 72
+}

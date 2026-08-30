@@ -5,6 +5,8 @@
 
 ## Slice 1: Connected Normal Flow
 
+**Status:** COMPLETE
+
 **Goal:** A newly opened Operations page receives continuously advancing authoritative
 synthetic telemetry through the backend and visibly animates the facility flow.
 
@@ -25,6 +27,8 @@ event-backed sparkline, and visible source-to-ERP motion. Business counts remain
 
 ## Slice 2: Isolated Scenario Lab
 
+**Status:** COMPLETE — independent review approved.
+
 **Goal:** Inject a source condition outside Operations and prove that the detector, not the
 button, creates the incident.
 
@@ -36,15 +40,34 @@ agent state; duplicate injection is blocked; reset creates a fresh session.
 
 ## Slice 3: Event-Backed Incident Command
 
+**Status:** COMPLETE — independent review approved after durable provider-degradation fail-closed verification.
+
 **Goal:** Show the actual Strands orchestrator, investigators, tools, evidence, handoffs,
 synthesis, and evaluator as a dynamic mission-control workflow.
 
 **Output:** public event bindings, active-agent graph, tool/evidence motion, advisory chat,
 diagnosis/abstention/degraded states.
 
+The Agent Workspace includes an interactive **Case Console** rather than a passive
+read-only transcript. A user can ask what is happening and what should happen next, or
+choose a bounded next step:
+
+- continue the investigation;
+- compare competing causes;
+- retrieve missing or supporting evidence;
+- explain the evaluator decision;
+- prepare a structured recovery proposal.
+
+Each choice calls the current incident API/harness and emits the corresponding public
+agent, tool, evidence, handoff, synthesis, or proposal event. The console may investigate
+and prepare, but approval and execution remain separate structured controls and cannot be
+triggered through chat.
+
 **Checks:** no fake typing or timer-driven completion; tool and evidence animations require
 matching events; missing evidence abstains; provider degradation cannot fabricate a
-diagnosis; chat remains read-only.
+diagnosis; free-text questions and every suggested action return case-specific evidence;
+the user can observe the selected action in the mission-control graph; chat cannot approve
+or execute and cannot mutate benchmark truth.
 
 ## Slice 4: Controlled Recovery
 

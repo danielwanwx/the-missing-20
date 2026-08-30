@@ -90,6 +90,9 @@ class NormalizedTrace:
     trace_id: str
     provider: str
     model: str
+    # Safe, redacted provider/request metadata.  This deliberately carries no
+    # prompt, response, credential, or enterprise payload.
+    provider_metadata: dict[str, Any] | None = None
     prompt_version: str = "agent-v5"
     prompt_digest: str = "prompt-digest-unavailable"
     knowledge_version: str = "knowledge-v1"
@@ -218,6 +221,7 @@ class NormalizedTrace:
             "trace_id": self.trace_id,
             "provider": self.provider,
             "model": self.model,
+            "provider_metadata": self.provider_metadata,
             "prompt_version": self.prompt_version,
             "prompt_digest": self.prompt_digest,
             "agent_contract_version": self.agent_contract_version,

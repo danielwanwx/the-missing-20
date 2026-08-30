@@ -3,7 +3,10 @@
 **Development status:** ready to be judged locally; video and Devpost submission are not ready.
 **Data:** synthetic only.
 **Runtime:** local synthetic incident API, ordered SSE ledger, Dashboard, and Agent
-Workspace; no AWS/provider call is made by the demo runner.
+Workspace; no AWS/provider call is made by the demo runner. A separate redacted
+artifact records the configured real AgentCore Runtime deployment/invocation boundary,
+real Nova advisory run, and read-only role chat; the default offline path does not call
+that provider.
 
 ## Before the timer
 
@@ -25,7 +28,9 @@ Then open the local root URL printed by the server. The initial page waits for a
 explicit **Start Investigation** click; the same control is available on Dashboard and
 Agent Workspace. The Dashboard receives the same ordered events as the backend and
 renders every unit. Open **Agent Workspace** to watch the paced orchestrator,
-investigators, tools, evidence, and handoffs. Ask the Copilot a question, prepare
+investigators, tools, evidence, and handoffs. Ask the Copilot a question, then point to
+the redacted AgentCore Runtime role-chat proof for the same read-only conversational
+boundary. Prepare
 **Receipt Message Restart**, approve it as the two scripted simulated role principals,
 execute, and verify the 100/100 result. Then prepare the separate **Invoice Release**
 action and approve it again with both simulated role principals; the final gate is
@@ -43,12 +48,12 @@ what to say, and the evidence boundary a judge should retain.
 | Time | Step | Show and say | Evidence |
 | --- | --- | --- | --- |
 | 0:00–0:35 | 1. Detect the gap | On **Dashboard**, point to 100 warehouse records, 80 ERP records, and the 20 exact IDs held at the queue; click **Start Investigation** when ready. | `PROVEN`: local API, ordered ledger, lifecycle evidence, detector genesis. |
-| 0:35–1:25 | 2. Investigate in parallel | Open **Agent Workspace**. Watch the paced ordered trace: three bounded investigators start, call tools, collect evidence, and hand results to the orchestrator. | `SCRIPTED_PROVEN`: scripted Strands trace; synthetic only. |
-| 1:25–2:00 | 3. Keep AI advisory | Ask Copilot which evidence proves the gap. “The agent explains and cites; it cannot approve or execute.” | Real Nova `PROVEN` only for connectivity/degraded observability; stable usefulness `NOT_PROVEN`. |
+| 0:35–1:25 | 2. Investigate in parallel | Open **Agent Workspace**. Watch the paced ordered trace: the Strands orchestrator starts three bounded investigators, which call audited read tools, collect evidence, and hand results to synthesis. | `SCRIPTED_PROVEN`: scripted Strands trace; synthetic only. |
+| 1:25–2:00 | 3. Keep AI advisory | Ask Copilot which evidence proves the gap. “The agent explains and cites; it cannot approve or execute.” Show the redacted Runtime role-chat record as the real-provider counterpart. | AgentCore Runtime deployment/invocation/observability and read-only role chat `PROVEN`; Nova advisory result `PARTIAL` (AI citations 1/5, application validation 5/5); stable usefulness `NOT_PROVEN`. |
 | 2:00–2:35 | 4. Decide deterministically | Choose **Prepare recovery**. “Code checks authoritative facts and permits only a recovery that cannot create a duplicate.” | `PROVEN`: policy, case/version, source and invariant checks. |
 | 2:35–3:35 | 5. Authorize and execute | Approve **Receipt Message Restart** with the two distinct simulated role principals and execute it; then prepare **Invoice Release** and approve that new intent with both principals again. “Neither AI nor one role principal can act alone, and approvals do not carry across actions.” | `PROVEN`: per-action quorum, signed grants, ControlledExecutor, two-effect ledger. |
 | 3:35–4:20 | 6. Verify and replay | Show 100/100 after receipt recovery, then the final `VERIFIED · CLOSED` gate after invoice release. Optionally click **Replay Investigation** to re-emit the immutable investigation ledger; it creates no action or effect. “Each action is reread and executor replay proves no duplicate change.” | `PROVEN`: receipt/effect/snapshot closure for both actions, executor replay delta `0`, and immutable ledger replay. |
-| 4:20–5:00 | 7. State the limits | Switch to `degraded`, then `invalid`. “AI can fail without weakening safety; missing authoritative evidence fails closed.” | Explicit `PROVEN`, `SCRIPTED_PROVEN`, `NOT_PROVEN`; no public submission claim. |
+| 4:20–5:00 | 7. State the limits | Switch to `degraded`, then `invalid`. “AI can fail without weakening safety; missing authoritative evidence fails closed.” | Explicit `PROVEN`, `SCRIPTED_PROVEN`, `PARTIAL`, and `NOT_PROVEN`; Gateway/Policy, stable usefulness, and production impact remain unclaimed. |
 
 ## Closing line
 
@@ -69,5 +74,7 @@ branch invents an approval, effect, pass, or closed state.
 ## Operator boundary
 
 This run card is a private judging aid. It does not authorize a provider request,
-cloud deployment, public release, video upload, or Devpost submission. The final
-`ready-to-be-judged` product decision is a human gate.
+new cloud deployment, public release, video upload, or Devpost submission. The
+historical Runtime proof is redacted and immutable evidence; the demo runner itself
+uses local synthetic data. The final `ready-to-be-judged` product decision is a human
+gate.

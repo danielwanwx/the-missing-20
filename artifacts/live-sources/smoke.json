@@ -1,0 +1,153 @@
+{
+  "captured_at": "2026-08-29T09:19:07.934553+00:00",
+  "event_cursor": 3,
+  "network": "official public NWS and NOAA one-shot read",
+  "new_cost_usd": 0,
+  "private_only": true,
+  "provider_calls": false,
+  "risk": {
+    "advisory_only": true,
+    "creates_operational_incident": false,
+    "label": "Route risk elevated",
+    "level": "HIGH",
+    "reasons": [
+      "2 severe weather alert(s) in route area"
+    ],
+    "source_ids": [
+      "nws-ca-alerts"
+    ]
+  },
+  "schema_version": "missing20-live-sources/v1",
+  "scope": {
+    "external_context_only": true,
+    "operational_authority": "synthetic_enterprise_twin",
+    "route": "Port of Los Angeles to inland warehouse"
+  },
+  "sources": [
+    {
+      "alerts": [
+        {
+          "area": "Santa Clarita Valley; Santa Barbara County Southeastern Coast; Ventura County Beaches; Ventura County Inland Coast; Lake Casitas; Ojai Valley; Central Ventura County Valleys; Malibu Coast; Los Angeles County Beaches; Palos Verdes Hills; Los Angeles County Inland Coast including Downtown Los Angeles; Western Santa Monica Mountains Recreational Area; Eastern Santa Monica Mountains Recreational Area; Calabasas and Agoura Hills; Western San Fernando Valley; Eastern San Fernando Valley; Southeastern Ventura County Valleys; Santa Susana Mountains; Los Angeles County San Gabriel Valley",
+          "certainty": "Likely",
+          "event": "Heat Advisory",
+          "expires_at": "2026-08-30T03:00:00+00:00",
+          "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.97a3c89bfc31fd87a79dfc32319e682e703051ea.003.1",
+          "route_relevant": true,
+          "severity": "Moderate",
+          "updated_at": null,
+          "urgency": "Expected"
+        },
+        {
+          "area": "Orange County Inland",
+          "certainty": "Likely",
+          "event": "Extreme Heat Warning",
+          "expires_at": "2026-08-29T13:15:00+00:00",
+          "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.8ea6e50478b0bd270f9bf78044cbf8f226f39f21.006.1",
+          "route_relevant": true,
+          "severity": "Severe",
+          "updated_at": null,
+          "urgency": "Expected"
+        },
+        {
+          "area": "San Bernardino and Riverside County Valleys-The Inland Empire",
+          "certainty": "Likely",
+          "event": "Extreme Heat Warning",
+          "expires_at": "2026-08-29T13:15:00+00:00",
+          "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.8ea6e50478b0bd270f9bf78044cbf8f226f39f21.001.1",
+          "route_relevant": true,
+          "severity": "Severe",
+          "updated_at": null,
+          "urgency": "Expected"
+        },
+        {
+          "area": "Orange County Coastal",
+          "certainty": "Likely",
+          "event": "Heat Advisory",
+          "expires_at": "2026-08-29T13:15:00+00:00",
+          "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.8ea6e50478b0bd270f9bf78044cbf8f226f39f21.008.1",
+          "route_relevant": true,
+          "severity": "Moderate",
+          "updated_at": null,
+          "urgency": "Expected"
+        }
+      ],
+      "error": null,
+      "external_context_only": true,
+      "freshness_seconds": 3547,
+      "location": "California / Los Angeles route context",
+      "metrics": {
+        "active_alerts": 4,
+        "california_active_alerts": 12,
+        "california_high_severity_alerts": 7,
+        "high_severity_alerts": 2,
+        "latest_alert_age_seconds": 3547,
+        "route_alerts": 4,
+        "route_high_severity_alerts": 2
+      },
+      "new_observation": true,
+      "observed_at": "2026-08-29T08:20:00+00:00",
+      "provenance_url": "https://api.weather.gov/alerts/active?area=CA",
+      "provider": "National Weather Service",
+      "received_at": "2026-08-29T09:19:07.407540+00:00",
+      "schema_version": "missing20-live-sources/v1",
+      "sequence": 1,
+      "source_id": "nws-ca-alerts",
+      "source_type": "weather_alerts",
+      "status": "CONNECTED"
+    },
+    {
+      "alerts": [],
+      "error": null,
+      "external_context_only": true,
+      "freshness_seconds": 427,
+      "location": "Port of Los Angeles / station 9410660",
+      "metrics": {
+        "datum": "MLLW",
+        "station_id": "9410660",
+        "unit": "m",
+        "water_level_m": 0.764
+      },
+      "new_observation": true,
+      "observed_at": "2026-08-29T09:12:00+00:00",
+      "provenance_url": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=9410660&product=water_level&datum=MLLW&time_zone=gmt&units=metric&application=TheMissing20&format=json",
+      "provider": "NOAA CO-OPS",
+      "received_at": "2026-08-29T09:19:07.407540+00:00",
+      "schema_version": "missing20-live-sources/v1",
+      "sequence": 2,
+      "source_id": "noaa-coops-9410660",
+      "source_type": "water_level",
+      "status": "CONNECTED"
+    },
+    {
+      "alerts": [],
+      "error": "optional AIS key is not configured",
+      "external_context_only": true,
+      "freshness_seconds": null,
+      "location": "Port of Los Angeles bounding box",
+      "metrics": {
+        "bbox": [
+          [
+            33.68,
+            -118.35
+          ],
+          [
+            33.82,
+            -118.12
+          ]
+        ],
+        "vessel_count": 0
+      },
+      "new_observation": false,
+      "observed_at": null,
+      "provenance_url": "https://aisstream.io/documentation",
+      "provider": "AISStream",
+      "received_at": "2026-08-29T09:19:07.407540+00:00",
+      "schema_version": "missing20-live-sources/v1",
+      "sequence": 3,
+      "source_id": "aisstream-port-los-angeles",
+      "source_type": "vessel_positions",
+      "status": "OPTIONAL_NOT_CONFIGURED"
+    }
+  ],
+  "status": "PASS"
+}

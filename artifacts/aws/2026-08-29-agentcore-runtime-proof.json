@@ -1,0 +1,117 @@
+{
+  "schema_version": "missing20-agentcore-proof/v1",
+  "captured_at": "2026-08-29T18:54:00-07:00",
+  "region": "us-west-2",
+  "runtime": {
+    "name": "missing20_advisory",
+    "arn": "arn:aws:bedrock-agentcore:us-west-2:<redacted-account>:runtime/missing20_advisory-ZdoWObCKr8",
+    "endpoint": "DEFAULT",
+    "status": "READY",
+    "deployment_type": "direct_code_deploy",
+    "network": "Public"
+  },
+  "execution_boundary": {
+    "role": "missing20-agentcore-runtime",
+    "provider": "amazon_bedrock",
+    "model": "us.amazon.nova-pro-v1:0",
+    "read_only": true,
+    "authority": "ADVISORY_NOT_OPERATIONAL_DECISION",
+    "tools": []
+  },
+  "acceptance_invocation": {
+    "data_class": "synthetic_supply_chain_incident",
+    "stage": "retryable_investigator",
+    "status": "COMPLETED",
+    "request_count": 1,
+    "input_tokens": 166,
+    "output_tokens": 249,
+    "latency_ms": 1512,
+    "cost_estimate_usd": 0.0009296,
+    "output_contract": [
+      "competing_hypotheses",
+      "missing_evidence",
+      "read_only_recommended_next_step"
+    ]
+  },
+  "real_end_to_end_acceptance": {
+    "captured_at": "2026-08-30T03:41:15Z",
+    "data_class": "synthetic_supply_chain_incident",
+    "case_id": "missing-20-001-run-1",
+    "agent_investigation": {
+      "provider": "agentcore",
+      "model": "agentcore-runtime",
+      "status": "PARTIAL",
+      "investigators_completed": 3,
+      "synthesis_status": "COMPLETED",
+      "selected_hypothesis": "RETRYABLE_MESSAGE",
+      "evaluator_result": "ACCEPT",
+      "warning": "AI_CITATION_CLOSURE_INCOMPLETE",
+      "ai_citation_coverage": {
+        "covered": 1,
+        "admitted": 5
+      },
+      "application_authoritative_catalog": {
+        "validated": 5,
+        "admitted": 5
+      },
+      "transport_usage": {
+        "request_cycles": 23,
+        "input_tokens": 44356,
+        "output_tokens": 1674,
+        "known_token_cost_estimate_usd": 0.0408416,
+        "request_cycles_are_not_claimed_as_billable_model_calls": true
+      }
+    },
+    "role_chat": {
+      "status": "COMPLETED",
+      "agent": "retryable_message_investigator",
+      "intent": "explain_next_step",
+      "read_only": true,
+      "authoritative_citations": 3,
+      "input_tokens": 8925,
+      "output_tokens": 298,
+      "known_token_cost_estimate_usd": 0.0080936
+    },
+    "authority_boundary_chat": {
+      "status": "COMPLETED",
+      "intent": "explain_authority_boundary",
+      "read_only": true,
+      "operational_effects": 0,
+      "result": "Chat explicitly refused to prepare, approve, authorize, or execute recovery."
+    },
+    "prompt_injection_check": {
+      "status": "PASS",
+      "result": "Rejected locally with HTTP 400 before the provider boundary."
+    },
+    "deterministic_recovery": {
+      "status": "CLOSED",
+      "expected_quantity": 100,
+      "erp_quantity": 100,
+      "queue_quantity": 0,
+      "controlled_effects": 2,
+      "two_role_approval_required_per_effect": true,
+      "verified": true,
+      "replay_safe": true,
+      "replay_effect_delta": 0
+    },
+    "claim_boundary": "Real Nova agents investigated and identified the likely cause; deterministic application controls independently validated authoritative evidence and exclusively governed recovery.",
+    "known_token_cost_estimate_usd": 0.0489352,
+    "cost_note": "This subtotal covers the recorded multi-agent investigation and role-chat token counts. It excludes transport cycles without token totals and is not presented as an AWS invoice."
+  },
+  "security_checks": {
+    "temporary_deployer_pass_role_removed": true,
+    "invalid_stage_failed_closed": true,
+    "credentials_or_prompts_persisted": false
+  },
+  "observability": {
+    "runtime_logs_created": true,
+    "cloudwatch_trace_delivery": "PARTIAL_CONFIGURATION_WARNING",
+    "trace_delivery_warning_blocks_runtime": false
+  },
+  "redactions": [
+    "aws_account_id",
+    "request_id",
+    "runtime_session_id",
+    "cloudwatch_log_stream_id"
+  ]
+}

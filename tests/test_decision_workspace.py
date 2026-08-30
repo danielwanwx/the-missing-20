@@ -6,6 +6,7 @@ import json
 import threading
 from collections.abc import Callable
 from copy import deepcopy
+from datetime import UTC, datetime
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
@@ -30,6 +31,11 @@ from the_missing_20.authority_b.workspace_demo import (
     build_decision_workspace,
 )
 from the_missing_20.experiment.session import ExperimentSession
+from the_missing_20.live_sources import (
+    LiveSourceRegistry,
+    LiveSourceSnapshot,
+    LiveSourceStatus,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -90,11 +96,18 @@ def test_workspace_artifact_is_typed_stable_and_claim_classified(mode: str) -> N
         payload["m6_aws_proof"]["real_provider_integration"]["stable_real_usefulness"]
         == "NOT_PROVEN"
     )
-    assert all(
-        item["status"] == "NOT_PROVEN"
+    agentcore_status = {
+        item["capability_id"]: item["status"]
         for item in payload["m6_aws_proof"]["capabilities"]
         if item["capability_id"].startswith("agentcore_")
-    )
+    }
+    assert agentcore_status == {
+        "agentcore_runtime": "PROVEN",
+        "agentcore_observability": "PROVEN",
+        "agentcore_deployment": "PROVEN",
+        "agentcore_gateway": "NOT_PROVEN",
+        "agentcore_policy": "NOT_PROVEN",
+    }
     parsed = type(artifact).model_validate_json(json.dumps(payload))
     assert parsed.artifact_digest == artifact.artifact_digest
     if mode == "complete":
@@ -278,6 +291,88 @@ def test_workspace_server_is_local_with_scoped_synthetic_commands() -> None:
         assert health["provider_calls"] is False
         assert health["write_scope"] == "local_synthetic_only"
         assert health["advisory_tools_read_only"] is True
+
+        asset_expectations = {
+            "/assets/phosphor-regular.css": "text/css; charset=utf-8",
+            "/assets/phosphor-bold.css": "text/css; charset=utf-8",
+            "/assets/Phosphor.woff2": "font/woff2",
+            "/assets/Phosphor-Bold.woff2": "font/woff2",
+        }
+        for route, content_type in asset_expectations.items():
+            status, body, headers = _request(f"{base}{route}")
+            assert status == 200
+            assert body
+            assert headers["Content-Type"] == content_type
+
+        for route in (
+            "/assets/../style.css",
+            "/assets/%2e%2e/style.css",
+            "/assets/phosphor-regular.css/../style.css",
+        ):
+            status, _body, _headers = _request(f"{base}{route}")
+            assert status == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_live_source_routes_are_read_only_and_use_injected_public_context(
+    tmp_path: Path,
+) -> None:
+    now = datetime(2026, 8, 29, 8, 0, tzinfo=UTC)
+
+    class StubAdapter:
+        source_id = "stub-public-source"
+        provider = "Public Stub"
+        source_type = "route_observation"
+        poll_interval_seconds = 60.0
+
+        def fetch(self, captured_at: datetime) -> LiveSourceSnapshot:
+            return LiveSourceSnapshot(
+                provider=self.provider,
+                source_id=self.source_id,
+                source_type=self.source_type,
+                location="Port of Los Angeles",
+                status=LiveSourceStatus.CONNECTED,
+                observed_at=captured_at,
+                received_at=captured_at,
+                freshness_seconds=0,
+                metrics={"observations": 1},
+                alerts=(),
+                provenance_url="https://example.test/public-observation",
+            )
+
+    live_sources = LiveSourceRegistry((StubAdapter(),), clock=lambda: now)
+    try:
+        server = DecisionWorkspaceServer(
+            ("127.0.0.1", 0),
+            ROOT,
+            runtime_directory=tmp_path / "runtime",
+            live_sources=live_sources,
+        )
+    except PermissionError:
+        pytest.skip("the managed test sandbox disallows loopback sockets")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        status, body, _headers = _request(f"{base}/api/v1/live-sources")
+        assert status == 200
+        current = json.loads(body)
+        assert current["scope"]["external_context_only"] is True
+        assert current["scope"]["operational_authority"] == "synthetic_enterprise_twin"
+        assert current["sources"][0]["source_id"] == "stub-public-source"
+        assert current["sources"][0]["external_context_only"] is True
+        assert current["risk"]["advisory_only"] is True
+        assert current["risk"]["creates_operational_incident"] is False
+
+        status, body, _headers = _request(f"{base}/api/v1/live-sources/events?after=0")
+        assert status == 200
+        events = json.loads(body)
+        assert events["external_context_only"] is True
+        assert events["events"][0]["snapshot"]["source_id"] == "stub-public-source"
+        assert events["events"][0]["new_observation"] is True
     finally:
         server.shutdown()
         server.server_close()

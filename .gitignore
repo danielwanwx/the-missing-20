@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 .venv/
+.agentcore-venv/
+.bedrock_agentcore.yaml
+.bedrock_agentcore/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -21,3 +24,6 @@ cdk.out/
 *.tfstate
 *.tfstate.*
 research-runs/
+
+# Browser profiles captured during local visual QA may contain session metadata.
+artifacts/audits/**/chrome-*/

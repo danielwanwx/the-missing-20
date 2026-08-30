@@ -26,13 +26,17 @@ M6_SCHEMA_VERSION: Final[str] = "M6AWSProofBundle/v1"
 M6_PROOF_SCHEMA_VERSION: Final[str] = M6_SCHEMA_VERSION
 M6_PROOF_ARTIFACT_PATH: Final[str] = "artifacts/aws/m6-proof-bundle-v1.json"
 M6_AWS_PROOF_ARTIFACT_PATH: Final[str] = M6_PROOF_ARTIFACT_PATH
+M6_AGENTCORE_RUNTIME_PROOF_PATH: Final[str] = (
+    "artifacts/aws/2026-08-29-agentcore-runtime-proof.json"
+)
 M6_GENERATED_AT: Final[str] = "2026-08-27T00:00:00Z"
 M6_PROVIDER: Final[str] = "bedrock"
 M6_MODEL: Final[str] = "us.amazon.nova-pro-v1:0"
-M6_REGION: Final[str] = "us-west-2"
-M6_PRIOR_COST_USD: Final[str] = "0.1109336"
-M6_INCREMENTAL_COST_USD: Final[str] = "0.014116"
-M6_CUMULATIVE_COST_USD: Final[str] = "0.1250496"
+M6_REGION: Final[Literal["us-west-2"]] = "us-west-2"
+M6_PROVIDER_ATTEMPT_PRIOR_COST_USD: Final[str] = "0.1109336"
+M6_PROVIDER_FAILURE_COST_USD: Final[str] = "0.014116"
+M6_PRIOR_COST_USD: Final[str] = "0.1250496"
+M6_RUNTIME_ACCEPTANCE_COST_USD: Final[str] = "0.0009296"
 M6_COST_CAP_USD: Final[str] = "0.60"
 
 # These are deliberately fixed reviewed bytes, not values copied from the input at
@@ -60,6 +64,9 @@ M6_APPROVED_SOURCE_DIGESTS: Final[Mapping[str, str]] = {
     "fixtures/scenarios/retryable-document-lock.json": (
         "b8c179b3f1becc02bdc41c42f025720f318697b4d31f1ae52a1ad7e36a38d5bf"
     ),
+    M6_AGENTCORE_RUNTIME_PROOF_PATH: (
+        "b5efdf64f36291ced3d7d988f416e2b6512adfd1fbea1a886cd94622473a486d"
+    ),
 }
 
 M6_APPROVED_SOURCE_SCHEMAS: Final[Mapping[str, str]] = {
@@ -73,6 +80,7 @@ M6_APPROVED_SOURCE_SCHEMAS: Final[Mapping[str, str]] = {
     # The scenario fixture predates explicit JSON schemas.  This value is the proof
     # contract's source classification, not a claim that the fixture declares it.
     "fixtures/scenarios/retryable-document-lock.json": "synthetic-fixture/v1",
+    M6_AGENTCORE_RUNTIME_PROOF_PATH: "missing20-agentcore-proof/v1",
 }
 
 M6_REQUIRED_SOURCE_PATHS: Final[tuple[str, ...]] = tuple(M6_APPROVED_SOURCE_DIGESTS)
@@ -83,6 +91,28 @@ M6_AGENTCORE_CAPABILITIES: Final[tuple[str, ...]] = (
     "agentcore_observability",
     "agentcore_deployment",
 )
+M6_AGENTCORE_PROVEN_CAPABILITIES: Final[tuple[str, ...]] = (
+    "agentcore_runtime",
+    "agentcore_observability",
+    "agentcore_deployment",
+)
+M6_AGENTCORE_NOT_PROVEN_CAPABILITIES: Final[tuple[str, ...]] = (
+    "agentcore_gateway",
+    "agentcore_policy",
+)
+M6_RUNTIME_PROVIDER: Final[Literal["agentcore"]] = "agentcore"
+M6_RUNTIME_MODEL: Final[Literal["agentcore-runtime"]] = "agentcore-runtime"
+M6_RUNTIME_NAME: Final[Literal["missing20_advisory"]] = "missing20_advisory"
+M6_RUNTIME_ENDPOINT: Final[Literal["DEFAULT"]] = "DEFAULT"
+M6_RUNTIME_STATUS: Final[Literal["READY"]] = "READY"
+M6_RUNTIME_AI_CITATIONS_COVERED: Final[int] = 1
+M6_RUNTIME_AI_CITATIONS_ADMITTED: Final[int] = 5
+M6_RUNTIME_APP_VALIDATED: Final[int] = 5
+M6_RUNTIME_APP_ADMITTED: Final[int] = 5
+M6_RUNTIME_KNOWN_TOKEN_COST_USD: Final[str] = "0.0489352"
+M6_INCREMENTAL_COST_USD: Final[str] = "0.0498648"
+M6_CUMULATIVE_COST_USD: Final[str] = "0.1749144"
+M6_AUTHORITY_CHAT_COST_STATUS: Final[Literal["NOT_RECORDED_EXCLUDED"]] = "NOT_RECORDED_EXCLUDED"
 
 
 class M6ProofError(ValueError):
@@ -108,7 +138,7 @@ class M6SourceArtifact(AuthorityModel):
 class M6Claim(AuthorityModel):
     claim_id: Annotated[str, Field(min_length=1)]
     statement: Annotated[str, Field(min_length=1)]
-    status: Literal["PROVEN", "DEGRADED", "NOT_PROVEN"]
+    status: Literal["PROVEN", "PARTIAL", "DEGRADED", "NOT_PROVEN"]
     evidence_class: Literal["PROVEN", "SCRIPTED_PROVEN", "NOT_PROVEN"]
     source_refs: tuple[Annotated[str, Field(min_length=1)], ...] = Field(min_length=1)
     operational_authority: Literal[False] = False
@@ -123,8 +153,14 @@ class M6Claim(AuthorityModel):
             raise ValueError("scripted proof claim must have PROVEN status")
         if "stable real nova" in lowered and self.status == "PROVEN":
             raise ValueError("stable real Nova usefulness cannot be proven")
-        if "agentcore" in lowered and self.status == "PROVEN":
-            raise ValueError("AgentCore capability cannot be proven by this bundle")
+        if (
+            "agentcore" in lowered
+            and self.status == "PROVEN"
+            and "runtime" not in lowered
+            and "deployment" not in lowered
+            and "observability" not in lowered
+        ):
+            raise ValueError("unscoped AgentCore capability cannot be proven by this bundle")
         if "write authority" in lowered and "no write authority" not in lowered:
             raise ValueError("advisory write authority claim is unsafe")
         return self
@@ -141,10 +177,20 @@ class M6Capability(AuthorityModel):
 
     @model_validator(mode="after")
     def capability_boundary(self) -> M6Capability:
-        if self.capability_id in M6_AGENTCORE_CAPABILITIES and self.status != "NOT_PROVEN":
-            raise ValueError("AgentCore capability must remain NOT_PROVEN")
-        if self.capability_id in M6_AGENTCORE_CAPABILITIES and self.evidence_class != "NOT_PROVEN":
-            raise ValueError("AgentCore capability evidence must remain NOT_PROVEN")
+        if (
+            self.capability_id in M6_AGENTCORE_NOT_PROVEN_CAPABILITIES
+            and self.status != "NOT_PROVEN"
+        ):
+            raise ValueError("AgentCore Gateway or Policy must remain NOT_PROVEN")
+        if (
+            self.capability_id in M6_AGENTCORE_NOT_PROVEN_CAPABILITIES
+            and self.evidence_class != "NOT_PROVEN"
+        ):
+            raise ValueError("AgentCore Gateway or Policy evidence must remain NOT_PROVEN")
+        if self.capability_id in M6_AGENTCORE_PROVEN_CAPABILITIES and (
+            self.status != "PROVEN" or self.evidence_class != "PROVEN"
+        ):
+            raise ValueError("AgentCore Runtime deployment/observability proof must be PROVEN")
         if self.capability_id == "stable_real_nova_usefulness" and self.status != "NOT_PROVEN":
             raise ValueError("stable real Nova usefulness must remain NOT_PROVEN")
         if self.capability_id == "real_bedrock_nova_integration" and self.status != "PROVEN":
@@ -206,11 +252,81 @@ class M6RealIntegrationProof(AuthorityModel):
     source_refs: tuple[Annotated[str, Field(min_length=1)], ...] = Field(min_length=1)
 
 
+class M6AgentCoreRuntimeProof(AuthorityModel):
+    """Redacted evidence for the deployed, non-authoritative AgentCore slice.
+
+    The runtime proof is intentionally separate from Nova usefulness.  A READY runtime,
+    one real invocation, and observable logs establish the integration boundary; the
+    partial advisory result does not establish stable model usefulness or authority.
+    """
+
+    status: Literal["PROVEN"] = "PROVEN"
+    evidence_class: Literal["PROVEN"] = "PROVEN"
+    runtime_name: Literal["missing20_advisory"] = M6_RUNTIME_NAME
+    endpoint: Literal["DEFAULT"] = M6_RUNTIME_ENDPOINT
+    runtime_status: Literal["READY"] = M6_RUNTIME_STATUS
+    deployment_type: Literal["direct_code_deploy"] = "direct_code_deploy"
+    provider: Literal["agentcore"] = M6_RUNTIME_PROVIDER
+    model: Literal["agentcore-runtime"] = M6_RUNTIME_MODEL
+    region: Literal["us-west-2"] = M6_REGION
+    deployment_status: Literal["PROVEN"] = "PROVEN"
+    invocation_status: Literal["PROVEN"] = "PROVEN"
+    observability_status: Literal["PROVEN"] = "PROVEN"
+    investigators_completed: int = Field(ge=3)
+    synthesis_status: Literal["COMPLETED"] = "COMPLETED"
+    evaluator_result: Literal["ACCEPT"] = "ACCEPT"
+    advisory_status: Literal["PARTIAL"] = "PARTIAL"
+    ai_citation_coverage: int = Field(ge=0)
+    ai_citation_admitted: int = Field(gt=0)
+    application_authoritative_validation: int = Field(ge=0)
+    application_authoritative_admitted: int = Field(gt=0)
+    role_chat_status: Literal["PROVEN"] = "PROVEN"
+    role_chat_read_only: Literal[True] = True
+    authority_boundary_chat_status: Literal["PROVEN"] = "PROVEN"
+    prompt_injection_check: Literal["PASS"] = "PASS"
+    deterministic_recovery_status: Literal["CLOSED"] = "CLOSED"
+    deterministic_two_role_quorums: int = Field(ge=2)
+    deterministic_controlled_effects: int = Field(ge=2)
+    deterministic_verification: Literal[True] = True
+    deterministic_replay_effect_delta: Literal[0] = 0
+    runtime_logs_created: Literal[True] = True
+    trace_delivery: Literal["PARTIAL_CONFIGURATION_WARNING"] = "PARTIAL_CONFIGURATION_WARNING"
+    known_token_cost_estimate_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
+    source_refs: tuple[Annotated[str, Field(min_length=1)], ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def runtime_scope_is_truthful(self) -> M6AgentCoreRuntimeProof:
+        if self.runtime_status != "READY":
+            raise ValueError("AgentCore Runtime deployment is not READY")
+        if self.ai_citation_coverage > self.ai_citation_admitted:
+            raise ValueError("AI citation coverage cannot exceed admitted records")
+        if self.application_authoritative_validation != self.application_authoritative_admitted:
+            raise ValueError("application authoritative validation must cover admitted records")
+        if self.ai_citation_coverage != M6_RUNTIME_AI_CITATIONS_COVERED:
+            raise ValueError("real Nova usefulness citation coverage is not the captured 1/5")
+        if self.ai_citation_admitted != M6_RUNTIME_AI_CITATIONS_ADMITTED:
+            raise ValueError("real Nova usefulness admitted count is not the captured 5")
+        if self.application_authoritative_validation != M6_RUNTIME_APP_VALIDATED:
+            raise ValueError("application authoritative validation count is not the captured 5")
+        if self.application_authoritative_admitted != M6_RUNTIME_APP_ADMITTED:
+            raise ValueError("application authoritative admitted count is not the captured 5")
+        if self.known_token_cost_estimate_usd != M6_RUNTIME_KNOWN_TOKEN_COST_USD:
+            raise ValueError("AgentCore known token cost estimate is not the captured value")
+        if self.deterministic_replay_effect_delta != 0:
+            raise ValueError("deterministic recovery replay must have zero effect delta")
+        return self
+
+
 class M6CostBoundary(AuthorityModel):
     prior_estimated_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
     existing_incremental_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
+    runtime_known_token_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
+    runtime_acceptance_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
     cumulative_estimated_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
     hard_cap_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
+    authority_boundary_chat_cost_status: Literal["NOT_RECORDED_EXCLUDED"] = (
+        M6_AUTHORITY_CHAT_COST_STATUS
+    )
     new_provider_calls: Literal[0] = 0
     new_aws_cost_usd: Literal["0"] = "0"
     source_refs: tuple[Annotated[str, Field(min_length=1)], ...] = Field(min_length=1)
@@ -229,6 +345,7 @@ class M6ProofBundle(AuthorityModel):
     lifecycle: M6LifecycleProof
     scripted_advisory: M6ScriptedAdvisoryProof
     real_provider_integration: M6RealIntegrationProof
+    agentcore_runtime: M6AgentCoreRuntimeProof
     capabilities: tuple[M6Capability, ...] = Field(min_length=1)
     cost_boundary: M6CostBoundary
     claims: tuple[M6Claim, ...] = Field(min_length=1)
@@ -260,6 +377,7 @@ class M6ProofBundle(AuthorityModel):
         check_refs(self.lifecycle.source_refs)
         check_refs(self.scripted_advisory.source_refs)
         check_refs(self.real_provider_integration.source_refs)
+        check_refs(self.agentcore_runtime.source_refs)
         check_refs(self.cost_boundary.source_refs)
         required_capabilities = {
             "local_deterministic_lifecycle",
@@ -279,7 +397,8 @@ class M6ProofBundle(AuthorityModel):
             "scripted_strands_advisory": ("SCRIPTED_PROVEN", "SCRIPTED_PROVEN"),
             "real_bedrock_nova_integration": ("PROVEN", "PROVEN"),
             "stable_real_nova_usefulness": ("NOT_PROVEN", "NOT_PROVEN"),
-            **{item: ("NOT_PROVEN", "NOT_PROVEN") for item in M6_AGENTCORE_CAPABILITIES},
+            **{item: ("PROVEN", "PROVEN") for item in M6_AGENTCORE_PROVEN_CAPABILITIES},
+            **{item: ("NOT_PROVEN", "NOT_PROVEN") for item in M6_AGENTCORE_NOT_PROVEN_CAPABILITIES},
         }
         if capability_statuses != expected_capability_statuses:
             raise ValueError("M6 capability status is contradictory")
@@ -287,9 +406,11 @@ class M6ProofBundle(AuthorityModel):
             "deterministic-lifecycle": ("PROVEN", "PROVEN"),
             "scripted-strands": ("PROVEN", "SCRIPTED_PROVEN"),
             "real-integration": ("DEGRADED", "PROVEN"),
-            "real-usefulness": ("NOT_PROVEN", "NOT_PROVEN"),
+            "real-usefulness": ("PARTIAL", "PROVEN"),
             "agentcore-capabilities": ("NOT_PROVEN", "NOT_PROVEN"),
             "advisory-boundary": ("PROVEN", "PROVEN"),
+            "agentcore-runtime": ("PROVEN", "PROVEN"),
+            "application-validation": ("PROVEN", "PROVEN"),
         }
         observed_claim_statuses = {
             item.claim_id: (item.status, item.evidence_class) for item in self.claims
@@ -309,11 +430,20 @@ class M6ProofBundle(AuthorityModel):
                 "Real Bedrock/Nova connectivity and degradation observability are PROVEN as "
                 "integration evidence only."
             ),
-            "real-usefulness": "Stable real Nova usefulness is NOT_PROVEN.",
+            "real-usefulness": (
+                "Real Nova multi-agent usefulness is PARTIAL: AI-authored citation coverage "
+                "is 1/5; application authoritative validation is 5/5."
+            ),
             "agentcore-capabilities": (
-                "All AgentCore capabilities are NOT_PROVEN by this existing-evidence bundle."
+                "AgentCore Gateway and Policy are NOT_PROVEN by this evidence bundle."
             ),
             "advisory-boundary": "Model output is advisory only and has NO WRITE AUTHORITY.",
+            "agentcore-runtime": (
+                "AgentCore Runtime deployment, invocation, and observability are PROVEN."
+            ),
+            "application-validation": (
+                "Application authoritative validation covers all 5 admitted evidence records."
+            ),
         }
         observed_claim_statements = {item.claim_id: item.statement for item in self.claims}
         if observed_claim_statements != expected_claim_statements:
@@ -331,11 +461,17 @@ class M6ProofBundle(AuthorityModel):
             ),
             "real-usefulness": (
                 "artifacts/agent/authority-b-usefulness-proof-v1.json",
+                M6_AGENTCORE_RUNTIME_PROOF_PATH,
                 "artifacts/golden/golden-v2.json",
             ),
-            "agentcore-capabilities": ("artifacts/golden/golden-v2.json",),
+            "agentcore-capabilities": (M6_AGENTCORE_RUNTIME_PROOF_PATH,),
             "advisory-boundary": (
                 "artifacts/agent/authority-b-advisory-v1.json",
+                LIFECYCLE_ARTIFACT_PATH,
+            ),
+            "agentcore-runtime": (M6_AGENTCORE_RUNTIME_PROOF_PATH,),
+            "application-validation": (
+                M6_AGENTCORE_RUNTIME_PROOF_PATH,
                 LIFECYCLE_ARTIFACT_PATH,
             ),
         }
@@ -355,9 +491,10 @@ class M6ProofBundle(AuthorityModel):
             ),
             "stable_real_nova_usefulness": (
                 "artifacts/agent/authority-b-usefulness-proof-v1.json",
+                M6_AGENTCORE_RUNTIME_PROOF_PATH,
                 "artifacts/golden/golden-v2.json",
             ),
-            **{item: ("artifacts/golden/golden-v2.json",) for item in M6_AGENTCORE_CAPABILITIES},
+            **{item: (M6_AGENTCORE_RUNTIME_PROOF_PATH,) for item in M6_AGENTCORE_CAPABILITIES},
         }
         observed_capability_refs = {
             item.capability_id: item.source_refs for item in self.capabilities
@@ -375,7 +512,7 @@ class M6ProofBundle(AuthorityModel):
             or self.real_provider_integration.request_count != 6
             or self.real_provider_integration.input_tokens != 11073
             or self.real_provider_integration.output_tokens != 1643
-            or self.real_provider_integration.estimated_cost_usd != M6_INCREMENTAL_COST_USD
+            or self.real_provider_integration.estimated_cost_usd != M6_PROVIDER_FAILURE_COST_USD
         ):
             raise ValueError("M6 real integration evidence is contradictory")
         if (
@@ -388,8 +525,12 @@ class M6ProofBundle(AuthorityModel):
         if (
             self.cost_boundary.prior_estimated_cost_usd != M6_PRIOR_COST_USD
             or self.cost_boundary.existing_incremental_cost_usd != M6_INCREMENTAL_COST_USD
+            or self.cost_boundary.runtime_known_token_cost_usd != M6_RUNTIME_KNOWN_TOKEN_COST_USD
+            or self.cost_boundary.runtime_acceptance_cost_usd != M6_RUNTIME_ACCEPTANCE_COST_USD
             or self.cost_boundary.cumulative_estimated_cost_usd != M6_CUMULATIVE_COST_USD
             or self.cost_boundary.hard_cap_usd != M6_COST_CAP_USD
+            or self.cost_boundary.authority_boundary_chat_cost_status
+            != M6_AUTHORITY_CHAT_COST_STATUS
         ):
             raise ValueError("M6 cost boundary is contradictory")
         if self.cost_boundary.new_provider_calls != 0 or self.cost_boundary.new_aws_cost_usd != "0":
@@ -457,6 +598,7 @@ def _source_artifacts(repository_root: Path) -> tuple[M6SourceArtifact, ...]:
         ),
         LIFECYCLE_ARTIFACT_PATH: "LOCAL_DETERMINISTIC_LIFECYCLE",
         "fixtures/scenarios/retryable-document-lock.json": "SYNTHETIC_FIXTURE",
+        M6_AGENTCORE_RUNTIME_PROOF_PATH: "AGENTCORE_RUNTIME_DEPLOYMENT_AND_E2E",
     }
     result: list[M6SourceArtifact] = []
     for path in sorted(M6_APPROVED_SOURCE_DIGESTS):
@@ -532,7 +674,7 @@ def _validate_real_provider(
         or claim.get("authority_version") != "authority-rebaseline-b/v1"
     ):
         raise M6ProofError("provider attempt claim is not the approved Authority-B claim")
-    if claim.get("prior_cost_usd") != M6_PRIOR_COST_USD:
+    if claim.get("prior_cost_usd") != M6_PROVIDER_ATTEMPT_PRIOR_COST_USD:
         raise M6ProofError("provider attempt prior cost is contradictory")
     if failure.get("status") != "DEGRADED" or failure.get("provider") != M6_PROVIDER:
         raise M6ProofError("real provider outcome is not the approved degraded record")
@@ -559,13 +701,163 @@ def _validate_real_provider(
     inputs = int(usage.get("input_tokens", 0))
     outputs = int(usage.get("output_tokens", 0))
     cost = str(usage.get("estimated_cost_usd", ""))
-    if requests <= 0 or inputs < 0 or outputs < 0 or cost != M6_INCREMENTAL_COST_USD:
+    if requests <= 0 or inputs < 0 or outputs < 0 or cost != M6_PROVIDER_FAILURE_COST_USD:
         raise M6ProofError("provider outcome usage or cost is invalid")
     if failure.get("claim_id") != claim.get("claim_id"):
         raise M6ProofError("provider outcome does not match the attempt claim")
     if advisory.get("case_id") != "case-01-retryable-lock-main-path":
         raise M6ProofError("provider advisory case identity is unexpected")
     return requests, inputs, outputs, cost
+
+
+def _validate_agentcore_runtime(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the redacted runtime/deployment and final real E2E evidence."""
+
+    runtime = value.get("runtime")
+    boundary = value.get("execution_boundary")
+    invocation = value.get("acceptance_invocation")
+    e2e = value.get("real_end_to_end_acceptance")
+    security = value.get("security_checks")
+    observability = value.get("observability")
+    if not all(
+        isinstance(item, dict)
+        for item in (runtime, boundary, invocation, e2e, security, observability)
+    ):
+        raise M6ProofError("AgentCore Runtime proof is missing a required section")
+    assert isinstance(runtime, dict)
+    assert isinstance(boundary, dict)
+    assert isinstance(invocation, dict)
+    assert isinstance(e2e, dict)
+    assert isinstance(security, dict)
+    assert isinstance(observability, dict)
+    if (
+        runtime.get("name") != M6_RUNTIME_NAME
+        or runtime.get("endpoint") != M6_RUNTIME_ENDPOINT
+        or runtime.get("status") != M6_RUNTIME_STATUS
+        or runtime.get("deployment_type") != "direct_code_deploy"
+        or value.get("region") != M6_REGION
+    ):
+        raise M6ProofError("AgentCore Runtime identity or deployment status is contradictory")
+    if (
+        boundary.get("provider") != "amazon_bedrock"
+        or boundary.get("model") != M6_MODEL
+        or boundary.get("read_only") is not True
+        or boundary.get("authority") != "ADVISORY_NOT_OPERATIONAL_DECISION"
+        or boundary.get("tools") != []
+    ):
+        raise M6ProofError("AgentCore Runtime execution boundary is contradictory")
+    if (
+        invocation.get("status") != "COMPLETED"
+        or invocation.get("data_class") != "synthetic_supply_chain_incident"
+        or invocation.get("stage") != "retryable_investigator"
+        or str(invocation.get("cost_estimate_usd")) != M6_RUNTIME_ACCEPTANCE_COST_USD
+    ):
+        raise M6ProofError("AgentCore Runtime acceptance invocation is contradictory")
+    investigation = e2e.get("agent_investigation")
+    role_chat = e2e.get("role_chat")
+    authority_chat = e2e.get("authority_boundary_chat")
+    injection = e2e.get("prompt_injection_check")
+    recovery = e2e.get("deterministic_recovery")
+    if not all(
+        isinstance(item, dict)
+        for item in (investigation, role_chat, authority_chat, injection, recovery)
+    ):
+        raise M6ProofError("AgentCore Runtime E2E proof is missing a required section")
+    assert isinstance(investigation, dict)
+    assert isinstance(role_chat, dict)
+    assert isinstance(authority_chat, dict)
+    assert isinstance(injection, dict)
+    assert isinstance(recovery, dict)
+    citation = investigation.get("ai_citation_coverage")
+    app_catalog = investigation.get("application_authoritative_catalog")
+    transport_usage = investigation.get("transport_usage")
+    if (
+        not isinstance(citation, dict)
+        or not isinstance(app_catalog, dict)
+        or not isinstance(transport_usage, dict)
+    ):
+        raise M6ProofError("AgentCore Runtime investigation proof is incomplete")
+    if (
+        investigation.get("provider") != M6_RUNTIME_PROVIDER
+        or investigation.get("model") != M6_RUNTIME_MODEL
+        or investigation.get("status") != "PARTIAL"
+        or investigation.get("investigators_completed") != 3
+        or investigation.get("synthesis_status") != "COMPLETED"
+        or investigation.get("selected_hypothesis") != "RETRYABLE_MESSAGE"
+        or investigation.get("evaluator_result") != "ACCEPT"
+        or investigation.get("warning") != "AI_CITATION_CLOSURE_INCOMPLETE"
+        or citation.get("covered") != M6_RUNTIME_AI_CITATIONS_COVERED
+        or citation.get("admitted") != M6_RUNTIME_AI_CITATIONS_ADMITTED
+        or app_catalog.get("validated") != M6_RUNTIME_APP_VALIDATED
+        or app_catalog.get("admitted") != M6_RUNTIME_APP_ADMITTED
+    ):
+        raise M6ProofError("AgentCore Runtime advisory/usefulness evidence is contradictory")
+    if (
+        role_chat.get("status") != "COMPLETED"
+        or role_chat.get("read_only") is not True
+        or authority_chat.get("status") != "COMPLETED"
+        or authority_chat.get("operational_effects") != 0
+        or injection.get("status") != "PASS"
+        or recovery.get("status") != "CLOSED"
+        or recovery.get("expected_quantity") != 100
+        or recovery.get("erp_quantity") != 100
+        or recovery.get("queue_quantity") != 0
+        or recovery.get("controlled_effects") != 2
+        or recovery.get("two_role_approval_required_per_effect") is not True
+        or recovery.get("verified") is not True
+        or recovery.get("replay_safe") is not True
+        or recovery.get("replay_effect_delta") != 0
+    ):
+        raise M6ProofError(
+            "AgentCore Runtime role-chat or deterministic closure proof is contradictory"
+        )
+    if (
+        security.get("temporary_deployer_pass_role_removed") is not True
+        or security.get("invalid_stage_failed_closed") is not True
+        or security.get("credentials_or_prompts_persisted") is not False
+        or observability.get("runtime_logs_created") is not True
+        or observability.get("cloudwatch_trace_delivery") != "PARTIAL_CONFIGURATION_WARNING"
+    ):
+        raise M6ProofError("AgentCore Runtime security or observability proof is contradictory")
+    if transport_usage.get("input_tokens") != 44356 or transport_usage.get("output_tokens") != 1674:
+        raise M6ProofError("AgentCore Runtime investigation token evidence is contradictory")
+    if role_chat.get("input_tokens") != 8925 or role_chat.get("output_tokens") != 298:
+        raise M6ProofError("AgentCore Runtime role-chat token evidence is contradictory")
+    if str(e2e.get("known_token_cost_estimate_usd")) != M6_RUNTIME_KNOWN_TOKEN_COST_USD:
+        raise M6ProofError("AgentCore Runtime known token subtotal is contradictory")
+    if any(
+        field in authority_chat
+        for field in ("input_tokens", "output_tokens", "known_token_cost_estimate_usd")
+    ):
+        raise M6ProofError("AgentCore authority-boundary chat cost must remain excluded")
+    return {
+        "investigators_completed": 3,
+        "ai_citation_coverage": M6_RUNTIME_AI_CITATIONS_COVERED,
+        "ai_citation_admitted": M6_RUNTIME_AI_CITATIONS_ADMITTED,
+        "application_authoritative_validation": M6_RUNTIME_APP_VALIDATED,
+        "application_authoritative_admitted": M6_RUNTIME_APP_ADMITTED,
+        "deterministic_two_role_quorums": 2,
+        "deterministic_controlled_effects": 2,
+        "known_token_cost_estimate_usd": M6_RUNTIME_KNOWN_TOKEN_COST_USD,
+    }
+
+
+def _build_agentcore_runtime_proof(
+    source_refs: Mapping[str, str], values: Mapping[str, Any]
+) -> M6AgentCoreRuntimeProof:
+    runtime = values[M6_AGENTCORE_RUNTIME_PROOF_PATH]
+    validated = _validate_agentcore_runtime(runtime)
+    return M6AgentCoreRuntimeProof(
+        investigators_completed=validated["investigators_completed"],
+        ai_citation_coverage=validated["ai_citation_coverage"],
+        ai_citation_admitted=validated["ai_citation_admitted"],
+        application_authoritative_validation=validated["application_authoritative_validation"],
+        application_authoritative_admitted=validated["application_authoritative_admitted"],
+        deterministic_two_role_quorums=validated["deterministic_two_role_quorums"],
+        deterministic_controlled_effects=validated["deterministic_controlled_effects"],
+        known_token_cost_estimate_usd=validated["known_token_cost_estimate_usd"],
+        source_refs=(source_refs["agentcore_runtime"],),
+    )
 
 
 def _build_capabilities(source_refs: Mapping[str, str]) -> tuple[M6Capability, ...]:
@@ -595,18 +887,47 @@ def _build_capabilities(source_refs: Mapping[str, str]) -> tuple[M6Capability, .
             capability_id="stable_real_nova_usefulness",
             status="NOT_PROVEN",
             evidence_class="NOT_PROVEN",
-            scope="no stable real-provider usefulness claim",
-            source_refs=(source_refs["usefulness"], source_refs["golden"]),
+            scope="stable real-provider usefulness remains unproven; captured run is partial",
+            source_refs=(
+                source_refs["usefulness"],
+                source_refs["agentcore_runtime"],
+                source_refs["golden"],
+            ),
         ),
-        *(
-            M6Capability(
-                capability_id=capability,
-                status="NOT_PROVEN",
-                evidence_class="NOT_PROVEN",
-                scope="no approved M6 evidence; advisory has no write authority",
-                source_refs=(source_refs["golden"],),
-            )
-            for capability in M6_AGENTCORE_CAPABILITIES
+        M6Capability(
+            capability_id="agentcore_runtime",
+            status="PROVEN",
+            evidence_class="PROVEN",
+            scope="READY AgentCore Runtime deployment and one redacted real invocation",
+            source_refs=(source_refs["agentcore_runtime"],),
+        ),
+        M6Capability(
+            capability_id="agentcore_gateway",
+            status="NOT_PROVEN",
+            evidence_class="NOT_PROVEN",
+            scope="no AgentCore Gateway deployment or invocation evidence",
+            source_refs=(source_refs["agentcore_runtime"],),
+        ),
+        M6Capability(
+            capability_id="agentcore_policy",
+            status="NOT_PROVEN",
+            evidence_class="NOT_PROVEN",
+            scope="no AgentCore Policy evidence; deterministic local policy governs recovery",
+            source_refs=(source_refs["agentcore_runtime"],),
+        ),
+        M6Capability(
+            capability_id="agentcore_observability",
+            status="PROVEN",
+            evidence_class="PROVEN",
+            scope="runtime logs and trace-delivery warning are observable",
+            source_refs=(source_refs["agentcore_runtime"],),
+        ),
+        M6Capability(
+            capability_id="agentcore_deployment",
+            status="PROVEN",
+            evidence_class="PROVEN",
+            scope="direct code deployment to a READY AgentCore Runtime",
+            source_refs=(source_refs["agentcore_runtime"],),
         ),
     )
 
@@ -645,17 +966,24 @@ def _build_claims(source_refs: Mapping[str, str]) -> tuple[M6Claim, ...]:
         ),
         M6Claim(
             claim_id="real-usefulness",
-            statement="Stable real Nova usefulness is NOT_PROVEN.",
-            status="NOT_PROVEN",
-            evidence_class="NOT_PROVEN",
-            source_refs=(source_refs["usefulness"], source_refs["golden"]),
+            statement=(
+                "Real Nova multi-agent usefulness is PARTIAL: AI-authored citation coverage "
+                "is 1/5; application authoritative validation is 5/5."
+            ),
+            status="PARTIAL",
+            evidence_class="PROVEN",
+            source_refs=(
+                source_refs["usefulness"],
+                source_refs["agentcore_runtime"],
+                source_refs["golden"],
+            ),
         ),
         M6Claim(
             claim_id="agentcore-capabilities",
-            statement="All AgentCore capabilities are NOT_PROVEN by this existing-evidence bundle.",
+            statement="AgentCore Gateway and Policy are NOT_PROVEN by this evidence bundle.",
             status="NOT_PROVEN",
             evidence_class="NOT_PROVEN",
-            source_refs=(source_refs["golden"],),
+            source_refs=(source_refs["agentcore_runtime"],),
         ),
         M6Claim(
             claim_id="advisory-boundary",
@@ -663,6 +991,22 @@ def _build_claims(source_refs: Mapping[str, str]) -> tuple[M6Claim, ...]:
             status="PROVEN",
             evidence_class="PROVEN",
             source_refs=(source_refs["advisory"], source_refs["lifecycle"]),
+        ),
+        M6Claim(
+            claim_id="agentcore-runtime",
+            statement="AgentCore Runtime deployment, invocation, and observability are PROVEN.",
+            status="PROVEN",
+            evidence_class="PROVEN",
+            source_refs=(source_refs["agentcore_runtime"],),
+        ),
+        M6Claim(
+            claim_id="application-validation",
+            statement=(
+                "Application authoritative validation covers all 5 admitted evidence records."
+            ),
+            status="PROVEN",
+            evidence_class="PROVEN",
+            source_refs=(source_refs["agentcore_runtime"], source_refs["lifecycle"]),
         ),
     )
 
@@ -693,7 +1037,9 @@ def build_m6_aws_proof(repository_root: Path) -> M6ProofBundle:
         "usefulness": "artifacts/agent/authority-b-usefulness-proof-v1.json",
         "lifecycle": LIFECYCLE_ARTIFACT_PATH,
         "fixture": "fixtures/scenarios/retryable-document-lock.json",
+        "agentcore_runtime": M6_AGENTCORE_RUNTIME_PROOF_PATH,
     }
+    _validate_agentcore_runtime(values[M6_AGENTCORE_RUNTIME_PROOF_PATH])
     lifecycle_proof = M6LifecycleProof(
         case_id=lifecycle.case_id,
         trace_id=lifecycle.trace_id,
@@ -725,18 +1071,26 @@ def build_m6_aws_proof(repository_root: Path) -> M6ProofBundle:
             source_refs["usefulness"],
         ),
     )
+    agentcore_runtime_proof = _build_agentcore_runtime_proof(source_refs, values)
     cost_boundary = M6CostBoundary(
         prior_estimated_cost_usd=M6_PRIOR_COST_USD,
         existing_incremental_cost_usd=M6_INCREMENTAL_COST_USD,
+        runtime_known_token_cost_usd=M6_RUNTIME_KNOWN_TOKEN_COST_USD,
+        runtime_acceptance_cost_usd=M6_RUNTIME_ACCEPTANCE_COST_USD,
         cumulative_estimated_cost_usd=M6_CUMULATIVE_COST_USD,
         hard_cap_usd=M6_COST_CAP_USD,
-        source_refs=(source_refs["claim"], source_refs["failure"]),
+        source_refs=(
+            source_refs["claim"],
+            source_refs["failure"],
+            source_refs["agentcore_runtime"],
+        ),
     )
     bundle = M6ProofBundle(
         source_artifacts=_source_artifacts(root),
         lifecycle=lifecycle_proof,
         scripted_advisory=scripted_proof,
         real_provider_integration=real_proof,
+        agentcore_runtime=agentcore_runtime_proof,
         capabilities=_build_capabilities(source_refs),
         cost_boundary=cost_boundary,
         claims=_build_claims(source_refs),
@@ -793,6 +1147,7 @@ def write_m6_aws_proof(repository_root: Path, *, output: Path | None = None) -> 
 
 __all__ = [
     "M6_AWS_PROOF_ARTIFACT_PATH",
+    "M6_AGENTCORE_RUNTIME_PROOF_PATH",
     "M6_APPROVED_SOURCE_DIGESTS",
     "M6_APPROVED_SOURCE_SCHEMAS",
     "M6_COST_CAP_USD",
@@ -801,9 +1156,27 @@ __all__ = [
     "M6_PROOF_SCHEMA_VERSION",
     "M6_SCHEMA_VERSION",
     "M6_AGENTCORE_CAPABILITIES",
+    "M6_AGENTCORE_NOT_PROVEN_CAPABILITIES",
+    "M6_AGENTCORE_PROVEN_CAPABILITIES",
+    "M6_RUNTIME_AI_CITATIONS_ADMITTED",
+    "M6_RUNTIME_AI_CITATIONS_COVERED",
+    "M6_RUNTIME_APP_ADMITTED",
+    "M6_RUNTIME_APP_VALIDATED",
+    "M6_RUNTIME_ACCEPTANCE_COST_USD",
+    "M6_RUNTIME_KNOWN_TOKEN_COST_USD",
+    "M6_AUTHORITY_CHAT_COST_STATUS",
+    "M6_CUMULATIVE_COST_USD",
+    "M6_INCREMENTAL_COST_USD",
+    "M6_PRIOR_COST_USD",
+    "M6_PROVIDER_ATTEMPT_PRIOR_COST_USD",
+    "M6_PROVIDER_FAILURE_COST_USD",
+    "M6_RUNTIME_MODEL",
+    "M6_RUNTIME_NAME",
+    "M6_RUNTIME_PROVIDER",
     "M6Capability",
     "M6Claim",
     "M6CostBoundary",
+    "M6AgentCoreRuntimeProof",
     "M6EvidenceClass",
     "M6LifecycleProof",
     "M6ProofBundle",

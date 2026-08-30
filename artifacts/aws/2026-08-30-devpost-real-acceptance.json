@@ -1,0 +1,60 @@
+{
+  "schema_version": "missing20-devpost-real-acceptance/v1",
+  "date": "2026-08-30",
+  "synthetic_business_data": true,
+  "runtime": {
+    "service": "Amazon Bedrock AgentCore Runtime",
+    "endpoint": "DEFAULT",
+    "region": "us-west-2",
+    "status": "READY",
+    "identifiers_redacted": true
+  },
+  "investigation": {
+    "provider": "agentcore",
+    "model": "agentcore-runtime",
+    "status": "PARTIAL",
+    "investigators_completed": 3,
+    "synthesis_selected_hypothesis": "RETRYABLE_MESSAGE",
+    "evaluation": "ACCEPT",
+    "ai_citation_coverage": "1/5",
+    "application_authoritative_validation": "5/5",
+    "warning": "AI_CITATION_CLOSURE_INCOMPLETE",
+    "input_tokens": 44355,
+    "output_tokens": 1673,
+    "transport_request_cycles": 23,
+    "estimated_cost_usd": 0.0408376
+  },
+  "role_chat": {
+    "selected_agent_id": "retryable_message_investigator",
+    "intent": "inspect_incident",
+    "status": "COMPLETE",
+    "read_only": true,
+    "authority": "ADVISORY_NOT_OPERATIONAL_DECISION",
+    "citation_count": 3,
+    "citation_source_types": [
+      "ERP_RECEIPT",
+      "FAILED_MESSAGE_QUEUE",
+      "WAREHOUSE"
+    ],
+    "input_tokens": 8954,
+    "output_tokens": 357,
+    "transport_request_cycles": 5,
+    "estimated_cost_usd": 0.0083056
+  },
+  "cost": {
+    "pricing_basis": "Frozen Nova Pro engineering estimate: $0.80/M input tokens and $3.20/M output tokens",
+    "new_estimated_cost_usd": 0.0491432,
+    "prior_known_estimated_cost_usd": 0.1749144,
+    "cumulative_known_estimated_cost_usd": 0.2240576,
+    "aws_invoice": false
+  },
+  "claims": {
+    "agentcore_runtime_deployment_and_invocation": "PROVEN",
+    "real_role_chat": "PROVEN_READ_ONLY",
+    "real_multi_agent_investigation": "PROVEN_PARTIAL",
+    "stable_real_nova_usefulness": "NOT_PROVEN",
+    "agentcore_gateway": "NOT_PROVEN",
+    "agentcore_policy": "NOT_PROVEN",
+    "production_business_impact": "NOT_PROVEN"
+  }
+}

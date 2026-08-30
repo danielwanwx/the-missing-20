@@ -65,7 +65,11 @@ class DiscrepancyDetector:
         if (
             missing < 0
             or snapshot.invoice.quantity != expected
-            or (missing == 0 and snapshot.invoice.state.value != "HELD")
+            or (
+                missing == 0
+                and fixture.scenario_id != "healthy-flow"
+                and snapshot.invoice.state.value != "HELD"
+            )
         ):
             raise ValueError("fixture does not contain the approved receipt discrepancy")
 
@@ -176,10 +180,10 @@ class DiscrepancyDetector:
             detector_evidence_ids=tuple(item.evidence_id for item in evidence),
             created_at=occurred_at,
         )
-        self.store.create_case(case, genesis)
-        for item in evidence:
-            self.store.add_evidence(item)
-        started, _ = self.store.apply_transition(
+        started, _ = self.store.create_detected_case(
+            case,
+            genesis,
+            evidence,
             TransitionCommand(
                 case_id=case_id,
                 expected_version=0,
@@ -187,6 +191,6 @@ class DiscrepancyDetector:
                 idempotency_key="case-investigation-started",
                 trace_id=trace_id,
                 occurred_at=occurred_at,
-            )
+            ),
         )
         return started, evidence

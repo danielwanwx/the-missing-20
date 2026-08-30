@@ -1,0 +1,648 @@
+{
+  "schema": "phase1-correction-verification/v1",
+  "results": [
+    {
+      "width": 1440,
+      "bodyScroll": 1440,
+      "docScroll": 1440,
+      "words": 141,
+      "unitButtons": 0,
+      "densityStrips": 1,
+      "densityCells": 100,
+      "diagramStories": {
+        "topology": true,
+        "reconciliation": true,
+        "health": true,
+        "external": true
+      },
+      "diagramMeta": {
+        "reconciliation": 0,
+        "queue": 0,
+        "erp": 0,
+        "invoice": 0,
+        "external": 3
+      },
+      "labels": [
+        {
+          "name": "Warehouse",
+          "count": "100",
+          "semantic": "dispatched"
+        },
+        {
+          "name": "Message Queue",
+          "count": "0",
+          "semantic": "backlog"
+        },
+        {
+          "name": "ERP",
+          "count": "100",
+          "semantic": "posted"
+        },
+        {
+          "name": "Invoice",
+          "count": "100",
+          "semantic": "completed"
+        }
+      ],
+      "agentStatusButtons": 0,
+      "activeIncidentButtons": 0,
+      "routeCandidates": [],
+      "allVisibleControls": [
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Warehouse\n100\nDISPATCHED",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Message Queue\n0\nBACKLOG",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "ERP\n100\nPOSTED",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-neutral",
+          "text": "Invoice\n100\nCOMPLETED",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        }
+      ],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "externalRequests": [],
+      "scenario": {
+        "url": "http://127.0.0.1:58378/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ],
+        "gap": "0",
+        "status": "Healthy"
+      },
+      "chartKeyboard": [
+        {
+          "canvas": "dashboard-chart",
+          "detail": "Select a node or data point to inspect the live flow.",
+          "labels": [
+            "LIVE",
+            "LIVE",
+            "LIVE"
+          ]
+        },
+        {
+          "canvas": "queue-health-chart",
+          "detail": "Select a node or data point to inspect the live flow.",
+          "labels": [
+            "LIVE",
+            "LIVE",
+            "LIVE"
+          ]
+        },
+        {
+          "canvas": "erp-health-chart",
+          "detail": "Select a node or data point to inspect the live flow.",
+          "labels": [
+            "LIVE",
+            "LIVE",
+            "LIVE"
+          ]
+        },
+        {
+          "canvas": "invoice-health-chart",
+          "detail": "Select a node or data point to inspect the live flow.",
+          "labels": [
+            "LIVE",
+            "LIVE",
+            "LIVE"
+          ]
+        },
+        {
+          "canvas": "external-risk-chart",
+          "detail": "Select a node or data point to inspect the live flow.",
+          "labels": [
+            "LIVE",
+            "LIVE",
+            "LIVE"
+          ]
+        }
+      ],
+      "reducedMotion": {
+        "animationName": "none",
+        "animationDuration": "0s"
+      },
+      "beforeInject": {
+        "selected": [
+          "normal"
+        ],
+        "status": "Select a source condition.",
+        "incidentDisabled": false
+      },
+      "incident": {
+        "width": 1440,
+        "bodyScroll": 1440,
+        "docScroll": 1440,
+        "words": 153,
+        "unitButtons": 0,
+        "densityStrips": 1,
+        "densityCells": 100,
+        "diagramStories": {
+          "topology": true,
+          "reconciliation": true,
+          "health": true,
+          "external": true
+        },
+        "diagramMeta": {
+          "reconciliation": 2,
+          "queue": 2,
+          "erp": 2,
+          "invoice": 2,
+          "external": 3
+        },
+        "labels": [
+          {
+            "name": "Warehouse",
+            "count": "100",
+            "semantic": "dispatched"
+          },
+          {
+            "name": "Message Queue",
+            "count": "20",
+            "semantic": "backlog"
+          },
+          {
+            "name": "ERP",
+            "count": "80",
+            "semantic": "posted"
+          },
+          {
+            "name": "Invoice",
+            "count": "100",
+            "semantic": "expected"
+          }
+        ],
+        "agentStatusButtons": 0,
+        "activeIncidentButtons": 0,
+        "routeCandidates": [],
+        "allVisibleControls": [
+          {
+            "tag": "ARTICLE",
+            "id": "",
+            "cls": "flow-node state-lime",
+            "text": "Warehouse\n100\nDISPATCHED",
+            "view": "",
+            "href": "",
+            "w": 146,
+            "h": 124
+          },
+          {
+            "tag": "ARTICLE",
+            "id": "",
+            "cls": "flow-node state-coral",
+            "text": "Message Queue\n20\nBACKLOG",
+            "view": "",
+            "href": "",
+            "w": 146,
+            "h": 124
+          },
+          {
+            "tag": "ARTICLE",
+            "id": "",
+            "cls": "flow-node state-coral",
+            "text": "ERP\n80\nPOSTED",
+            "view": "",
+            "href": "",
+            "w": 146,
+            "h": 124
+          },
+          {
+            "tag": "ARTICLE",
+            "id": "",
+            "cls": "flow-node state-coral",
+            "text": "Invoice\n100\nEXPECTED",
+            "view": "",
+            "href": "",
+            "w": 146,
+            "h": 124
+          },
+          {
+            "tag": "BUTTON",
+            "id": "",
+            "cls": "unit-anomaly-button",
+            "text": "PO-10001-10-unit-081, QUEUE FAILED, MESSAGE QUEUE",
+            "view": "",
+            "href": "",
+            "w": 40,
+            "h": 32
+          },
+          {
+            "tag": "BUTTON",
+            "id": "",
+            "cls": "unit-anomaly-button",
+            "text": "PO-10001-10-unit-082, QUEUE FAILED, MESSAGE QUEUE",
+            "view": "",
+            "href": "",
+            "w": 40,
+            "h": 32
+          },
+          {
+            "tag": "BUTTON",
+            "id": "",
+            "cls": "unit-anomaly-button",
+            "text": "PO-10001-10-unit-083, QUEUE FAILED, MESSAGE QUEUE",
+            "view": "",
+            "href": "",
+            "w": 40,
+            "h": 32
+          },
+          {
+            "tag": "BUTTON",
+            "id": "",
+            "cls": "unit-anomaly-button",
+            "text": "PO-10001-10-unit-084, QUEUE FAILED, MESSAGE QUEUE",
+            "view": "",
+            "href": "",
+            "w": 40,
+            "h": 32
+          },
+          {
+            "tag": "BUTTON",
+            "id": "",
+            "cls": "unit-anomaly-button",
+            "text": "PO-10001-10-unit-085, QUEUE FAILED, MESSAGE QUEUE",
+            "view": "",
+            "href": "",
+            "w": 40,
+            "h": 32
+          },
+          {
+            "tag": "BUTTON",
+            "id": "",
+            "cls": "unit-anomaly-button",
+            "text": "PO-10001-10-unit-086, QUEUE FAILED, MESSAGE QUEUE",
+            "view": "",
+            "href": "",
+            "w": 40,
+            "h": 32
+          }
+        ],
+        "cursorLabels": [
+          "LIVE",
+          "LIVE",
+          "LIVE"
+        ],
+        "externalRequests": [],
+        "scenario": {
+          "url": "http://127.0.0.1:58378/?view=dashboard&scenario=incident&incident_id=missing-20-001-run-1",
+          "title": "20 units stopped before ERP",
+          "selected": [
+            "incident"
+          ],
+          "gap": "20",
+          "status": "Attention needed"
+        }
+      },
+      "sse": [],
+      "console": []
+    },
+    {
+      "width": 1280,
+      "bodyScroll": 1280,
+      "docScroll": 1280,
+      "words": 141,
+      "unitButtons": 0,
+      "densityStrips": 1,
+      "densityCells": 100,
+      "diagramStories": {
+        "topology": true,
+        "reconciliation": true,
+        "health": true,
+        "external": true
+      },
+      "diagramMeta": {
+        "reconciliation": 2,
+        "queue": 2,
+        "erp": 2,
+        "invoice": 2,
+        "external": 3
+      },
+      "labels": [
+        {
+          "name": "Warehouse",
+          "count": "100",
+          "semantic": "dispatched"
+        },
+        {
+          "name": "Message Queue",
+          "count": "0",
+          "semantic": "backlog"
+        },
+        {
+          "name": "ERP",
+          "count": "100",
+          "semantic": "posted"
+        },
+        {
+          "name": "Invoice",
+          "count": "100",
+          "semantic": "completed"
+        }
+      ],
+      "agentStatusButtons": 0,
+      "activeIncidentButtons": 0,
+      "routeCandidates": [],
+      "allVisibleControls": [
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Warehouse\n100\nDISPATCHED",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Message Queue\n0\nBACKLOG",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "ERP\n100\nPOSTED",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-neutral",
+          "text": "Invoice\n100\nCOMPLETED",
+          "view": "",
+          "href": "",
+          "w": 146,
+          "h": 124
+        }
+      ],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "externalRequests": [],
+      "scenario": {
+        "url": "http://127.0.0.1:58378/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ],
+        "gap": "0",
+        "status": "Healthy"
+      },
+      "console": []
+    },
+    {
+      "width": 768,
+      "bodyScroll": 768,
+      "docScroll": 768,
+      "words": 141,
+      "unitButtons": 0,
+      "densityStrips": 1,
+      "densityCells": 100,
+      "diagramStories": {
+        "topology": true,
+        "reconciliation": true,
+        "health": true,
+        "external": true
+      },
+      "diagramMeta": {
+        "reconciliation": 3,
+        "queue": 3,
+        "erp": 3,
+        "invoice": 3,
+        "external": 3
+      },
+      "labels": [
+        {
+          "name": "Warehouse",
+          "count": "100",
+          "semantic": "dispatched"
+        },
+        {
+          "name": "Message Queue",
+          "count": "0",
+          "semantic": "backlog"
+        },
+        {
+          "name": "ERP",
+          "count": "100",
+          "semantic": "posted"
+        },
+        {
+          "name": "Invoice",
+          "count": "100",
+          "semantic": "completed"
+        }
+      ],
+      "agentStatusButtons": 0,
+      "activeIncidentButtons": 0,
+      "routeCandidates": [],
+      "allVisibleControls": [
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Warehouse\n100\nDISPATCHED",
+          "view": "",
+          "href": "",
+          "w": 120,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Message Queue\n0\nBACKLOG",
+          "view": "",
+          "href": "",
+          "w": 120,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "ERP\n100\nPOSTED",
+          "view": "",
+          "href": "",
+          "w": 120,
+          "h": 124
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-neutral",
+          "text": "Invoice\n100\nCOMPLETED",
+          "view": "",
+          "href": "",
+          "w": 141,
+          "h": 124
+        }
+      ],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "externalRequests": [],
+      "scenario": {
+        "url": "http://127.0.0.1:58378/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ],
+        "gap": "0",
+        "status": "Healthy"
+      },
+      "console": []
+    },
+    {
+      "width": 390,
+      "bodyScroll": 390,
+      "docScroll": 390,
+      "words": 134,
+      "unitButtons": 0,
+      "densityStrips": 1,
+      "densityCells": 100,
+      "diagramStories": {
+        "topology": true,
+        "reconciliation": true,
+        "health": true,
+        "external": true
+      },
+      "diagramMeta": {
+        "reconciliation": 3,
+        "queue": 3,
+        "erp": 3,
+        "invoice": 3,
+        "external": 3
+      },
+      "labels": [
+        {
+          "name": "Warehouse",
+          "count": "100",
+          "semantic": "dispatched"
+        },
+        {
+          "name": "Message Queue",
+          "count": "0",
+          "semantic": "backlog"
+        },
+        {
+          "name": "ERP",
+          "count": "100",
+          "semantic": "posted"
+        },
+        {
+          "name": "Invoice",
+          "count": "100",
+          "semantic": "completed"
+        }
+      ],
+      "agentStatusButtons": 0,
+      "activeIncidentButtons": 0,
+      "routeCandidates": [],
+      "allVisibleControls": [
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Warehouse\n100\nDISPATCHED",
+          "view": "",
+          "href": "",
+          "w": 103,
+          "h": 105
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "Message Queue\n0\nBACKLOG",
+          "view": "",
+          "href": "",
+          "w": 103,
+          "h": 105
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-lime",
+          "text": "ERP\n100\nPOSTED",
+          "view": "",
+          "href": "",
+          "w": 103,
+          "h": 105
+        },
+        {
+          "tag": "ARTICLE",
+          "id": "",
+          "cls": "flow-node state-neutral",
+          "text": "Invoice\n100\nCOMPLETED",
+          "view": "",
+          "href": "",
+          "w": 122,
+          "h": 105
+        }
+      ],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "externalRequests": [],
+      "scenario": {
+        "url": "http://127.0.0.1:58378/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ],
+        "gap": "0",
+        "status": "Healthy"
+      },
+      "console": []
+    }
+  ]
+}

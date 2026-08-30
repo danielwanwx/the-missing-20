@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Missing 20
+    orgId: 1
+    folder: Missing 20
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards

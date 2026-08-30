@@ -34,6 +34,7 @@ from the_missing_20.agents.schemas import (
     EVALUATOR_VERSION,
     HARNESS_VERSION,
     HYPOTHESIS_TO_INVESTIGATOR,
+    REQUIRED_AUTHORITATIVE_SOURCES,
     AgentEvaluationResult,
     AgentProtocolEnvelope,
     ClaimRelation,
@@ -77,6 +78,40 @@ from the_missing_20.ports.knowledge import KnowledgeRepository
 
 PROMPT_VERSION = "agent-v5"
 FIXED_ASSESSMENT_TIME = datetime(2026, 8, 26, 0, 0, tzinfo=UTC)
+
+# These are the only roles exposed by the browser chat control.  ``orchestrator``
+# is a team-facing alias that uses the first investigator contract while retaining
+# the full source allowlist; it never gains authority to approve or execute.
+CHAT_AGENT_ROLES: dict[str, InvestigatorID] = {
+    "orchestrator": InvestigatorID.RETRYABLE_MESSAGE,
+    InvestigatorID.RETRYABLE_MESSAGE.value: InvestigatorID.RETRYABLE_MESSAGE,
+    InvestigatorID.SHORT_SHIPMENT.value: InvestigatorID.SHORT_SHIPMENT,
+    InvestigatorID.DUPLICATE_POSTING.value: InvestigatorID.DUPLICATE_POSTING,
+}
+CHAT_AGENT_SOURCE_TYPES: dict[str, frozenset[EvidenceSourceType]] = {
+    "orchestrator": frozenset(REQUIRED_AUTHORITATIVE_SOURCES),
+    InvestigatorID.RETRYABLE_MESSAGE.value: frozenset(
+        {
+            EvidenceSourceType.FAILED_MESSAGE_QUEUE,
+            EvidenceSourceType.WAREHOUSE,
+            EvidenceSourceType.ERP_RECEIPT,
+        }
+    ),
+    InvestigatorID.SHORT_SHIPMENT.value: frozenset(
+        {
+            EvidenceSourceType.WAREHOUSE,
+            EvidenceSourceType.ERP_RECEIPT,
+            EvidenceSourceType.INVOICE,
+        }
+    ),
+    InvestigatorID.DUPLICATE_POSTING.value: frozenset(
+        {
+            EvidenceSourceType.FAILED_MESSAGE_QUEUE,
+            EvidenceSourceType.ERP_RECEIPT,
+            EvidenceSourceType.MATERIAL_DOCUMENT,
+        }
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +188,140 @@ class HarnessRun:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class AdvisoryStageResult:
+    """Auditable advisory output when semantic acceptance lacks citation closure.
+
+    ``HarnessRun`` deliberately remains the legacy full-closure result consumed by
+    the deterministic policy.  A provider can still produce a semantically accepted
+    synthesis whose claims cover only part of the admitted catalog; that output is
+    useful to show, but it must not be coerced into an ``InvestigationAssessment`` or
+    an action recommendation.  This separate result carries the exact model stages
+    and the application-owned closure/source projections for that case.
+    """
+
+    investigators: tuple[InvestigatorResult, ...]
+    investigator_knowledge_citations: tuple[tuple[KnowledgeCitation, ...], ...]
+    investigator_read_evidence_ids: tuple[tuple[str, ...], ...]
+    synthesis: SynthesisResult
+    evaluation: AgentEvaluationResult
+    evaluator_citation_closure: EvaluatorCitationClosure
+    evaluator_source_coverage: EvaluatorSourceCoverage
+    trace: NormalizedTrace
+    protocol: AgentProtocolEnvelope
+    authoritative_evidence_ids: tuple[str, ...]
+    authoritative_source_types: tuple[EvidenceSourceType, ...]
+    advisory_status: str = "PARTIAL"
+    warnings: tuple[str, ...] = ("AI_CITATION_CLOSURE_INCOMPLETE",)
+
+    @property
+    def status(self) -> str:
+        """Compatibility alias for consumers that call the result status."""
+
+        return self.advisory_status
+
+    @property
+    def warning_codes(self) -> tuple[str, ...]:
+        return self.warnings
+
+    @property
+    def ai_coverage(self) -> dict[str, Any]:
+        """Expose model-cited coverage without filling omitted IDs."""
+
+        covered_ids = tuple(sorted(self.evaluator_citation_closure.validated_evidence_ids))
+        admitted_ids = tuple(sorted(self.authoritative_evidence_ids))
+        covered_sources = tuple(
+            sorted(
+                {source.value for source in self.evaluator_source_coverage.validated_source_types}
+            )
+        )
+        authoritative_sources = tuple(
+            sorted({source.value for source in self.authoritative_source_types})
+        )
+        omitted_ids = tuple(
+            evidence_id for evidence_id in admitted_ids if evidence_id not in covered_ids
+        )
+        omitted_sources = tuple(
+            source for source in authoritative_sources if source not in covered_sources
+        )
+        return {
+            "covered_evidence_ids": list(covered_ids),
+            "covered_source_types": list(covered_sources),
+            "omitted_evidence_ids": list(omitted_ids),
+            "omitted_source_types": list(omitted_sources),
+            "covered_count": len(covered_ids),
+            "admitted_count": len(admitted_ids),
+            "coverage": f"{len(covered_ids)}/{len(admitted_ids)}",
+        }
+
+    @property
+    def authoritative_catalog(self) -> dict[str, Any]:
+        """Expose the detector-owned catalog as a separate truth surface."""
+
+        evidence_ids = tuple(sorted(self.authoritative_evidence_ids))
+        source_types = tuple(sorted({source.value for source in self.authoritative_source_types}))
+        return {
+            "evidence_ids": list(evidence_ids),
+            "source_types": list(source_types),
+            "evidence_count": len(evidence_ids),
+            "source_count": len(source_types),
+        }
+
+    def public(self) -> dict[str, Any]:
+        """Return the bounded advisory projection, never operational authority."""
+
+        return {
+            "schema_version": "advisory-stage/v1",
+            "status": self.advisory_status,
+            "warnings": list(self.warnings),
+            "provider": self.trace.provider,
+            "model": self.trace.model,
+            "protocol": self.protocol.model_dump(mode="json"),
+            "investigators": [item.model_dump(mode="json") for item in self.investigators],
+            "investigator_knowledge_citations": [
+                [citation.model_dump(mode="json") for citation in citations]
+                for citations in self.investigator_knowledge_citations
+            ],
+            "investigator_read_evidence_ids": [
+                list(read_ids) for read_ids in self.investigator_read_evidence_ids
+            ],
+            "synthesis": self.synthesis.model_dump(mode="json"),
+            "evaluation": self.evaluation.model_dump(mode="json"),
+            "evaluator_citation_closure": self.evaluator_citation_closure.model_dump(
+                mode="json"
+            ),
+            "evaluator_source_coverage": self.evaluator_source_coverage.model_dump(
+                mode="json"
+            ),
+            "ai_coverage": self.ai_coverage,
+            "authoritative_catalog": self.authoritative_catalog,
+            "trace": self.trace.public(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChatRun:
+    """One bounded, role-scoped advisory turn.
+
+    Chat deliberately stops at a single investigator.  It does not create a
+    synthesis, evaluation, decision, approval, or execution record; the session's
+    deterministic router remains responsible for the user-facing operational
+    explanation and authority boundary.
+    """
+
+    agent_id: str
+    investigator: InvestigatorRun
+    provider_metadata: dict[str, Any]
+
+    @property
+    def read_evidence_ids(self) -> tuple[str, ...]:
+        return self.investigator.read_evidence_ids
+
+    @property
+    def knowledge_citations(self) -> tuple[KnowledgeCitation, ...]:
+        return self.investigator.knowledge_citations
+
+
 def _digest(value: object) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
@@ -163,6 +332,116 @@ def _usage_metric(result: Any, name: str) -> int:
     metrics = getattr(result, "metrics", None)
     usage = getattr(metrics, "accumulated_usage", {}) if metrics is not None else {}
     return int((usage or {}).get(name, 0))
+
+
+def _provider_metadata(
+    factory: AgentModelFactory,
+    result: Any | None = None,
+    *,
+    agent_id: str | None = None,
+    error_code: str | None = None,
+) -> dict[str, Any]:
+    """Build a redacted provider record from the model boundary.
+
+    The record is intentionally made from factory configuration and stable SDK
+    metrics only.  Prompts, raw model text, credentials, account IDs, and tool
+    payloads never cross this boundary.
+    """
+
+    provenance = getattr(factory, "provenance", None)
+    metadata = provenance() if callable(provenance) else {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    metrics = getattr(result, "metrics", None) if result is not None else None
+    usage = getattr(metrics, "accumulated_usage", {}) or {}
+    accumulated = getattr(metrics, "accumulated_metrics", {}) or {}
+    try:
+        input_tokens = int(usage.get("inputTokens", 0))
+        output_tokens = int(usage.get("outputTokens", 0))
+        request_count = int(getattr(metrics, "cycle_count", 0))
+        latency_ms = int(accumulated.get("latencyMs", 0))
+    except (AttributeError, TypeError, ValueError):
+        input_tokens = output_tokens = request_count = latency_ms = 0
+    metadata.update(
+        {
+            "request_count": max(0, request_count),
+            "input_tokens": max(0, input_tokens),
+            "output_tokens": max(0, output_tokens),
+            "latency_ms": max(0, latency_ms),
+            "read_only": True,
+            "authority": "ADVISORY_NOT_OPERATIONAL_DECISION",
+        }
+    )
+    if agent_id is not None:
+        metadata["agent_id"] = agent_id
+    if error_code is not None:
+        metadata["error_code"] = error_code
+        metadata["status"] = "DEGRADED"
+    else:
+        metadata.setdefault("status", "COMPLETE")
+    ledger = getattr(factory, "ledger", None)
+    if ledger is not None:
+        try:
+            ledger_snapshot = ledger.snapshot()
+        except Exception:  # pragma: no cover - defensive provider adapter boundary
+            ledger_snapshot = {}
+        if isinstance(ledger_snapshot, dict):
+            for key in (
+                "incremental_cost_usd",
+                "cumulative_cost_usd",
+                "remaining_cumulative_cost_usd",
+                "request_cap",
+                "input_token_cap",
+                "output_token_cap",
+            ):
+                if key in ledger_snapshot:
+                    metadata[key] = ledger_snapshot[key]
+    return metadata
+
+
+def _validate_chat_investigator(
+    result: InvestigatorResult,
+    *,
+    allowed_evidence_ids: frozenset[str],
+    read_evidence_ids: tuple[str, ...],
+) -> InvestigatorResult:
+    """Validate a role-scoped advisory result without widening its read scope.
+
+    The full diagnosis validator requires every authoritative source to be read
+    before a supported conclusion can drive the action policy.  A chat turn is
+    intentionally narrower: it may inspect only the selected role's sources and
+    can never produce a synthesis or operational decision.  This validator keeps
+    the same citation/read integrity at that smaller boundary.
+    """
+
+    if not set(read_evidence_ids).issubset(allowed_evidence_ids):
+        raise AgentValidationError("chat investigator read an unallowlisted evidence ID")
+    referenced = {
+        evidence_id
+        for claim in result.factual_claims
+        for evidence_id in claim.evidence_ids
+    }
+    if not referenced.issubset(allowed_evidence_ids):
+        raise AgentValidationError("chat investigator cited an unallowlisted evidence ID")
+    if not referenced.issubset(set(read_evidence_ids)):
+        raise AgentValidationError("chat investigator cited evidence that was not read")
+    supporting = {
+        evidence_id
+        for claim in result.factual_claims
+        if claim.relation is ClaimRelation.SUPPORTS_HYPOTHESIS
+        for evidence_id in claim.evidence_ids
+    }
+    contradicting = {
+        evidence_id
+        for claim in result.factual_claims
+        if claim.relation is ClaimRelation.CONTRADICTS_HYPOTHESIS
+        for evidence_id in claim.evidence_ids
+    }
+    if result.conclusion is HypothesisConclusion.SUPPORTED and not supporting:
+        raise AgentValidationError("supported chat result must cite supporting evidence")
+    if result.conclusion is HypothesisConclusion.SUPPORTED and contradicting:
+        raise AgentValidationError("supported chat result contains contradictory evidence")
+    return result
 
 
 def _claim_payload(
@@ -452,7 +731,7 @@ class AgentHarness:
         trace_id: str,
         evidence: tuple[EvidenceItem, ...],
         assessed_at: datetime = FIXED_ASSESSMENT_TIME,
-    ) -> HarnessRun:
+    ) -> HarnessRun | AdvisoryStageResult:
         if not evidence:
             raise AgentValidationError("agent harness requires admitted evidence")
         if any(item.case_id != case_id or item.trace_id != trace_id for item in evidence):
@@ -500,7 +779,11 @@ class AgentHarness:
                 status="RUNNING",
                 correlation_id=trace_id,
                 stage=stage,
-                payload={"stage": stage.value, "mode": "SCRIPTED_SYNTHETIC"},
+                payload={
+                    "stage": stage.value,
+                    "mode": self.model_factory.provider.value,
+                    "advisory": True,
+                },
             )
 
             async def operation() -> InvestigatorRun:
@@ -517,7 +800,11 @@ class AgentHarness:
                         status="RUNNING",
                         correlation_id=trace_id,
                         stage=stage,
-                        payload={"stage": stage.value, "mode": "SCRIPTED_SYNTHETIC"},
+                        payload={
+                            "stage": stage.value,
+                            "mode": self.model_factory.provider.value,
+                            "advisory": True,
+                        },
                     )
                 return await run_investigator(
                     role=role,
@@ -678,13 +965,6 @@ class AgentHarness:
                 trace_id=trace_id,
                 protocol=protocol,
             )
-            if evaluation.decision.value == "ACCEPT" and (
-                not evaluator_citation_closure.all_synthesis_claims_validated
-                or not evaluator_citation_closure.all_admitted_evidence_covered
-            ):
-                raise AgentValidationError(
-                    "accepted synthesis does not have complete citation closure"
-                )
             evaluator_source_coverage = build_evaluator_source_coverage(
                 evidence=evidence,
                 source_availability=self.source_availability,
@@ -695,53 +975,65 @@ class AgentHarness:
             )
         except Exception as error:
             raise _stage_failure(error, stage=AgentStage.EVALUATOR) from error
-        selected_role = HYPOTHESIS_TO_INVESTIGATOR[synthesis.selected_hypothesis]
-        selected_index = next(
-            index
-            for index, item in enumerate(validated_investigators)
-            if item.investigator_id is selected_role
+        partial_advisory = evaluation.decision.value == "ACCEPT" and (
+            not evaluator_citation_closure.all_synthesis_claims_validated
+            or not evaluator_citation_closure.all_admitted_evidence_covered
         )
-        selected_investigator = validated_investigators[selected_index]
-        selected_read_ids = investigator_runs[selected_index].read_evidence_ids
-        coverage_ledger = build_evidence_coverage_ledger(
-            evidence=evidence,
-            source_availability=self.source_availability,
-            selected_hypothesis=synthesis.selected_hypothesis,
-            selected_investigator=selected_investigator,
-            selected_investigator_read_ids=selected_read_ids,
-            evaluator=evaluation,
-            selected_synthesis=synthesis,
-            evaluator_citation_closure=evaluator_citation_closure,
-            evaluator_source_coverage=evaluator_source_coverage,
-            protocol=protocol,
-        )
-        action_recommendation = ActionRecommendationPolicy.evaluate(
-            synthesis=synthesis,
-            investigators=validated_investigators,
-            evaluator=evaluation,
-            evidence=evidence,
-            ledger=coverage_ledger,
-            evaluator_citation_closure=evaluator_citation_closure,
-            evaluator_source_coverage=evaluator_source_coverage,
-        )
-        action_recommendation = action_recommendation.model_copy(update={"protocol": protocol})
-        coverage_ledger = coverage_ledger.model_copy(
-            update={"outcome_reason": action_recommendation.reason_code}
-        )
-        assessment = validator.build_assessment(
-            assessment_id=f"assessment:agent:{case_id}",
-            case_id=case_id,
-            synthesis=synthesis,
-            evaluation=evaluation,
-            assessed_at=assessed_at,
-            protocol=protocol,
-            citation_closure=evaluator_citation_closure,
-            recommendation=action_recommendation,
-        )
+        coverage_ledger: EvidenceCoverageLedger | None = None
+        action_recommendation: ActionRecommendation | None = None
+        assessment: InvestigationAssessment | None = None
+        if not partial_advisory:
+            selected_role = HYPOTHESIS_TO_INVESTIGATOR[synthesis.selected_hypothesis]
+            selected_index = next(
+                index
+                for index, item in enumerate(validated_investigators)
+                if item.investigator_id is selected_role
+            )
+            selected_investigator = validated_investigators[selected_index]
+            selected_read_ids = investigator_runs[selected_index].read_evidence_ids
+            coverage_ledger = build_evidence_coverage_ledger(
+                evidence=evidence,
+                source_availability=self.source_availability,
+                selected_hypothesis=synthesis.selected_hypothesis,
+                selected_investigator=selected_investigator,
+                selected_investigator_read_ids=selected_read_ids,
+                evaluator=evaluation,
+                selected_synthesis=synthesis,
+                evaluator_citation_closure=evaluator_citation_closure,
+                evaluator_source_coverage=evaluator_source_coverage,
+                protocol=protocol,
+            )
+            action_recommendation = ActionRecommendationPolicy.evaluate(
+                synthesis=synthesis,
+                investigators=validated_investigators,
+                evaluator=evaluation,
+                evidence=evidence,
+                ledger=coverage_ledger,
+                evaluator_citation_closure=evaluator_citation_closure,
+                evaluator_source_coverage=evaluator_source_coverage,
+            )
+            action_recommendation = action_recommendation.model_copy(
+                update={"protocol": protocol}
+            )
+            coverage_ledger = coverage_ledger.model_copy(
+                update={"outcome_reason": action_recommendation.reason_code}
+            )
+            assessment = validator.build_assessment(
+                assessment_id=f"assessment:agent:{case_id}",
+                case_id=case_id,
+                synthesis=synthesis,
+                evaluation=evaluation,
+                assessed_at=assessed_at,
+                protocol=protocol,
+                citation_closure=evaluator_citation_closure,
+                recommendation=action_recommendation,
+            )
         provider = self.model_factory.provider.value
         model = (
             "scripted-strands-v1"
             if provider == AgentProvider.SCRIPTED.value
+            else "agentcore-runtime"
+            if provider == AgentProvider.AGENTCORE.value
             else "us.amazon.nova-pro-v1:0"
         )
         trace = NormalizedTrace(
@@ -750,17 +1042,28 @@ class AgentHarness:
             trace_id=trace_id,
             provider=provider,
             model=model,
+            provider_metadata=_provider_metadata(self.model_factory),
             prompt_version=prompts.version,
             prompt_digest=prompts.digest,
             knowledge_version=self.knowledge.version,
             harness_version=HARNESS_VERSION,
             evaluator_version=EVALUATOR_VERSION,
             agent_contract_version=AGENT_CONTRACT_VERSION,
-            stop_reason="ASSESSMENT_VALIDATED",
+            stop_reason=(
+                "ADVISORY_PARTIAL_CITATION_CLOSURE"
+                if partial_advisory
+                else "ASSESSMENT_VALIDATED"
+            ),
             evaluator_source_coverage=evaluator_source_coverage.model_dump(mode="json"),
             evaluator_citation_closure=evaluator_citation_closure.model_dump(mode="json"),
-            coverage_ledger=coverage_ledger.model_dump(mode="json"),
-            action_recommendation=action_recommendation.model_dump(mode="json"),
+            coverage_ledger=(
+                coverage_ledger.model_dump(mode="json") if coverage_ledger is not None else None
+            ),
+            action_recommendation=(
+                action_recommendation.model_dump(mode="json")
+                if action_recommendation is not None
+                else None
+            ),
             protocol=protocol,
         )
         deterministic = self.model_factory.provider is AgentProvider.SCRIPTED
@@ -800,6 +1103,39 @@ class AgentHarness:
                 protocol=protocol,
             )
         )
+        trace.provider_metadata = _provider_metadata(self.model_factory)
+        trace.provider_metadata.update(
+            {
+                "request_count": trace.request_count,
+                "input_tokens": trace.input_tokens,
+                "output_tokens": trace.output_tokens,
+                "latency_ms": sum(stage.latency_ms for stage in trace.stages),
+            }
+        )
+        if partial_advisory:
+            return AdvisoryStageResult(
+                investigators=validated_investigators,
+                synthesis=synthesis,
+                evaluation=evaluation,
+                evaluator_citation_closure=evaluator_citation_closure,
+                evaluator_source_coverage=evaluator_source_coverage,
+                investigator_knowledge_citations=investigator_knowledge_citations,
+                investigator_read_evidence_ids=tuple(
+                    run.read_evidence_ids for run in investigator_runs
+                ),
+                trace=trace,
+                protocol=protocol,
+                authoritative_evidence_ids=tuple(sorted(item.evidence_id for item in evidence)),
+                authoritative_source_types=tuple(
+                    sorted(
+                        {item.source_type for item in evidence},
+                        key=lambda source: source.value,
+                    )
+                ),
+            )
+        assert assessment is not None
+        assert coverage_ledger is not None
+        assert action_recommendation is not None
         return HarnessRun(
             assessment=assessment,
             investigators=validated_investigators,
@@ -817,6 +1153,173 @@ class AgentHarness:
             protocol=protocol,
         )
 
+    async def run_chat_async(
+        self,
+        *,
+        case_id: str,
+        trace_id: str,
+        evidence: tuple[EvidenceItem, ...],
+        user_question: str,
+        selected_agent_id: str = "orchestrator",
+    ) -> ChatRun:
+        """Run one bounded read-only turn for the selected investigator role.
+
+        Chat deliberately does not invoke synthesis or evaluation.  The selected
+        role receives a smaller evidence allowlist and its own system context;
+        deterministic policy, approvals, and execution remain outside this path.
+        """
+
+        if not evidence:
+            raise AgentValidationError("chat harness requires admitted evidence")
+        if any(item.case_id != case_id or item.trace_id != trace_id for item in evidence):
+            raise AgentValidationError("chat evidence does not match case and trace")
+        question = user_question.strip()
+        if not question or len(question) > 2_000:
+            raise AgentValidationError("chat question must contain one to two thousand characters")
+        role = CHAT_AGENT_ROLES.get(selected_agent_id)
+        if role is None:
+            raise AgentValidationError("chat agent is not allowlisted")
+        allowed_types = CHAT_AGENT_SOURCE_TYPES[selected_agent_id]
+        allowed_ids = frozenset(
+            item.evidence_id for item in evidence if item.source_type in allowed_types
+        )
+        if not allowed_ids:
+            raise AgentValidationError("selected chat role has no admitted evidence")
+        prompts = PromptSet.load(self.prompt_root)
+        scope = ToolScope(
+            case_id=case_id,
+            trace_id=trace_id,
+            admitted_evidence=evidence,
+            allowed_evidence_ids=allowed_ids,
+            knowledge=self.knowledge,
+            knowledge_version=self.knowledge.version,
+            max_evidence_reads=len(allowed_ids),
+        )
+        scripted_outputs, _synthesis_payload, _evaluator_payload = _profile_outputs(
+            evidence=evidence,
+            trace_id=trace_id,
+            source_availability=self.source_availability,
+        )
+        # The scripted fixture is only used for the offline provider.  Restrict its
+        # citations as well so offline chat exercises the same role boundary as a
+        # real provider response.
+        output_payload = json.loads(json.dumps(scripted_outputs[role]))
+        filtered_claims: list[dict[str, Any]] = []
+        for claim in output_payload.get("factual_claims", []):
+            claim_ids = [
+                evidence_id
+                for evidence_id in claim.get("evidence_ids", [])
+                if evidence_id in allowed_ids
+            ]
+            if claim_ids:
+                filtered = dict(claim)
+                filtered["evidence_ids"] = claim_ids
+                filtered_claims.append(filtered)
+        output_payload["factual_claims"] = filtered_claims
+        if (
+            output_payload.get("conclusion") == HypothesisConclusion.SUPPORTED.value
+            and not filtered_claims
+        ):
+            output_payload["conclusion"] = HypothesisConclusion.REJECTED.value
+        operation_id = f"chat-agent:{selected_agent_id}:{trace_id}"
+        self._emit(
+            event_type=AgentOperationEventType.AGENT_STARTED,
+            case_id=case_id,
+            trace_id=trace_id,
+            actor=role.value,
+            operation_id=operation_id,
+            status="RUNNING",
+            correlation_id=trace_id,
+            stage=AgentStage.RETRYABLE_INVESTIGATOR,
+            payload={
+                "agent_id": selected_agent_id,
+                "mode": self.model_factory.provider.value,
+                "chat": True,
+                "allowlisted_evidence_count": len(allowed_ids),
+            },
+        )
+        stage = {
+            InvestigatorID.RETRYABLE_MESSAGE: AgentStage.RETRYABLE_INVESTIGATOR,
+            InvestigatorID.SHORT_SHIPMENT: AgentStage.SHORT_SHIPMENT_INVESTIGATOR,
+            InvestigatorID.DUPLICATE_POSTING: AgentStage.DUPLICATE_POSTING_INVESTIGATOR,
+        }[role]
+        try:
+            run = await run_investigator(
+                role=role,
+                stage=stage,
+                model_factory=self.model_factory,
+                output_payload=output_payload,
+                tool_plan=default_tool_plan(scope),
+                scope=scope,
+                source_availability=self.source_availability,
+                event_sink=self.event_sink,
+                operation_prefix=operation_id,
+                system_prompt=(
+                    f"{prompts.investigator}\n\n"
+                    f"You are the selected {selected_agent_id} role."
+                    " This is advisory, read-only investigation; do not approve or execute."
+                ),
+                user_question=question,
+                role_label=selected_agent_id,
+                agent_id_override=selected_agent_id,
+                timeout_seconds=self.budget.per_call_timeout_seconds,
+            )
+            result = _validate_chat_investigator(
+                run.result,
+                allowed_evidence_ids=allowed_ids,
+                read_evidence_ids=run.read_evidence_ids,
+            )
+            del result
+            metadata = _provider_metadata(
+                self.model_factory,
+                run.model_result,
+                agent_id=selected_agent_id,
+            )
+            self._emit(
+                event_type=AgentOperationEventType.AGENT_COMPLETED,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor=role.value,
+                operation_id=operation_id,
+                status="COMPLETED",
+                correlation_id=trace_id,
+                stage=stage,
+                payload={
+                    "agent_id": selected_agent_id,
+                    "chat": True,
+                    "read_evidence_ids": list(run.read_evidence_ids),
+                    "provider_metadata": metadata,
+                },
+            )
+            return ChatRun(
+                agent_id=selected_agent_id,
+                investigator=run,
+                provider_metadata=metadata,
+            )
+        except Exception as error:
+            metadata = _provider_metadata(
+                self.model_factory,
+                agent_id=selected_agent_id,
+                error_code=type(error).__name__,
+            )
+            self._emit(
+                event_type=AgentOperationEventType.AGENT_COMPLETED,
+                case_id=case_id,
+                trace_id=trace_id,
+                actor=role.value,
+                operation_id=operation_id,
+                status="FAILED",
+                correlation_id=trace_id,
+                stage=stage,
+                payload={
+                    "agent_id": selected_agent_id,
+                    "chat": True,
+                    "error_code": type(error).__name__,
+                    "provider_metadata": metadata,
+                },
+            )
+            raise
+
     def run(
         self,
         *,
@@ -824,13 +1327,32 @@ class AgentHarness:
         trace_id: str,
         evidence: tuple[EvidenceItem, ...],
         assessed_at: datetime = FIXED_ASSESSMENT_TIME,
-    ) -> HarnessRun:
+    ) -> HarnessRun | AdvisoryStageResult:
         return asyncio.run(
             self.run_async(
                 case_id=case_id,
                 trace_id=trace_id,
                 evidence=evidence,
                 assessed_at=assessed_at,
+            )
+        )
+
+    def run_chat(
+        self,
+        *,
+        case_id: str,
+        trace_id: str,
+        evidence: tuple[EvidenceItem, ...],
+        user_question: str,
+        selected_agent_id: str = "orchestrator",
+    ) -> ChatRun:
+        return asyncio.run(
+            self.run_chat_async(
+                case_id=case_id,
+                trace_id=trace_id,
+                evidence=evidence,
+                user_question=user_question,
+                selected_agent_id=selected_agent_id,
             )
         )
 

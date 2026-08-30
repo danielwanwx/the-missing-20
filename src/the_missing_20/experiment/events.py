@@ -13,6 +13,14 @@ from the_missing_20.domain.models import ContractModel, NonEmptyStr, PositiveInt
 class PublicEventType(StrEnum):
     """Public vocabulary shared by Dashboard and Agent Workspace projections."""
 
+    # ``TELEMETRY_OBSERVED`` is an observation from the synthetic enterprise
+    # source.  It intentionally lives in the same ordered ledger as incident
+    # lifecycle events so the browser can prove that motion came from the
+    # backend stream rather than from a client-side timer.
+    TELEMETRY_OBSERVED = "telemetry.observed"
+    # Scenario Lab changes the synthetic source first. The detector observes
+    # that fact in a later event; a UI control must not claim an incident.
+    SOURCE_CONDITION_INJECTED = "source.condition.injected"
     INCIDENT_DETECTED = "incident.detected"
     INVESTIGATION_STARTED = "investigation.started"
     AGENT_STARTED = "agent.started"

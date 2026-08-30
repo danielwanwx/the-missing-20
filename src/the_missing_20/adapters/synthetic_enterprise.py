@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from the_missing_20.domain.enterprise import (
@@ -34,6 +35,35 @@ from the_missing_20.domain.execution import (
     RestartReceiptMessageParameters,
 )
 from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed
+
+
+@dataclass(frozen=True)
+class SourceConditionMutation:
+    """Authoritative before/after reads for one synthetic source transaction."""
+
+    pre_state: EnterpriseSnapshot
+    post_state: EnterpriseSnapshot
+    affected_unit_ids: tuple[str, ...]
+    transition_id: str = "source-transition:retryable-document-lock"
+    committed_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class SourceConditionOutbox:
+    """Immutable source transition envelope committed with the source mutation.
+
+    The enterprise database is the source system and the public event ledger is a
+    projection.  Keeping this envelope in the same SQLite transaction as the
+    source rows gives the projector a durable recovery point when a ledger append
+    fails after the source commit.
+    """
+
+    transition_id: str
+    condition: str
+    pre_state: EnterpriseSnapshot
+    post_state: EnterpriseSnapshot
+    affected_unit_ids: tuple[str, ...]
+    committed_at: datetime
 
 
 class SyntheticEnterprise:
@@ -104,6 +134,10 @@ class SyntheticEnterprise:
                     invoice.released_by_execution_id,
                 ),
             )
+            # The healthy control room view uses the same stable 100-unit order but
+            # starts after the queue has reconciled.  Keep it as a separate
+            # synthetic fixture so switching scenarios never rewrites the active
+            # incident ledger or fabricates a browser-only count.
             units = fixture.supply_units or cls._units_for_fixture(fixture)
             if len(units) != fixture.purchase_order.ordered_quantity:
                 raise ValueError("synthetic fixture must contain one unit per ordered item")
@@ -115,7 +149,10 @@ class SyntheticEnterprise:
             recorded_units = tuple(
                 item for item in units if item.status is SupplyUnitStatus.ERP_RECORDED
             )
-            if len(failed_units) != fixture.failed_message.quantity:
+            expected_failed_quantity = (
+                0 if fixture.scenario_id == "healthy-flow" else fixture.failed_message.quantity
+            )
+            if len(failed_units) != expected_failed_quantity:
                 raise ValueError("synthetic fixture units must bind the exact failed quantity")
             if len(recorded_units) + len(failed_units) != len(units):
                 raise ValueError("synthetic fixture units contain an unsupported status")
@@ -181,7 +218,7 @@ class SyntheticEnterprise:
         """
 
         ordered = fixture.purchase_order.ordered_quantity
-        missing = fixture.failed_message.quantity
+        missing = 0 if fixture.scenario_id == "healthy-flow" else fixture.failed_message.quantity
         recorded = ordered - missing
         if recorded < 0:
             raise ValueError("failed-message quantity cannot exceed ordered quantity")
@@ -290,12 +327,137 @@ class SyntheticEnterprise:
                     result_record_ids_json TEXT NOT NULL,
                     committed_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS source_condition_outbox (
+                    transition_id TEXT PRIMARY KEY,
+                    condition TEXT NOT NULL,
+                    pre_state_json TEXT NOT NULL,
+                    post_state_json TEXT NOT NULL,
+                    affected_unit_ids_json TEXT NOT NULL,
+                    committed_at TEXT NOT NULL
+                );
                 """
             )
 
     def read_snapshot(self) -> EnterpriseSnapshot:
         with self._connect() as connection:
             return self._snapshot(connection)
+
+    @staticmethod
+    def _source_transition_snapshot(snapshot: EnterpriseSnapshot) -> dict[str, object]:
+        """Serialize every source row needed to recover one transition exactly."""
+
+        return {
+            "purchase_order": snapshot.purchase_order.model_dump(mode="json"),
+            "warehouse_receipt": snapshot.warehouse_receipt.model_dump(mode="json"),
+            "failed_message": snapshot.failed_message.model_dump(mode="json"),
+            "erp_receipt": snapshot.erp_receipt.model_dump(mode="json"),
+            "invoice": snapshot.invoice.model_dump(mode="json"),
+            "supply_units": [item.model_dump(mode="json") for item in snapshot.supply_units],
+            "material_documents": [
+                item.model_dump(mode="json") for item in snapshot.material_documents
+            ],
+            "business_effects": [
+                item.model_dump(mode="json") for item in snapshot.business_effects
+            ],
+        }
+
+    @staticmethod
+    def _source_transition_snapshot_from_json(raw: str) -> EnterpriseSnapshot:
+        """Restore a typed source snapshot from the durable outbox envelope."""
+
+        value = json.loads(raw)
+        if not isinstance(value, dict):
+            raise EnterprisePreconditionFailed("source transition envelope is malformed")
+        try:
+            purchase_order = PurchaseOrderLine(**value["purchase_order"])
+            warehouse_receipt = WarehouseReceipt(**value["warehouse_receipt"])
+            message_value = value["failed_message"]
+            failed_message = FailedReceiptMessage(
+                **{
+                    **message_value,
+                    "status": MessageStatus(message_value["status"]),
+                },
+            )
+            erp_receipt = ErpReceipt(**value["erp_receipt"])
+            invoice_value = value["invoice"]
+            invoice = Invoice(
+                **{
+                    **invoice_value,
+                    "state": EnterpriseInvoiceState(invoice_value["state"]),
+                    "other_blocking_holds": tuple(invoice_value["other_blocking_holds"]),
+                },
+            )
+            supply_units = tuple(
+                SupplyUnit(
+                    **{
+                        **item,
+                        "current_stage": SupplyUnitStage(item["current_stage"]),
+                        "status": SupplyUnitStatus(item["status"]),
+                    },
+                )
+                for item in value["supply_units"]
+            )
+            material_documents = tuple(
+                MaterialDocument(**item) for item in value["material_documents"]
+            )
+            business_effects = tuple(
+                BusinessEffect(
+                    **{
+                        **item,
+                        "effect_type": EffectType(item["effect_type"]),
+                        "result_record_ids": tuple(item["result_record_ids"]),
+                        "committed_at": datetime.fromisoformat(item["committed_at"]),
+                    },
+                )
+                for item in value["business_effects"]
+            )
+            return EnterpriseSnapshot(
+                purchase_order=purchase_order,
+                warehouse_receipt=warehouse_receipt,
+                failed_message=failed_message,
+                erp_receipt=erp_receipt,
+                invoice=invoice,
+                supply_units=supply_units,
+                material_documents=material_documents,
+                business_effects=business_effects,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise EnterprisePreconditionFailed("source transition envelope is malformed") from exc
+
+    @classmethod
+    def _source_condition_outbox_row(
+        cls, row: sqlite3.Row | None
+    ) -> SourceConditionOutbox | None:
+        if row is None:
+            return None
+        try:
+            committed_at = datetime.fromisoformat(row["committed_at"])
+            if committed_at.tzinfo is None or committed_at.utcoffset() is None:
+                raise ValueError("outbox timestamp is not timezone aware")
+            affected_raw = json.loads(row["affected_unit_ids_json"])
+            if not isinstance(affected_raw, list) or not all(
+                isinstance(item, str) and item for item in affected_raw
+            ):
+                raise ValueError("outbox unit IDs are malformed")
+            return SourceConditionOutbox(
+                transition_id=row["transition_id"],
+                condition=row["condition"],
+                pre_state=cls._source_transition_snapshot_from_json(row["pre_state_json"]),
+                post_state=cls._source_transition_snapshot_from_json(row["post_state_json"]),
+                affected_unit_ids=tuple(affected_raw),
+                committed_at=committed_at,
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise EnterprisePreconditionFailed("source transition outbox is malformed") from exc
+
+    def read_source_condition_outbox(self) -> SourceConditionOutbox | None:
+        """Read the immutable source transition awaiting public publication."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM source_condition_outbox ORDER BY committed_at, transition_id LIMIT 1"
+            ).fetchone()
+        return self._source_condition_outbox_row(row)
 
     def list_units(self) -> tuple[SupplyUnit, ...]:
         """Return the authoritative unit records in stable ID order."""
@@ -436,6 +598,259 @@ class SyntheticEnterprise:
                 (idempotency_key,),
             ).fetchone()
             return None if row is None else self._effect(row)
+
+    def inject_retryable_document_lock(
+        self,
+        *,
+        purchase_order_id: str = "PO-10001",
+        line_id: str = "10",
+        message_id: str = "RECEIPT-MESSAGE-020",
+        quantity: int = 20,
+    ) -> SourceConditionMutation:
+        """Atomically turn the healthy source into the retryable-lock condition.
+
+        This is the only source-condition write used by Scenario Lab.  It starts
+        from the frozen healthy-flow state, validates the complete aggregate and
+        per-unit preconditions, and commits the queue, ERP, invoice, message, and
+        exact unit-set changes in one SQLite transaction.  A stale or partially
+        changed source fails closed before any row is updated.
+        """
+
+        expected_purchase_order_id = "PO-10001"
+        expected_line_id = "10"
+        expected_message_id = "RECEIPT-MESSAGE-020"
+        expected_quantity = 20
+        if (
+            purchase_order_id != expected_purchase_order_id
+            or line_id != expected_line_id
+            or message_id != expected_message_id
+            or quantity != expected_quantity
+        ):
+            raise EnterprisePreconditionFailed(
+                "retryable lock must target the frozen PO-10001 line 10 message and quantity"
+            )
+
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing_outbox = self._source_condition_outbox_row(
+                connection.execute(
+                    "SELECT * FROM source_condition_outbox "
+                    "ORDER BY committed_at, transition_id LIMIT 1"
+                ).fetchone()
+            )
+            if existing_outbox is not None:
+                raise EnterprisePreconditionFailed(
+                    "retryable lock source transition has already been committed"
+                )
+            pre_state = self._snapshot(connection)
+            purchase_order = pre_state.purchase_order
+            message = pre_state.failed_message
+            erp = pre_state.erp_receipt
+            invoice = pre_state.invoice
+            units = pre_state.supply_units
+            expected_unit_ids = tuple(
+                f"{expected_purchase_order_id}-{expected_line_id}-unit-{index:03d}"
+                for index in range(81, 101)
+            )
+            actual_unit_ids = tuple(item.unit_id for item in units)
+            target_units = tuple(item for item in units if item.unit_id in expected_unit_ids)
+            healthy = (
+                purchase_order.purchase_order_id == expected_purchase_order_id
+                and purchase_order.line_id == expected_line_id
+                and purchase_order.ordered_quantity == expected_quantity * 5
+                and message.message_id == expected_message_id
+                and message.revision == 4
+                and message.purchase_order_id == expected_purchase_order_id
+                and message.line_id == expected_line_id
+                and message.quantity == expected_quantity
+                and message.error_code == "DOCUMENT_LOCKED_RETRYABLE"
+                and message.status is MessageStatus.CONSUMED
+                and not message.retry_eligible
+                and message.lock_cleared
+                and message.consumed_by_execution_id == "external:healthy-baseline"
+                and erp.purchase_order_id == expected_purchase_order_id
+                and erp.line_id == expected_line_id
+                and erp.quantity == purchase_order.ordered_quantity
+                and erp.revision == 9
+                and invoice.invoice_id == "INV-10001"
+                and invoice.revision == 5
+                and invoice.purchase_order_id == expected_purchase_order_id
+                and invoice.line_id == expected_line_id
+                and invoice.quantity == purchase_order.ordered_quantity
+                and invoice.state is EnterpriseInvoiceState.RELEASED
+                and invoice.hold_reason is None
+                and not invoice.other_blocking_holds
+                and invoice.released_by_execution_id == message.consumed_by_execution_id
+                and not pre_state.material_documents
+                and not pre_state.business_effects
+                and len(units) == purchase_order.ordered_quantity
+                and actual_unit_ids == tuple(sorted(actual_unit_ids))
+                and set(actual_unit_ids) == set(
+                    f"{expected_purchase_order_id}-{expected_line_id}-unit-{index:03d}"
+                    for index in range(1, purchase_order.ordered_quantity + 1)
+                )
+                and len(target_units) == expected_quantity
+                and all(
+                    item.purchase_order_id == expected_purchase_order_id
+                    and item.line_id == expected_line_id
+                    and item.current_stage is SupplyUnitStage.ERP
+                    and item.status is SupplyUnitStatus.ERP_RECORDED
+                    and item.source_message_id is None
+                    and item.revision == 0
+                    for item in units
+                )
+            )
+            if not healthy:
+                raise EnterprisePreconditionFailed(
+                    "retryable lock source preconditions are not satisfied"
+                )
+
+            changed = connection.execute(
+                "UPDATE failed_messages SET revision = revision + 1, status = ?, "
+                "retry_eligible = 1, lock_cleared = 1, consumed_by_execution_id = NULL "
+                "WHERE message_id = ? AND revision = ? AND status = ? "
+                "AND retry_eligible = 0 AND lock_cleared = 1",
+                (
+                    MessageStatus.FAILED.value,
+                    expected_message_id,
+                    message.revision,
+                    MessageStatus.CONSUMED.value,
+                ),
+            ).rowcount
+            if changed != 1:
+                raise EnterprisePreconditionFailed(
+                    "retryable lock message changed during source transaction"
+                )
+            changed = connection.execute(
+                "UPDATE erp_receipts SET quantity = ?, revision = revision + 1 "
+                "WHERE purchase_order_id = ? AND line_id = ? AND quantity = ? AND revision = ?",
+                (
+                    purchase_order.ordered_quantity - expected_quantity,
+                    expected_purchase_order_id,
+                    expected_line_id,
+                    erp.quantity,
+                    erp.revision,
+                ),
+            ).rowcount
+            if changed != 1:
+                raise EnterprisePreconditionFailed(
+                    "ERP receipt changed during source transaction"
+                )
+            changed = connection.execute(
+                "UPDATE invoices SET revision = revision + 1, state = ?, "
+                "hold_reason = ?, released_by_execution_id = NULL "
+                "WHERE invoice_id = ? AND revision = ? AND state = ? "
+                "AND hold_reason IS NULL",
+                (
+                    EnterpriseInvoiceState.HELD.value,
+                    "RECEIPT_MISMATCH",
+                    invoice.invoice_id,
+                    invoice.revision,
+                    EnterpriseInvoiceState.RELEASED.value,
+                ),
+            ).rowcount
+            if changed != 1:
+                raise EnterprisePreconditionFailed(
+                    "invoice changed during source transaction"
+                )
+            for unit in target_units:
+                changed = connection.execute(
+                    "UPDATE supply_units SET current_stage = ?, status = ?, "
+                    "source_message_id = ?, revision = revision + 1 "
+                    "WHERE unit_id = ? AND purchase_order_id = ? AND line_id = ? "
+                    "AND current_stage = ? AND status = ? AND source_message_id IS NULL "
+                    "AND revision = 0",
+                    (
+                        SupplyUnitStage.MESSAGE_QUEUE.value,
+                        SupplyUnitStatus.QUEUE_FAILED.value,
+                        expected_message_id,
+                        unit.unit_id,
+                        expected_purchase_order_id,
+                        expected_line_id,
+                        SupplyUnitStage.ERP.value,
+                        SupplyUnitStatus.ERP_RECORDED.value,
+                    ),
+                ).rowcount
+                if changed != 1:
+                    raise EnterprisePreconditionFailed(
+                        "retryable lock could not update the exact unit set"
+                    )
+
+            post_state = self._snapshot(connection)
+            post_units = {item.unit_id: item for item in post_state.supply_units}
+            if (
+                post_state.erp_receipt.quantity
+                != purchase_order.ordered_quantity - expected_quantity
+                or post_state.erp_receipt.revision != erp.revision + 1
+                or post_state.failed_message.status is not MessageStatus.FAILED
+                or post_state.failed_message.revision != message.revision + 1
+                or not post_state.failed_message.retry_eligible
+                or post_state.failed_message.lock_cleared is not True
+                or post_state.failed_message.consumed_by_execution_id is not None
+                or post_state.invoice.state is not EnterpriseInvoiceState.HELD
+                or post_state.invoice.revision != invoice.revision + 1
+                or post_state.invoice.hold_reason != "RECEIPT_MISMATCH"
+                or post_state.invoice.released_by_execution_id is not None
+                or len(post_units) != purchase_order.ordered_quantity
+                or sum(
+                    item.status is SupplyUnitStatus.QUEUE_FAILED
+                    and item.current_stage is SupplyUnitStage.MESSAGE_QUEUE
+                    and item.source_message_id == expected_message_id
+                    for item in post_units.values()
+                )
+                != expected_quantity
+                or any(
+                    post_units[item_id].revision != 1
+                    or post_units[item_id].status is not SupplyUnitStatus.QUEUE_FAILED
+                    or post_units[item_id].current_stage is not SupplyUnitStage.MESSAGE_QUEUE
+                    or post_units[item_id].source_message_id != expected_message_id
+                    for item_id in expected_unit_ids
+                )
+                or any(
+                    post_units[item.unit_id] != item
+                    for item in units
+                    if item.unit_id not in expected_unit_ids
+                )
+            ):
+                raise RuntimeError("retryable lock transaction failed postcondition validation")
+            transition_id = (
+                f"source-transition:retryable-document-lock:"
+                f"{expected_purchase_order_id}:{expected_line_id}:{expected_message_id}"
+            )
+            committed_at = datetime.now(UTC)
+            connection.execute(
+                "INSERT INTO source_condition_outbox VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    transition_id,
+                    "retryable_document_lock",
+                    json.dumps(
+                        self._source_transition_snapshot(pre_state),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    json.dumps(
+                        self._source_transition_snapshot(post_state),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    json.dumps(expected_unit_ids, separators=(",", ":")),
+                    committed_at.isoformat(),
+                ),
+            )
+            return SourceConditionMutation(
+                pre_state=pre_state,
+                post_state=post_state,
+                affected_unit_ids=expected_unit_ids,
+                transition_id=transition_id,
+                committed_at=committed_at,
+            )
+
+    def apply_retryable_document_lock(self) -> SourceConditionMutation:
+        """Compatibility name for callers describing the source write as an apply."""
+
+        return self.inject_retryable_document_lock()
 
     def restart_receipt_message(
         self,

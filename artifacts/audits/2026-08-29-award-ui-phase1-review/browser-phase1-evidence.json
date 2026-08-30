@@ -1,0 +1,3041 @@
+{
+  "results": [
+    {
+      "width": 1440,
+      "bodyScroll": 1440,
+      "docScroll": 1440,
+      "dashboardWords": 302,
+      "diagramPanels": 3,
+      "visibleCanvases": [
+        "dashboard-chart",
+        "queue-health-chart",
+        "erp-health-chart",
+        "invoice-health-chart",
+        "external-risk-chart"
+      ],
+      "unitButtons": 100,
+      "buttons": [
+        {
+          "text": "Receipt retry",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 114,
+          "h": 60
+        },
+        {
+          "text": "Shipment check",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 114,
+          "h": 60
+        },
+        {
+          "text": "Duplicate check",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 114,
+          "h": 60
+        },
+        {
+          "text": "001",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "002",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "003",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "004",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "005",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "006",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "007",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "008",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "009",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "010",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "011",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "012",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "013",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "014",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "015",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "016",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "017",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "018",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "019",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "020",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "021",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "022",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "023",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "024",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "025",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "026",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "027",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "028",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "029",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "030",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "031",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "032",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "033",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "034",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "035",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "036",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "037",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "038",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "039",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "040",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "041",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "042",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "043",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "044",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "045",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "046",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "047",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "048",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "049",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "050",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "051",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "052",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "053",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "054",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "055",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "056",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "057",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "058",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "059",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "060",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "061",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "062",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "063",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "064",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "065",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "066",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "067",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "068",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "069",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "070",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "071",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "072",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "073",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "074",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "075",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "076",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "077",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "078",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "079",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "080",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "081",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "082",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "083",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "084",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "085",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "086",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "087",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "088",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "089",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "090",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "091",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "092",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "093",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "094",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "095",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "096",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "097",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "098",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "099",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "100",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        }
+      ],
+      "externalRequests": [],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "scenario": {
+        "url": "http://127.0.0.1:8765/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ]
+      },
+      "keyboardSharedCursor": {
+        "before": "Select a node or data point to inspect the live flow.",
+        "after": {
+          "detail": "Gap \u00b7 0 units \u00b7 synthetic-enterprise-snapshot \u00b7 observed 15:37:11 \u00b7 received 15:37:11 \u00b7 freshness unavailable",
+          "labels": [
+            "15:37:11",
+            "15:37:11",
+            "15:37:11"
+          ]
+        }
+      },
+      "reducedMotion": {
+        "animation": "packet-travel",
+        "duration": "0.65s"
+      },
+      "scenarioBeforeInject": {
+        "current": [
+          "normal"
+        ],
+        "status": "Select a source condition.",
+        "incidentDisabled": false
+      },
+      "scenarioAfterInject": {
+        "url": "http://127.0.0.1:8765/?view=dashboard&scenario=incident&incident_id=missing-20-001-run-1",
+        "title": "20 units stopped before ERP",
+        "gap": "20",
+        "status": "Attention needed",
+        "error": ""
+      },
+      "console": []
+    },
+    {
+      "width": 1280,
+      "bodyScroll": 1280,
+      "docScroll": 1280,
+      "dashboardWords": 302,
+      "diagramPanels": 3,
+      "visibleCanvases": [
+        "dashboard-chart",
+        "queue-health-chart",
+        "erp-health-chart",
+        "invoice-health-chart",
+        "external-risk-chart"
+      ],
+      "unitButtons": 100,
+      "buttons": [
+        {
+          "text": "Receipt retry",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 114,
+          "h": 60
+        },
+        {
+          "text": "Shipment check",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 114,
+          "h": 60
+        },
+        {
+          "text": "Duplicate check",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 114,
+          "h": 60
+        },
+        {
+          "text": "001",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "002",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "003",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "004",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "005",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "006",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "007",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "008",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "009",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "010",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "011",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "012",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "013",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "014",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "015",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "016",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "017",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "018",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "019",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "020",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "021",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "022",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "023",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "024",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "025",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "026",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "027",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "028",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "029",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "030",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "031",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "032",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "033",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "034",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "035",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "036",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "037",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "038",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "039",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "040",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "041",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "042",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "043",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "044",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "045",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "046",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "047",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "048",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "049",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "050",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "051",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "052",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "053",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "054",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "055",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "056",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "057",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "058",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "059",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "060",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "061",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "062",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "063",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "064",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "065",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "066",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "067",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "068",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "069",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "070",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "071",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "072",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "073",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "074",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "075",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "076",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "077",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "078",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "079",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "080",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "081",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "082",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "083",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "084",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "085",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "086",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "087",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "088",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "089",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "090",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "091",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "092",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "093",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "094",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "095",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "096",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "097",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "098",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "099",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        },
+        {
+          "text": "100",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 10,
+          "h": 4
+        }
+      ],
+      "externalRequests": [],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "scenario": {
+        "url": "http://127.0.0.1:8765/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ]
+      },
+      "console": []
+    },
+    {
+      "width": 768,
+      "bodyScroll": 768,
+      "docScroll": 768,
+      "dashboardWords": 302,
+      "diagramPanels": 3,
+      "visibleCanvases": [
+        "dashboard-chart",
+        "queue-health-chart",
+        "erp-health-chart",
+        "invoice-health-chart",
+        "external-risk-chart"
+      ],
+      "unitButtons": 100,
+      "buttons": [
+        {
+          "text": "Receipt retry",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 94,
+          "h": 60
+        },
+        {
+          "text": "Shipment check",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 94,
+          "h": 60
+        },
+        {
+          "text": "Duplicate check",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 94,
+          "h": 60
+        },
+        {
+          "text": "001",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "002",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "003",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "004",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "005",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "006",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "007",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "008",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "009",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "010",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "011",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "012",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "013",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "014",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "015",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "016",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "017",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "018",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "019",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "020",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "021",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "022",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "023",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "024",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "025",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "026",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "027",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "028",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "029",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "030",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "031",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "032",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "033",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "034",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "035",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "036",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "037",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "038",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "039",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "040",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "041",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "042",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "043",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "044",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "045",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "046",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "047",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "048",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "049",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "050",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "051",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "052",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "053",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "054",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "055",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "056",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "057",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "058",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "059",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "060",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "061",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "062",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "063",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "064",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "065",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "066",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "067",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "068",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "069",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "070",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "071",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "072",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "073",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "074",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "075",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "076",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "077",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "078",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "079",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "080",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "081",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "082",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "083",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "084",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "085",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "086",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "087",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "088",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "089",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "090",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "091",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "092",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "093",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "094",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "095",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "096",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "097",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "098",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "099",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        },
+        {
+          "text": "100",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 8,
+          "h": 4
+        }
+      ],
+      "externalRequests": [],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "scenario": {
+        "url": "http://127.0.0.1:8765/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ]
+      },
+      "console": []
+    },
+    {
+      "width": 390,
+      "bodyScroll": 390,
+      "docScroll": 390,
+      "dashboardWords": 289,
+      "diagramPanels": 3,
+      "visibleCanvases": [
+        "dashboard-chart",
+        "queue-health-chart",
+        "erp-health-chart",
+        "invoice-health-chart",
+        "external-risk-chart"
+      ],
+      "unitButtons": 100,
+      "buttons": [
+        {
+          "text": "Receipt retryWAITINGFailed message path0 tools \u00b7 0 evidences",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Shipment checkWAITINGPhysical quantity0 tools \u00b7 0 evidences",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Duplicate checkWAITINGExisting postings0 tools \u00b7 0 evidences",
+          "id": "",
+          "cls": "agent-card agent-card-compact",
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "001",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "002",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "003",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "004",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "005",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "006",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "007",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "008",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "009",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "010",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "011",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "012",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "013",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "014",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "015",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "016",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "017",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "018",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "019",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "020",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "021",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "022",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "023",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "024",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "025",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "026",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "027",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "028",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "029",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "030",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "031",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "032",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "033",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "034",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "035",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "036",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "037",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "038",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "039",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "040",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "041",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "042",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "043",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "044",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "045",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "046",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "047",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "048",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "049",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "050",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "051",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "052",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "053",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "054",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "055",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "056",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "057",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "058",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "059",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "060",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "061",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "062",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "063",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "064",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "065",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "066",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "067",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "068",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "069",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "070",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "071",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "072",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "073",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "074",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "075",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "076",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "077",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "078",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "079",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "080",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "081",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "082",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "083",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "084",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "085",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "086",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "087",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "088",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "089",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "090",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "091",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "092",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "093",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "094",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "095",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "096",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "097",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "098",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "099",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        },
+        {
+          "text": "100",
+          "id": "",
+          "cls": "unit-entity erp-recorded",
+          "w": 6,
+          "h": 4
+        }
+      ],
+      "externalRequests": [],
+      "cursorLabels": [
+        "LIVE",
+        "LIVE",
+        "LIVE"
+      ],
+      "scenario": {
+        "url": "http://127.0.0.1:8765/?view=dashboard",
+        "title": "All 100 units are accounted for",
+        "selected": [
+          "normal"
+        ]
+      },
+      "console": []
+    }
+  ]
+}

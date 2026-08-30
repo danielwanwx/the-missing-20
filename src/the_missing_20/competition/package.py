@@ -21,8 +21,13 @@ from typing import Annotated, Any, Final, Literal, cast
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from the_missing_20.authority_b.aws_proof import (
-    M6_AGENTCORE_CAPABILITIES,
+    M6_AGENTCORE_NOT_PROVEN_CAPABILITIES,
+    M6_AGENTCORE_PROVEN_CAPABILITIES,
+    M6_AGENTCORE_RUNTIME_PROOF_PATH,
+    M6_AUTHORITY_CHAT_COST_STATUS,
     M6_PROOF_ARTIFACT_PATH,
+    M6_RUNTIME_ACCEPTANCE_COST_USD,
+    M6_RUNTIME_KNOWN_TOKEN_COST_USD,
     M6ProofError,
     load_m6_aws_proof,
 )
@@ -37,7 +42,7 @@ M7_SCHEMA_VERSION: Final[str] = "M7PrivateCompetitionAudit/v1"
 M7_AUDIT_ARTIFACT_PATH: Final[str] = "artifacts/submission/private-audit-v1.json"
 M7_GENERATED_AT: Final[str] = "2026-08-27T00:00:00Z"
 M7_TOTAL_DURATION_SECONDS: Final[int] = 300
-M7_CUMULATIVE_COST_USD: Final[str] = "0.1250496"
+M7_CUMULATIVE_COST_USD: Final[str] = "0.1749144"
 M7_COST_CAP_USD: Final[str] = "0.60"
 
 # This is an auditor-owned contract, not a claim supplied by the browser smoke
@@ -94,6 +99,7 @@ M7_ARTIFACT_PATHS: Final[tuple[str, ...]] = (
     "artifacts/agent/authority-b-usefulness-proof-v1.json",
     "artifacts/golden/golden-v2.json",
     M6_PROOF_ARTIFACT_PATH,
+    M6_AGENTCORE_RUNTIME_PROOF_PATH,
     "artifacts/workspace/authority-b-lifecycle-v1.json",
     "artifacts/workspace/browser-smoke-v1.json",
     "artifacts/workspace/decision-workspace-complete.json",
@@ -121,7 +127,10 @@ M7_FIXED_SOURCE_DIGESTS: Final[Mapping[str, str]] = {
     "artifacts/golden/golden-v2.json": (
         "d275470cfe5748105630f22d3c08c9c962001cf3957e62735b63d8b406352e69"
     ),
-    M6_PROOF_ARTIFACT_PATH: ("063aa1bc07d1f26930e3e16b8801a6e10c5708fb294eb97d77e6a9fee843e492"),
+    M6_PROOF_ARTIFACT_PATH: ("236c50a469f06ec1a15944d7f5636f4eaafae3b7c0e5788a86286e3c705b16f0"),
+    M6_AGENTCORE_RUNTIME_PROOF_PATH: (
+        "b5efdf64f36291ced3d7d988f416e2b6512adfd1fbea1a886cd94622473a486d"
+    ),
     "artifacts/workspace/authority-b-lifecycle-v1.json": (
         "670b525cc5bfd9f673fd63de660a44d9db5ae000ce2cecb49fc053cacf4d7512"
     ),
@@ -148,6 +157,7 @@ M7_SOURCE_ROLES: Final[Mapping[str, str]] = {
     "artifacts/agent/authority-b-usefulness-proof-v1.json": "REAL_USEFULNESS_DISCLOSURE",
     "artifacts/golden/golden-v2.json": "GOLDEN_V2",
     M6_PROOF_ARTIFACT_PATH: "M6_EXISTING_EVIDENCE_PROOF",
+    M6_AGENTCORE_RUNTIME_PROOF_PATH: "AGENTCORE_RUNTIME_DEPLOYMENT_AND_E2E",
     "artifacts/workspace/authority-b-lifecycle-v1.json": "M5_LIFECYCLE",
     "artifacts/workspace/browser-smoke-v1.json": "M5_BROWSER_SMOKE",
     "artifacts/workspace/decision-workspace-complete.json": "M5_COMPLETE_WORKSPACE",
@@ -206,7 +216,7 @@ class M7EvidenceRecord(M7Model):
     evidence_id: Annotated[str, Field(min_length=1)]
     claim: Annotated[str, Field(min_length=1)]
     evidence_class: M7EvidenceClass
-    status: Literal["PASS", "DEGRADED", "NOT_PROVEN"]
+    status: Literal["PASS", "PARTIAL", "DEGRADED", "NOT_PROVEN"]
     scope: Annotated[str, Field(min_length=1)]
     source_refs: tuple[Annotated[str, Field(min_length=1)], ...] = Field(min_length=1)
     operational_authority: Literal[False] = False
@@ -222,8 +232,13 @@ class M7AcceptanceCheck(M7Model):
 
 class M7CostBoundary(M7Model):
     prior_cumulative_estimated_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
+    runtime_known_token_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
+    runtime_acceptance_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
     cumulative_estimated_cost_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
     hard_cap_usd: Annotated[str, Field(pattern=r"^\d+(?:\.\d+)?$")]
+    authority_boundary_chat_cost_status: Literal["NOT_RECORDED_EXCLUDED"] = (
+        M6_AUTHORITY_CHAT_COST_STATUS
+    )
     new_provider_calls: Literal[0] = 0
     new_aws_cost_usd: Literal["0"] = "0"
 
@@ -300,9 +315,11 @@ class M7PrivateAudit(M7Model):
             "workspace_fail_closed": (M7EvidenceClass.PROVEN, "PASS"),
             "scripted_advisory": (M7EvidenceClass.SCRIPTED_PROVEN, "PASS"),
             "real_nova_integration": (M7EvidenceClass.PROVEN, "DEGRADED"),
-            "stable_real_nova_usefulness": (M7EvidenceClass.NOT_PROVEN, "NOT_PROVEN"),
+            "stable_real_nova_usefulness": (M7EvidenceClass.PROVEN, "PARTIAL"),
             "agentcore_capabilities": (M7EvidenceClass.NOT_PROVEN, "NOT_PROVEN"),
             "advisory_authority_boundary": (M7EvidenceClass.PROVEN, "PASS"),
+            "agentcore_runtime": (M7EvidenceClass.PROVEN, "PASS"),
+            "application_authoritative_validation": (M7EvidenceClass.PROVEN, "PASS"),
         }
         observed_evidence = {
             item.evidence_id: (item.evidence_class, item.status) for item in self.evidence
@@ -317,17 +334,32 @@ class M7PrivateAudit(M7Model):
             ):
                 raise ValueError("real Nova evidence scope must be connectivity/degradation only")
             if evidence_item.evidence_id == "stable_real_nova_usefulness" and (
-                evidence_item.evidence_class is not M7EvidenceClass.NOT_PROVEN
-                or evidence_item.status != "NOT_PROVEN"
-                or ("not proven" not in lowered and "not_proven" not in lowered)
+                evidence_item.evidence_class is not M7EvidenceClass.PROVEN
+                or evidence_item.status != "PARTIAL"
+                or "partial" not in lowered
+                or "1/5" not in lowered
             ):
-                raise ValueError("stable real Nova usefulness must remain NOT_PROVEN")
+                raise ValueError("real Nova usefulness must remain an honest PARTIAL result")
             if evidence_item.evidence_id == "agentcore_capabilities" and (
                 evidence_item.evidence_class is not M7EvidenceClass.NOT_PROVEN
                 or evidence_item.status != "NOT_PROVEN"
+                or "gateway" not in lowered
+                or "policy" not in lowered
                 or ("not proven" not in lowered and "not_proven" not in lowered)
             ):
-                raise ValueError("AgentCore capabilities must remain NOT_PROVEN")
+                raise ValueError("AgentCore Gateway and Policy must remain NOT_PROVEN")
+            if evidence_item.evidence_id == "agentcore_runtime" and (
+                evidence_item.evidence_class is not M7EvidenceClass.PROVEN
+                or evidence_item.status != "PASS"
+                or "runtime" not in lowered
+            ):
+                raise ValueError("AgentCore Runtime evidence must remain PROVEN")
+            if evidence_item.evidence_id == "application_authoritative_validation" and (
+                evidence_item.evidence_class is not M7EvidenceClass.PROVEN
+                or evidence_item.status != "PASS"
+                or "5" not in lowered
+            ):
+                raise ValueError("application authoritative validation must remain PROVEN")
 
         expected_check_ids = {
             "clean_state_regeneration",
@@ -344,8 +376,12 @@ class M7PrivateAudit(M7Model):
             raise ValueError("M7 acceptance check set is incomplete")
         if (
             self.cost_boundary.prior_cumulative_estimated_cost_usd != M7_CUMULATIVE_COST_USD
+            or self.cost_boundary.runtime_known_token_cost_usd != M6_RUNTIME_KNOWN_TOKEN_COST_USD
+            or self.cost_boundary.runtime_acceptance_cost_usd != M6_RUNTIME_ACCEPTANCE_COST_USD
             or self.cost_boundary.cumulative_estimated_cost_usd != M7_CUMULATIVE_COST_USD
             or self.cost_boundary.hard_cap_usd != M7_COST_CAP_USD
+            or self.cost_boundary.authority_boundary_chat_cost_status
+            != M6_AUTHORITY_CHAT_COST_STATUS
             or self.cost_boundary.new_provider_calls != 0
             or self.cost_boundary.new_aws_cost_usd != "0"
         ):
@@ -688,15 +724,6 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
         raise M7PackageError("M7 browser smoke does not prove the closed final gate")
     if event_ledger.get("replay_effect_delta") != 0:
         raise M7PackageError("M7 browser smoke replay changed the effect count")
-    if (
-        event_ledger.get("open_replay_sequence_start") != 2
-        or event_ledger.get("open_replay_sequence_end") != 66
-        or event_ledger.get("open_replay_paced") is not True
-        or event_ledger.get("open_replay_api_bytes_unchanged") is not True
-    ):
-        raise M7PackageError(
-            "M7 browser smoke does not prove open-incident replay drained without mutation"
-        )
     observed_sequences = event_ledger.get("observed_sequences")
     if not isinstance(observed_sequences, list) or len(observed_sequences) < 2:
         raise M7PackageError("M7 browser smoke is missing observed SSE sequences")
@@ -708,10 +735,95 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
     required_types = event_ledger.get("required_event_types")
     if not isinstance(observed_types, list) or not isinstance(required_types, list):
         raise M7PackageError("M7 browser smoke event type proof is missing")
+    if len(observed_types) != len(observed_sequences):
+        raise M7PackageError("M7 browser smoke sequence/type evidence is not aligned")
     if required_types != list(M7_REQUIRED_BROWSER_EVENT_TYPES):
         raise M7PackageError("M7 browser smoke required event contract is invalid")
     if any(event_type not in observed_types for event_type in M7_REQUIRED_BROWSER_EVENT_TYPES):
         raise M7PackageError("M7 browser smoke omitted a required agent or lifecycle event")
+
+    replay_start = event_ledger.get("open_replay_sequence_start")
+    replay_end = event_ledger.get("open_replay_sequence_end")
+    if (
+        not isinstance(replay_start, int)
+        or isinstance(replay_start, bool)
+        or not isinstance(replay_end, int)
+        or isinstance(replay_end, bool)
+        or replay_start < 1
+        or replay_end < replay_start
+    ):
+        raise M7PackageError("M7 browser smoke replay boundaries are invalid")
+    sequence_type_pairs = tuple(zip(observed_sequences, observed_types, strict=True))
+    source_sequences = tuple(
+        sequence
+        for sequence, event_type in sequence_type_pairs
+        if event_type == "source.condition.injected"
+    )
+    detected_sequences = tuple(
+        sequence
+        for sequence, event_type in sequence_type_pairs
+        if event_type == "incident.detected"
+    )
+    if (
+        len(source_sequences) != 1
+        or len(detected_sequences) != 1
+        or source_sequences[0] >= detected_sequences[0]
+    ):
+        raise M7PackageError("M7 browser smoke source/detection anchor is missing or out of order")
+    expected_replay_start = detected_sequences[0] + 1
+    if replay_start != expected_replay_start:
+        raise M7PackageError("M7 browser smoke replay does not begin after the detection anchor")
+    replay_sequences = event_ledger.get("open_replay_sequences")
+    if (
+        not isinstance(replay_sequences, list)
+        or not replay_sequences
+        or any(
+            not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1
+            for sequence in replay_sequences
+        )
+        or replay_sequences != list(range(replay_start, replay_sequences[-1] + 1))
+        or replay_sequences[-1] != replay_end
+    ):
+        raise M7PackageError(
+            "M7 browser smoke replay sequence evidence is invalid or does not match its boundary"
+        )
+    replay_evaluation_sequences = tuple(
+        sequence
+        for sequence, event_type in sequence_type_pairs
+        if sequence >= replay_start and event_type == "evaluation.completed"
+    )
+    if not replay_evaluation_sequences or replay_evaluation_sequences[0] > replay_end:
+        raise M7PackageError(
+            "M7 browser smoke replay does not include the investigation evaluation"
+        )
+    observed_set = set(observed_sequences)
+    if any(sequence not in observed_set for sequence in range(replay_start, replay_end + 1)):
+        raise M7PackageError("M7 browser smoke replay coverage has a sequence gap")
+    replay_types = {
+        event_type
+        for sequence, event_type in sequence_type_pairs
+        if replay_start <= sequence <= replay_end
+    }
+    required_replay_types = {
+        "investigation.started",
+        "agent.started",
+        "tool.started",
+        "tool.completed",
+        "evidence.returned",
+        "agent.handoff",
+        "synthesis.completed",
+        "evaluation.started",
+        "evaluation.completed",
+    }
+    if not required_replay_types.issubset(replay_types):
+        raise M7PackageError("M7 browser smoke replay omitted investigation coverage")
+    if (
+        event_ledger.get("open_replay_paced") is not True
+        or event_ledger.get("open_replay_api_bytes_unchanged") is not True
+    ):
+        raise M7PackageError(
+            "M7 browser smoke does not prove open-incident replay drained without mutation"
+        )
     modes = value.get("modes")
     if not isinstance(modes, list) or [item.get("mode") for item in modes] != [
         "complete",
@@ -795,7 +907,8 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
     required_ui_actions = {
         "dashboard_loaded",
         "agent_workspace_opened",
-        "investigation_start_control",
+        "investigation_auto_handoff",
+        "manual_start_control_absent",
         "paced_investigation",
         "copilot_queried",
         "recovery_prepared",
@@ -878,7 +991,9 @@ _UNSAFE_REAL_NOVA = re.compile(
     re.IGNORECASE,
 )
 _UNSAFE_AGENTCORE = re.compile(
-    r"agentcore[^\n.]{0,100}(?<!not\s)\b(?:proven|pass|verified|deployed|working)\b",
+    r"(?:agentcore\s+(?:gateway|policy)[^\n.]{0,100}|"
+    r"(?:all|every)\s+agentcore[^\n.]{0,100})"
+    r"\b(?:proven|pass|verified|deployed|working)\b",
     re.IGNORECASE,
 )
 
@@ -966,17 +1081,47 @@ def _validate_m6(repository_root: Path) -> None:
         or real.write_authority
     ):
         raise M7PackageError("M7 real Nova integration boundary is contradictory")
+    runtime = proof.agentcore_runtime
+    if (
+        runtime.status != "PROVEN"
+        or runtime.runtime_status != "READY"
+        or runtime.deployment_status != "PROVEN"
+        or runtime.invocation_status != "PROVEN"
+        or runtime.observability_status != "PROVEN"
+        or runtime.advisory_status != "PARTIAL"
+        or runtime.ai_citation_coverage != 1
+        or runtime.ai_citation_admitted != 5
+        or runtime.application_authoritative_validation != 5
+        or runtime.application_authoritative_admitted != 5
+        or runtime.role_chat_read_only is not True
+        or runtime.deterministic_recovery_status != "CLOSED"
+        or runtime.deterministic_two_role_quorums != 2
+        or runtime.deterministic_controlled_effects != 2
+        or runtime.deterministic_verification is not True
+        or runtime.deterministic_replay_effect_delta != 0
+    ):
+        raise M7PackageError("M7 AgentCore Runtime proof is incomplete or contradictory")
     for capability in proof.capabilities:
-        if capability.capability_id in M6_AGENTCORE_CAPABILITIES and (
+        if capability.capability_id in M6_AGENTCORE_PROVEN_CAPABILITIES and (
+            capability.status != "PROVEN"
+            or capability.evidence_class != "PROVEN"
+            or capability.write_authority
+            or capability.operational_authority
+        ):
+            raise M7PackageError("M7 AgentCore Runtime capability proof is contradictory")
+        if capability.capability_id in M6_AGENTCORE_NOT_PROVEN_CAPABILITIES and (
             capability.status != "NOT_PROVEN"
             or capability.evidence_class != "NOT_PROVEN"
             or capability.write_authority
             or capability.operational_authority
         ):
-            raise M7PackageError("M7 AgentCore capability is overclaimed")
+            raise M7PackageError("M7 AgentCore Gateway/Policy capability is overclaimed")
     if (
         proof.cost_boundary.new_provider_calls != 0
         or proof.cost_boundary.new_aws_cost_usd != "0"
+        or proof.cost_boundary.runtime_known_token_cost_usd != M6_RUNTIME_KNOWN_TOKEN_COST_USD
+        or proof.cost_boundary.runtime_acceptance_cost_usd != M6_RUNTIME_ACCEPTANCE_COST_USD
+        or proof.cost_boundary.authority_boundary_chat_cost_status != M6_AUTHORITY_CHAT_COST_STATUS
         or proof.cost_boundary.cumulative_estimated_cost_usd != M7_CUMULATIVE_COST_USD
     ):
         raise M7PackageError("M7 cost boundary records new spend")
@@ -1141,25 +1286,32 @@ def _build_evidence() -> tuple[M7EvidenceRecord, ...]:
         ),
         M7EvidenceRecord(
             evidence_id="stable_real_nova_usefulness",
-            claim="Stable real Nova usefulness is NOT_PROVEN.",
-            evidence_class=M7EvidenceClass.NOT_PROVEN,
-            status="NOT_PROVEN",
-            scope="the consumed real attempt degraded before stable useful advisory output",
+            claim=(
+                "Real Nova multi-agent usefulness is PARTIAL: AI-authored citation coverage "
+                "is 1/5; application authoritative validation is 5/5."
+            ),
+            evidence_class=M7EvidenceClass.PROVEN,
+            status="PARTIAL",
+            scope=(
+                "three real investigators completed; AI citation coverage is 1/5 while "
+                "the application validated all 5 admitted records"
+            ),
             source_refs=(
                 M6_PROOF_ARTIFACT_PATH + "#claims/real-usefulness",
+                M6_AGENTCORE_RUNTIME_PROOF_PATH + "#real_end_to_end_acceptance",
                 "artifacts/agent/authority-b-usefulness-proof-v1.json",
             ),
         ),
         M7EvidenceRecord(
             evidence_id="agentcore_capabilities",
-            claim="All AgentCore capabilities are NOT_PROVEN.",
+            claim="AgentCore Gateway and Policy are NOT_PROVEN.",
             evidence_class=M7EvidenceClass.NOT_PROVEN,
             status="NOT_PROVEN",
             scope=(
-                "no AgentCore Runtime, Gateway, Policy, Observability, or deployment proof "
-                "is included"
+                "the package proves the Runtime slice only; Gateway and Policy are not deployed "
+                "or evidenced"
             ),
-            source_refs=(M6_PROOF_ARTIFACT_PATH + "#capabilities",),
+            source_refs=(M6_PROOF_ARTIFACT_PATH + "#capabilities", M6_AGENTCORE_RUNTIME_PROOF_PATH),
         ),
         M7EvidenceRecord(
             evidence_id="advisory_authority_boundary",
@@ -1174,6 +1326,28 @@ def _build_evidence() -> tuple[M7EvidenceRecord, ...]:
             source_refs=(
                 "artifacts/agent/authority-b-advisory-v1.json",
                 "artifacts/workspace/authority-b-lifecycle-v1.json#grants",
+            ),
+        ),
+        M7EvidenceRecord(
+            evidence_id="agentcore_runtime",
+            claim="AgentCore Runtime deployment, invocation, and observability are PROVEN.",
+            evidence_class=M7EvidenceClass.PROVEN,
+            status="PASS",
+            scope=(
+                "READY Runtime deployment, completed redacted invocation, runtime logs, and "
+                "visible trace-delivery warning"
+            ),
+            source_refs=(M6_AGENTCORE_RUNTIME_PROOF_PATH,),
+        ),
+        M7EvidenceRecord(
+            evidence_id="application_authoritative_validation",
+            claim="Application authoritative validation covers all 5 admitted evidence records.",
+            evidence_class=M7EvidenceClass.PROVEN,
+            status="PASS",
+            scope="deterministic application validation, independent of model citation closure",
+            source_refs=(
+                M6_AGENTCORE_RUNTIME_PROOF_PATH + "#real_end_to_end_acceptance",
+                M6_PROOF_ARTIFACT_PATH + "#lifecycle",
             ),
         ),
     )
@@ -1214,8 +1388,8 @@ def _build_checks() -> tuple[M7AcceptanceCheck, ...]:
         M7AcceptanceCheck(
             check_id="m6_evidence_boundary",
             detail=(
-                "M6 preserves real Nova degradation and marks stable usefulness and all "
-                "AgentCore capabilities NOT_PROVEN."
+                "M6 proves the deployed AgentCore Runtime integration boundary, preserves "
+                "the PARTIAL 1/5 Nova citation result, and keeps Gateway/Policy NOT_PROVEN."
             ),
             source_refs=(M6_PROOF_ARTIFACT_PATH,),
         ),
@@ -1277,6 +1451,8 @@ def build_private_audit(repository_root: Path) -> M7PrivateAudit:
             source_artifacts=sources,
             cost_boundary=M7CostBoundary(
                 prior_cumulative_estimated_cost_usd=M7_CUMULATIVE_COST_USD,
+                runtime_known_token_cost_usd=M6_RUNTIME_KNOWN_TOKEN_COST_USD,
+                runtime_acceptance_cost_usd=M6_RUNTIME_ACCEPTANCE_COST_USD,
                 cumulative_estimated_cost_usd=M7_CUMULATIVE_COST_USD,
                 hard_cap_usd=M7_COST_CAP_USD,
             ),

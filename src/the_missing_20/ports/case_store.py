@@ -24,6 +24,14 @@ from the_missing_20.domain.models import (
 class CaseStore(Protocol):
     def create_case(self, case: Case, genesis: DetectionGenesis) -> None: ...
 
+    def create_detected_case(
+        self,
+        case: Case,
+        genesis: DetectionGenesis,
+        evidence: tuple[EvidenceItem, ...],
+        transition: TransitionCommand,
+    ) -> tuple[Case, CaseEvent]: ...
+
     def get_case(self, case_id: str) -> Case: ...
 
     def apply_transition(self, command: TransitionCommand) -> tuple[Case, CaseEvent]: ...

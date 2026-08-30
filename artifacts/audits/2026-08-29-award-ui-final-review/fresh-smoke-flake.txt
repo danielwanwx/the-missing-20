@@ -1,0 +1,7 @@
+Fresh isolated Chrome run 1 (2026-08-29): BLOCKED
+
+physical chart key focus was lost for state={'active_id': 'invoice-health-chart', 'metric': 'External context', 'detail': 'Invoice completion · 100 units · synthetic-enterprise-snapshot · observed 16:57:15 · received 16:57:15 · 0s old', 'shared_timestamp': '16:57:15', 'health_timestamp': '16:57:15', 'source_timestamp': '16:57:15', 'numeric_freshness': True}
+
+Fresh isolated Chrome run 2: PASS
+
+Decision Workspace browser smoke: PASS (real API, agent workspace, approvals, recovery)

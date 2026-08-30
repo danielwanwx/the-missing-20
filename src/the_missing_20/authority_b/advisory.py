@@ -127,6 +127,14 @@ def advisory_from_harness_run(
     allowed_ids = None if admitted_evidence_ids is None else frozenset(admitted_evidence_ids)
     hypotheses = tuple(_harness_hypothesis(item, index) for index, item in enumerate(investigators))
     warnings_set: set[str] = set()
+    stage_warnings = getattr(run, "warnings", ())
+    warnings_set.update(str(item) for item in stage_warnings)
+    stage_closure = getattr(run, "evaluator_citation_closure", None)
+    if stage_closure is not None and (
+        not bool(getattr(stage_closure, "all_synthesis_claims_validated", False))
+        or not bool(getattr(stage_closure, "all_admitted_evidence_covered", False))
+    ):
+        warnings_set.add("AI_CITATION_CLOSURE_INCOMPLETE")
     if allowed_ids is not None:
         filtered: list[AdvisoryHypothesis] = []
         for item in hypotheses:
@@ -193,14 +201,33 @@ def advisory_from_harness_run(
         estimated_cost_usd=0.0,
     )
     missing = tuple(sorted(set(getattr(assessment, "missing_evidence_sources", ()))))
+    if not missing:
+        source_coverage = getattr(run, "evaluator_source_coverage", None)
+        missing = tuple(
+            sorted(
+                {
+                    getattr(getattr(item, "source_type", None), "value", "")
+                    for item in getattr(source_coverage, "source_availability", ())
+                    if getattr(getattr(item, "status", None), "value", None) == "UNAVAILABLE"
+                }
+                - {""}
+            )
+        )
     proposed_gaps = missing or ("NO_MISSING_AUTHORITATIVE_EVIDENCE",)
     warnings_set.update(missing)
     warnings: tuple[str, ...] = tuple(sorted(warnings_set))
-    status = (
-        AdvisoryStatus.PARTIAL
-        if "UNKNOWN_ADVISORY_CITATION" in warnings_set
-        else AdvisoryStatus.COMPLETE
-    )
+    stage_status = getattr(run, "advisory_status", None)
+    if stage_status is None:
+        status = (
+            AdvisoryStatus.PARTIAL
+            if "UNKNOWN_ADVISORY_CITATION" in warnings_set
+            else AdvisoryStatus.COMPLETE
+        )
+    else:
+        try:
+            status = AdvisoryStatus(getattr(stage_status, "value", stage_status))
+        except ValueError as exc:
+            raise ValueError("harness run has an unknown advisory status") from exc
     return AdvisoryInvestigation(
         advisory_id=f"advisory:{resolved_case_id}:{resolved_trace_id}",
         case_id=resolved_case_id,

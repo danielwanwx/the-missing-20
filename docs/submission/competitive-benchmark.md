@@ -41,12 +41,18 @@ The closest public benchmark is the official
   and adversarial mutation tests.
 - Explicit complete, degraded, and fail-closed states.
 
-### Below the public winner bar
+### Gaps to close before public release
 
-- Stable useful Nova-produced investigation is not proven.
-- AgentCore deployment is not implemented.
-- All business data and impact evidence are synthetic.
-- The public video and public live deployment do not yet exist.
+- Stable useful Nova-produced investigation is not proven; the captured real result
+  is intentionally disclosed as `PARTIAL` (AI citation coverage 1/5, application
+  validation 5/5).
+- AgentCore Runtime deployment, invocation, read-only role chat, and runtime-log
+  evidence are implemented and proven within the redacted evidence boundary. Gateway
+  and Policy are not proven and should not be implied.
+- All business data and impact evidence are synthetic, so no production savings or
+  reliability metric is claimed.
+- The public video and public live deployment are release deliverables, not evidence
+  that should be invented before they exist.
 
 ## Presentation strategy
 

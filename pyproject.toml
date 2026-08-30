@@ -18,6 +18,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+live = [
+  "websockets>=15,<18",
+]
 dev = [
   "mypy>=1.15,<2",
   "pytest>=8.3,<9",

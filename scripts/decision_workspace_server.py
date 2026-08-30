@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from http import HTTPStatus
@@ -32,7 +33,16 @@ from the_missing_20.authority_b.workspace_demo import (  # noqa: E402
 )
 from the_missing_20.domain.errors import VersionConflict  # noqa: E402
 from the_missing_20.experiment.ledger import EventLedgerError  # noqa: E402
-from the_missing_20.experiment.session import ExperimentRegistry, ExperimentSession  # noqa: E402
+from the_missing_20.experiment.session import (  # noqa: E402
+    ExperimentRegistry,
+    ExperimentSession,
+    ScenarioTransitionDenied,
+)
+from the_missing_20.live_sources import (  # noqa: E402
+    LiveSourcePoller,
+    LiveSourceRegistry,
+)
+from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC_ROOT = ROOT / "workspace"
@@ -43,6 +53,13 @@ STATIC_FILES = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
+STATIC_ASSETS = {
+    "/assets/phosphor-regular.css": ("phosphor-regular.css", "text/css; charset=utf-8"),
+    "/assets/phosphor-bold.css": ("phosphor-bold.css", "text/css; charset=utf-8"),
+    "/assets/Phosphor.woff2": ("Phosphor.woff2", "font/woff2"),
+    "/assets/Phosphor-Bold.woff2": ("Phosphor-Bold.woff2", "font/woff2"),
+}
+STATIC_ASSET_ROOT = (STATIC_ROOT / "assets").resolve()
 API_SCHEMA_VERSION = "missing20-experiment-api/v1"
 MAX_REQUEST_BYTES = 64 * 1024
 SSE_HEARTBEAT_SECONDS = 10.0
@@ -55,11 +72,19 @@ SSE_EVENT_PACING_SECONDS = 0.12
 class APIRequestError(Exception):
     """A safe, typed error returned by an experiment API handler."""
 
-    def __init__(self, status: HTTPStatus, code: str, detail: str) -> None:
+    def __init__(
+        self,
+        status: HTTPStatus,
+        code: str,
+        detail: str,
+        *,
+        snapshot: dict[str, object] | None = None,
+    ) -> None:
         super().__init__(detail)
         self.status = status
         self.code = code
         self.detail = detail
+        self.snapshot = snapshot
 
 
 def _json_bytes(value: object) -> bytes:
@@ -98,8 +123,12 @@ def _identity(snapshot: dict[str, object]) -> dict[str, object]:
 def _error_status(exc: Exception) -> tuple[HTTPStatus, str]:
     if isinstance(exc, VersionConflict):
         return HTTPStatus.CONFLICT, "stale_case_version"
+    if isinstance(exc, ScenarioTransitionDenied):
+        return HTTPStatus.CONFLICT, "scenario_transition_required"
     if isinstance(exc, QuorumDenied):
         return HTTPStatus.CONFLICT, "decision_not_allowed"
+    if isinstance(exc, EnterprisePreconditionFailed):
+        return HTTPStatus.CONFLICT, "source_precondition_failed"
     if isinstance(exc, EventLedgerError):
         return HTTPStatus.UNPROCESSABLE_ENTITY, "event_ledger_invalid"
     if isinstance(exc, ValueError):
@@ -119,6 +148,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     @property
     def registry(self) -> ExperimentRegistry:
         return self.server.registry  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def live_sources(self) -> LiveSourceRegistry:
+        return self.server.live_sources  # type: ignore[attr-defined,no-any-return]
 
     def _send(
         self,
@@ -166,7 +199,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     def _session(self, incident_id: str) -> ExperimentSession:
         try:
             return self.registry.get(incident_id)
-        except (OSError, TypeError, ValueError) as exc:
+        except (LookupError, OSError, TypeError, ValueError) as exc:
             raise APIRequestError(HTTPStatus.NOT_FOUND, "incident_not_found", str(exc)) from exc
 
     def _read_json(self, *, allow_empty: bool = False) -> dict[str, object]:
@@ -220,7 +253,79 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         return sequence
 
     def _v1_get(self, route: str, query: dict[str, list[str]]) -> None:
+        if route == "/api/v1/live-sources":
+            self._send_json(HTTPStatus.OK, self.live_sources.current())
+            return
+        if route == "/api/v1/live-sources/events":
+            raw_after = (query.get("after") or ["0"])[0]
+            try:
+                after = int(raw_after)
+            except ValueError as exc:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_live_source_cursor",
+                    "live-source cursor must be a non-negative integer",
+                ) from exc
+            if after < 0:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_live_source_cursor",
+                    "live-source cursor cannot be negative",
+                )
+            self._send_json(HTTPStatus.OK, self.live_sources.events_since(after))
+            return
         prefix = "/api/v1/incidents"
+        if route == "/api/v1/scenarios":
+            normal = self.registry.get("missing-20-normal").snapshot()
+            active_scenario, active_incident_id = self.registry.active_scenario()
+            incident_candidate = (
+                self.registry.get(active_incident_id)
+                if active_scenario in {"incident", "golden"}
+                else None
+            )
+            incident = (
+                incident_candidate.snapshot()
+                if incident_candidate is not None
+                else self.registry.scenario_incident_identity()
+            )
+            recovery_session = self.registry.latest_verified()
+            recovery = recovery_session.snapshot() if recovery_session is not None else normal
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "schema_version": API_SCHEMA_VERSION,
+                    "current": active_incident_id,
+                    "scenarios": [
+                        {
+                            "id": "normal",
+                            "label": "Normal",
+                            **_identity(normal),
+                            "status": "READY",
+                        },
+                        {
+                            "id": "incident",
+                            "label": "Incident",
+                            **_identity(incident),
+                            "status": (
+                                "ACTIVE"
+                                if active_scenario in {"incident", "golden"}
+                                else "READY"
+                            ),
+                        },
+                        {
+                            "id": "recovery",
+                            "label": "Recovery",
+                            **_identity(recovery),
+                            "status": (
+                                "READY"
+                                if recovery_session is not None
+                                else "LOCKED"
+                            ),
+                        },
+                    ],
+                },
+            )
+            return
         if route == prefix:
             sessions = self.registry.list()
             summaries = []
@@ -236,7 +341,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                         "advisory": snapshot["advisory"],
                     }
                 )
-            first = self.registry.get()
+            first = self.registry.get("missing-20-normal")
             first_snapshot = first.snapshot()
             self._send_json(
                 HTTPStatus.OK,
@@ -286,6 +391,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "units": snapshot["units"],
                 },
             )
+            return
+        if resource == "metrics":
+            self._send_json(HTTPStatus.OK, session.metrics())
             return
         if resource == "events":
             self._send_sse(session, query)
@@ -366,10 +474,15 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "provider_calls": False,
                     "write_scope": "local_synthetic_only",
                     "advisory_tools_read_only": True,
+                    "live_sources": True,
+                    "external_context_only": True,
                     "schema_version": WORKSPACE_SCHEMA_VERSION,
                     "experiment_api": API_SCHEMA_VERSION,
                 },
             )
+            return
+        if route == "/metrics":
+            self._send_prometheus()
             return
         if route == "/api/workspace":
             requested = query.get("mode", [WorkspaceMode.COMPLETE.value])[0]
@@ -384,7 +497,13 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(HTTPStatus.OK, artifact.model_dump(mode="json"))
             return
-        if route == "/api/v1/incidents" or route.startswith("/api/v1/incidents/"):
+        if (
+            route == "/api/v1/scenarios"
+            or route == "/api/v1/incidents"
+            or route.startswith("/api/v1/incidents/")
+            or route == "/api/v1/live-sources"
+            or route == "/api/v1/live-sources/events"
+        ):
             try:
                 self._v1_get(route, query)
             except APIRequestError as exc:
@@ -392,6 +511,21 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # pragma: no cover - defensive transport boundary
                 status, code = _error_status(exc)
                 self._send_api_error(status, code, str(exc))
+            return
+        if route in STATIC_ASSETS:
+            relative, content_type = STATIC_ASSETS[route]
+            path = (STATIC_ROOT / "assets" / relative).resolve()
+            try:
+                path.relative_to(STATIC_ASSET_ROOT)
+            except ValueError:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                return
+            try:
+                payload = path.read_bytes()
+            except OSError:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                return
+            self._send(HTTPStatus.OK, payload, content_type)
             return
         if route in STATIC_FILES:
             relative, content_type = STATIC_FILES[route]
@@ -409,6 +543,60 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def _v1_post(self, route: str, payload: dict[str, object]) -> None:
+        if route == "/api/v1/scenarios":
+            scenario = str(payload.get("scenario") or "").strip().lower()
+            if scenario not in {"normal", "incident", "recovery", "golden"}:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_scenario",
+                    "scenario must be normal, incident, recovery, or golden",
+                )
+            session: ExperimentSession
+            if scenario == "normal":
+                # Normal is the explicit reset boundary. It does not delete any
+                # completed run; it only permits a later Incident to allocate a
+                # new source session.
+                session = self.registry.select_normal()
+            elif scenario == "recovery":
+                recovery_candidate = self.registry.select_recovery()
+                if recovery_candidate is None:
+                    raise APIRequestError(
+                        HTTPStatus.CONFLICT,
+                        "scenario_not_ready",
+                        "recovery is available after the approved recovery is verified",
+                    )
+                session = recovery_candidate
+            elif scenario == "golden":
+                session = self.registry.select_golden()
+            else:
+                # Incident is an explicit Scenario Lab command. The source
+                # condition is persisted first, then the detector performs its
+                # fresh read and emits ``incident.detected``.
+                session = self.registry.select_incident(
+                    requested_incident_id=(
+                        str(payload["incident_id"])
+                        if payload.get("incident_id") is not None
+                        else None
+                    )
+                )
+            snapshot = session.snapshot()
+            if scenario == "recovery" and snapshot.get("execution", {}).get("verified") is not True:
+                raise APIRequestError(
+                    HTTPStatus.CONFLICT,
+                    "scenario_not_ready",
+                    "recovery is available after the approved recovery is verified",
+                    snapshot=snapshot,
+                )
+            command = "scenario_selected"
+            if scenario == "golden":
+                session.start_investigation()
+                snapshot = session.snapshot()
+                command = "golden_incident_started"
+            self._send_json(
+                HTTPStatus.OK,
+                {**snapshot, "scenario": scenario, "command": command},
+            )
+            return
         prefix = "/api/v1/incidents/"
         parts = route[len(prefix) :].strip("/").split("/")
         if len(parts) != 2 or not parts[0] or not parts[1]:
@@ -435,13 +623,22 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         if resource == "chat":
             question = payload.get("question")
             key = str(payload.get("idempotency_key") or "").strip()
-            if not isinstance(question, str) or not key:
+            agent_id = payload.get("agent_id", "orchestrator")
+            if not isinstance(question, str) or not key or not isinstance(agent_id, str):
                 raise APIRequestError(
                     HTTPStatus.BAD_REQUEST,
                     "invalid_chat_request",
-                    "chat requires question and idempotency_key",
+                    "chat requires question, agent_id, and idempotency_key",
                 )
-            response = session.chat_command(question, idempotency_key=key)
+            try:
+                response = session.chat_command(
+                    question,
+                    idempotency_key=key,
+                    agent_id=agent_id,
+                )
+            except (QuorumDenied, ValueError) as exc:
+                status, code = _error_status(exc)
+                raise APIRequestError(status, code, str(exc)) from exc
             snapshot = session.snapshot()
             self._send_json(HTTPStatus.OK, {**_identity(snapshot), **response})
             return
@@ -460,7 +657,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         if route == "/api/workspace":
             self._method_not_allowed("GET")
             return
-        if not route.startswith("/api/v1/incidents/"):
+        if route not in {"/api/v1/scenarios"} and not route.startswith("/api/v1/incidents/"):
             self._method_not_allowed("GET")
             return
         content_type = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
@@ -486,13 +683,47 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             payload = self._read_json(allow_empty=route.endswith("/start"))
             self._v1_post(route, payload)
         except APIRequestError as exc:
-            self._send_api_error(exc.status, exc.code, exc.detail)
+            self._send_api_error(exc.status, exc.code, exc.detail, snapshot=exc.snapshot)
         except (QuorumDenied, VersionConflict, EventLedgerError, ValueError) as exc:
             status, code = _error_status(exc)
             self._send_api_error(status, code, str(exc))
         except Exception as exc:  # pragma: no cover - defensive transport boundary
             status, code = _error_status(exc)
             self._send_api_error(status, code, str(exc))
+
+    def _send_prometheus(self) -> None:
+        """Expose the same local authoritative metrics used by the native UI."""
+
+        lines = [
+            "# HELP missing20_expected_units Expected units in the active order.",
+            "# TYPE missing20_expected_units gauge",
+            "# HELP missing20_recorded_units Units recorded by the ERP projection.",
+            "# TYPE missing20_recorded_units gauge",
+            "# HELP missing20_queue_units Units currently held at the message queue.",
+            "# TYPE missing20_queue_units gauge",
+            "# HELP missing20_active_agents Investigators currently working.",
+            "# TYPE missing20_active_agents gauge",
+            "# HELP missing20_event_sequence Latest public ledger sequence.",
+            "# TYPE missing20_event_sequence gauge",
+            "# HELP missing20_tool_calls Tool results admitted to the public ledger.",
+            "# TYPE missing20_tool_calls counter",
+        ]
+        for session in self.registry.list():
+            metrics = session.metrics()
+            incident_id = str(metrics["incident_id"]).replace('\\', '_').replace('"', '_')
+            labels = f'incident_id="{incident_id}"'
+            lines.extend(
+                [
+                    f"missing20_expected_units{{{labels}}} {metrics['expected_units']}",
+                    f"missing20_recorded_units{{{labels}}} {metrics['recorded_units']}",
+                    f"missing20_queue_units{{{labels}}} {metrics['queue_units']}",
+                    f"missing20_active_agents{{{labels}}} {metrics['active_agents']}",
+                    f"missing20_event_sequence{{{labels}}} {metrics['projection_sequence']}",
+                    f"missing20_tool_calls{{{labels}}} {metrics['tool_calls']}",
+                ]
+            )
+        payload = ("\n".join(lines) + "\n").encode("utf-8")
+        self._send(HTTPStatus.OK, payload, "text/plain; version=0.0.4; charset=utf-8")
 
     def do_PUT(self) -> None:  # noqa: N802
         self._method_not_allowed()
@@ -534,6 +765,8 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         *,
         runtime_directory: Path | None = None,
         registry: ExperimentRegistry | None = None,
+        live_sources: LiveSourceRegistry | None = None,
+        live_sources_autostart: bool | None = None,
     ) -> None:
         if address[0] not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("decision workspace server must bind to loopback")
@@ -542,7 +775,31 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             self.repository_root,
             data_directory=runtime_directory,
         )
+        self.live_sources = live_sources or LiveSourceRegistry()
+        self.live_source_poller = LiveSourcePoller(self.live_sources)
+        configured_autostart = os.environ.get("MISSING20_LIVE_SOURCES_AUTOSTART", "0")
+        should_autostart = (
+            live_sources_autostart
+            if live_sources_autostart is not None
+            else configured_autostart.strip().lower() in {"1", "true", "yes", "on"}
+        )
         super().__init__(address, DecisionWorkspaceHandler)
+        if should_autostart:
+            self.live_source_poller.start()
+
+    def shutdown(self) -> None:
+        """Stop session producers as the serving loop is asked to terminate."""
+
+        self.live_source_poller.stop()
+        self.registry.close()
+        super().shutdown()
+
+    def server_close(self) -> None:
+        """Stop session producers before closing the listening socket."""
+
+        self.live_source_poller.stop()
+        self.registry.close()
+        super().server_close()
 
 
 def main() -> int:

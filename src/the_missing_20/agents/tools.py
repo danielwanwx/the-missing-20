@@ -209,9 +209,12 @@ class ToolScope:
             for item in self.admitted_evidence
         ):
             raise ValueError("tool evidence must match immutable case and trace")
-        if self.max_evidence_reads != len(REQUIRED_AUTHORITATIVE_SOURCES):
+        if (
+            self.max_evidence_reads <= 0
+            or self.max_evidence_reads > len(REQUIRED_AUTHORITATIVE_SOURCES)
+        ):
             raise ValueError(
-                "evidence read budget must equal the required authoritative source count"
+                "evidence read budget must be within the authoritative source count"
             )
 
 

@@ -9,5 +9,8 @@
   "scripts": {
     "test": "node --test tests-js/*.test.mjs",
     "check": "npm test"
+  },
+  "dependencies": {
+    "@phosphor-icons/web": "^2.1.2"
   }
 }

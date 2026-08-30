@@ -1,0 +1,24 @@
+{
+  "id": "case:missing-20-001-run-1:erp-receipt",
+  "candidates": [
+    {
+      "tag": "ARTICLE",
+      "cls": "evidence-packet",
+      "card": true
+    },
+    {
+      "tag": "DIV",
+      "cls": "evidence-record",
+      "card": true
+    },
+    {
+      "tag": "CODE",
+      "cls": "evidence-record-id",
+      "card": true
+    }
+  ],
+  "drawer": true,
+  "focused": [],
+  "status": "",
+  "scrollY": 0
+}

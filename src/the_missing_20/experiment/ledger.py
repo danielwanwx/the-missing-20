@@ -208,6 +208,41 @@ class PublicEventLedger:
     def all_events(self, incident_id: str) -> tuple[PublicIncidentEvent, ...]:
         return self.list_events(incident_id, limit=10_000)
 
+    def tail_events(
+        self, incident_id: str, *, limit: int = 2_000
+    ) -> tuple[PublicIncidentEvent, ...]:
+        """Read a bounded tail ending at the ledger's true latest sequence.
+
+        Cursor replay keeps its existing semantics in ``list_events``. Session
+        restoration and browser snapshots instead need the current tail: once a
+        stream exceeds ten thousand rows, the first page is stale and cannot
+        restore the latest observation index.
+        """
+
+        if limit <= 0 or limit > 10_000:
+            raise ValueError("event tail limit must be between one and ten thousand")
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT event_json FROM public_events WHERE incident_id = ? "
+                "ORDER BY sequence DESC LIMIT ?",
+                (incident_id, limit),
+            ).fetchall()
+        events = tuple(
+            reversed(
+                tuple(
+                    PublicIncidentEvent.model_validate_json(row["event_json"])
+                    for row in rows
+                )
+            )
+        )
+        if events:
+            self.validate(
+                events,
+                after_sequence=events[0].sequence - 1,
+                incident_id=incident_id,
+            )
+        return events
+
     def latest_sequence(self, incident_id: str) -> int:
         with self._connect() as connection:
             row = connection.execute(
