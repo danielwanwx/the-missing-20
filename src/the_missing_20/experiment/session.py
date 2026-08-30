@@ -40,7 +40,11 @@ from the_missing_20.agents.events import (
     AgentOperationEvent,
     AgentOperationEventType,
 )
-from the_missing_20.agents.harness import AdvisoryStageResult, AgentHarness, HarnessRun
+from the_missing_20.agents.harness import (
+    AdvisoryStageResult,
+    AgentHarness,
+    HarnessRun,
+)
 from the_missing_20.agents.schemas import (
     REQUIRED_AUTHORITATIVE_SOURCES,
     SourceAvailability,
@@ -178,6 +182,28 @@ class _SessionAgentEventSink(AgentEventSink):
         payload = dict(event.payload)
         if event.stage is not None:
             payload.setdefault("stage", event.stage)
+        # Completion records are the durable run boundary used by a restarted
+        # workspace.  Preserve the same redacted provider attribution that the
+        # in-memory trace/chat projection exposes so a fresh AgentCore run does
+        # not collapse to ``mode: agentcore`` after persistence.  This is
+        # metadata only: it contains no runtime ARN, prompt, credentials, or
+        # operational authority.
+        if event.event_type in {
+            AgentOperationEventType.AGENT_COMPLETED,
+            AgentOperationEventType.SYNTHESIS_COMPLETED,
+            AgentOperationEventType.EVALUATION_COMPLETED,
+        }:
+            payload["provider_metadata"] = self._session._provider_attribution(
+                operation_id=event.operation_id,
+                status=event.status,
+                stage=event.stage,
+                existing=payload.get("provider_metadata"),
+                error_code=(
+                    str(payload["error_code"])
+                    if payload.get("error_code") is not None
+                    else None
+                ),
+            )
         self._session._append(
             event_type,
             actor=event.actor,
@@ -1004,6 +1030,67 @@ class ExperimentSession:
                 agentcore_qualifier=self._agentcore_qualifier,
             )
         return self._model_factory
+
+    def _provider_attribution(
+        self,
+        *,
+        operation_id: str,
+        status: str,
+        stage: str | None = None,
+        existing: object | None = None,
+        error_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Return a bounded redacted projection of actual adapter attribution.
+
+        A completion event is an application lifecycle marker, not provider proof.
+        The adapter must supply ``provider_metadata`` after a response returned;
+        missing metadata remains missing rather than being reconstructed from
+        configuration, a started event, or the public operation ID.
+        """
+
+        del operation_id
+        metadata = dict(existing) if isinstance(existing, dict) else {}
+        if error_code is not None:
+            metadata["error_code"] = error_code
+            metadata.setdefault("status", "DEGRADED")
+            metadata.setdefault("invocation_status", "FAILED")
+        if metadata:
+            metadata.setdefault("read_only", True)
+            metadata.setdefault("authority", "ADVISORY_NOT_OPERATIONAL_DECISION")
+        if stage is not None:
+            metadata.setdefault("stage", stage)
+        # A provider implementation must not be able to smuggle a secret or a
+        # resource identifier into a public completion record through custom
+        # provenance.  Keep the allowlist explicit and bounded.
+        allowed = {
+            "mode",
+            "provider",
+            "model",
+            "transport",
+            "region",
+            "runtime_configured",
+            "qualifier",
+            "request_count",
+            "input_tokens",
+            "output_tokens",
+            "latency_ms",
+            "incremental_cost_usd",
+            "cumulative_cost_usd",
+            "remaining_cumulative_cost_usd",
+            "request_cap",
+            "input_token_cap",
+            "output_token_cap",
+            "status",
+            "invocation_status",
+            "invocation_id",
+            "invocation_proof",
+            "read_only",
+            "authority",
+            "stage",
+            "agent_id",
+            "error_code",
+        }
+        return {key: value for key, value in metadata.items() if key in allowed}
 
     def _run_read_only_harness(
         self, *, operation_namespace: str
@@ -1873,19 +1960,14 @@ class ExperimentSession:
             # run.  There is no scripted fallback and no operational side effect.
             if self.provider_mode is AgentProvider.SCRIPTED:
                 raise
-            provider_metadata = {
-                "mode": self.provider_mode.value,
-                "provider": self.provider_mode.value,
-                "agent_id": agent_id,
-                "request_count": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "latency_ms": 0,
-                "read_only": True,
-                "authority": "ADVISORY_NOT_OPERATIONAL_DECISION",
-                "status": "DEGRADED",
-                "error_code": type(exc).__name__,
-            }
+            provider_metadata = self._provider_attribution(
+                operation_id=f"chat:{idempotency_key}",
+                status="FAILED",
+                stage="retryable_investigator",
+                existing=getattr(exc, "provider_metadata", None),
+                error_code=type(exc).__name__,
+            )
+            provider_metadata["agent_id"] = agent_id
             case_version = self._current_case_version()
             self._append(
                 PublicEventType.PROVIDER_DEGRADED,
@@ -1931,9 +2013,10 @@ class ExperimentSession:
             if item.status is SupplyUnitStatus.QUEUE_FAILED
         ]
         evidence = tuple(self.store.list_evidence(self.case_id))
+        latest_evidence = latest_authoritative_evidence(evidence)
         citations = [
             item.evidence_id
-            for item in latest_authoritative_evidence(evidence)
+            for item in latest_evidence
             if item.source_type
                 in {
                 EvidenceSourceType.FAILED_MESSAGE_QUEUE,
@@ -1957,7 +2040,7 @@ class ExperimentSession:
         except (LookupError, QuorumDenied):
             current_decision = None
         intent = ""
-        if any(
+        status_question = any(
             phrase in lowered
             for phrase in (
                 "what is happening",
@@ -1966,7 +2049,52 @@ class ExperimentSession:
                 "what's happening",
                 "status now",
             )
-        ):
+        )
+        next_step_question = "next" in lowered
+        retryable_question = (
+            "retryable" in lowered
+            and any(word in lowered for word in ("evidence", "queue", "message", "prove"))
+        )
+        status_proof_next_question = (
+            status_question
+            and next_step_question
+            and retryable_question
+            and any(word in lowered for word in ("evidence", "prove", "proof"))
+        )
+        if status_proof_next_question:
+            canonical_sources = (
+                EvidenceSourceType.FAILED_MESSAGE_QUEUE,
+                EvidenceSourceType.ERP_RECEIPT,
+                EvidenceSourceType.WAREHOUSE,
+            )
+            read_ids = set(citations)
+            canonical_citations = [
+                item.evidence_id
+                for source_type in canonical_sources
+                for item in latest_evidence
+                if item.source_type is source_type and item.evidence_id in read_ids
+            ]
+            if len(canonical_citations) != len(canonical_sources):
+                answer = (
+                    "The complete RETRYABLE_MESSAGE proof is not available in the "
+                    "selected evidence, so no governed action is recommended."
+                )
+                citations = canonical_citations
+                intent = "retrieve_evidence"
+            else:
+                counts = self._unit_counts(snapshot)
+                answer = (
+                    "RETRYABLE_MESSAGE is SUPPORTED. Current status: "
+                    f"{counts['total']} expected, {counts['erp_recorded']} in ERP, and "
+                    f"{counts['queue_failed']} stopped at the message queue—the "
+                    "20-unit gap. Proof: "
+                    f"{', '.join(canonical_citations)}. Next: prepare Receipt Message "
+                    "Restart for two-role approval; chat is read-only and cannot "
+                    "approve or execute autonomously."
+                )
+                citations = canonical_citations
+                intent = "inspect_current_status"
+        elif status_question:
             counts = self._unit_counts(snapshot)
             workflow = self._workflow_status()
             answer = (
@@ -2008,10 +2136,6 @@ class ExperimentSession:
                     "no controlled action is eligible right now."
                 )
             intent = "explain_next_step"
-        retryable_question = (
-            "retryable" in lowered
-            and any(word in lowered for word in ("evidence", "queue", "message", "prove"))
-        )
         if not intent and retryable_question:
             queue_evidence = next(
                 (
@@ -2042,7 +2166,8 @@ class ExperimentSession:
         ):
             shown_ids = ", ".join(failed_ids[:3]) or "none"
             answer = (
-                f"The current authoritative read shows {len(failed_ids)} units stopped at the "
+                f"The current authoritative read classifies this as RETRYABLE_MESSAGE: "
+                f"{len(failed_ids)} units stopped at the "
                 f"message queue. They are the exact unit records {shown_ids}"
                 f"{'…' if len(failed_ids) > 3 else ''}."
             )
@@ -2410,25 +2535,41 @@ class ExperimentSession:
                 # truthfully expose that a scripted evaluation completed, while it
                 # deliberately omits details that were not persisted in the public
                 # projection.
+                evaluation_event = next(
+                    item
+                    for item in reversed(events)
+                    if item.event_type is PublicEventType.EVALUATION_COMPLETED
+                )
+                persisted_metadata = evaluation_event.payload.get("provider_metadata")
+                provider_metadata = self._provider_attribution(
+                    operation_id=evaluation_event.idempotency_key,
+                    status=evaluation_event.status,
+                    stage="evaluation",
+                    existing=persisted_metadata,
+                )
+                provider_name = provider_metadata.get("provider", self.provider_mode.value)
+                model_name = provider_metadata.get("model")
+                provider_complete = (
+                    provider_metadata.get("status") == "COMPLETE"
+                    and provider_metadata.get("invocation_proof") == "returned"
+                )
                 advisory = {
-                    "status": "COMPLETE",
-                    "provider": self.provider_mode.value,
-                    "model": (
-                        "scripted-strands-v1"
-                        if self.provider_mode is AgentProvider.SCRIPTED
-                        else "agentcore-runtime"
-                        if self.provider_mode is AgentProvider.AGENTCORE
-                        else "us.amazon.nova-pro-v1:0"
-                    ),
+                    "status": "COMPLETE" if provider_complete else "DEGRADED",
+                    "provider": provider_name,
                     "usefulness": (
                         "SCRIPTED_SYNTHETIC_PROOF"
-                        if self.provider_mode is AgentProvider.SCRIPTED
+                        if provider_name == AgentProvider.SCRIPTED.value and provider_complete
                         else "LIVE_PROVIDER_ADVISORY"
+                        if provider_complete
+                        else "NOT_PROVEN"
                     ),
                     "authority": "ADVISORY_NOT_OPERATIONAL_DECISION",
+                    "provider_metadata": provider_metadata,
                     "trace_id": self.trace_id,
                     "durable_projection": True,
                 }
+                if model_name is not None:
+                    advisory["model"] = model_name
             else:
                 advisory = {
                     "status": "NOT_STARTED",
@@ -3044,6 +3185,51 @@ class ExperimentRegistry:
             if not self._sessions:
                 return (self.get("missing-20-normal"),)
             return tuple(self._sessions.values())
+
+    def provider_truth(self) -> dict[str, Any]:
+        """Summarize configured and observed provider use without starting a run.
+
+        The health endpoint is intentionally observational.  It must not create
+        the normal session (or invoke a provider) merely to answer a health
+        check, but it should stop claiming ``provider_calls: false`` after a real
+        AgentCore/Bedrock completion has been durably recorded.
+        """
+
+        with self._lock:
+            sessions = tuple(self._sessions.values())
+            provider_mode = self.provider_mode.value
+        calls_observed = False
+        for session in sessions:
+            for event in session.events_since():
+                if event.event_type not in {
+                    PublicEventType.AGENT_COMPLETED,
+                    PublicEventType.SYNTHESIS_COMPLETED,
+                    PublicEventType.EVALUATION_COMPLETED,
+                }:
+                    continue
+                payload = event.payload
+                metadata = payload.get("provider_metadata")
+                if not isinstance(metadata, dict):
+                    continue
+                provider = metadata.get("provider")
+                event_status = str(event.status).strip().upper()
+                if (
+                    provider is not None
+                    and str(provider) != AgentProvider.SCRIPTED.value
+                    and metadata.get("invocation_proof") == "returned"
+                    and metadata.get("status") == "COMPLETE"
+                    and metadata.get("invocation_status") == "COMPLETED"
+                    and event_status not in {"FAILED", "DEGRADED", "ERROR", "BLOCKED"}
+                ):
+                    calls_observed = True
+                    break
+            if calls_observed:
+                break
+        return {
+            "mode": provider_mode,
+            "configured": provider_mode != AgentProvider.SCRIPTED.value,
+            "calls_observed": calls_observed,
+        }
 
 
 __all__ = ["ExperimentRegistry", "ExperimentSession"]

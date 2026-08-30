@@ -1387,3 +1387,27 @@ body[data-hidden="true"] * { animation-play-state: paused !important; }
 }
 
 .flow-selection-detail:empty { min-height: 0; margin: 0; }
+
+/* Topology endpoints -----------------------------------------------------
+   Route geometry owns the visual flow; endpoint markers stay tiny and
+   unobtrusive. The source chip rule above targets every span, so the scoped
+   min-width override prevents source ports becoming black-looking ovals.
+   Existing semantic top/side anchors remain in the authored topology block
+   above, keeping all routes outside node bodies and status text. */
+.operations-map.agent-system-panel .graph-port {
+  width: 5px;
+  min-width: 5px;
+  height: 5px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(92, 222, 234, .86);
+  box-shadow: 0 0 5px rgba(92, 222, 234, .55);
+}
+.operations-map.agent-system-panel .graph-sources .graph-port {
+  display: block;
+  flex: 0 0 5px;
+  width: 5px;
+  min-width: 5px;
+  height: 5px;
+}
+.workspace-timeline { position: relative; }

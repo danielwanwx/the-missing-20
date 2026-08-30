@@ -338,20 +338,24 @@ def _provider_metadata(
     factory: AgentModelFactory,
     result: Any | None = None,
     *,
+    actual: dict[str, Any] | None = None,
     agent_id: str | None = None,
     error_code: str | None = None,
+    completed: bool = False,
+    stage: str | None = None,
 ) -> dict[str, Any]:
-    """Build a redacted provider record from the model boundary.
+    """Build redacted attribution from an actual adapter response.
 
-    The record is intentionally made from factory configuration and stable SDK
-    metrics only.  Prompts, raw model text, credentials, account IDs, and tool
-    payloads never cross this boundary.
+    Factory configuration describes what *could* be invoked; it is not proof that
+    a provider returned anything.  Completion records therefore start only with
+    metadata emitted by the adapter after a bounded response, plus observed SDK
+    metrics.  Prompts, raw model text, credentials, account IDs, and tool payloads
+    never cross this boundary.
     """
 
-    provenance = getattr(factory, "provenance", None)
-    metadata = provenance() if callable(provenance) else {}
-    if not isinstance(metadata, dict):
-        metadata = {}
+    metadata = dict(actual) if isinstance(actual, dict) else {}
+    if not metadata and result is not None:
+        metadata = dict(getattr(result, "provider_metadata", {}) or {})
     metrics = getattr(result, "metrics", None) if result is not None else None
     usage = getattr(metrics, "accumulated_usage", {}) or {}
     accumulated = getattr(metrics, "accumulated_metrics", {}) or {}
@@ -362,23 +366,29 @@ def _provider_metadata(
         latency_ms = int(accumulated.get("latencyMs", 0))
     except (AttributeError, TypeError, ValueError):
         input_tokens = output_tokens = request_count = latency_ms = 0
-    metadata.update(
-        {
-            "request_count": max(0, request_count),
-            "input_tokens": max(0, input_tokens),
-            "output_tokens": max(0, output_tokens),
-            "latency_ms": max(0, latency_ms),
-            "read_only": True,
-            "authority": "ADVISORY_NOT_OPERATIONAL_DECISION",
-        }
-    )
+    if result is not None:
+        metadata.update(
+            {
+                "request_count": max(0, request_count),
+                "input_tokens": max(0, input_tokens),
+                "output_tokens": max(0, output_tokens),
+                "latency_ms": max(0, latency_ms),
+            }
+        )
+    if metadata:
+        metadata.setdefault("read_only", True)
+        metadata.setdefault("authority", "ADVISORY_NOT_OPERATIONAL_DECISION")
     if agent_id is not None:
         metadata["agent_id"] = agent_id
     if error_code is not None:
         metadata["error_code"] = error_code
-        metadata["status"] = "DEGRADED"
-    else:
-        metadata.setdefault("status", "COMPLETE")
+        metadata.setdefault("status", "DEGRADED")
+        metadata.setdefault("invocation_status", "FAILED")
+    if completed and metadata.get("invocation_proof") == "returned":
+        metadata["status"] = "COMPLETE"
+        metadata["invocation_status"] = "COMPLETED"
+    if stage is not None:
+        metadata.setdefault("stage", stage)
     ledger = getattr(factory, "ledger", None)
     if ledger is not None:
         try:
@@ -634,11 +644,13 @@ def _stage_failure(
         and error.role == expected_role
     ):
         return error
+    provider_metadata = getattr(error, "provider_metadata", None)
     return AgentStageFailure(
         str(error),
         stage=expected_stage,
         role=expected_role,
         validator_code=stable_agent_error_code(error),
+        provider_metadata=provider_metadata if isinstance(provider_metadata, dict) else None,
     )
 
 
@@ -652,10 +664,15 @@ async def _run_checked_once[T](
 
     attempts = 2 if allow_retry else 1
     for attempt in range(attempts):
+        result: T | None = None
         try:
             result = await operation()
             checked = check(result)
         except Exception as error:
+            if result is not None:
+                metadata = getattr(result, "provider_metadata", None)
+                if isinstance(metadata, dict) and metadata:
+                    cast(Any, error).provider_metadata = dict(metadata)
             if attempt == attempts - 1 or not allow_retry or not _retryable_stage_error(error):
                 raise
             continue
@@ -841,6 +858,13 @@ class AgentHarness:
                     payload={
                         "read_evidence_ids": list(run.read_evidence_ids),
                         "knowledge_citation_count": len(run.knowledge_citations),
+                        "provider_metadata": _provider_metadata(
+                            self.model_factory,
+                            run.model_result,
+                            actual=run.provider_metadata,
+                            completed=True,
+                            stage=stage.value,
+                        ),
                     },
                 )
                 self._emit(
@@ -868,7 +892,19 @@ class AgentHarness:
                     status="FAILED",
                     correlation_id=trace_id,
                     stage=stage,
-                    payload={"error_code": type(error).__name__},
+                    payload={
+                        "error_code": type(error).__name__,
+                        "provider_metadata": _provider_metadata(
+                            self.model_factory,
+                            actual=(
+                                error.provider_metadata
+                                if isinstance(error, AgentStageFailure)
+                                else getattr(error, "provider_metadata", None)
+                            ),
+                            error_code=type(error).__name__,
+                            stage=stage.value,
+                        ),
+                    },
                 )
                 raise _stage_failure(error, stage=stage, role=role) from error
 
@@ -1042,7 +1078,7 @@ class AgentHarness:
             trace_id=trace_id,
             provider=provider,
             model=model,
-            provider_metadata=_provider_metadata(self.model_factory),
+            provider_metadata={},
             prompt_version=prompts.version,
             prompt_digest=prompts.digest,
             knowledge_version=self.knowledge.version,
@@ -1103,14 +1139,12 @@ class AgentHarness:
                 protocol=protocol,
             )
         )
-        trace.provider_metadata = _provider_metadata(self.model_factory)
-        trace.provider_metadata.update(
-            {
-                "request_count": trace.request_count,
-                "input_tokens": trace.input_tokens,
-                "output_tokens": trace.output_tokens,
-                "latency_ms": sum(stage.latency_ms for stage in trace.stages),
-            }
+        trace.provider_metadata = _provider_metadata(
+            self.model_factory,
+            evaluation_run.model_result,
+            actual=evaluation_run.provider_metadata,
+            completed=True,
+            stage=AgentStage.EVALUATOR.value,
         )
         if partial_advisory:
             return AdvisoryStageResult(
@@ -1273,7 +1307,10 @@ class AgentHarness:
             metadata = _provider_metadata(
                 self.model_factory,
                 run.model_result,
+                actual=run.provider_metadata,
                 agent_id=selected_agent_id,
+                completed=True,
+                stage=stage.value,
             )
             self._emit(
                 event_type=AgentOperationEventType.AGENT_COMPLETED,
@@ -1300,7 +1337,9 @@ class AgentHarness:
             metadata = _provider_metadata(
                 self.model_factory,
                 agent_id=selected_agent_id,
+                actual=getattr(error, "provider_metadata", None),
                 error_code=type(error).__name__,
+                stage=stage.value,
             )
             self._emit(
                 event_type=AgentOperationEventType.AGENT_COMPLETED,

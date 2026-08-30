@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 
 import pytest
@@ -78,6 +79,102 @@ def test_structured_output_sends_canonical_schema_to_fake_runtime(
         captured_prompts[0]
     )
     assert len(schema.encode("utf-8")) <= model.MAX_STRUCTURED_SCHEMA_BYTES
+
+
+def test_returned_runtime_response_carries_known_invocation_attribution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The completion record can only use identity returned by the transport."""
+
+    model = _model()
+
+    def fake_invoke(prompt: str) -> tuple[object, int, int, dict[str, object]]:
+        del prompt
+        return (
+            {"output": {"finding": "queue lag", "confidence": 0.91}},
+            12,
+            8,
+            {
+                "mode": "agentcore",
+                "provider": "agentcore",
+                "model": "agentcore-runtime",
+                "transport": "agentcore_invoke_agent_runtime",
+                "region": "us-west-2",
+                "runtime_configured": True,
+                "qualifier": "DEFAULT",
+                "invocation_id": "runtime-session-123",
+                "invocation_proof": "returned",
+                "status": "RETURNED",
+                "invocation_status": "RETURNED",
+            },
+        )
+
+    monkeypatch.setattr(model, "_invoke", fake_invoke)
+    event = asyncio.run(_first_structured_output(model))
+
+    metadata = event["metadata"]["provider_metadata"]
+    assert metadata["provider"] == "agentcore"
+    assert metadata["transport"] == "agentcore_invoke_agent_runtime"
+    assert metadata["invocation_id"] == "runtime-session-123"
+    assert metadata["invocation_proof"] == "returned"
+    assert metadata["status"] == "COMPLETE"
+    assert "runtime_arn" not in json.dumps(metadata)
+
+
+def test_mocked_agentcore_transport_returns_runtime_session_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The adapter captures the provider response header, never its configured ARN."""
+
+    import boto3
+
+    model = _model()
+    response = {
+        "runtimeSessionId": "runtime-session-from-provider",
+        "response": io.BytesIO(
+            b'{"output":{"finding":"queue lag","confidence":0.91}}'
+        ),
+    }
+
+    class FakeClient:
+        def invoke_agent_runtime(self, **kwargs: object) -> dict[str, object]:
+            assert str(kwargs["agentRuntimeArn"]).startswith("arn:aws:bedrock-agentcore:")
+            return response
+
+    class FakeSession:
+        def __init__(self, **kwargs: object) -> None:
+            assert kwargs["region_name"] == "us-west-2"
+
+        def client(self, name: str, *, region_name: str) -> FakeClient:
+            assert name == "bedrock-agentcore"
+            assert region_name == "us-west-2"
+            return FakeClient()
+
+    monkeypatch.setattr(boto3, "Session", FakeSession)
+    _payload, _input_tokens, _output_tokens, metadata = model._invoke("Investigate.")
+
+    assert metadata["invocation_id"] == "runtime-session-from-provider"
+    assert metadata["invocation_proof"] == "returned"
+    assert metadata["status"] == "RETURNED"
+    assert "runtime_arn" not in json.dumps(metadata)
+
+
+def test_transport_failure_has_no_observed_provider_attribution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failure before a response cannot become a configured-provider proof."""
+
+    model = _model()
+
+    def fail_invoke(prompt: str) -> tuple[object, int, int, dict[str, object]]:
+        del prompt
+        raise AgentProviderUnavailable("transport unavailable")
+
+    monkeypatch.setattr(model, "_invoke", fail_invoke)
+    with pytest.raises(AgentProviderUnavailable, match="transport unavailable"):
+        asyncio.run(_first_structured_output(model))
+
+    assert model.actual_provider_metadata() == {}
 
 
 def test_invalid_fake_runtime_response_fails_closed(

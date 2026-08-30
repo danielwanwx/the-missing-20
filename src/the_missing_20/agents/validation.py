@@ -7,6 +7,7 @@ import json
 import re
 from collections.abc import Iterable
 from datetime import datetime
+from typing import Any
 
 from the_missing_20.agents.policy import ActionRecommendation
 from the_missing_20.agents.schemas import (
@@ -57,11 +58,13 @@ class AgentStageFailure(AgentValidationError):
         stage: str,
         role: str | None = None,
         validator_code: str = "AGENT_VALIDATION_ERROR",
+        provider_metadata: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.stage = stage
         self.role = role
         self.validator_code = validator_code
+        self.provider_metadata = dict(provider_metadata or {})
 
 
 def stable_agent_error_code(error: BaseException) -> str:

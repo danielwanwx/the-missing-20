@@ -1953,13 +1953,62 @@
     }
   }
 
+  function verifiedClosedSnapshot(snapshot) {
+    return value(snapshot && snapshot.incident && snapshot.incident.status).toUpperCase() === "CLOSED"
+      && Boolean(snapshot && snapshot.execution && snapshot.execution.verified === true);
+  }
+
+  function chartTelemetryPoints(snapshot) {
+    const points = state.telemetry.slice();
+    // Replay intentionally preserves the historical 80/20 observations while
+    // the immutable stream is being drained.  Once the authoritative execution
+    // and verification are closed, append a terminal 100/0 point to the chart
+    // projection instead of rewriting that incident history in place.
+    if (!points.length || state.replaying || !verifiedClosedSnapshot(snapshot)) return points;
+    const counts = snapshot && snapshot.unit_counts && typeof snapshot.unit_counts === "object"
+      ? snapshot.unit_counts
+      : {};
+    const current = {
+      total: number(counts.total, 0),
+      erp_recorded: number(counts.erp_recorded, 0),
+      queue_failed: number(counts.queue_failed, 0),
+    };
+    const last = points[points.length - 1] || {};
+    const lastCounts = last.unit_counts && typeof last.unit_counts === "object"
+      ? last.unit_counts
+      : {};
+    const alreadyCurrent = number(lastCounts.total, -1) === current.total
+      && number(lastCounts.erp_recorded, -1) === current.erp_recorded
+      && number(lastCounts.queue_failed, -1) === current.queue_failed;
+    if (alreadyCurrent) return points;
+    const latest = snapshot && snapshot.telemetry && snapshot.telemetry.latest;
+    points.push({
+      sequence: number(snapshot && snapshot.projection_sequence, number(last.sequence, 0)),
+      observed_at: value(latest && (latest.observed_at || latest.received_at))
+        || value(last.observed_at || last.captured_at),
+      received_at: value(latest && latest.received_at)
+        || value(last.received_at || last.observed_at || last.captured_at),
+      unit_counts: current,
+      queue_depth: current.queue_failed,
+      recorded_quantity: current.erp_recorded,
+      invoice_count: number(
+        snapshot && snapshot.flow && snapshot.flow.summary && snapshot.flow.summary.invoice,
+        current.erp_recorded,
+      ),
+      source: "authoritative-verified-state",
+      authoritative: true,
+    });
+    return points;
+  }
+
   function sparklineValues(kind, snapshot) {
     const telemetryKind = {
       recorded: "observed_record_count",
       missing: "queue_depth",
     }[kind];
-    if (telemetryKind && state.telemetry.length) {
-      return state.telemetry.map((point) => kind === "recorded"
+    const telemetry = chartTelemetryPoints(snapshot);
+    if (telemetryKind && telemetry.length) {
+      return telemetry.map((point) => kind === "recorded"
         ? number(point.unit_counts?.erp_recorded, number(state.snapshot?.unit_counts?.erp_recorded, 0))
         : telemetryRecordCount(point));
     }
@@ -2396,7 +2445,7 @@
   }
 
   function reconciliationSeries(snapshot) {
-    const telemetry = state.telemetry;
+    const telemetry = chartTelemetryPoints(snapshot);
     const snapshotCounts = snapshot && snapshot.unit_counts && typeof snapshot.unit_counts === "object"
       ? snapshot.unit_counts
       : {};
@@ -2425,7 +2474,7 @@
   }
 
   function reconciliationPoints(snapshot) {
-    const telemetry = state.telemetry;
+    const telemetry = chartTelemetryPoints(snapshot);
     if (telemetry.length) {
       return telemetry.map((point) => ({
         sequence: point.sequence,
@@ -2452,7 +2501,7 @@
   }
 
   function telemetryPoints(snapshot, metric) {
-    const points = state.telemetry.length ? state.telemetry : [];
+    const points = chartTelemetryPoints(snapshot);
     // A one-point snapshot is not a trend. Do not attach a wall-clock value to
     // it: that would make an apparently live line without a server observation.
     if (!points.length) return [];
@@ -2776,8 +2825,9 @@
     const timeline = $("reconciliation-timeline");
     if (timeline) {
       timeline.replaceChildren();
-      const points = state.telemetry.length
-        ? state.telemetry.map((point) => ({
+      const chartPoints = chartTelemetryPoints(snapshot);
+      const points = chartPoints.length
+        ? chartPoints.map((point) => ({
           sequence: point.sequence,
           recorded: number(point.unit_counts?.erp_recorded, number(counts.erp_recorded)),
           missing: number(point.unit_counts?.queue_failed, number(counts.queue_failed)),

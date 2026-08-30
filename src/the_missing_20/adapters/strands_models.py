@@ -8,7 +8,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -96,6 +96,19 @@ class ScriptedStrandsModel(Model):
         self.request_count = 0
         self._tool_index = 0
         self._structured_index = 0
+        self._last_provider_metadata: dict[str, Any] = {}
+
+    def actual_provider_metadata(self) -> dict[str, Any]:
+        """Return attribution for the last completed deterministic model response."""
+
+        return dict(self._last_provider_metadata)
+
+    def mark_provider_failure(self) -> None:
+        """Mark a returned deterministic response as non-complete after validation."""
+
+        if self._last_provider_metadata:
+            self._last_provider_metadata["status"] = "DEGRADED"
+            self._last_provider_metadata["invocation_status"] = "FAILED"
 
     def update_config(self, **model_config: Any) -> None:
         self.config.update(model_config)
@@ -193,6 +206,18 @@ class ScriptedStrandsModel(Model):
                 tool_specs=tool_specs,
             )
         elif structured is not None:
+            # This is the deterministic adapter's actual structured response
+            # boundary.  It is not factory configuration and carries no fabricated
+            # external invocation identity.
+            self._last_provider_metadata = {
+                "mode": AgentProvider.SCRIPTED.value,
+                "provider": AgentProvider.SCRIPTED.value,
+                "model": self.config["model_id"],
+                "transport": "local_strands_model",
+                "invocation_proof": "returned",
+                "status": "COMPLETE",
+                "invocation_status": "COMPLETED",
+            }
             events = self._tool_events(
                 name=structured["name"],
                 arguments=self._payload(),
@@ -225,7 +250,21 @@ class ScriptedStrandsModel(Model):
         **kwargs: Any,
     ) -> AsyncGenerator[dict[str, T | Any], None]:
         del prompt, system_prompt, kwargs
-        yield {"output": output_model.model_validate(self._payload())}
+        self._last_provider_metadata = {
+            "mode": AgentProvider.SCRIPTED.value,
+            "provider": AgentProvider.SCRIPTED.value,
+            "model": self.config["model_id"],
+            "transport": "local_strands_model",
+            "invocation_proof": "returned",
+            "status": "COMPLETE",
+            "invocation_status": "COMPLETED",
+        }
+        try:
+            structured = output_model.model_validate(self._payload())
+        except Exception:
+            self.mark_provider_failure()
+            raise
+        yield {"output": structured}
 
 
 class BudgetedModel(Model):
@@ -571,6 +610,67 @@ class AgentCoreRuntimeModel(Model):
         self._tool_plan = self._freeze_tool_plan(tool_plan)
         self._tool_index = 0
         self._tool_call_history: list[dict[str, Any]] = []
+        self._last_provider_metadata: dict[str, Any] = {}
+
+    def actual_provider_metadata(self) -> dict[str, Any]:
+        """Return only attribution captured from the last runtime response."""
+
+        return dict(self._last_provider_metadata)
+
+    def mark_provider_failure(self) -> None:
+        """Mark a returned runtime response as degraded after local validation fails."""
+
+        if self._last_provider_metadata:
+            self._last_provider_metadata["status"] = "DEGRADED"
+            self._last_provider_metadata["invocation_status"] = "FAILED"
+
+    @staticmethod
+    def _response_invocation_id(response: Any) -> str | None:
+        """Extract an invocation identity only when the runtime returned one."""
+
+        if not isinstance(response, dict):
+            return None
+        # AgentCore exposes the runtime invocation identity as a response header
+        # named ``runtimeSessionId``.  Accept test/double transports that use the
+        # equivalent JSON spellings, but never copy the client-side session value
+        # when the provider did not return it.
+        for key in ("invocationId", "invocation_id", "runtimeSessionId", "runtime_session_id"):
+            value = response.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    def _mark_response_returned(self, response: Any) -> None:
+        """Record redacted attribution after transport returned a bounded response."""
+
+        metadata: dict[str, Any] = {
+            "mode": AgentProvider.AGENTCORE.value,
+            "provider": AgentProvider.AGENTCORE.value,
+            "model": "agentcore-runtime",
+            "transport": "agentcore_invoke_agent_runtime",
+            "region": self._region,
+            "qualifier": self._qualifier,
+            "runtime_configured": True,
+            "invocation_proof": "returned",
+            "status": "RETURNED",
+            "invocation_status": "RETURNED",
+        }
+        invocation_id = self._response_invocation_id(response)
+        if invocation_id is not None:
+            metadata["invocation_id"] = invocation_id
+        self._last_provider_metadata = metadata
+
+    @staticmethod
+    def _unpack_invocation_result(value: Any) -> tuple[Any, int, int, dict[str, Any]]:
+        """Accept legacy test transports while preferring explicit result metadata."""
+
+        if not isinstance(value, tuple) or len(value) not in {3, 4}:
+            raise AgentProviderUnavailable("AgentCore invocation result is malformed")
+        payload, input_tokens, output_tokens = value[:3]
+        metadata = value[3] if len(value) == 4 else {}
+        if not isinstance(metadata, dict):
+            raise AgentProviderUnavailable("AgentCore invocation metadata is malformed")
+        return payload, int(input_tokens), int(output_tokens), dict(metadata)
 
     @staticmethod
     def _freeze_tool_plan(tool_plan: tuple[dict[str, Any], ...]) -> tuple[dict[str, Any], ...]:
@@ -826,7 +926,10 @@ class AgentCoreRuntimeModel(Model):
         except (TypeError, ValueError) as exc:
             raise AgentProviderUnavailable("AgentCore response output is malformed") from exc
 
-    def _invoke(self, prompt: str) -> tuple[Any, int, int]:
+    def _invoke(self, prompt: str) -> tuple[Any, int, int, dict[str, Any]]:
+        # A failed transport starts with no observed provider result.  In
+        # particular, configuration alone must never become an invocation record.
+        self._last_provider_metadata = {}
         if not self._runtime_arn:
             raise AgentProviderUnavailable("AgentCore runtime ARN is not configured")
         if not self._runtime_arn.startswith("arn:aws:bedrock-agentcore:"):
@@ -863,12 +966,17 @@ class AgentCoreRuntimeModel(Model):
         except Exception as exc:  # pragma: no cover - exercised only with cloud credentials
             raise AgentProviderUnavailable("AgentCore invocation failed") from exc
         raw = _agentcore_response_bytes(response)
-        payload = _agentcore_json_payload(raw)
+        self._mark_response_returned(response)
+        try:
+            payload = _agentcore_json_payload(raw)
+        except Exception:
+            self.mark_provider_failure()
+            raise
         input_tokens = max(1, len(prompt.encode("utf-8")) // 4)
         output_tokens = max(1, len(raw) // 4)
-        return payload, input_tokens, output_tokens
+        return payload, input_tokens, output_tokens, self.actual_provider_metadata()
 
-    async def _invoke_async(self, prompt: str) -> tuple[Any, int, int]:
+    async def _invoke_async(self, prompt: str) -> tuple[Any, int, int, dict[str, Any]]:
         """Run the synchronous AgentCore SDK call outside Strands' event loop."""
 
         return await asyncio.to_thread(self._invoke, prompt)
@@ -893,13 +1001,19 @@ class AgentCoreRuntimeModel(Model):
         del kwargs
         request_prompt = self._prompt_text(prompt, system_prompt)
         request_prompt += self._structured_schema_instruction(output_model)
-        payload, input_tokens, output_tokens = await self._invoke_async(request_prompt)
+        invocation = await self._invoke_async(request_prompt)
+        payload, input_tokens, output_tokens, invocation_metadata = self._unpack_invocation_result(
+            invocation
+        )
+        if invocation_metadata:
+            self._last_provider_metadata = invocation_metadata
         candidate = payload.get("output", payload) if isinstance(payload, dict) else payload
         if isinstance(candidate, dict) and isinstance(candidate.get("response"), dict):
             candidate = candidate["response"]
         try:
             structured = output_model.model_validate(candidate)
         except Exception as exc:
+            self.mark_provider_failure()
             error_codes = tuple(
                 str(item.get("type", "unknown"))
                 for item in (exc.errors() if hasattr(exc, "errors") else ())
@@ -921,6 +1035,9 @@ class AgentCoreRuntimeModel(Model):
             raise AgentProviderUnavailable(
                 "AgentCore returned an invalid structured response"
             ) from exc
+        if self._last_provider_metadata:
+            self._last_provider_metadata["status"] = "COMPLETE"
+            self._last_provider_metadata["invocation_status"] = "COMPLETED"
         yield {
             "output": structured,
             "metadata": {
@@ -930,6 +1047,7 @@ class AgentCoreRuntimeModel(Model):
                     "totalTokens": input_tokens + output_tokens,
                 },
                 "metrics": {"latencyMs": 0},
+                "provider_metadata": self.actual_provider_metadata(),
             },
         }
 
@@ -973,8 +1091,17 @@ class AgentCoreRuntimeModel(Model):
         request_prompt = self._prompt_text(messages, system_prompt)
         if structured is not None:
             request_prompt += self._structured_input_schema_instruction(structured)
-            payload, input_tokens, output_tokens = await self._invoke_async(request_prompt)
-            candidate = self._structured_candidate(payload)
+            invocation = await self._invoke_async(request_prompt)
+            payload, input_tokens, output_tokens, invocation_metadata = (
+                self._unpack_invocation_result(invocation)
+            )
+            if invocation_metadata:
+                self._last_provider_metadata = invocation_metadata
+            try:
+                candidate = self._structured_candidate(payload)
+            except Exception:
+                self.mark_provider_failure()
+                raise
             for event in self._tool_events(
                 name=str(structured["name"]),
                 arguments=candidate,
@@ -984,27 +1111,37 @@ class AgentCoreRuntimeModel(Model):
                 # The remote provider metadata is represented only by the bounded
                 # Strands metadata event; it never becomes model content.
                 if "metadata" in event:
-                    event["metadata"] = {
+                    cast(Any, event)["metadata"] = {
                         "usage": {
                             "inputTokens": input_tokens,
                             "outputTokens": output_tokens,
                             "totalTokens": input_tokens + output_tokens,
                         },
                         "metrics": {"latencyMs": 0},
+                        "provider_metadata": self.actual_provider_metadata(),
                     }
                 yield event
             return
 
         # Safe advisory-text fallback for callers that do not enable structured
         # output.  Even here, only the actual output/text field is rendered.
-        payload, input_tokens, output_tokens = await self._invoke_async(request_prompt)
-        rendered = self._text_candidate(payload)
+        invocation = await self._invoke_async(request_prompt)
+        payload, input_tokens, output_tokens, invocation_metadata = self._unpack_invocation_result(
+            invocation
+        )
+        if invocation_metadata:
+            self._last_provider_metadata = invocation_metadata
+        try:
+            rendered = self._text_candidate(payload)
+        except Exception:
+            self.mark_provider_failure()
+            raise
         yield {"messageStart": {"role": "assistant"}}
         yield {"contentBlockStart": {"start": {}}}
         yield {"contentBlockDelta": {"delta": {"text": rendered}}}
         yield {"contentBlockStop": {}}
         yield {"messageStop": {"stopReason": "end_turn"}}
-        yield {
+        yield cast(Any, {
             "metadata": {
                 "usage": {
                     "inputTokens": input_tokens,
@@ -1012,8 +1149,9 @@ class AgentCoreRuntimeModel(Model):
                     "totalTokens": input_tokens + output_tokens,
                 },
                 "metrics": {"latencyMs": 0},
+                "provider_metadata": self.actual_provider_metadata(),
             }
-        }
+        })
 
 
 class BedrockNovaProFactory(AgentModelFactory):

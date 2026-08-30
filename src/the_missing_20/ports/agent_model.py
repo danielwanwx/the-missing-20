@@ -431,3 +431,32 @@ class AgentModelFactory(Protocol):
         tool_plan: tuple[dict[str, Any], ...] = (),
     ) -> Any:
         """Return a Strands ``Model`` configured for exactly one stage."""
+
+
+def actual_provider_metadata(model: Any) -> dict[str, Any]:
+    """Read only attribution emitted by an adapter after an actual invocation.
+
+    This deliberately does not consult a factory's configuration.  A model may
+    expose this optional method when its transport received a provider response;
+    an invocation that failed before a response has no observed attribution.
+    """
+
+    candidate = getattr(model, "actual_provider_metadata", None)
+    if not callable(candidate):
+        return {}
+    try:
+        value = candidate()
+    except Exception:  # pragma: no cover - defensive adapter boundary
+        return {}
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def mark_provider_failure(model: Any) -> None:
+    """Let an adapter mark an observed response as non-complete after validation fails."""
+
+    callback = getattr(model, "mark_provider_failure", None)
+    if callable(callback):
+        try:
+            callback()
+        except Exception:  # pragma: no cover - defensive adapter boundary
+            return

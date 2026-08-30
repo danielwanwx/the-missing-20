@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from the_missing_20.agents.events import (
@@ -21,7 +21,12 @@ from the_missing_20.agents.schemas import (
 )
 from the_missing_20.agents.tools import ToolAudit
 from the_missing_20.agents.validation import AgentValidationError
-from the_missing_20.ports.agent_model import AgentModelFactory, AgentStage
+from the_missing_20.ports.agent_model import (
+    AgentModelFactory,
+    AgentStage,
+    actual_provider_metadata,
+    mark_provider_failure,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +35,7 @@ class EvaluationRun:
     model_result: Any
     audit: ToolAudit
     retry_count: int = 0
+    provider_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def _evaluator_prompt(context: dict[str, Any]) -> str:
@@ -154,6 +160,8 @@ async def run_evaluator(
         if not isinstance(structured, AgentEvaluationResult):
             raise ValueError("evaluator did not return structured output")
     except Exception as exc:
+        mark_provider_failure(model)
+        provider_metadata = actual_provider_metadata(model)
         if event_sink is not None:
             event_sink.emit(
                 AgentOperationEvent(
@@ -165,10 +173,17 @@ async def run_evaluator(
                     status="FAILED",
                     correlation_id=trace_id,
                     stage=AgentStage.EVALUATOR.value,
-                    payload={"error_code": type(exc).__name__},
+                    payload={
+                        "error_code": type(exc).__name__,
+                        "provider_metadata": provider_metadata,
+                    },
                 )
             )
         raise
+    provider_metadata = actual_provider_metadata(model)
+    if provider_metadata.get("invocation_proof") == "returned":
+        provider_metadata["status"] = "COMPLETE"
+        provider_metadata["invocation_status"] = "COMPLETED"
     if event_sink is not None:
         event_sink.emit(
             AgentOperationEvent(
@@ -183,6 +198,7 @@ async def run_evaluator(
                 payload={
                     "decision": structured.decision.value,
                     "failed_invariants": list(structured.failed_invariants),
+                    "provider_metadata": provider_metadata,
                 },
             )
         )
@@ -191,4 +207,5 @@ async def run_evaluator(
         model_result=result,
         audit=ToolAudit(),
         retry_count=_structured_retry_count(result),
+        provider_metadata=provider_metadata,
     )

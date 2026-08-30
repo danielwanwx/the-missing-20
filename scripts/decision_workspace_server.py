@@ -466,12 +466,15 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         route = parsed.path
         query = parse_qs(parsed.query, keep_blank_values=True)
         if route == "/healthz":
+            provider_truth = self.registry.provider_truth()
             self._send_json(
                 HTTPStatus.OK,
                 {
                     "status": "ok",
                     "local_synthetic_commands": True,
-                    "provider_calls": False,
+                    "provider_calls": provider_truth["calls_observed"],
+                    "provider_mode": provider_truth["mode"],
+                    "provider_configured": provider_truth["configured"],
                     "write_scope": "local_synthetic_only",
                     "advisory_tools_read_only": True,
                     "live_sources": True,

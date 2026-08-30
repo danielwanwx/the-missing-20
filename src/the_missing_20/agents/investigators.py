@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, cast
 
 from the_missing_20.agents.events import AgentEventSink
 from the_missing_20.agents.schemas import (
@@ -29,6 +29,8 @@ from the_missing_20.ports.agent_model import (
     MAX_OUTPUT_TOKENS_PER_REQUEST,
     AgentModelFactory,
     AgentStage,
+    actual_provider_metadata,
+    mark_provider_failure,
 )
 
 
@@ -44,6 +46,21 @@ def _structured_retry_count(result: Any, output_name: str) -> int:
     return retries
 
 
+def _record_post_response_provider_failure(model: Any, error: BaseException) -> None:
+    """Keep returned adapter attribution on deterministic validation failures.
+
+    A provider response is still useful evidence of an attempted invocation when
+    the structured result fails a role, hypothesis, or provenance invariant.  The
+    adapter marks that response as degraded; attach its redacted metadata to the
+    exception so the harness can persist the same truth on the failure event.
+    """
+
+    mark_provider_failure(model)
+    metadata = actual_provider_metadata(model)
+    if metadata:
+        cast(Any, error).provider_metadata = metadata
+
+
 @dataclass(frozen=True, slots=True)
 class InvestigatorRun:
     result: InvestigatorResult
@@ -52,6 +69,7 @@ class InvestigatorRun:
     read_evidence_ids: tuple[str, ...] = ()
     knowledge_citations: tuple[KnowledgeCitation, ...] = ()
     retry_count: int = 0
+    provider_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def _prompt(
@@ -151,50 +169,71 @@ async def run_investigator(
         agent_id=agent_id_override or f"{role.value}-v3",
         name=role_label or role.value,
     )
-    model_result = await asyncio.wait_for(
-        agent.invoke_async(
-            _prompt(
-                role,
-                scope,
-                source_availability,
-                user_question=user_question,
-                role_label=role_label,
+    try:
+        model_result = await asyncio.wait_for(
+            agent.invoke_async(
+                _prompt(
+                    role,
+                    scope,
+                    source_availability,
+                    user_question=user_question,
+                    role_label=role_label,
+                ),
+                structured_output_model=InvestigatorResult,
+                structured_output_prompt="Return the complete investigator result now.",
+                limits=Limits(
+                    turns=8,
+                    output_tokens=MAX_OUTPUT_TOKENS_PER_REQUEST,
+                    total_tokens=16_000,
+                ),
             ),
-            structured_output_model=InvestigatorResult,
-            structured_output_prompt="Return the complete investigator result now.",
-            limits=Limits(
-                turns=8,
-                output_tokens=MAX_OUTPUT_TOKENS_PER_REQUEST,
-                total_tokens=16_000,
-            ),
-        ),
-        timeout=timeout_seconds,
-    )
+            timeout=timeout_seconds,
+        )
+    except Exception as exc:
+        mark_provider_failure(model)
+        metadata = actual_provider_metadata(model)
+        if metadata:
+            cast(Any, exc).provider_metadata = metadata
+        raise
     structured = getattr(model_result, "structured_output", None)
     if not isinstance(structured, InvestigatorResult):
-        raise ValueError(f"investigator {role.value} did not return structured output")
+        error = ValueError(f"investigator {role.value} did not return structured output")
+        _record_post_response_provider_failure(model, error)
+        raise error
     if structured.investigator_id is not role:
-        raise AgentValidationError(
+        error = AgentValidationError(
             f"investigator output role {structured.investigator_id.value} "
             f"does not match assigned role {role.value}"
         )
+        _record_post_response_provider_failure(model, error)
+        raise error
     if HYPOTHESIS_TO_INVESTIGATOR.get(structured.hypothesis_type) is not role:
-        raise AgentValidationError(
+        error = AgentValidationError(
             f"investigator hypothesis {structured.hypothesis_type.value} "
             f"does not match assigned role {role.value}"
         )
+        _record_post_response_provider_failure(model, error)
+        raise error
     try:
         read_evidence_ids = derive_read_evidence_ids((audit,))
         knowledge_citations = derive_knowledge_citations((audit,), scope.knowledge)
     except KnowledgeProvenanceError as exc:
-        raise AgentValidationError(str(exc)) from exc
+        error = AgentValidationError(str(exc))
+        _record_post_response_provider_failure(model, error)
+        raise error from exc
+    try:
+        retry_count = _structured_retry_count(model_result, InvestigatorResult.__name__)
+    except Exception as exc:
+        _record_post_response_provider_failure(model, exc)
+        raise
     return InvestigatorRun(
         result=structured,
         model_result=model_result,
         audit=audit,
         read_evidence_ids=read_evidence_ids,
         knowledge_citations=knowledge_citations,
-        retry_count=_structured_retry_count(model_result, InvestigatorResult.__name__),
+        retry_count=retry_count,
+        provider_metadata=actual_provider_metadata(model),
     )
 
 

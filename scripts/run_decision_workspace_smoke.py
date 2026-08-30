@@ -68,9 +68,27 @@ REPLAY_CONTROL_READY = (
     "document.querySelector('#agent-replay-investigation')?.hidden === false && "
     "document.querySelector('#agent-replay-investigation')?.disabled === false"
 )
-COPILOT_RESPONSE = (
-    "Array.from(document.querySelectorAll('.chat-message.chat-assistant')).some("
-    "(node) => /20|queue/i.test(node.textContent || ''))"
+
+
+def _copilot_response_expression(required_evidence_ids: tuple[str, ...]) -> str:
+    """Return a strict predicate for one fresh, evidence-grounded chat response."""
+
+    required_ids = json.dumps(list(required_evidence_ids), ensure_ascii=False, sort_keys=True)
+    return (
+        "(node) => {"
+        " if (node.classList.contains('chat-pending')) return false;"
+        " const text = node.textContent || '';"
+        " const ids = [...node.querySelectorAll('.chat-citations .citation')]"
+        "   .map((button) => (button.getAttribute('aria-label') || '')"
+        "     .split(' evidence: ').pop().trim());"
+        f" const required = {required_ids};"
+        " return /RETRYABLE_MESSAGE/i.test(text) && /\\b20\\b/.test(text) && "
+        " required.every((id) => ids.includes(id));"
+        "}"
+    )
+COPILOT_IDLE = (
+    "document.querySelector('#chat-submit')?.disabled === false && "
+    "!document.querySelector('.chat-message.chat-pending')"
 )
 RECOVERY_READY = (
     "document.body.dataset.connection === 'live' && "
@@ -1652,7 +1670,8 @@ def main() -> int:
                     _wait_ui(
                         browser,
                         "document.querySelectorAll('.chat-message.chat-assistant').length >= 1 && "
-                        "document.querySelectorAll('.operation-item').length > 0",
+                        "document.querySelectorAll('.operation-item').length > 0 && "
+                        f"{COPILOT_IDLE}",
                         "Case Console compare causes response",
                         timeout=60,
                     )
@@ -1664,7 +1683,8 @@ def main() -> int:
                     _wait_ui(
                         browser,
                         "document.querySelectorAll('.chat-message.chat-assistant').length >= 2 && "
-                        "document.querySelectorAll('.chat-citations .citation').length > 0",
+                        "document.querySelectorAll('.chat-citations .citation').length > 0 && "
+                        f"{COPILOT_IDLE}",
                         "Case Console evidence response",
                         timeout=60,
                     )
@@ -1677,26 +1697,49 @@ def main() -> int:
                         browser,
                         "document.querySelectorAll('.chat-message.chat-assistant').length >= 3 && "
                         "/evaluator|deterministic/i.test(document.querySelector("
-                        "'#chat-log')?.textContent || '')",
+                        "'#chat-log')?.textContent || '') && "
+                        f"{COPILOT_IDLE}",
                         "Case Console decision response",
                         timeout=60,
                     )
 
-                    _ui(
+                    copilot_before = browser.evaluate(
+                        "document.querySelectorAll('.chat-message.chat-assistant').length"
+                    )
+                    if (
+                        not isinstance(copilot_before, int)
+                        or isinstance(copilot_before, bool)
+                    ):
+                        raise AssertionError(
+                            f"chat log did not expose an assistant count: {copilot_before!r}"
+                        )
+                    _wait_ui(
                         browser,
                         """(() => {
                             const input = document.querySelector('#chat-input');
-                            if (!input) return false;
+                            const submit = document.querySelector('#chat-submit');
+                            if (!input || !submit || submit.disabled) return false;
                             input.value = 'Where did the missing units go?';
                             input.dispatchEvent(new Event('input', {bubbles: true}));
-                            document.querySelector('#chat-submit')?.click();
+                            submit.click();
                             return true;
                         })()""",
+                        "Case Console free-form chat submit",
+                    )
+                    required_chat_evidence_ids = (
+                        f"case:{incident_id}:failed-message",
+                        f"case:{incident_id}:erp-receipt",
+                        f"case:{incident_id}:warehouse",
+                    )
+                    copilot_response_expression = _copilot_response_expression(
+                        required_chat_evidence_ids
                     )
                     _wait_ui(
                         browser,
-                        COPILOT_RESPONSE,
+                        f"Array.from(document.querySelectorAll('.chat-message.chat-assistant'))"
+                        f".slice({copilot_before}).some({copilot_response_expression})",
                         "cited Copilot response",
+                        timeout=60,
                     )
                     live_copilot_citations = browser.evaluate(
                         "document.querySelectorAll('.chat-citations .citation').length"
@@ -1715,14 +1758,18 @@ def main() -> int:
                           const buttons = [...document.querySelectorAll(
                             '.chat-citations .citation'
                           )];
+                          const citations = buttons.map((button) => ({
+                            button,
+                            id: (button.getAttribute('aria-label') || '')
+                              .split(' evidence: ')
+                              .pop()
+                              .trim(),
+                          })).filter((item) => item.id);
                           const ids = [...new Set(
-                            buttons.map((button) => (button.textContent || '').trim())
-                              .filter(Boolean)
+                            citations.map((item) => item.id)
                           )];
                           const results = ids.map((id) => {
-                            const button = buttons.find(
-                              (candidate) => (candidate.textContent || '').trim() === id
-                            );
+                            const button = citations.find((item) => item.id === id)?.button;
                             button?.click();
                             const target = [...document.querySelectorAll(
                               '.evidence-record[data-evidence-id]'
@@ -1775,7 +1822,9 @@ def main() -> int:
                     missing_citation_state = browser.evaluate(
                         """(() => {
                           const button = document.querySelector('.chat-citations .citation');
-                          const id = (button?.textContent || '').trim();
+                          const id = (button?.getAttribute('aria-label') || '')
+                            .replace(/^.* evidence: /, '')
+                            .trim();
                           const records = [...document.querySelectorAll(
                             '.evidence-record[data-evidence-id]'
                           )].filter((record) => record.dataset.evidenceId === id);
@@ -2044,14 +2093,17 @@ def main() -> int:
                           const buttons = [...document.querySelectorAll(
                             '.chat-citations .citation'
                           )];
+                          const citations = buttons.map((button) => ({
+                            button,
+                            id: (button.getAttribute('aria-label') || '')
+                              .replace(/^.* evidence: /, '')
+                              .trim(),
+                          })).filter((item) => item.id);
                           const ids = [...new Set(
-                            buttons.map((button) => (button.textContent || '').trim())
-                              .filter(Boolean)
+                            citations.map((item) => item.id)
                           )];
                           const results = ids.map((id) => {
-                            const button = buttons.find(
-                              (candidate) => (candidate.textContent || '').trim() === id
-                            );
+                            const button = citations.find((item) => item.id === id)?.button;
                             button?.click();
                             const target = [...document.querySelectorAll(
                               '.evidence-record[data-evidence-id]'

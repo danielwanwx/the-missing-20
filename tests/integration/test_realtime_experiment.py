@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event, Thread
 from time import monotonic
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -15,7 +15,12 @@ import pytest
 
 from scripts.decision_workspace_server import DecisionWorkspaceServer
 from the_missing_20.adapters.local_knowledge import LocalKnowledgeRepository
-from the_missing_20.adapters.strands_models import ScriptedStrandsFactory
+from the_missing_20.adapters.strands_models import (
+    AgentCoreRuntimeConfig,
+    AgentCoreRuntimeFactory,
+    AgentCoreRuntimeModel,
+    ScriptedStrandsFactory,
+)
 from the_missing_20.adapters.synthetic_enterprise import SyntheticEnterprise
 from the_missing_20.agents.events import (
     AgentEventSink,
@@ -30,12 +35,18 @@ from the_missing_20.agents.schemas import (
 )
 from the_missing_20.agents.validation import AgentStageFailure
 from the_missing_20.application.executor import SimulatedPersistenceFault
+from the_missing_20.authority_b.classifier import latest_authoritative_evidence
 from the_missing_20.authority_b.executor import AuthorityBControlledExecutor
 from the_missing_20.authority_b.quorum import QuorumDenied
 from the_missing_20.domain.enterprise import EvidenceReadStatus
+from the_missing_20.domain.models import EvidenceSourceType
 from the_missing_20.experiment.events import PublicEventType, PublicIncidentEvent
 from the_missing_20.experiment.ledger import EventLedgerError, PublicEventLedger
-from the_missing_20.experiment.session import ExperimentSession
+from the_missing_20.experiment.session import (
+    ExperimentRegistry,
+    ExperimentSession,
+    _SessionAgentEventSink,
+)
 from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -100,6 +111,239 @@ def test_experiment_starts_with_exact_stable_unit_split(tmp_path: Path) -> None:
     assert {item["status"] for item in units[80:]} == {"QUEUE_FAILED"}
     assert {item["source_message_id"] for item in units[80:]} == {"RECEIPT-MESSAGE-020"}
     assert all(item["source_message_id"] is None for item in units[:80])
+
+
+def test_agentcore_completion_events_persist_redacted_provider_attribution(
+    tmp_path: Path,
+) -> None:
+    """A returned runtime response, not config, supplies durable attribution."""
+
+    factory = AgentCoreRuntimeFactory(
+        config=AgentCoreRuntimeConfig(
+            runtime_arn="arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/fake"
+        )
+    )
+    session = ExperimentSession(ROOT, data_directory=tmp_path / "agentcore", model_factory=factory)
+    sink = _SessionAgentEventSink(session)
+    completion_stages = (
+        (AgentOperationEventType.AGENT_COMPLETED, "investigator"),
+        (AgentOperationEventType.SYNTHESIS_COMPLETED, "synthesis"),
+        (AgentOperationEventType.EVALUATION_COMPLETED, "evaluation"),
+    )
+    for index, (event_type, stage) in enumerate(completion_stages, start=1):
+        provider_metadata = {
+            "mode": "agentcore",
+            "provider": "agentcore",
+            "model": "agentcore-runtime",
+            "transport": "agentcore_invoke_agent_runtime",
+            "region": "us-west-2",
+            "runtime_configured": True,
+            "qualifier": "DEFAULT",
+            "invocation_id": f"runtime-session-{index}",
+            "invocation_proof": "returned",
+            "status": "COMPLETE",
+            "invocation_status": "COMPLETED",
+        }
+        sink.emit(
+            AgentOperationEvent(
+                event_type=event_type,
+                case_id=session.case_id,
+                trace_id=session.trace_id,
+                actor="agentcore-advisor",
+                operation_id=f"agentcore-operation-{index}",
+                status=(
+                    "ACCEPT"
+                    if event_type is AgentOperationEventType.EVALUATION_COMPLETED
+                    else "COMPLETED"
+                ),
+                correlation_id=session.trace_id,
+                stage=stage,
+                payload={"provider_metadata": provider_metadata},
+            )
+        )
+
+    completion_events = [
+        event
+        for event in session.events_since()
+        if event.event_type
+        in {
+            PublicEventType.AGENT_COMPLETED,
+            PublicEventType.SYNTHESIS_COMPLETED,
+            PublicEventType.EVALUATION_COMPLETED,
+        }
+    ]
+    assert len(completion_events) == len(completion_stages)
+    required = {
+        "provider",
+        "model",
+        "mode",
+        "transport",
+        "region",
+        "runtime_configured",
+        "qualifier",
+        "read_only",
+        "authority",
+        "invocation_id",
+        "invocation_proof",
+    }
+    for event in completion_events:
+        metadata = cast(dict[str, Any], event.payload["provider_metadata"])
+        assert required.issubset(metadata)
+        assert metadata["provider"] == "agentcore"
+        assert metadata["model"] == "agentcore-runtime"
+        assert metadata["mode"] == "agentcore"
+        assert metadata["transport"] == "agentcore_invoke_agent_runtime"
+        assert metadata["region"] == "us-west-2"
+        assert metadata["runtime_configured"] is True
+        assert metadata["read_only"] is True
+        assert metadata["authority"] == "ADVISORY_NOT_OPERATIONAL_DECISION"
+        assert "runtime_arn" not in metadata
+        assert "123456789012" not in json.dumps(metadata)
+
+    # The durable fallback uses the persisted evaluation completion rather than
+    # dropping back to a mode-only summary.
+    snapshot = session.snapshot()
+    assert snapshot["advisory"]["provider_metadata"]["provider"] == "agentcore"
+    assert snapshot["advisory"]["provider_metadata"]["transport"] == (
+        "agentcore_invoke_agent_runtime"
+    )
+
+
+def test_provider_truth_reports_observed_real_provider_without_invoking_it(
+    tmp_path: Path,
+) -> None:
+    """Health can distinguish configured AgentCore from an observed call."""
+
+    registry = ExperimentRegistry(
+        ROOT,
+        data_directory=tmp_path / "registry",
+        provider_mode="agentcore",
+    )
+    assert registry.provider_truth() == {
+        "mode": "agentcore",
+        "configured": True,
+        "calls_observed": False,
+    }
+    session = registry.get("missing-20-normal")
+    _SessionAgentEventSink(session).emit(
+        AgentOperationEvent(
+            event_type=AgentOperationEventType.AGENT_COMPLETED,
+            case_id=session.case_id,
+            trace_id=session.trace_id,
+            actor="agentcore-advisor",
+            operation_id="agentcore-health-operation",
+            status="COMPLETED",
+            correlation_id=session.trace_id,
+            stage="investigator",
+        )
+    )
+    # A lifecycle marker alone cannot prove that a provider returned anything.
+    assert registry.provider_truth()["calls_observed"] is False
+    _SessionAgentEventSink(session).emit(
+        AgentOperationEvent(
+            event_type=AgentOperationEventType.AGENT_COMPLETED,
+            case_id=session.case_id,
+            trace_id=session.trace_id,
+            actor="agentcore-advisor",
+            operation_id="agentcore-health-returned",
+            status="COMPLETED",
+            correlation_id=session.trace_id,
+            stage="investigator",
+            payload={
+                "provider_metadata": {
+                    "mode": "agentcore",
+                    "provider": "agentcore",
+                    "model": "agentcore-runtime",
+                    "transport": "agentcore_invoke_agent_runtime",
+                    "invocation_id": "runtime-session-health",
+                    "invocation_proof": "returned",
+                    "status": "COMPLETE",
+                    "invocation_status": "COMPLETED",
+                }
+            },
+        )
+    )
+    assert registry.provider_truth()["calls_observed"] is True
+    registry.close()
+
+
+def test_provider_truth_ignores_returned_but_invalid_completion(
+    tmp_path: Path,
+) -> None:
+    """Returned proof is not a completed call after durable validation failure."""
+
+    registry = ExperimentRegistry(
+        ROOT,
+        data_directory=tmp_path / "registry-invalid-return",
+        provider_mode="agentcore",
+    )
+    session = registry.get("missing-20-normal")
+    _SessionAgentEventSink(session).emit(
+        AgentOperationEvent(
+            event_type=AgentOperationEventType.SYNTHESIS_COMPLETED,
+            case_id=session.case_id,
+            trace_id=session.trace_id,
+            actor="agentcore-advisor",
+            operation_id="agentcore-invalid-return",
+            status="FAILED",
+            correlation_id=session.trace_id,
+            stage="synthesis",
+            payload={
+                "provider_metadata": {
+                    "mode": "agentcore",
+                    "provider": "agentcore",
+                    "model": "agentcore-runtime",
+                    "transport": "agentcore_invoke_agent_runtime",
+                    "invocation_id": "runtime-session-invalid",
+                    "invocation_proof": "returned",
+                    "status": "DEGRADED",
+                    "invocation_status": "FAILED",
+                }
+            },
+        )
+    )
+
+    assert registry.provider_truth()["calls_observed"] is False
+    registry.close()
+
+
+def test_precompletion_failure_does_not_infer_provider_attribution(
+    tmp_path: Path,
+) -> None:
+    """A failed completion retains failure context but no fabricated call proof."""
+
+    registry = ExperimentRegistry(
+        ROOT,
+        data_directory=tmp_path / "registry-failure",
+        provider_mode="agentcore",
+    )
+    session = registry.get("missing-20-normal")
+    _SessionAgentEventSink(session).emit(
+        AgentOperationEvent(
+            event_type=AgentOperationEventType.SYNTHESIS_COMPLETED,
+            case_id=session.case_id,
+            trace_id=session.trace_id,
+            actor="agentcore-advisor",
+            operation_id="agentcore-precompletion-failure",
+            status="FAILED",
+            correlation_id=session.trace_id,
+            stage="synthesis",
+            payload={"error_code": "AgentProviderUnavailable"},
+        )
+    )
+    event = next(
+        event
+        for event in session.events_since()
+        if event.event_type is PublicEventType.SYNTHESIS_COMPLETED
+    )
+    metadata = cast(dict[str, Any], event.payload["provider_metadata"])
+    assert metadata["status"] == "DEGRADED"
+    assert metadata["invocation_status"] == "FAILED"
+    assert "provider" not in metadata
+    assert "transport" not in metadata
+    assert "invocation_id" not in metadata
+    assert registry.provider_truth()["calls_observed"] is False
+    registry.close()
 
 
 def test_normal_flow_telemetry_is_ordered_and_snapshot_derived(tmp_path: Path) -> None:
@@ -1822,6 +2066,117 @@ def test_copilot_answers_retryable_queue_evidence_with_exact_citation(tmp_path: 
     assert "error_code=DOCUMENT_LOCKED_RETRYABLE" in response["message"]
     assert "retry_eligible=True" in response["message"]
     assert "lock_cleared=True" in response["message"]
+
+
+def test_copilot_composes_status_proof_and_governed_next_step(tmp_path: Path) -> None:
+    """A combined operator question receives one concise, grounded answer."""
+
+    session = _session(tmp_path)
+    response = session.chat_command(
+        "What is the current status, which exact evidence proves RETRYABLE_MESSAGE "
+        "and the 20-unit gap, and what should the human do next?",
+        idempotency_key="chat:status-proof-next:scripted",
+    )
+
+    evidence = tuple(session.store.list_evidence(session.case_id))
+    latest = latest_authoritative_evidence(evidence)
+    expected_citations = [
+        next(
+            item.evidence_id
+            for item in latest
+            if item.source_type is source_type
+        )
+        for source_type in (
+            EvidenceSourceType.FAILED_MESSAGE_QUEUE,
+            EvidenceSourceType.ERP_RECEIPT,
+            EvidenceSourceType.WAREHOUSE,
+        )
+    ]
+    assert response["intent"] == "inspect_current_status"
+    assert response["citations"] == expected_citations
+    assert "RETRYABLE_MESSAGE is SUPPORTED" in response["message"]
+    assert "20 stopped at the message queue" in response["message"]
+    assert all(citation in response["message"] for citation in expected_citations)
+    assert "prepare Receipt Message Restart for two-role approval" in response["message"]
+    assert "cannot approve or execute autonomously" in response["message"]
+
+
+def test_agentcore_shaped_chat_composes_status_proof_and_next_step(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The direct answer remains grounded when the role turn has provider-shaped output."""
+
+    factory = AgentCoreRuntimeFactory(
+        config=AgentCoreRuntimeConfig(
+            runtime_arn="arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/fake"
+        )
+    )
+    session = ExperimentSession(
+        ROOT,
+        data_directory=tmp_path / "agentcore-chat",
+        model_factory=factory,
+    )
+    evidence = tuple(session.store.list_evidence(session.case_id))
+    by_source = {item.source_type: item.evidence_id for item in evidence}
+    output = {
+        "investigator_id": "retryable_message_investigator",
+        "hypothesis_type": "RETRYABLE_MESSAGE",
+        "conclusion": "SUPPORTED",
+        "confidence_band": "HIGH",
+        "factual_claims": [
+            {
+                "claim_id": "retryable-status-proof",
+                "statement": "Twenty units are stopped at a retryable message queue.",
+                "relation": "SUPPORTS_HYPOTHESIS",
+                "evidence_ids": [
+                    by_source[EvidenceSourceType.FAILED_MESSAGE_QUEUE],
+                    by_source[EvidenceSourceType.ERP_RECEIPT],
+                    by_source[EvidenceSourceType.WAREHOUSE],
+                ],
+            }
+        ],
+    }
+
+    def fake_invoke(
+        self: AgentCoreRuntimeModel, prompt: str
+    ) -> tuple[Any, int, int, dict[str, object]]:
+        del self, prompt
+        return (
+            {"output": output},
+            12,
+            8,
+            {
+                "mode": "agentcore",
+                "provider": "agentcore",
+                "model": "agentcore-runtime",
+                "transport": "agentcore_invoke_agent_runtime",
+                "region": "us-west-2",
+                "qualifier": "DEFAULT",
+                "runtime_configured": True,
+                "invocation_id": "runtime-status-proof-next",
+                "invocation_proof": "returned",
+                "status": "RETURNED",
+                "invocation_status": "RETURNED",
+            },
+        )
+
+    monkeypatch.setattr(AgentCoreRuntimeModel, "_invoke", fake_invoke)
+    response = session.chat_command(
+        "What is the current status, which exact evidence proves RETRYABLE_MESSAGE "
+        "and the 20-unit gap, and what should the human do next?",
+        idempotency_key="chat:status-proof-next:agentcore",
+    )
+
+    assert response["provider_metadata"]["provider"] == "agentcore"
+    assert response["provider_metadata"]["invocation_id"] == "runtime-status-proof-next"
+    assert response["citations"] == [
+        by_source[EvidenceSourceType.FAILED_MESSAGE_QUEUE],
+        by_source[EvidenceSourceType.ERP_RECEIPT],
+        by_source[EvidenceSourceType.WAREHOUSE],
+    ]
+    assert "RETRYABLE_MESSAGE is SUPPORTED" in response["message"]
+    assert "prepare Receipt Message Restart for two-role approval" in response["message"]
 
 
 def test_scenario_reentry_after_recovery_uses_a_fresh_authoritative_incident(

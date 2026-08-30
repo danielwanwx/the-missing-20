@@ -336,6 +336,48 @@ test("persisted closed verification projects completed stages and non-empty hist
   assert.match(app, /synthesisStatus\(\)[\s\S]*persisted\.stagesComplete/);
 });
 
+test("replay dashboard charts append the authoritative verified close", async () => {
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const helperStart = app.indexOf("  function verifiedClosedSnapshot(snapshot) {");
+  const helperEnd = app.indexOf("  function reconciliationPoints(snapshot)", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart, "chart reconciliation helpers are present");
+  const state = {
+    replaying: false,
+    telemetry: [
+      {
+        sequence: 120,
+        observed_at: "2026-08-28T00:01:00.000Z",
+        unit_counts: { total: 100, erp_recorded: 80, queue_failed: 20 },
+        queue_depth: 20,
+      },
+    ],
+  };
+  const snapshot = {
+    projection_sequence: 140,
+    incident: { status: "CLOSED" },
+    execution: { verified: true },
+    unit_counts: { total: 100, erp_recorded: 100, queue_failed: 0 },
+    telemetry: { latest: { observed_at: "2026-08-28T00:02:00.000Z" } },
+  };
+  const helpers = new Function(
+    "state",
+    "value",
+    "number",
+    `${app.slice(helperStart, helperEnd)}; return { chartTelemetryPoints, reconciliationSeries };`,
+  )(
+    state,
+    (input) => input == null ? "" : String(input),
+    (input, fallback = 0) => Number.isFinite(Number(input)) ? Number(input) : fallback,
+  );
+  const series = helpers.reconciliationSeries(snapshot);
+  assert.deepEqual(series.expected, [100, 100]);
+  assert.deepEqual(series.recorded, [80, 100]);
+  assert.deepEqual(series.gap, [20, 0]);
+  assert.equal(state.telemetry.length, 1, "historical telemetry remains unchanged");
+  state.replaying = true;
+  assert.equal(helpers.chartTelemetryPoints(snapshot).length, 1, "replay does not preempt history");
+});
+
 test("verified closed incident deep links select Recovery in the Scenario Lab", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
@@ -480,6 +522,21 @@ test("the live UI preserves truth and accessible targets", async () => {
   assert.doesNotMatch(app, /API · LIVE/);
   assert.doesNotMatch(html, /section-note/);
   assert.doesNotMatch(app, /The diagram moves only when/);
+});
+
+test("browser smoke waits for settled Copilot turns before chaining chat", async () => {
+  const smoke = await readFile(new URL("../scripts/run_decision_workspace_smoke.py", import.meta.url), "utf8");
+  assert.match(smoke, /chat-message\.chat-pending/);
+  assert.match(smoke, /COPILOT_IDLE/);
+  assert.match(smoke, /Case Console free-form chat submit/);
+  assert.match(smoke, /copilot_before = browser\.evaluate/);
+  assert.match(smoke, /_copilot_response_expression/);
+  assert.match(smoke, /RETRYABLE_MESSAGE/);
+  assert.match(smoke, /failed-message/);
+  assert.match(smoke, /erp-receipt/);
+  assert.match(smoke, /warehouse/);
+  assert.match(smoke, /getAttribute\('aria-label'\)/);
+  assert.doesNotMatch(smoke, /textContent \|\| ''\)\.trim\(\)[\s\S]*=== id/);
 });
 
 test("live source cards preserve disclosure and consume observation pulses once", async () => {
@@ -639,6 +696,12 @@ test("agent graph route contract stays cubic, monotonic, and clear of node inter
   assert.match(css, /\.graph-route-path\s*\{/);
   assert.doesNotMatch(css, /\.graph-route-segment/);
   assert.doesNotMatch(css, /\.graph-route-arrow/);
+  assert.match(css, /\.operations-map\.agent-system-panel \.graph-port\s*\{[\s\S]*?width:\s*5px;[\s\S]*?min-width:\s*5px;[\s\S]*?height:\s*5px;[\s\S]*?background:\s*rgba\(92, 222, 234, \.86\)/);
+  assert.match(css, /\.operations-map\.agent-system-panel \.graph-sources \.graph-port\s*\{[\s\S]*?flex:\s*0 0 5px;/);
+  assert.match(css, /\.workspace-timeline\s*\{\s*position:\s*relative;\s*\}/);
+  assert.match(css, /\.orchestrator-node \.graph-port-in\s*\{[\s\S]*?left:\s*50%;/);
+  assert.match(css, /\.synthesis-node \.graph-port-synthesis-(left|middle|right)/);
+  assert.match(css, /\.graph-step\[data-graph-node="safety"\] \.graph-port-in\s*\{[\s\S]*?left:\s*50%;/);
 
   const metrics = {
     width: 1002,

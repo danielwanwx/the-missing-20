@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from the_missing_20.agents.events import (
@@ -25,6 +25,8 @@ from the_missing_20.ports.agent_model import (
     MAX_OUTPUT_TOKENS_PER_REQUEST,
     AgentModelFactory,
     AgentStage,
+    actual_provider_metadata,
+    mark_provider_failure,
 )
 
 
@@ -34,6 +36,7 @@ class SynthesisRun:
     model_result: Any
     audit: ToolAudit
     retry_count: int = 0
+    provider_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def _synthesis_prompt(context: dict[str, Any]) -> str:
@@ -162,6 +165,8 @@ async def run_synthesis(
         if not isinstance(structured, SynthesisResult):
             raise ValueError("synthesis did not return structured output")
     except Exception as exc:
+        mark_provider_failure(model)
+        provider_metadata = actual_provider_metadata(model)
         if event_sink is not None:
             event_sink.emit(
                 AgentOperationEvent(
@@ -173,10 +178,17 @@ async def run_synthesis(
                     status="FAILED",
                     correlation_id=trace_id,
                     stage=AgentStage.SYNTHESIS.value,
-                    payload={"error_code": type(exc).__name__},
+                    payload={
+                        "error_code": type(exc).__name__,
+                        "provider_metadata": provider_metadata,
+                    },
                 )
             )
         raise
+    provider_metadata = actual_provider_metadata(model)
+    if provider_metadata.get("invocation_proof") == "returned":
+        provider_metadata["status"] = "COMPLETE"
+        provider_metadata["invocation_status"] = "COMPLETED"
     if event_sink is not None:
         event_sink.emit(
             AgentOperationEvent(
@@ -192,6 +204,7 @@ async def run_synthesis(
                     "selected_hypothesis": structured.selected_hypothesis.value,
                     "conclusion": structured.conclusion.value,
                     "claim_ids": [item.claim_id for item in structured.factual_claims],
+                    "provider_metadata": provider_metadata,
                 },
             )
         )
@@ -200,4 +213,5 @@ async def run_synthesis(
         model_result=result,
         audit=ToolAudit(),
         retry_count=_structured_retry_count(result),
+        provider_metadata=provider_metadata,
     )
