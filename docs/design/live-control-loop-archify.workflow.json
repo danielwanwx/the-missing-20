@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "The Missing 20 · Live Control Loop",
+    "output": "docs/design/live-control-loop-archify.html",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "signal", "label": "Signal" },
+    { "id": "coordination", "label": "Coordination" },
+    { "id": "investigation_a", "label": "Investigation A" },
+    { "id": "investigation_b", "label": "Investigation B" },
+    { "id": "investigation_c", "label": "Investigation C" },
+    { "id": "decision", "label": "Synthesis" },
+    { "id": "safety", "label": "Safety" },
+    { "id": "authorization", "label": "Authorization" },
+    { "id": "execution", "label": "Execution" },
+    { "id": "proof", "label": "Proof" }
+  ],
+  "phases": [
+    { "id": "detect", "label": "Detect", "fromCol": 0, "toCol": 0 },
+    { "id": "investigate", "label": "Investigate", "fromCol": 1, "toCol": 2, "variant": "emphasis" },
+    { "id": "synthesize", "label": "Synthesize", "fromCol": 3, "toCol": 3 },
+    { "id": "govern", "label": "Govern", "fromCol": 4, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": [
+    "incident",
+    "orchestrator",
+    "receipt_retry",
+    "synthesis",
+    "safety_gate",
+    "approval",
+    "recovery",
+    "verification"
+  ],
+  "nodes": [
+    { "id": "incident", "lane": "signal", "col": 0, "type": "messagebus", "label": "Incident", "width": 58, "height": 40 },
+    { "id": "orchestrator", "lane": "coordination", "col": 1, "type": "backend", "label": "Orchestrator", "width": 64, "height": 44 },
+    { "id": "receipt_retry", "lane": "investigation_a", "col": 2, "type": "backend", "label": "Receipt Retry", "width": 64, "height": 40 },
+    { "id": "shipment_evidence", "lane": "investigation_b", "col": 2, "type": "backend", "label": "Shipment Evidence", "width": 68, "height": 40 },
+    { "id": "duplicate_posting", "lane": "investigation_c", "col": 2, "type": "backend", "label": "Duplicate Posting", "width": 68, "height": 40 },
+    { "id": "synthesis", "lane": "decision", "col": 3, "type": "cloud", "label": "Synthesis", "width": 58, "height": 40 },
+    { "id": "safety_gate", "lane": "safety", "col": 4, "type": "security", "label": "Safety Gate", "width": 58, "height": 40 },
+    { "id": "approval", "lane": "authorization", "col": 4, "type": "security", "label": "Two-role Approval", "width": 68, "height": 40 },
+    { "id": "recovery", "lane": "execution", "col": 5, "type": "backend", "label": "Controlled Recovery", "width": 70, "height": 40 },
+    { "id": "verification", "lane": "proof", "col": 5, "type": "database", "label": "Verification", "width": 58, "height": 40 }
+  ],
+  "edges": [
+    { "id": "incident_to_orchestrator", "from": "incident", "to": "orchestrator", "role": "main", "variant": "emphasis", "route": "auto" },
+    { "id": "orchestrator_to_receipt", "from": "orchestrator", "to": "receipt_retry", "role": "main", "variant": "emphasis", "route": "auto" },
+    { "id": "orchestrator_to_shipment", "from": "orchestrator", "to": "shipment_evidence", "role": "branch", "route": "auto" },
+    { "id": "orchestrator_to_duplicate", "from": "orchestrator", "to": "duplicate_posting", "role": "branch", "route": "auto" },
+    { "id": "receipt_to_synthesis", "from": "receipt_retry", "to": "synthesis", "role": "main", "variant": "emphasis", "route": "auto" },
+    { "id": "shipment_to_synthesis", "from": "shipment_evidence", "to": "synthesis", "role": "branch", "route": "auto" },
+    { "id": "duplicate_to_synthesis", "from": "duplicate_posting", "to": "synthesis", "role": "branch", "route": "auto" },
+    { "id": "synthesis_to_safety", "from": "synthesis", "to": "safety_gate", "role": "main", "variant": "security", "route": "auto" },
+    { "id": "safety_to_approval", "from": "safety_gate", "to": "approval", "role": "main", "variant": "security", "route": "auto" },
+    { "id": "approval_to_recovery", "from": "approval", "to": "recovery", "role": "main", "variant": "security", "route": "auto" },
+    { "id": "recovery_to_verification", "from": "recovery", "to": "verification", "role": "main", "variant": "security", "route": "auto" },
+    { "id": "verification_to_incident", "from": "verification", "to": "incident", "role": "return", "variant": "dashed", "route": "outside-right" }
+  ]
+}
