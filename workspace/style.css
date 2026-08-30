@@ -761,11 +761,9 @@ body[data-hidden="true"] * { animation-play-state: paused !important; }
 .view-bar { min-height: 35px; }
 .view-bar h1 { font-size: clamp(1.3rem, 2vw, 1.78rem); }
 .view-bar-actions { gap: .55rem; }
-.dashboard-inject-incident, .dashboard-open-investigation { min-height: 32px; padding: .46rem .62rem; font-size: .59rem; }
+.dashboard-inject-incident { min-height: 32px; padding: .46rem .62rem; font-size: .59rem; }
 .dashboard-inject-incident span[aria-hidden="true"] { color: var(--faint); }
 .dashboard-inject-incident strong { color: currentColor; font-weight: 850; }
-.dashboard-open-investigation { gap: .55rem; }
-.dashboard-open-investigation i { font-size: .92rem; }
 .flow-stage { padding-top: 19px; }
 .flow-map { min-height: 211px; padding: 28px 25px 18px; }
 .flow-node { flex-basis: 148px; min-height: 119px; }
@@ -885,7 +883,7 @@ body[data-hidden="true"] * { animation-play-state: paused !important; }
   .dashboard-main { padding: 15px 12px 16px; }
   .view-bar { align-items: flex-start; flex-direction: column; gap: .55rem; }
   .view-bar-actions { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
-  .dashboard-inject-incident, .dashboard-open-investigation { flex: 0 0 auto; }
+  .dashboard-inject-incident { flex: 0 0 auto; }
   .flow-stage { padding-top: 14px; }
   .flow-stage-heading { align-items: flex-start; flex-direction: column; }
   .flow-kpis { width: 100%; justify-content: flex-start; }
@@ -1168,3 +1166,224 @@ body[data-hidden="true"] * { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) {
   .agent-link.is-event, .agent-link.is-event::after, .agent-link.is-event .graph-link-pulse, .agent-mark.is-active, .graph-step.is-active i { animation: none !important; }
 }
+
+/* Live control loop topology rebaseline ----------------------------------
+   Five semantic layers, one center axis, and one independent return rail.
+   The SVG routes are the only source of connection lines; the CSS below only
+   establishes the authored geometry and compact visual hierarchy. */
+.operations-map.agent-system-panel {
+  min-height: 680px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(92, 222, 234, .105), transparent 15rem),
+    linear-gradient(180deg, rgba(8, 21, 14, .26), rgba(2, 7, 5, .68));
+}
+.graph-map-heading { top: 14px; right: 18px; left: 18px; }
+.graph-sources {
+  top: 218px;
+  right: 11%;
+  left: 11%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 38px;
+}
+.graph-source-group {
+  justify-self: center;
+  width: 76px;
+  min-height: 30px;
+  height: 30px;
+  padding: .18rem .35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .24rem;
+  border-radius: 999px;
+  background: rgba(4, 20, 15, .68);
+  box-shadow: 0 0 12px rgba(92, 222, 234, .045);
+}
+.graph-source-group > i { font-size: .78rem; }
+.graph-source-group strong { font-size: .49rem; }
+.graph-source-group small { display: none; }
+.graph-incident-packet {
+  top: 48px;
+  left: 50%;
+  width: 118px;
+  min-height: 38px;
+  height: 38px;
+  padding: .3rem .48rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .28rem;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+.graph-incident-packet > i { font-size: .82rem; }
+.graph-incident-packet > strong { font-size: .55rem; }
+.graph-incident-packet .graph-port-in { top: 50%; right: -5px; left: auto; }
+.graph-incident-packet .graph-port-out { top: auto; right: auto; bottom: -5px; left: 50%; transform: translateX(-50%); }
+.orchestrator-node {
+  top: 112px;
+  width: 126px;
+  height: 78px;
+  padding: .56rem .45rem .42rem;
+  gap: .14rem;
+}
+.orchestrator-node .graph-port-in { top: -5px; right: auto; bottom: auto; left: 50%; transform: translateX(-50%); }
+.orchestrator-node .graph-port-coordination-left { top: auto; right: auto; bottom: -5px; left: 22%; transform: translateX(-50%); }
+.orchestrator-node .graph-port-coordination-middle { top: auto; right: auto; bottom: -5px; left: 50%; transform: translateX(-50%); }
+.orchestrator-node .graph-port-coordination-right { top: auto; right: auto; bottom: -5px; left: 78%; transform: translateX(-50%); }
+.orchestrator-icon { font-size: 1.22rem; }
+.orchestrator-node strong { font-size: .61rem; }
+.node-pulse { top: 6px; right: 14px; width: 6px; height: 6px; }
+.agent-nodes {
+  top: 264px;
+  right: 11%;
+  bottom: auto;
+  left: 11%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 38px;
+  height: 76px;
+}
+.agent-nodes .agent-card {
+  width: auto;
+  min-height: 76px;
+  height: 76px;
+  padding: .42rem .34rem;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  border-radius: 8px;
+}
+.agent-nodes .agent-card-top { justify-content: center; gap: .28rem; }
+.agent-nodes .agent-card .agent-card-focus,
+.agent-nodes .agent-card .agent-card-stats { display: none; }
+.agent-nodes .agent-card .agent-card-name { max-width: 100%; font-size: .56rem; }
+.agent-nodes .agent-card .state-badge { font-size: .4rem; }
+.agent-nodes .agent-card .agent-mark { width: 18px; height: 18px; }
+.agent-nodes .agent-card .graph-port-in {
+  top: -5px;
+  right: auto;
+  bottom: auto;
+  left: 28%;
+  transform: translateX(-50%);
+}
+.agent-nodes .agent-card .graph-port-control-in {
+  top: -5px;
+  right: auto;
+  bottom: auto;
+  left: 72%;
+  transform: translateX(-50%);
+}
+.agent-nodes .agent-card .graph-port-out { top: auto; right: auto; bottom: -5px; left: 50%; transform: translateX(-50%); }
+.agent-nodes .agent-card:nth-child(1) .graph-port-control-in { left: 74%; }
+.agent-nodes .agent-card:nth-child(2) .graph-port-control-in { left: 78%; }
+.agent-nodes .agent-card:nth-child(3) .graph-port-control-in { left: 26%; }
+.agent-nodes .agent-card:nth-child(1) .graph-port-in { left: 28%; }
+.agent-nodes .agent-card:nth-child(2) .graph-port-in { left: 28%; }
+.agent-nodes .agent-card:nth-child(3) .graph-port-in { left: 72%; }
+.synthesis-node {
+  top: 394px;
+  width: 132px;
+  min-height: 58px;
+  height: 58px;
+  padding: .35rem .42rem;
+}
+.synthesis-node > i { font-size: .9rem; }
+.synthesis-node strong { font-size: .56rem; }
+.synthesis-node .state-badge { font-size: .4rem; }
+.synthesis-node .graph-port-synthesis-left { top: -5px; left: 24%; transform: translateX(-50%); }
+.synthesis-node .graph-port-synthesis-middle { top: -5px; left: 50%; transform: translateX(-50%); }
+.synthesis-node .graph-port-synthesis-right { top: -5px; left: 76%; transform: translateX(-50%); }
+.graph-lifecycle {
+  top: 512px;
+  right: 7%;
+  bottom: auto;
+  left: 7%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.graph-step {
+  min-height: 72px;
+  padding: .34rem .15rem .28rem;
+  border-radius: 8px;
+}
+.graph-step::before { display: none; }
+.graph-step i { width: 28px; height: 28px; font-size: .76rem; }
+.graph-step strong { max-width: 100%; font-size: .43rem; }
+.graph-step small { font-size: .38rem; }
+.graph-loop-label { display: none; }
+.graph-port { width: 8px; height: 8px; }
+.agent-graph-links { z-index: 1; overflow: visible; }
+.agent-link { z-index: 1; }
+.agent-link.is-muted { opacity: .11; }
+.agent-link.is-selected-route { opacity: 1; }
+.agent-link.is-event { opacity: 1; }
+.graph-route-path { stroke-width: 1.45; }
+.agent-link.is-selected-route .graph-route-path,
+.agent-link.is-event .graph-route-path { stroke-width: 2; }
+.graph-link-pulse { pointer-events: none; }
+.case-console-actions { margin-top: 8px; padding: 0; border: 0; background: transparent; }
+.case-actions { margin-top: 0; gap: .28rem; }
+.case-action { min-height: 28px; padding: .3rem .42rem; font-size: .52rem; }
+.suggestion-row { gap: .28rem; margin: 7px 0; }
+.suggestion { min-height: 25px; padding: .25rem .38rem; font-size: .5rem; }
+.chat-citations { gap: .22rem; margin-top: .32rem; }
+.citation { min-height: 24px; padding: .22rem .36rem; font-family: inherit; font-size: .5rem; }
+
+@media (max-width: 767px) {
+  .workspace-main { overflow-x: auto; }
+  .operations-map.agent-system-panel { width: 720px; min-width: 720px; min-height: 680px; overflow: hidden; }
+  .graph-map-heading { top: 12px; right: 14px; left: 14px; }
+  .graph-sources { top: 218px; right: 11%; left: 11%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+  .graph-source-group { width: 70px; height: 28px; min-height: 28px; }
+  .graph-source-group strong { font-size: .46rem; }
+  .graph-incident-packet { top: 48px; width: 108px; height: 34px; min-height: 34px; }
+  .orchestrator-node { top: 112px; width: 116px; height: 72px; }
+  .agent-nodes { top: 264px; right: 11%; left: 11%; column-gap: 28px; height: 72px; }
+  .agent-nodes .agent-card { min-height: 72px; height: 72px; }
+  .synthesis-node { top: 394px; width: 124px; height: 56px; min-height: 56px; }
+  .graph-lifecycle { top: 512px; right: 7%; left: 7%; gap: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-link-pulse, .agent-link.is-event, .agent-link.is-event::after, .agent-mark.is-active, .graph-step.is-active i { animation: none !important; }
+}
+
+/* Dashboard supply-flow alignment ---------------------------------------
+   Keep the four API-projected components on one optical rail.  Flexing the
+   cards equally and giving links a fixed breathing space makes each visible
+   port-to-port connector continuous without adding another decorative edge. */
+@media (min-width: 768px) {
+  .flow-map {
+    display: flex;
+    align-items: stretch;
+    min-height: 178px;
+    padding: 28px 34px 18px;
+    overflow: hidden;
+  }
+  .flow-column { display: contents; }
+  .flow-node {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 96px;
+    padding: .6rem .48rem .44rem;
+    border-radius: 8px;
+  }
+  .flow-node-icon { font-size: 1.62rem; }
+  .flow-node-label { font-size: .64rem; }
+  .flow-node-count { margin-top: .5rem; font-size: 1.34rem; }
+  .flow-node-count-label { margin-top: .2rem; font-size: .5rem; }
+  .flow-link {
+    flex: 0 0 48px;
+    width: 48px;
+    min-width: 48px;
+    height: 20px;
+    align-self: center;
+  }
+  .flow-link-line { width: 100%; }
+  .flow-gap-branch { left: 50%; transform: translateX(-18%); }
+}
+
+.flow-selection-detail:empty { min-height: 0; margin: 0; }

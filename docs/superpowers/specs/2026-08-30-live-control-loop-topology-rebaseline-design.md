@@ -78,6 +78,22 @@ investigator layer, without explanatory body copy.
   do not recompute a different topology or collapse routes through nodes.
 - Verify at the current browser width, 1440×900, and 1920×1080.
 
+## Dashboard topology alignment
+
+- Apply the same sparse geometry language to the Dashboard supply-flow diagram.
+- Warehouse, Message Queue, ERP, and Invoice occupy four equal columns with smaller
+  cards and larger clear gaps. Ports share one optical rail and every connector meets
+  the visible component boundary without a gap.
+- Keep exactly one main supply-flow route and one queue anomaly branch. Do not render
+  duplicate route lines, repeated topology cards, or decorative edges.
+- Remove the redundant `Open investigation` feature button because Agent Workspace is
+  already a primary navigation tab. Preserve one clear incident state and the existing
+  top-level view navigation.
+- Remove instructional microcopy below the supply-flow canvas when direct node
+  selection and the visible exception state already communicate the interaction.
+- Keep the live quantities and unit-density animation; geometry changes must not turn
+  the Dashboard into a static report.
+
 ## Acceptance gates
 
 - Existing live API/SSE data, agent selection, chat, approvals, recovery, and replay

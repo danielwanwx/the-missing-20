@@ -161,7 +161,7 @@ test("dashboard rebaseline exposes one live incident control and component ports
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
   assert.match(html, /id="dashboard-inject-incident"[^>]*disabled/);
   assert.match(html, /Live[\s\S]*Inject incident/);
-  assert.match(html, /id="dashboard-open-investigation"/);
+  assert.doesNotMatch(html, /dashboard-open-investigation|Open investigation/);
   assert.match(html, /id="dashboard-component-graph"/);
   assert.match(html, /data-health-node="message-queue"/);
   assert.match(html, /id="dashboard-live-sources"[^>]*route-risk detector/);
@@ -563,7 +563,7 @@ test("agent workspace exposes one launch path and a live selected-role context",
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
-  assert.match(html, /id="dashboard-open-investigation"[^>]*hidden/);
+  assert.doesNotMatch(html, /dashboard-open-investigation|Open investigation/);
   assert.doesNotMatch(html, />View all agents</);
   assert.doesNotMatch(html, />View all</);
   assert.match(html, /id="agent-role-context"/);
@@ -642,53 +642,55 @@ test("agent graph route contract stays cubic, monotonic, and clear of node inter
 
   const metrics = {
     width: 1002,
-    height: 640,
-    sourceTop: 53,
-    sourceBottom: 97,
-    cardTop: 261,
-    cardBottom: 335,
-    lifecycleTop: 501,
-    packetLeft: 25,
-    packetRight: 137,
-    orchestratorLeft: 435,
-    orchestratorRight: 567,
-    orchestratorTop: 133,
-    orchestratorBottom: 223,
-    incidentOuterLeft: 17,
-    returnOuterLeft: 4,
-    returnBottom: 618,
+    height: 680,
+    sourceTop: 218,
+    sourceBottom: 248,
+    cardTop: 264,
+    cardBottom: 340,
+    lifecycleTop: 512,
+    packetLeft: 442,
+    packetRight: 560,
+    orchestratorLeft: 438,
+    orchestratorRight: 564,
+    orchestratorTop: 112,
+    orchestratorBottom: 190,
+    incidentOuterLeft: 434,
+    returnOuterLeft: 990,
+    returnBottom: 548,
   };
   const rects = [
-    ["receipt-retry", 176, 53, 286, 97],
-    ["shipment-evidence", 446, 53, 556, 97],
-    ["duplicate-posting", 716, 53, 826, 97],
-    ["incident-packet", 25, 153, 137, 189],
-    ["orchestrator", 435, 133, 567, 223],
-    ["retryable_message_investigator", 151, 261, 311, 335],
-    ["short_shipment_investigator", 421, 261, 581, 335],
-    ["duplicate_posting_investigator", 691, 261, 851, 335],
-    ["synthesis", 426, 391, 576, 457],
-    ["safety", 101, 501, 287.5, 571],
-    ["approval", 305.5, 501, 492, 571],
-    ["execution", 510, 501, 696.5, 571],
-    ["verification", 714.5, 501, 901, 571],
+      ["receipt-retry", 190, 218, 266, 248],
+      // The middle compact ERP evidence chip is an explicit obstacle, not a
+      // decorative label; every unrelated route must clear this rectangle.
+      ["erp-evidence-port", 463, 218, 539, 248],
+      ["duplicate-posting", 736, 218, 812, 248],
+    ["incident-packet", 442, 48, 560, 86],
+    ["orchestrator", 438, 112, 564, 190],
+    ["retryable_message_investigator", 110, 264, 345, 340],
+    ["short_shipment_investigator", 383, 264, 619, 340],
+    ["duplicate_posting_investigator", 657, 264, 892, 340],
+    ["synthesis", 435, 394, 567, 452],
+    ["safety", 70, 512, 271, 584],
+    ["approval", 291, 512, 491, 584],
+    ["execution", 511, 512, 711, 584],
+    ["verification", 731, 512, 932, 584],
   ].map(([id, left, top, right, bottom]) => ({ id, left, top, right, bottom }));
   const edges = [
-    ["incident", "incident-packet", "orchestrator", [137, 171], [435, 178], "incident-bus"],
-    ["source", "receipt-retry", "retryable_message_investigator", [231, 97], [167.8, 261], "source-column"],
-    ["orchestrator", "orchestrator", "retryable_message_investigator", [467.2, 223], [311, 298], "coord-left"],
-    ["investigator", "retryable_message_investigator", "synthesis", [231, 335], [464, 391], "handoff"],
-    ["source", "shipment-evidence", "short_shipment_investigator", [501, 97], [564.2, 261], "source-center"],
-    ["orchestrator", "orchestrator", "short_shipment_investigator", [501, 223], [421, 298], "coord-middle"],
-    ["investigator", "short_shipment_investigator", "synthesis", [501, 335], [501, 391], "handoff"],
-    ["source", "duplicate-posting", "duplicate_posting_investigator", [771, 97], [834.2, 261], "source-column"],
-    ["orchestrator", "orchestrator", "duplicate_posting_investigator", [584, 223], [691, 298], "coord-right"],
-    ["investigator", "duplicate_posting_investigator", "synthesis", [771, 335], [538, 391], "handoff"],
-    ["synthesis", "synthesis", "safety", [501, 457], [194.25, 501], "lifecycle-entry"],
-    ["lifecycle", "safety", "approval", [287.5, 536], [305.5, 536], "lifecycle-chain"],
-    ["lifecycle", "approval", "execution", [492, 536], [510, 536], "lifecycle-chain"],
-    ["lifecycle", "execution", "verification", [696.5, 536], [714.5, 536], "lifecycle-chain"],
-    ["return", "verification", "incident-packet", [901, 536], [25, 171], "outer-return"],
+    ["incident", "incident-packet", "orchestrator", [501, 86], [501, 112], "incident-axis"],
+      ["source", "receipt-retry", "retryable_message_investigator", [228, 248], [176, 264], "evidence-port-left"],
+    ["orchestrator", "orchestrator", "retryable_message_investigator", [466, 190], [284, 264], "coord-left"],
+    ["investigator", "retryable_message_investigator", "synthesis", [228, 340], [467, 394], "handoff-left"],
+      ["source", "shipment-evidence", "short_shipment_investigator", [501, 248], [449, 264], "evidence-port-center"],
+      ["orchestrator", "orchestrator", "short_shipment_investigator", [501, 190], [566, 264], "coord-middle"],
+    ["investigator", "short_shipment_investigator", "synthesis", [501, 340], [501, 394], "handoff-center"],
+      ["source", "duplicate-posting", "duplicate_posting_investigator", [774, 248], [826, 264], "evidence-port-right"],
+    ["orchestrator", "orchestrator", "duplicate_posting_investigator", [536, 190], [718, 264], "coord-right"],
+    ["investigator", "duplicate_posting_investigator", "synthesis", [774, 340], [535, 394], "handoff-right"],
+    ["synthesis", "synthesis", "safety", [501, 452], [170, 512], "lifecycle-entry"],
+    ["lifecycle", "safety", "approval", [271, 548], [291, 548], "lifecycle-chain"],
+    ["lifecycle", "approval", "execution", [491, 548], [511, 548], "lifecycle-chain"],
+    ["lifecycle", "execution", "verification", [711, 548], [731, 548], "lifecycle-chain"],
+    ["return", "verification", "incident-packet", [932, 548], [560, 67], "outer-return"],
   ];
   const monotonic = (values) => {
     const increasing = values.every((value, index) => index === 0 || value >= values[index - 1] - .01);
@@ -757,12 +759,29 @@ test("agent graph route contract stays cubic, monotonic, and clear of node inter
     }
   }
   assert.deepEqual(crossings, [], "graph routes must not cross outside a named port");
+  assert.ok(rects.some((rect) => rect.id === "erp-evidence-port"), "ERP evidence chip is part of collision geometry");
   assert.ok(edgePoints.every(({ points }) => points.length >= 17));
   assert.deepEqual(
     [...new Set(edges.map(([, , , , , lane]) => lane))].sort(),
-    ["coord-left", "coord-middle", "coord-right", "handoff", "incident-bus", "lifecycle-chain", "lifecycle-entry", "outer-return", "source-center", "source-column"].sort(),
+    ["coord-left", "coord-middle", "coord-right", "evidence-port-center", "evidence-port-left", "evidence-port-right", "handoff-center", "handoff-left", "handoff-right", "incident-axis", "lifecycle-chain", "lifecycle-entry", "outer-return"].sort(),
   );
   assert.equal(rects.some((rect) => rect.id === "operational-flow"), false);
+});
+
+test("copilot density exposes concise labels and available actions only", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /chat-context-pill/);
+  assert.doesNotMatch(html, /case-console-actions-heading|NEXT STEP/);
+  assert.equal((html.match(/class="suggestion"/g) || []).length, 2);
+  assert.match(app, /const actions = currentCaseActions\(\)\.filter\(\(action\) => action\.id !== "continue_investigation" && action\.enabled\)/);
+  assert.match(app, /actionRail\.hidden = actions\.length === 0/);
+  assert.match(app, /function evidenceChipLabel\(evidenceId\)/);
+  assert.match(app, /setAttribute\("aria-label", `\$\{label\} evidence: \$\{evidenceId\}`\)/);
+  assert.match(css, /\.case-action \{[^}]*min-height:\s*28px/s);
+  assert.match(css, /\.suggestion \{[^}]*min-height:\s*25px/s);
+  assert.match(css, /\.citation \{[^}]*min-height:\s*24px/s);
 });
 
 test("recovered and partial snapshots keep the UI state truthful", async () => {
@@ -782,11 +801,33 @@ test("dashboard flow links are continuous between components at every width", as
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
   assert.match(app, /column\.append\(node\);[\s\S]*column\.append\(link\);[\s\S]*map\.append\(column\);/);
+  assert.match(app, /const nodes = \["warehouse", "message-queue", "erp", "invoice"\]/);
+  assert.match(app, /const edge = edges\.find\(\(candidate\) => candidate\.from === item\.id && candidate\.to === next\.id\)/);
+  assert.match(app, /const gapEdge = edge\.from === "message-queue" && edge\.to === "erp" && queueException > 0/);
+  assert.equal((app.match(/const gapEdge = /g) || []).length, 1, "the queue anomaly branch is rendered once");
   assert.match(css, /\.flow-map\s*\{[^}]*overflow:\s*hidden;[^}]*overflow-x:\s*auto/s);
   assert.match(css, /\.flow-column\s*\{\s*display:\s*contents;\s*\}/);
   assert.match(css, /\.flow-node\s*\{[^}]*flex:\s*0 0 146px[^}]*margin:\s*0;/s);
   assert.match(css, /\.flow-link\s*\{[^}]*flex:\s*1 1 0[^}]*min-width:\s*30px/s);
   assert.match(css, /\.flow-node\s*\{\s*flex-basis:\s*103px;\s*min-width:\s*103px;/s);
+  assert.match(css, /@media \(min-width: 768px\)[\s\S]*?\.flow-node \{[\s\S]*?flex: 1 1 0;/);
+  assert.match(css, /@media \(min-width: 768px\)[\s\S]*?\.flow-link \{[\s\S]*?flex: 0 0 48px;/);
+  assert.match(css, /\.flow-node-port-in \{[^}]*left: -5px/);
+  assert.match(css, /\.flow-node-port-out \{[^}]*right: -5px/);
+  assert.match(css, /\.flow-gap-branch \{/);
+});
+
+test("dashboard evidence ports and copy stay sparse and symmetric", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /dashboard-open-investigation|Open investigation/);
+  assert.doesNotMatch(html, /Select a node or data point to inspect the live flow/);
+  assert.match(css, /\.graph-source-group \{[\s\S]*?justify-self: center;/);
+  assert.doesNotMatch(css, /\.graph-source-group:nth-child/);
+  assert.match(css, /\.agent-nodes \.agent-card:nth-child\(1\) \.graph-port-in \{ left: 28%;/);
+  assert.match(css, /\.agent-nodes \.agent-card:nth-child\(2\) \.graph-port-in \{ left: 28%;/);
+  assert.match(css, /\.agent-nodes \.agent-card:nth-child\(3\) \.graph-port-in \{ left: 72%;/);
+  assert.match(css, /\.flow-node \{[\s\S]*?min-height: 96px;/);
 });
 
 test("dashboard agent rail projects the authoritative lifecycle label", async () => {

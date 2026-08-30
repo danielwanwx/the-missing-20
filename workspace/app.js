@@ -142,7 +142,7 @@
     chatHydrated: false,
     chatPending: false,
     nextActions: [],
-    caseActionStatus: "Waiting for a case",
+    caseActionStatus: "",
     commandBusy: false,
     commandError: "",
     scenarioError: "",
@@ -1188,7 +1188,7 @@
     state.startIssued = false;
     state.startBusy = false;
     state.nextActions = [];
-    state.caseActionStatus = "Waiting for a case";
+    state.caseActionStatus = "";
     state.replaying = false;
     state.replayTargetSequence = 0;
     state.activeScenario = scenario === "golden" ? "incident" : scenario;
@@ -2797,9 +2797,15 @@
     const flow = snapshot.flow || { nodes: [], edges: [] };
     const map = $("flow-map");
     map.replaceChildren();
-    const nodes = Array.isArray(flow.nodes) ? flow.nodes : [];
+    const rawNodes = Array.isArray(flow.nodes) ? flow.nodes : [];
     const edges = Array.isArray(flow.edges) ? flow.edges : [];
-    const nodeMap = new Map(nodes.map((item) => [value(item.id), item]));
+    const nodeMap = new Map(rawNodes.map((item) => [value(item.id), item]));
+    // The control-room route is a fixed four-component supply chain.  Keep
+    // the visual order and one card per component even if a future payload
+    // contains auxiliary projection nodes or duplicate compatibility rows.
+    const nodes = ["warehouse", "message-queue", "erp", "invoice"]
+      .map((id) => nodeMap.get(id))
+      .filter(Boolean);
     const flowSummary = flow.summary || {};
     const snapshotCounts = snapshot.unit_counts && typeof snapshot.unit_counts === "object" ? snapshot.unit_counts : {};
     const expected = number(snapshotCounts.total, number(flowSummary.expected, number(nodeMap.get("warehouse")?.count)));
@@ -3061,7 +3067,6 @@
     const badge = $("agent-role-status");
     const title = $("copilot-chat-title") || $("copilot-title");
     const input = $("chat-input");
-    const contextPill = $("chat-context-pill");
     if (!name || !mission || !task || !tools || !hypothesis || !evidence || !badge || !title || !input) return;
     const item = selectedAgent();
     if (!item) {
@@ -3085,11 +3090,7 @@
         : evidenceCount ? countLabel(evidenceCount, "evidence") : "—";
       setBadge(badge, advisory.partial ? "PARTIAL" : "TEAM MODE", advisory.partial ? "PARTIAL" : orchestration.raw);
       title.textContent = "Ask the agent team";
-      input.placeholder = "Ask the agent team about this incident…";
-      if (contextPill) {
-        contextPill.textContent = "Team context · all investigators";
-        contextPill.dataset.agentId = "orchestrator";
-      }
+      input.placeholder = "Ask the agent team…";
       const orchestrator = $("orchestrator-node");
       if (orchestrator) orchestrator.setAttribute("aria-pressed", "true");
       renderAdvisoryTruth(document.querySelector("#agent-role-context"), advisory);
@@ -3108,11 +3109,7 @@
     evidence.textContent = item.evidenceIds.length ? countLabel(item.evidenceIds.length, "record") : "—";
     setBadge(badge, item.status, item.status);
     title.textContent = `Ask ${item.name}`;
-    input.placeholder = `Ask ${item.name} about this incident…`;
-    if (contextPill) {
-      contextPill.textContent = `Role context · ${item.name}`;
-      contextPill.dataset.agentId = item.id;
-    }
+    input.placeholder = `Ask ${item.name}…`;
     const orchestrator = $("orchestrator-node");
     if (orchestrator) orchestrator.setAttribute("aria-pressed", "false");
     renderAdvisoryTruth(document.querySelector("#agent-role-context"), advisory);
@@ -3178,70 +3175,60 @@
     const { x1, y1, x2, y2 } = anchors;
     const width = number(metrics.width, 0);
     const graphHeight = number(metrics.height, 0);
-    const cardTop = number(metrics.cardTop, Math.max(y1, y2));
-    const cardBottom = number(metrics.cardBottom, cardTop);
-    const sourceTop = number(metrics.sourceTop, 0);
-    const sourceBottom = number(metrics.sourceBottom, sourceTop);
-    if (route.type === "incident") {
-      // Lift immediately beside the compact incident badge, then run one
-      // smooth upper bus above the source row. This keeps the incident lane
-      // clear of every source card without asking the other three vertical
-      // source lanes to detour.
-      const upperLane = Math.max(8, sourceTop - 14);
-      const liftX = x1 + 14;
-      const run = x2 - liftX;
-      const span = run * .35;
-      return [
-        [[x1, y1], [x1, y1 + (upperLane - y1) * .45], [liftX - 4, upperLane], [liftX, upperLane]],
-        [[liftX, upperLane], [liftX + span, upperLane], [x2 - span, upperLane], [x2, y2]],
-      ];
+    // Every semantic lane except the return corridor is a single smooth
+    // cubic. Control points stay between the ports, so both axes are
+    // monotonic and a fan-out can never fold back across a sibling route.
+    if (route.type === "orchestrator" && route.lane === "coord-left") {
+      // The left coordination lane leaves the orchestrator early enough to
+      // pass outside the compact evidence-port row before it fans into the
+      // left investigator.  Keeping both controls to the left of the middle
+      // port makes the fan-out monotonic without cutting through a sibling
+      // source chip.
+      const spanY = (y2 - y1) * .38;
+      const sideControl = x1 + (x2 - x1) * .82;
+      return [[[x1, y1], [sideControl, y1 + spanY * .52], [sideControl, y2 - spanY], [x2, y2]]];
     }
-    if (route.type === "source") {
-      if (route.lane === "source-center") {
-        const orchestratorLeft = number(metrics.orchestratorLeft, x1 - 60);
-        const orchestratorRight = number(metrics.orchestratorRight, x1 + 60);
-        const clearX = Math.min(width - 18, orchestratorRight + 12);
-        const clearTop = number(metrics.orchestratorTop, y1);
-        const clearBottom = number(metrics.orchestratorBottom, y1);
-        const topJunction = clearTop - 10;
-        const bottomJunction = clearBottom + 10;
-        return [
-          [[x1, y1], [x1 + (clearX - x1) * .35, y1], [clearX, topJunction - 18], [clearX, topJunction]],
-          [[clearX, topJunction], [clearX, topJunction + 32], [clearX, bottomJunction - 32], [clearX, bottomJunction]],
-          [[clearX, bottomJunction], [clearX, bottomJunction + 18], [x2 + (clearX - x2) * .35, y2 - (y2 - bottomJunction) * .35], [x2, y2]],
-        ];
-      }
-      const span = (y2 - y1) * .35;
-      return [[[x1, y1], [x1 + (x2 - x1) * .35, y1 + span], [x2 - (x2 - x1) * .35, y2 - span], [x2, y2]]];
+    if (route.type === "orchestrator" && route.lane === "coord-right") {
+      // Mirror the left lane so the right fan-out also clears the center
+      // evidence port while preserving a smooth, non-crossing layout.
+      const spanY = (y2 - y1) * .38;
+      const sideControl = x1 + (x2 - x1) * .82;
+      return [[[x1, y1], [sideControl, y1 + spanY * .52], [sideControl, y2 - spanY], [x2, y2]]];
     }
-    if (route.type === "orchestrator") {
-      const spanX = (x2 - x1) * .35;
-      const spanY = (y2 - y1) * .35;
-      return [[[x1, y1], [x1 + spanX, y1 + spanY], [x2 - spanX, y2 - spanY], [x2, y2]]];
+    if (route.type === "orchestrator" && route.lane === "coord-middle") {
+      // The centered evidence port owns the center axis.  Move the
+      // coordination lane to its distinct right-hand top port before it
+      // reaches the investigator row, so the two routes never sit on top of
+      // one another inside the compact source-port band.
+      const spanY = (y2 - y1) * .38;
+      return [[[x1, y1], [x2, y1 + spanY * .52], [x2, y2 - spanY], [x2, y2]]];
     }
-    if (route.type === "investigator") {
-      const spanX = (x2 - x1) * .35;
-      const spanY = (y2 - y1) * .35;
+    if (["incident", "source", "orchestrator", "investigator", "synthesis"].includes(route.type)) {
+      const spanX = (x2 - x1) * .38;
+      const spanY = (y2 - y1) * .38;
       return [[[x1, y1], [x1 + spanX, y1 + spanY], [x2 - spanX, y2 - spanY], [x2, y2]]];
     }
     if (route.type === "lifecycle") {
-      const span = (x2 - x1) * .35;
+      const span = (x2 - x1) * .38;
       return [[[x1, y1], [x1 + span, y1], [x2 - span, y2], [x2, y2]]];
     }
-    if (route.type === "synthesis") {
-      const spanX = (x2 - x1) * .35;
-      const spanY = (y2 - y1) * .35;
-      return [[[x1, y1], [x1 + spanX, y1 + spanY], [x2 - spanX, y2 - spanY], [x2, y2]]];
-    }
     if (route.type === "return") {
-      const rightOuter = Math.max(10, width - 8);
-      const leftOuter = number(metrics.returnOuterLeft, 8);
-      const bottomOuter = Math.min(graphHeight - 14, number(metrics.returnBottom, graphHeight - 18));
-      const outerSpan = rightOuter - x1;
+      // Verification exits into a private right-hand rail, rises beside the
+      // graph, then enters the incident capsule from its right port. Short
+      // cubic corner turns keep the return visually rounded without creating
+      // the old bottom/left drag tail or crossing the control row.
+      const rightOuter = Math.max(x1 + 36, Math.min(width - 12, width - 12));
+      const topLane = Math.max(10, Math.min(y2, y1 - 72));
+      const corner = Math.max(14, Math.min(24, (y1 - topLane) / 8));
+      const horizontal = Math.max(18, Math.min(32, (rightOuter - x1) * .16));
+      const railSpan = Math.max(1, rightOuter - corner - x1);
+      const turnControl = railSpan * .35;
       return [
-        [[x1, y1], [x1 + outerSpan * .35, y1 + 18], [rightOuter - outerSpan * .35, bottomOuter - 28], [rightOuter, bottomOuter]],
-        [[rightOuter, bottomOuter], [width * .56, bottomOuter], [leftOuter + 40, bottomOuter], [leftOuter, bottomOuter]],
-        [[leftOuter, bottomOuter], [leftOuter, y2 + 82], [x2 - (x2 - leftOuter) * .35, y2 + 48], [x2, y2]],
+        [[x1, y1], [x1 + turnControl, y1], [rightOuter - corner - turnControl, y1], [rightOuter - corner, y1]],
+        [[rightOuter - corner, y1], [rightOuter - corner + corner * .55, y1], [rightOuter, y1 - corner * .55], [rightOuter, y1 - corner]],
+        [[rightOuter, y1 - corner], [rightOuter, y1 - corner - (y1 - topLane - corner * 2) * .34], [rightOuter, topLane + corner + (y1 - topLane - corner * 2) * .34], [rightOuter, topLane + corner]],
+        [[rightOuter, topLane + corner], [rightOuter, topLane + corner * .45], [rightOuter - corner * .55, topLane], [rightOuter - corner, topLane]],
+        [[rightOuter - corner, topLane], [rightOuter - corner - horizontal, topLane], [x2 + horizontal, topLane], [x2, topLane]],
       ];
     }
     return [[[x1, y1], [x1, y1 + 32], [x2, y2 - 32], [x2, y2]]];
@@ -3385,7 +3372,11 @@
       const sourceKey = agent.id === "retryable_message_investigator" ? "queue" : agent.id === "short_shipment_investigator" ? "shipment" : "duplicate";
       const source = graph.querySelector(`[data-source-group="${CSS.escape(sourceGroup)}"], [data-graph-source="${CSS.escape(sourceKey)}"]`);
       if (!card || !source) return;
-      const sourceLane = agent.id === "short_shipment_investigator" ? "source-center" : "source-column";
+      const sourceLane = agent.id === "retryable_message_investigator"
+        ? "evidence-port-left"
+        : agent.id === "short_shipment_investigator"
+          ? "evidence-port-center"
+          : "evidence-port-right";
       const coordinationLane = agent.id === "retryable_message_investigator"
         ? "coord-left"
         : agent.id === "short_shipment_investigator"
@@ -3797,6 +3788,29 @@
     return { source, observation, supported, integrity };
   }
 
+  function evidenceChipLabel(evidenceId) {
+    const id = value(evidenceId);
+    const record = Array.isArray(state.snapshot && state.snapshot.evidence)
+      ? state.snapshot.evidence.find((item) => value(item && item.evidence_id) === id)
+      : null;
+    const sourceType = value(record && record.source_type).toUpperCase();
+    const sourceNames = {
+      FAILED_MESSAGE_QUEUE: "Failed message",
+      WAREHOUSE: "Warehouse",
+      ERP_RECEIPT: "ERP receipt",
+      INVOICE: "Invoice",
+      MATERIAL_DOCUMENT: "Material document",
+      KNOWLEDGE_BASE: "Knowledge record",
+    };
+    if (sourceNames[sourceType]) return sourceNames[sourceType];
+    const normalized = id.toLowerCase();
+    if (normalized.includes("failed") || normalized.includes("queue")) return "Failed message";
+    if (normalized.includes("warehouse") || normalized.includes("ship")) return "Warehouse";
+    if (normalized.includes("erp") || normalized.includes("receipt")) return "ERP receipt";
+    if (normalized.includes("invoice")) return "Invoice";
+    return "Evidence";
+  }
+
   function renderLatestEvent() {
     const latest = state.events[state.events.length - 1];
     const latestNode = $("latest-event");
@@ -3858,12 +3872,6 @@
         : selectedScenario === "normal"
           ? "The control plane has not admitted a new incident yet"
           : "Return to Normal before injecting another incident";
-    }
-    const openInvestigation = $("dashboard-open-investigation");
-    if (openInvestigation) {
-      openInvestigation.hidden = !incidentVisible;
-      openInvestigation.disabled = !incidentVisible || state.commandBusy || !streamIsLive();
-      openInvestigation.setAttribute("aria-disabled", String(openInvestigation.disabled));
     }
     const livePanel = $("live-panel");
     if (livePanel) {
@@ -4260,12 +4268,14 @@
     // Investigation has one launch point in the workspace header. Keep the
     // typed API action for auditability, but do not render a second button that
     // can start the same harness.
-    const actions = currentCaseActions().filter((action) => action.id !== "continue_investigation");
+    const actions = currentCaseActions().filter((action) => action.id !== "continue_investigation" && action.enabled);
+    const actionRail = host.closest(".case-console-actions");
+    if (actionRail) actionRail.hidden = actions.length === 0;
     actions.forEach((action) => {
       const button = create("button", `case-action case-action-${slug(action.id)}`, action.label);
       button.type = "button";
       button.setAttribute("data-case-action-id", action.id);
-      button.disabled = !action.enabled || state.commandBusy || state.chatPending || !streamIsLive();
+      button.disabled = state.commandBusy || state.chatPending || !streamIsLive();
       button.setAttribute("aria-disabled", String(button.disabled));
       if (action.reason) button.title = action.reason;
       button.addEventListener("click", () => invokeCaseAction(action.id));
@@ -4274,7 +4284,7 @@
     if (status) {
       status.textContent = isVerifiedClosedRecovery()
         ? "Recovery verified · No further action"
-        : state.caseActionStatus || (isNormalScenario() ? "Waiting for an incident" : "Choose a next step");
+        : state.caseActionStatus || "";
     }
   }
 
@@ -4282,29 +4292,22 @@
     syncDurableChat();
     const log = $("chat-log");
     log.replaceChildren();
-    if (!state.chatMessages.length) {
-      log.append(create(
-        "div",
-        "chat-empty",
-        isNormalScenario() ? "Run incident demo to start role chat." : "Ask the selected role about this incident.",
-      ));
-    }
     state.chatMessages.slice(-12).forEach((item) => {
       const row = create("article", `chat-message chat-${item.role}`);
       const messageAgent = item.agentId && item.agentId !== "orchestrator"
         ? agentDefinition(item.agentId)
         : null;
-      const assistantLabel = messageAgent
-        ? `${messageAgent.name.toUpperCase()} · COPILOT`
-        : "AGENT TEAM · COPILOT";
+      const assistantLabel = messageAgent ? messageAgent.name.toUpperCase() : "AGENT TEAM";
       row.append(create("span", "chat-role", item.role === "user" ? "YOU" : assistantLabel), create("p", null, item.message));
       if (item.citations && item.citations.length) {
         const refs = create("div", "chat-citations");
-        refs.append(create("span", "chat-citation-label", "Cites"));
         item.citations.slice(0, 6).forEach((citation) => {
-          const button = create("button", "citation", citation);
+          const evidenceId = value(citation);
+          const label = evidenceChipLabel(evidenceId);
+          const button = create("button", "citation", label);
           button.type = "button";
-          button.addEventListener("click", () => focusEvidence(citation));
+          button.setAttribute("aria-label", `${label} evidence: ${evidenceId}`);
+          button.addEventListener("click", () => focusEvidence(evidenceId));
           refs.append(button);
         });
         row.append(refs);
@@ -4340,9 +4343,17 @@
     const roleQuestion = roleQuestions[selectedRole] || roleQuestions.orchestrator;
     document.querySelectorAll(".suggestion").forEach((button, index) => {
       if (index === 0) {
-        button.textContent = selectedRole === "orchestrator" ? "What proves it?" : roleQuestion[0];
+        button.hidden = false;
+        button.textContent = "Evidence";
         button.dataset.question = roleQuestion[1];
         button.setAttribute("aria-label", roleQuestion[0]);
+      } else if (index === 1) {
+        button.hidden = false;
+        button.textContent = "Compare causes";
+        button.dataset.question = "Compare the alternative hypotheses.";
+        button.setAttribute("aria-label", "Compare the alternative hypotheses");
+      } else {
+        button.hidden = true;
       }
       button.disabled = chatDisabled;
     });
@@ -4394,7 +4405,7 @@
     const currentRecorded = number(counts.erp_recorded, number(counts.recorded, 0));
     const expected = number(counts.total, number(counts.expected, currentRecorded));
     const citations = Array.isArray(response.citations) ? response.citations : [];
-    const cited = citations.length ? ` Evidence is available in ${citations.slice(0, 2).join(" and ")}.` : "";
+    const cited = citations.length ? " Evidence is attached below." : "";
     return {
       ...response,
       message: `The case is closed and reconciled: ${currentRecorded} of ${expected} units are now recorded. During the incident, ${historicalGap} units stopped at the queue; the recovery path restored them.${cited}`,
@@ -4690,7 +4701,6 @@
   // fixtures, but there is no user-facing Start control or click listener.
   $("dashboard-inject-incident").addEventListener("click", () => selectScenario("incident"));
   $("workspace-run-incident-demo")?.addEventListener("click", () => selectScenario("incident"));
-  $("dashboard-open-investigation").addEventListener("click", () => selectAgent("orchestrator", true));
   $("dashboard-replay-investigation").addEventListener("click", replayInvestigation);
   $("agent-replay-investigation").addEventListener("click", replayInvestigation);
   $("prepare-button").addEventListener("click", prepareRecovery);
