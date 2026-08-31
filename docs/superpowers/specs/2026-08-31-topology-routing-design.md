@@ -1,89 +1,115 @@
-# Live Control Loop Topology Routing Design
+# Dual-Plane Live Architecture Design
 
 **Date:** 2026-08-31
 **Status:** Approved
 
 ## Objective
 
-Refine the Dashboard live-control-loop topology so every relationship is visually
-traceable, every connection terminates at a consistent centered boundary port, and
-the Queue and Invoice branches visibly identify their upstream resources.
+Replace the mixed control-loop topology with a legible architecture view that
+separates deterministic supply-chain truth from AI investigation. A judge should
+immediately understand what runs the business, what the agents may inspect, and where
+human-controlled deterministic authority begins.
 
-## Selected direction
+## Selected composition
 
-Use the approved **unified upper-arch** routing language. Connections use smooth cubic
-Bézier arches instead of diagonal straight-looking segments or mixed routing styles.
-The topology remains a semantic live view: existing event highlighting and selection
-behavior continue to drive the same edges.
+Use the approved **stacked dual-plane** composition:
 
-## Node model
+1. deterministic supply-chain data plane at the top;
+2. Incident and Evidence API boundary in the middle;
+3. Agent investigation plane below the boundary;
+4. deterministic control chain after agent synthesis;
+5. authoritative verification returning to the supply-chain data plane.
 
-- Add an upstream `Receipt Source` resource node for the Queue branch.
-- Add an upstream `Invoice Source` resource node for the Invoice branch.
-- Preserve the existing ERP-related source semantics for the middle branch.
-- Keep Incident, Orchestrator, the three investigator cards, Synthesis, and the four
-  deterministic lifecycle stages.
-- Resource labels describe synthetic source roles and do not imply a real production
-  integration.
+The planes use different routing languages. The supply-chain plane uses aligned,
+orthogonal architecture lines. The Agent plane uses restrained curves for fan-out and
+fan-in. Curvature communicates agent coordination rather than decorating every edge.
 
-## Port contract
+## Deterministic supply-chain data plane
 
-- Each visible relationship attaches to one centered port on the relevant node edge.
-- A node may have one centered input and one centered output when it participates in
-  both directions, but it must not expose multiple offset ports for sibling routes.
-- Ports sit on the node boundary. Paths must not enter a card interior or overlap its
-  icon, label, badge, or status text.
-- Fan-out and fan-in share their centered origin or destination visually, then separate
-  outside the node boundary through route control points.
+- Show `Warehouse`, `Queue`, `ERP`, and `Invoice` in one ordered horizontal flow.
+- Use cyan, straight, orthogonal routing with rounded 90-degree corners only where a
+  bend is required.
+- Keep a single centered port per visible relationship on each node boundary.
+- Preserve synthetic-data disclosure and avoid implying production integration.
+- This plane represents authoritative operational state, not agent-generated state.
 
-## Route contract
+## Incident and Evidence API boundary
 
-- Incident to Orchestrator uses a centered, smooth vertical arch.
-- Orchestrator fan-out to all three investigators starts at the single centered output
-  and uses symmetric upper-arch curves.
-- Each resource-to-investigator relationship uses the same upper-arch curve language.
-- Investigator fan-in to Synthesis ends at the single centered Synthesis input.
-- Synthesis enters Safety Gate through a smooth arch.
-- Safety Gate, Two-role approval, Controlled recovery, and Verification remain a clear
-  ordered chain, with rounded curves and centered boundary ports.
-- The Verification-to-Incident return route remains outside the node field and uses
-  rounded corners consistent with the Bézier system.
-- No route may cross a node or use a direct diagonal segment.
+- Place one explicit boundary band between the two planes.
+- Show `Incident` and `Evidence API` as the only downward bridge from supply-chain
+  state into agent investigation.
+- The Evidence API is read-only from the Agent plane.
+- Do not draw an Agent edge directly to Warehouse, Queue, ERP, Invoice, approval,
+  execution, or verification.
+- Preserve existing event and evidence semantics behind the visual projection.
+
+## Agent investigation plane
+
+- Place `Orchestrator` above three investigator nodes: Receipt Retry, Shipment
+  Evidence, and Duplicate Posting.
+- Use a single centered Orchestrator output and a single centered input per
+  investigator.
+- Use restrained cubic curves for the Orchestrator fan-out.
+- Route all investigator outputs into one centered Synthesis input with restrained
+  fan-in curves; the aligned middle route may remain straight.
+- Agent edges express advisory coordination only.
+
+## Deterministic control chain
+
+- Route Synthesis into `Safety Gate` as a proposal, not an authorization.
+- Show `Safety Gate → Two-role approval → Controlled recovery → Verification` as a
+  separate deterministic horizontal chain.
+- Use straight or orthogonal lines for this chain, visually matching the supply-chain
+  data plane rather than the Agent plane.
+- Route Verification back to the supply-chain plane through an outside return rail.
+- Preserve the exact two-role, controlled-execution, verification, and replay truth
+  boundaries already implemented.
+
+## Visual hierarchy
+
+- Label the upper zone `DETERMINISTIC SUPPLY CHAIN`.
+- Label the lower advisory zone `AGENT INVESTIGATION`.
+- Label the post-synthesis chain `DETERMINISTIC CONTROL`.
+- Use cyan for authoritative data/control routes and lime for advisory Agent routes.
+- Use background zoning and whitespace before adding explanatory copy.
+- Keep node labels and statuses readable without route overlap.
 
 ## Responsive behavior
 
-- Desktop retains the five-layer authored topology and balanced three-column branches.
-- Narrow layouts may preserve a fixed minimum topology width with horizontal viewport
-  scrolling, as the current workspace does, rather than compressing paths through
-  nodes.
-- Port centering and route clearance must hold at both desktop and narrow breakpoints.
+- Desktop shows the complete stacked architecture without clipping.
+- Narrow layouts preserve a fixed minimum diagram width with horizontal scrolling
+  rather than collapsing routes through nodes.
+- Plane order, centered ports, boundary semantics, and route clearance must remain
+  unchanged at the narrow breakpoint.
 
 ## Implementation boundaries
 
-- Update only the topology markup, layout styles, routing geometry, and directly
-  related tests.
-- Preserve event IDs, route IDs, selection behavior, SSE behavior, and lifecycle
-  semantics.
-- Do not change provider boundaries, synthetic data behavior, deterministic policy,
-  approvals, execution, or verification logic.
+- Update topology markup, styling, client-side route geometry, and directly related
+  tests.
+- Preserve event IDs, route selection, SSE behavior, lifecycle behavior, synthetic
+  data, policy, approvals, execution, verification, and replay semantics.
+- Do not add a provider call, external integration, or write authority.
 
 ## Verification
 
-1. Add or update focused JavaScript assertions for resource labels, centered-port
-   selectors, route IDs, and Bézier routing.
-2. Run `npm test`.
-3. Run the decision-workspace smoke test or its proportionate topology/browser subset.
-4. Inspect the rendered dashboard at desktop and narrow widths for centered endpoints,
-   node clearance, curve consistency, and absence of route crossings.
-5. Confirm event highlighting and agent selection still illuminate the intended path.
+1. Assert the three labeled zones and the Incident/Evidence API boundary in JavaScript
+   tests.
+2. Assert centered ports, orthogonal deterministic routes, curved Agent fan-out/fan-in,
+   and absence of node intersections.
+3. Run `npm test` and `git diff --check`.
+4. Run the complete decision-workspace browser smoke.
+5. Inspect desktop and narrow layouts in the browser.
+6. Confirm event highlighting, agent selection, lifecycle controls, and return-loop
+   semantics remain intact.
 
 ## Acceptance criteria
 
-- `Receipt Source` is visibly upstream of Queue.
-- `Invoice Source` is visibly upstream of Invoice.
-- All topology relationships attach at centered node-boundary ports.
-- Orchestrator fan-out and investigator fan-in use one shared centered endpoint per
-  node rather than offset sibling ports.
-- No direct diagonal-looking connection remains.
-- Curves do not enter or cross any node.
-- Existing live-event, selection, lifecycle, and replay behavior remains functional.
+- The top row reads as Warehouse → Queue → ERP → Invoice without Agent involvement.
+- Incident and Evidence API form the only visible bridge into Agent investigation.
+- The Agent network is visually distinct and uses restrained free curves only where
+  coordination branches or converges.
+- Synthesis cannot be mistaken for execution authority.
+- The deterministic control chain is visually separate from the Agent plane.
+- Verification visibly returns to authoritative supply-chain state.
+- No route crosses a node, label, icon, badge, or status.
+- Existing behavior and truthful AWS/synthetic-data boundaries remain unchanged.
