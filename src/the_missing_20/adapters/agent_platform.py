@@ -243,7 +243,7 @@ class AgentPlatform:
                 "celigo",
                 "Celigo",
                 by_source.get("celigo-quality-release"),
-                "Control-plane only; not a correlated run receipt",
+                "Post-execution run receipt; cannot authorize an ERP release",
             ),
             system(
                 "slack",
@@ -385,7 +385,12 @@ class AgentPlatform:
         integration_receipt = self._integration_receipt(saas, correlation)
         erp_ready = self._text(erp.get("status")) == "CONNECTED"
         saas_ready = self._text(saas.get("status")) == "CONNECTED"
-        complete = self._text(self._agent_run.get("state")) in {"PLAN_READY", "BLOCKED"}
+        complete = self._text(self._agent_run.get("state")) in {
+            "PLAN_READY",
+            "BLOCKED",
+            "VERIFYING",
+            "VERIFIED",
+        }
         return [
             {
                 "id": "read_erp",
@@ -403,15 +408,19 @@ class AgentPlatform:
                 "status": (
                     "DONE"
                     if integration_receipt["status"] == "VERIFIED"
-                    else ("BLOCKED" if complete else "QUEUED")
+                    else (
+                        "WAITING"
+                        if self._execution and self._text(self._execution.get("status")) == "VERIFYING"
+                        else ("QUEUED" if not complete else "NOT_REQUIRED_YET")
+                    )
                 ),
             },
             {
                 "id": "guarded_plan",
                 "label": "Produce guarded recovery plan",
                 "status": (
-                    "BLOCKED"
-                    if complete and self._text(self._agent_run.get("state")) == "PLAN_READY"
+                    "DONE"
+                    if self._text(self._agent_run.get("state")) in {"PLAN_READY", "VERIFYING", "VERIFIED"}
                     else ("BLOCKED" if complete else "QUEUED")
                 ),
             },
@@ -472,16 +481,10 @@ class AgentPlatform:
                 }
             )
         hold_detected = self._text(receipt.get("status")) == "PARTIAL_QUALITY_HOLD"
-        complete = (
-            correlation["status"] == "FULLY_CORRELATED"
-            and integration_receipt["status"] == "VERIFIED"
-        )
-        confidence = 0.91 if hold_detected and complete else (0.82 if hold_detected else 0.0)
-        conclusion_status = (
-            "BLOCKED"
-            if not complete
-            else ("GUARDED" if hold_detected else "CLEAR")
-        )
+        eligible = correlation["status"] == "FULLY_CORRELATED"
+        verified = eligible and integration_receipt["status"] == "VERIFIED"
+        confidence = 0.91 if hold_detected and verified else (0.82 if hold_detected and eligible else 0.0)
+        conclusion_status = "BLOCKED" if not eligible else ("GUARDED" if hold_detected else "CLEAR")
         return {
             "nodes": nodes,
             "conclusion": {
@@ -540,8 +543,12 @@ class AgentPlatform:
         with self._lock:
             erp, saas = self._read_all()
             correlation = self._correlation(erp, saas)
-            receipt = self._integration_receipt(saas, correlation)
-            if self._executor is None or not clean_manager or self._text(self._agent_run.get("state")) != "PLAN_READY" or receipt["status"] != "VERIFIED":
+            if (
+                self._executor is None
+                or not clean_manager
+                or self._text(self._agent_run.get("state")) != "PLAN_READY"
+                or correlation["status"] != "FULLY_CORRELATED"
+            ):
                 raise ValueError("manager approval requires an executor and a fresh verified plan")
             approval_id = f"m20-approval-{self._run_number:04d}"
             self._approval = {"approval_id": approval_id, "manager_id": clean_manager}
@@ -552,15 +559,68 @@ class AgentPlatform:
         with self._lock:
             erp, saas = self._read_all()
             correlation = self._correlation(erp, saas)
-            receipt = self._integration_receipt(saas, correlation)
-            if self._executor is None or approval_id != self._text(self._approval.get("approval_id")) or receipt["status"] != "VERIFIED" or correlation["status"] != "FULLY_CORRELATED":
+            if (
+                self._executor is None
+                or approval_id != self._text(self._approval.get("approval_id"))
+                or correlation["status"] != "FULLY_CORRELATED"
+            ):
                 raise ValueError("execution requires the current Manager approval and fully verified evidence")
             raw_values = correlation.get("tuple")
             values = dict(raw_values) if isinstance(raw_values, Mapping) else {}
             result = self._executor.execute(DemoReleasePlan(case_id=self._text(values.get("case_id")), purchase_receipt=self._text(values.get("purchase_receipt")), purchase_invoice=self._text(values.get("purchase_invoice")), quantity=float(values.get("quantity") or 0), idempotency_key=idempotency_key))
-            self._execution = {"available": False, "status": "VERIFYING" if not getattr(result, "verified", False) else "VERIFIED", "detail": "ERPNext write completed; fresh verification result recorded.", "transfer_name": getattr(result, "transfer_name", ""), "invoice_name": getattr(result, "invoice_name", "")}
+            erp_verified = bool(getattr(result, "verified", False))
+            self._execution = {
+                "available": False,
+                "status": "VERIFYING" if erp_verified else "FAILED",
+                "detail": (
+                    "ERPNext write completed. Waiting for the independent Celigo run receipt."
+                    if erp_verified
+                    else "ERPNext write did not pass its fresh verification read."
+                ),
+                "transfer_name": getattr(result, "transfer_name", ""),
+                "invoice_name": getattr(result, "invoice_name", ""),
+                "erp_verified": erp_verified,
+            }
             self._append("agent.execution.completed", source_id="agent-platform", provider="Missing 20 Agent", status=self._text(self._execution["status"]), label="Guarded ERP recovery completed", detail=self._text(self._execution["detail"]), record_id=self._text(self._execution.get("transfer_name")))
             erp, saas = self._read_all()
+            return self._projection(erp, saas)
+
+    def verify(self) -> dict[str, object]:
+        """Complete recovery only after a fresh, independent Celigo receipt read."""
+
+        with self._lock:
+            erp, saas = self._read_all()
+            correlation = self._correlation(erp, saas)
+            receipt = self._integration_receipt(saas, correlation)
+            if not self._execution or not bool(self._execution.get("erp_verified")):
+                raise ValueError("verification requires a completed guarded ERP execution")
+            if receipt["status"] != "VERIFIED":
+                self._execution.update(
+                    {
+                        "available": False,
+                        "status": "VERIFYING",
+                        "detail": "ERPNext is verified; waiting for a tuple-matched Celigo run receipt.",
+                    }
+                )
+                return self._projection(erp, saas)
+            self._execution.update(
+                {
+                    "available": False,
+                    "status": "VERIFIED",
+                    "detail": "ERPNext recovery and the independent Celigo run receipt are verified.",
+                    "celigo_receipt_id": self._text(receipt.get("record_id")),
+                }
+            )
+            self._agent_run.update({"state": "VERIFIED", "active_step": "", "confidence": 0.96})
+            self._append(
+                "agent.execution.verified",
+                source_id="agent-platform",
+                provider="Missing 20 Agent",
+                status="VERIFIED",
+                label="Closed-loop recovery verified",
+                detail=self._text(self._execution["detail"]),
+                record_id=self._text(receipt.get("record_id")),
+            )
             return self._projection(erp, saas)
 
     def current(self) -> dict[str, object]:
@@ -662,13 +722,13 @@ class AgentPlatform:
             if correlation["status"] != "FULLY_CORRELATED":
                 summary += " Correlation is partial; release eligibility cannot be proven."
             elif integration_receipt["status"] != "VERIFIED":
-                summary += " No tuple-matched Celigo run receipt proves ERP acknowledgement."
+                summary += " A Celigo run receipt will be required only after guarded ERP execution."
             run_state = (
                 "BLOCKED"
                 if (
                     finding == "INCONCLUSIVE"
                     or correlation["status"] != "FULLY_CORRELATED"
-                    or integration_receipt["status"] != "VERIFIED"
+                    or not quality_hold
                 )
                 else "PLAN_READY"
             )
@@ -687,7 +747,6 @@ class AgentPlatform:
                     "confidence": (
                         0.91
                         if finding == "QUALITY_HOLD_DETECTED"
-                        and integration_receipt["status"] == "VERIFIED"
                         and correlation["status"] == "FULLY_CORRELATED"
                         else (0.82 if finding == "QUALITY_HOLD_DETECTED" else 0.0)
                     ),

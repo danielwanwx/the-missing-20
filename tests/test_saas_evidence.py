@@ -194,6 +194,74 @@ def test_celigo_direct_run_exposes_only_the_tuple_needed_for_receipt_validation(
     assert "must-not-escape" not in json.dumps(celigo)
 
 
+def test_celigo_written_receipt_registry_is_pending_until_job_and_acknowledgement_exist() -> None:
+    def receipt_registry_transport(request: Request, _timeout: float) -> bytes:
+        assert request.get_header("Authorization") == "Bearer airtable-secret"
+        if "Release%20Records" in request.full_url:
+            return json.dumps(
+                {
+                    "records": [
+                        {
+                            "id": "rec-release",
+                            "fields": {
+                                "Release Correlation ID": "M20-TEST",
+                                "Supplier Lot": "LOT-20",
+                                "Disposition": "APPROVED",
+                                "Approved Quantity": 8,
+                                "Purchase Order": "PO-20",
+                                "Purchase Receipt": "PR-20",
+                                "Purchase Invoice": "PI-20",
+                                "Certificate ID": "CERT-20",
+                                "Evidence Revision": "rev-3",
+                            },
+                        }
+                    ]
+                }
+            ).encode()
+        return json.dumps(
+            {
+                "records": [
+                    {
+                        "id": "rec-receipt",
+                        "fields": {
+                            "Run Key": "m20-run-20",
+                            "Case ID": "M20-TEST",
+                            "Purchase Order": "PO-20",
+                            "Purchase Receipt": "PR-20",
+                            "Purchase Invoice": "PI-20",
+                            "Supplier Lot": "LOT-20",
+                            "Certificate ID": "CERT-20",
+                            "Quantity": 8,
+                            "Evidence Revision": "rev-3",
+                            "Status": "VERIFIED",
+                        },
+                    }
+                ]
+            }
+        ).encode()
+
+    source = SaaSEvidenceSource(
+        SaaSEvidenceConfig(
+            correlation_id="M20-TEST",
+            airtable_token="airtable-secret",
+            airtable_base_id="app-demo",
+            airtable_table="Release Records",
+            airtable_receipt_table="Integration Receipts",
+        ),
+        transport=receipt_registry_transport,
+    )
+
+    celigo = next(
+        item
+        for item in source.current()["sources"]
+        if item["source_id"] == "celigo-quality-release"
+    )
+
+    assert celigo["status"] == "PENDING"
+    assert celigo["evidence_kind"] == "RUN_RECEIPT_PENDING"
+    assert celigo["erp_acknowledged"] is False
+
+
 def test_jira_scoped_token_uses_gateway_bearer_authentication() -> None:
     requests: list[Request] = []
 

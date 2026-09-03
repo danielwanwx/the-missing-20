@@ -36,6 +36,7 @@ class SaaSEvidenceConfig:
     airtable_token: str = ""
     airtable_base_id: str = ""
     airtable_table: str = DEFAULT_AIRTABLE_TABLE
+    airtable_receipt_table: str = ""
     celigo_evidence_url: str = ""
     celigo_api_token: str = ""
     celigo_flow_id: str = ""
@@ -84,6 +85,7 @@ class SaaSEvidenceSource:
                     values.get("AIRTABLE_QUALITY_RELEASE_TABLE", DEFAULT_AIRTABLE_TABLE).strip()
                     or DEFAULT_AIRTABLE_TABLE
                 ),
+                airtable_receipt_table=values.get("AIRTABLE_INTEGRATION_RECEIPT_TABLE", "").strip(),
                 celigo_evidence_url=values.get("CELIGO_EVIDENCE_URL", "").strip(),
                 celigo_api_token=values.get("CELIGO_API_TOKEN", "").strip(),
                 celigo_flow_id=values.get("CELIGO_FLOW_ID", "").strip(),
@@ -264,6 +266,9 @@ class SaaSEvidenceSource:
 
     def _celigo(self, now: datetime) -> dict[str, object]:
         config = self._config
+        receipt = self._celigo_receipt_registry(now)
+        if receipt is not None:
+            return receipt
         if not (config.celigo_evidence_url and config.celigo_api_token):
             return self._record(
                 "celigo-quality-release",
@@ -273,6 +278,10 @@ class SaaSEvidenceSource:
                 "Celigo evidence endpoint has not been configured.",
                 now,
             )
+        return self._celigo_direct(now)
+
+    def _celigo_direct(self, now: datetime) -> dict[str, object]:
+        config = self._config
         try:
             payload = self._get_payload(
                 config.celigo_evidence_url,
@@ -337,6 +346,94 @@ class SaaSEvidenceSource:
                 "DEGRADED",
                 "Integration-run read degraded",
                 "Celigo did not return a usable run record.",
+                now,
+            )
+
+    def _celigo_receipt_registry(self, now: datetime) -> dict[str, object] | None:
+        """Read a Celigo-written receipt from the dedicated demo registry.
+
+        The table is deliberately separate from the human-maintained quality
+        registry.  A row is useful only after the flow has written a Celigo job
+        identifier, the flow reports success, and the payload attests to the
+        fresh ERP read.  Until then it remains a pending *post-execution*
+        verification artifact and can never authorize a release.
+        """
+
+        config = self._config
+        if not (
+            config.airtable_token
+            and config.airtable_base_id
+            and config.airtable_receipt_table
+        ):
+            return None
+        query = urlencode({"maxRecords": "25"})
+        url = (
+            f"https://api.airtable.com/v0/{quote(config.airtable_base_id, safe='')}/"
+            f"{quote(config.airtable_receipt_table, safe='')}?{query}"
+        )
+        try:
+            payload = self._get_json(url, {"Authorization": f"Bearer {config.airtable_token}"})
+            records = payload.get("records")
+            if not isinstance(records, list):
+                raise ValueError("Airtable returned no receipt records")
+            matching = next(
+                (
+                    row
+                    for row in records
+                    if isinstance(row, Mapping)
+                    and isinstance(row.get("fields"), Mapping)
+                    and str(row["fields"].get("Case ID", "")) == config.correlation_id
+                ),
+                None,
+            )
+            if not isinstance(matching, Mapping) or not isinstance(matching.get("fields"), Mapping):
+                return self._record(
+                    "celigo-quality-release",
+                    "Celigo · quality.release",
+                    "PENDING",
+                    "Celigo run receipt pending",
+                    "No post-execution integration receipt has been written for this M20 case.",
+                    now,
+                    evidence_kind="RUN_RECEIPT_PENDING",
+                )
+            fields = matching["fields"]
+            raw_status = str(fields.get("Status", "PENDING")).upper()
+            job_id = str(fields.get("Celigo Job ID", "")).strip()
+            acknowledged = bool(fields.get("ERP Acknowledged"))
+            correlation = {
+                "case_id": fields.get("Case ID", ""),
+                "purchase_order": fields.get("Purchase Order", ""),
+                "purchase_receipt": fields.get("Purchase Receipt", ""),
+                "purchase_invoice": fields.get("Purchase Invoice", ""),
+                "supplier_lot": fields.get("Supplier Lot", ""),
+                "certificate_id": fields.get("Certificate ID", ""),
+                "quantity": fields.get("Quantity", ""),
+                "evidence_revision": fields.get("Evidence Revision", ""),
+            }
+            verified = raw_status == "VERIFIED" and bool(job_id) and acknowledged
+            return self._record(
+                "celigo-quality-release",
+                "Celigo · quality.release",
+                "VERIFIED" if verified else ("FAILED" if raw_status == "FAILED" else "PENDING"),
+                f"Celigo run receipt · {raw_status}",
+                (
+                    "ERP acknowledgement and a Celigo job ID are recorded."
+                    if verified
+                    else "Waiting for the Celigo flow to record a successful ERP acknowledgement."
+                ),
+                now,
+                record_id=job_id or str(matching.get("id", "")),
+                evidence_kind="RUN_RECEIPT" if verified else "RUN_RECEIPT_PENDING",
+                correlation=correlation,
+                erp_acknowledged=acknowledged,
+            )
+        except (OSError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+            return self._record(
+                "celigo-quality-release",
+                "Celigo · quality.release",
+                "DEGRADED",
+                "Celigo receipt read degraded",
+                "The dedicated Celigo run-receipt registry could not be read.",
                 now,
             )
 

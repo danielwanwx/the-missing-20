@@ -149,18 +149,18 @@ def test_full_tuple_and_exact_celigo_receipt_only_prepare_a_guarded_plan() -> No
     assert erp.calls == saas.calls == 1
 
 
-def test_enabled_flow_is_not_a_run_receipt_even_with_a_complete_registry_tuple() -> None:
+def test_enabled_flow_does_not_block_a_pre_execution_guarded_plan() -> None:
     projection = AgentPlatform(
         _MutableReader(_erp()), _MutableReader(_saas(direct_receipt=False))
     ).diagnose()
 
     assert projection["correlation"]["status"] == "FULLY_CORRELATED"
     assert projection["integration_receipt"]["status"] == "CONTROL_PLANE_ONLY"
-    assert projection["agent_run"]["state"] == "BLOCKED"
-    assert _step(projection, "validate_run")["status"] == "BLOCKED"
+    assert projection["agent_run"]["state"] == "PLAN_READY"
+    assert _step(projection, "validate_run")["status"] == "NOT_REQUIRED_YET"
 
 
-def test_verified_plan_needs_manager_approval_before_a_guarded_executor_runs() -> None:
+def test_guarded_executor_waits_for_post_execution_receipt_before_closure() -> None:
     class _Executor:
         def __init__(self) -> None:
             self.calls = 0
@@ -172,7 +172,8 @@ def test_verified_plan_needs_manager_approval_before_a_guarded_executor_runs() -
             return DemoExecutionResult("MAT-STE-20", "PI-20", False, True)
 
     executor = _Executor()
-    platform = AgentPlatform(_MutableReader(_erp()), _MutableReader(_saas(direct_receipt=True)), executor=executor)
+    saas = _MutableReader(_saas(direct_receipt=False))
+    platform = AgentPlatform(_MutableReader(_erp()), saas, executor=executor)
     ready = platform.diagnose()
 
     assert ready["execution"]["status"] == "AWAITING_MANAGER_APPROVAL"
@@ -180,7 +181,16 @@ def test_verified_plan_needs_manager_approval_before_a_guarded_executor_runs() -
     result = platform.execute(approved["execution"]["approval_id"], "m20-run-20")
 
     assert executor.calls == 1
-    assert result["execution"]["status"] == "VERIFIED"
+    assert result["execution"]["status"] == "VERIFYING"
+    waiting = platform.verify()
+    assert waiting["execution"]["status"] == "VERIFYING"
+
+    row = next(item for item in saas.payload["sources"] if item["source_id"] == "celigo-quality-release")  # type: ignore[index]
+    row.update({"status": "VERIFIED", "record_id": "run-20", "label": "Run receipt", "detail": "ERP acknowledged", "evidence_kind": "RUN_RECEIPT", "erp_acknowledged": True})
+    activity_row = next(item for item in saas.payload["activity"] if item["source_id"] == "celigo-quality-release")  # type: ignore[index]
+    activity_row.update(row)
+    verified = platform.verify()
+    assert verified["execution"]["status"] == "VERIFIED"
 
 
 def test_normal_receipt_uses_the_same_guarded_evidence_path_without_an_incident() -> None:
@@ -193,7 +203,7 @@ def test_normal_receipt_uses_the_same_guarded_evidence_path_without_an_incident(
     ).diagnose()
 
     assert projection["diagnosis"]["finding"] == "NO_QUALITY_HOLD_DETECTED"
-    assert projection["agent_run"]["state"] == "PLAN_READY"
+    assert projection["agent_run"]["state"] == "BLOCKED"
     assert projection["evidence_constellation"]["conclusion"]["status"] == "CLEAR"
     assert projection["execution"]["available"] is False
 
@@ -210,7 +220,7 @@ def test_mismatched_registry_or_receipt_is_blocked_and_names_the_mismatch() -> N
     assert registry_mismatch["correlation"]["mismatched_fields"] == ["purchase_order"]
     assert registry_mismatch["agent_run"]["state"] == "BLOCKED"
     assert receipt_mismatch["integration_receipt"]["status"] == "MISMATCHED_RECEIPT"
-    assert receipt_mismatch["agent_run"]["state"] == "BLOCKED"
+    assert receipt_mismatch["agent_run"]["state"] == "PLAN_READY"
 
 
 def test_registry_that_is_held_cannot_be_used_to_complete_a_correlation() -> None:

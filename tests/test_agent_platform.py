@@ -118,7 +118,7 @@ def test_diagnosis_detects_hold_without_claiming_release_or_provider_write() -> 
     assert [step["status"] for step in projection["plan"]] == [
         "DONE",
         "DONE",
-        "BLOCKED",
+        "NOT_REQUIRED_YET",
         "BLOCKED",
     ]
     assert [event["sequence"] for event in projection["activity"]] == list(

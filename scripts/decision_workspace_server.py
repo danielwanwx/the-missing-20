@@ -613,6 +613,15 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                 )
             self._send_json(HTTPStatus.OK, self.agent_platform.execute(approval_id, idempotency_key))
             return
+        if route == "/api/v1/agent-platform/verify":
+            if payload:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "unexpected_payload",
+                    "verification is a fresh provider read and accepts no commands",
+                )
+            self._send_json(HTTPStatus.OK, self.agent_platform.verify())
+            return
         if route == "/api/v1/scenarios":
             scenario = str(payload.get("scenario") or "").strip().lower()
             if scenario not in {"normal", "incident", "recovery", "golden"}:
@@ -748,6 +757,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             "/api/v1/agent-platform/diagnose",
             "/api/v1/agent-platform/approve",
             "/api/v1/agent-platform/execute",
+            "/api/v1/agent-platform/verify",
         }
         if route not in allowed_routes and not route.startswith("/api/v1/incidents/"):
             self._method_not_allowed("GET")
