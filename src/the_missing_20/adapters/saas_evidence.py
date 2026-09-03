@@ -353,8 +353,8 @@ class SaaSEvidenceSource:
         """Read a Celigo-written receipt from the dedicated demo registry.
 
         The table is deliberately separate from the human-maintained quality
-        registry.  A row is useful only after the flow has written a Celigo job
-        identifier, the flow reports success, and the payload attests to the
+        registry.  A row is useful only after the flow has written its Celigo flow
+        flow identifier, the flow reports success, and the payload attests to the
         fresh ERP read.  Until then it remains a pending *post-execution*
         verification artifact and can never authorize a release.
         """
@@ -398,7 +398,7 @@ class SaaSEvidenceSource:
                 )
             fields = matching["fields"]
             raw_status = str(fields.get("Status", "PENDING")).upper()
-            job_id = str(fields.get("Celigo Job ID", "")).strip()
+            flow_id = str(fields.get("Celigo Flow ID", "")).strip()
             acknowledged = bool(fields.get("ERP Acknowledged"))
             correlation = {
                 "case_id": fields.get("Case ID", ""),
@@ -410,19 +410,19 @@ class SaaSEvidenceSource:
                 "quantity": fields.get("Quantity", ""),
                 "evidence_revision": fields.get("Evidence Revision", ""),
             }
-            verified = raw_status == "VERIFIED" and bool(job_id) and acknowledged
+            verified = raw_status == "VERIFIED" and bool(flow_id) and acknowledged
             return self._record(
                 "celigo-quality-release",
                 "Celigo · quality.release",
                 "VERIFIED" if verified else ("FAILED" if raw_status == "FAILED" else "PENDING"),
                 f"Celigo run receipt · {raw_status}",
                 (
-                    "ERP acknowledgement and a Celigo job ID are recorded."
+                    "ERP acknowledgement and the Celigo flow ID are recorded."
                     if verified
                     else "Waiting for the Celigo flow to record a successful ERP acknowledgement."
                 ),
                 now,
-                record_id=job_id or str(matching.get("id", "")),
+                record_id=flow_id or str(matching.get("id", "")),
                 evidence_kind="RUN_RECEIPT" if verified else "RUN_RECEIPT_PENDING",
                 correlation=correlation,
                 erp_acknowledged=acknowledged,
