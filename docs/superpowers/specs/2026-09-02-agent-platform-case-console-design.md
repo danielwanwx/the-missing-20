@@ -41,6 +41,10 @@ All requests are server-owned. Browser payloads contain only the correlation-
 scoped projection, safe summaries, record IDs, status, timing, and audit
 metadata; never credentials or raw provider payloads.
 
+ERPNext, Airtable, and an exact Celigo run are evidence sources. Jira and Slack
+are downstream journals only: their contents can establish that the case was
+communicated, but never prove the causal hypothesis or release eligibility.
+
 ## Autonomous diagnostic loop
 
 1. Detect the correlated ERPNext hold.
@@ -77,6 +81,47 @@ journal only to Jira and Slack. ERPNext effects require a server-side,
 least-privilege execution capability and an explicit authenticated approval.
 Any out-of-scope identifier is rejected server-side and produces a visible
 `BLOCKED` result.
+
+## Deterministic release policy
+
+The only live ERP effect is eligible when all conditions hold on fresh reads:
+
+- the full correlation tuple is unique and matches PO line, receipt, invoice,
+  supplier lot, certificate ID, quantity, and evidence revision;
+- the release is approved and unexpired;
+- approved quantity is at least the held quantity (8 in the seeded case);
+- the targeted quantity is currently in Quality Hold, Stores does not already
+  contain the same case-keyed transfer, and no pre-existing Stock Entry has the
+  case idempotency key;
+- the invoice is linked to that PO and receipt, and remains held before the
+  transfer.
+
+Its postconditions are: exactly one Stock Entry exists for the case key,
+Quality Hold falls by 8, Stores rises by 8, and the linked invoice is unheld
+only after those balances and document lineage reread successfully. Any failed
+or uncertain condition stays `BLOCKED` and prevents the invoice change.
+
+## Approval, journaling, and resolution
+
+Live ERP effects are disabled until an authenticated Manager capability exists.
+That capability must bind an approver identity, role, case correlation,
+evidence revision, proposed action digest, expiration, and single-use nonce.
+The existing simulated Manager remains clearly labelled as local-demo-only and
+can never mint a live capability.
+
+The Agent may autonomously append only these Airtable fields: `Remediation
+Status`, `Remediation Timestamp`, and `Agent Run ID`. It may never change
+approval, certificate, quantity, lot, or lineage fields. Jira and Slack are
+autonomous journals after a case transition. Their failure becomes a visible
+degraded journal sink but does not negate a verified ERP repair; their retry
+uses the same action key. Celigo is non-blocking until it is explicitly placed
+in the effect graph with one owned propagation action.
+
+`RESOLVED` requires verified ERP postconditions plus a confirmed or explicitly
+not-required Airtable remediation record. Jira, Slack, and Celigo status are
+shown separately. A fresh recording uses a new versioned case correlation and
+new seeded records; no inventory reversal or invoice reopening is used to reset
+a demo.
 
 ## Implementation boundaries
 
