@@ -1,10 +1,10 @@
 """Local HTTP adapter for the Missing 20 decision workspace.
 
 The legacy ``/api/workspace`` route remains a read-only artifact endpoint for the
-existing acceptance tests.  The ``/api/v1`` routes expose the real synthetic
-experiment session used by the Dashboard and Agent Workspace.  They are local,
-loopback-oriented routes only: no provider, cloud resource, or private system is
-contacted by this process.
+existing acceptance tests. The ``/api/v1`` routes expose the synthetic experiment
+and a read-only multi-SaaS evidence projection used by the Dashboard. They are
+local, loopback-oriented routes only; the agent-platform endpoint can read narrow
+provider evidence but has no provider mutation capability.
 """
 
 from __future__ import annotations
@@ -24,6 +24,10 @@ if __package__ in {None, ""}:
     _root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(_root / "src"))
 
+from the_missing_20.adapters.agent_platform import AgentPlatform  # noqa: E402
+from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
+from the_missing_20.adapters.erpnext_source import ERPNextEvidenceSource  # noqa: E402
+from the_missing_20.adapters.saas_evidence import SaaSEvidenceSource  # noqa: E402
 from the_missing_20.authority_b.models import canonical_json  # noqa: E402
 from the_missing_20.authority_b.quorum import QuorumDenied  # noqa: E402
 from the_missing_20.authority_b.workspace_demo import (  # noqa: E402
@@ -153,6 +157,18 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     def live_sources(self) -> LiveSourceRegistry:
         return self.server.live_sources  # type: ignore[attr-defined,no-any-return]
 
+    @property
+    def erpnext_evidence(self) -> ERPNextEvidenceSource:
+        return self.server.erpnext_evidence  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def saas_evidence(self) -> SaaSEvidenceSource:
+        return self.server.saas_evidence  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def agent_platform(self) -> AgentPlatform:
+        return self.server.agent_platform  # type: ignore[attr-defined,no-any-return]
+
     def _send(
         self,
         status: HTTPStatus,
@@ -253,6 +269,15 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         return sequence
 
     def _v1_get(self, route: str, query: dict[str, list[str]]) -> None:
+        if route == "/api/v1/agent-platform":
+            self._send_json(HTTPStatus.OK, self.agent_platform.current())
+            return
+        if route == "/api/v1/erpnext-evidence":
+            self._send_json(HTTPStatus.OK, self.erpnext_evidence.current())
+            return
+        if route == "/api/v1/saas-evidence":
+            self._send_json(HTTPStatus.OK, self.saas_evidence.current())
+            return
         if route == "/api/v1/live-sources":
             self._send_json(HTTPStatus.OK, self.live_sources.current())
             return
@@ -476,6 +501,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "provider_mode": provider_truth["mode"],
                     "provider_configured": provider_truth["configured"],
                     "write_scope": "local_synthetic_only",
+                    "external_provider_writes": "disabled",
                     "advisory_tools_read_only": True,
                     "live_sources": True,
                     "external_context_only": True,
@@ -501,11 +527,14 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, artifact.model_dump(mode="json"))
             return
         if (
-            route == "/api/v1/scenarios"
+            route == "/api/v1/agent-platform"
+            or route == "/api/v1/scenarios"
             or route == "/api/v1/incidents"
             or route.startswith("/api/v1/incidents/")
             or route == "/api/v1/live-sources"
             or route == "/api/v1/live-sources/events"
+            or route == "/api/v1/erpnext-evidence"
+            or route == "/api/v1/saas-evidence"
         ):
             try:
                 self._v1_get(route, query)
@@ -546,6 +575,44 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def _v1_post(self, route: str, payload: dict[str, object]) -> None:
+        if route == "/api/v1/agent-platform/diagnose":
+            if payload:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "unexpected_payload",
+                    "automatic diagnosis does not accept provider commands",
+                )
+            self._send_json(HTTPStatus.OK, self.agent_platform.diagnose())
+            return
+        if route == "/api/v1/agent-platform/ask":
+            question = payload.get("question")
+            if not isinstance(question, str):
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_question",
+                    "evidence questions require a text question",
+                )
+            self._send_json(HTTPStatus.OK, self.agent_platform.answer(question))
+            return
+        if route == "/api/v1/agent-platform/approve":
+            manager_id = payload.get("manager_id")
+            if not isinstance(manager_id, str):
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST, "invalid_manager", "approval requires manager_id"
+                )
+            self._send_json(HTTPStatus.OK, self.agent_platform.approve(manager_id))
+            return
+        if route == "/api/v1/agent-platform/execute":
+            approval_id = payload.get("approval_id")
+            idempotency_key = payload.get("idempotency_key")
+            if not isinstance(approval_id, str) or not isinstance(idempotency_key, str):
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_execution",
+                    "execution requires approval_id and idempotency_key",
+                )
+            self._send_json(HTTPStatus.OK, self.agent_platform.execute(approval_id, idempotency_key))
+            return
         if route == "/api/v1/scenarios":
             scenario = str(payload.get("scenario") or "").strip().lower()
             if scenario not in {"normal", "incident", "recovery", "golden"}:
@@ -647,11 +714,26 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             return
         if resource == "decisions":
             try:
-                response = session.decision_command(payload)
+                if str(payload.get("command") or "") in {"execute", "recover"}:
+                    intent_id = str(payload.get("intent_id") or "").strip()
+                    idempotency_key = str(payload.get("idempotency_key") or "").strip()
+                    if not intent_id or not idempotency_key:
+                        raise ValueError("execution requires an intent_id and idempotency_key")
+                    response = session.accept_execution(
+                        intent_id=intent_id,
+                        idempotency_key=idempotency_key,
+                    )
+                else:
+                    response = session.decision_command(payload)
             except (QuorumDenied, VersionConflict, ValueError) as exc:
                 status, code = _error_status(exc)
                 raise APIRequestError(status, code, str(exc)) from exc
-            self._send_json(HTTPStatus.OK, response)
+            status = (
+                HTTPStatus.ACCEPTED
+                if response.get("command") == "execution_accepted"
+                else HTTPStatus.OK
+            )
+            self._send_json(status, response)
             return
         raise APIRequestError(HTTPStatus.NOT_FOUND, "not_found", "experiment command not found")
 
@@ -660,7 +742,14 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         if route == "/api/workspace":
             self._method_not_allowed("GET")
             return
-        if route not in {"/api/v1/scenarios"} and not route.startswith("/api/v1/incidents/"):
+        allowed_routes = {
+            "/api/v1/scenarios",
+            "/api/v1/agent-platform/ask",
+            "/api/v1/agent-platform/diagnose",
+            "/api/v1/agent-platform/approve",
+            "/api/v1/agent-platform/execute",
+        }
+        if route not in allowed_routes and not route.startswith("/api/v1/incidents/"):
             self._method_not_allowed("GET")
             return
         content_type = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
@@ -683,7 +772,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                 )
                 return
         try:
-            payload = self._read_json(allow_empty=route.endswith("/start"))
+            payload = self._read_json(
+                allow_empty=route.endswith("/start") or route.endswith("/diagnose")
+            )
             self._v1_post(route, payload)
         except APIRequestError as exc:
             self._send_api_error(exc.status, exc.code, exc.detail, snapshot=exc.snapshot)
@@ -769,6 +860,9 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         runtime_directory: Path | None = None,
         registry: ExperimentRegistry | None = None,
         live_sources: LiveSourceRegistry | None = None,
+        erpnext_evidence: ERPNextEvidenceSource | None = None,
+        saas_evidence: SaaSEvidenceSource | None = None,
+        agent_platform: AgentPlatform | None = None,
         live_sources_autostart: bool | None = None,
     ) -> None:
         if address[0] not in {"127.0.0.1", "localhost", "::1"}:
@@ -779,6 +873,17 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             data_directory=runtime_directory,
         )
         self.live_sources = live_sources or LiveSourceRegistry()
+        self.erpnext_evidence = erpnext_evidence or ERPNextEvidenceSource.from_environment(
+            repository_root=repository_root
+        )
+        self.saas_evidence = saas_evidence or SaaSEvidenceSource.from_environment(
+            repository_root=repository_root
+        )
+        self.agent_platform = agent_platform or AgentPlatform(
+            self.erpnext_evidence,
+            self.saas_evidence,
+            executor=ERPNextDemoExecutor.from_environment(repository_root),
+        )
         self.live_source_poller = LiveSourcePoller(self.live_sources)
         configured_autostart = os.environ.get("MISSING20_LIVE_SOURCES_AUTOSTART", "0")
         should_autostart = (
