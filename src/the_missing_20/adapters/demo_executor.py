@@ -7,13 +7,16 @@ validated M20 quality hold only after the Agent has produced a guarded plan.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from the_missing_20.adapters.erpnext_source import ERPNextCredentials
+from the_missing_20.adapters.erpnext_source import _read_env_file
 
 
 class DemoExecutionBlocked(ValueError):
@@ -52,6 +55,18 @@ class ERPNextDemoExecutor:
         self._environment = environment.strip().lower()
         self._transport = transport or self._default_transport
         self._timeout_seconds = timeout_seconds
+
+    @classmethod
+    def from_environment(cls, repository_root: Path) -> ERPNextDemoExecutor | None:
+        values = {**_read_env_file(repository_root / ".env"), **os.environ}
+        credentials = ERPNextCredentials(
+            base_url=values.get("ERPNEXT_BASE_URL", "").rstrip("/"),
+            api_key=values.get("ERPNEXT_API_KEY", ""),
+            api_secret=values.get("ERPNEXT_API_SECRET", ""),
+        )
+        if not all((credentials.base_url, credentials.api_key, credentials.api_secret)):
+            return None
+        return cls(credentials, environment=values.get("MISSING20_ENVIRONMENT", "local"))
 
     @staticmethod
     def _default_transport(request: Request, timeout: float) -> bytes:
