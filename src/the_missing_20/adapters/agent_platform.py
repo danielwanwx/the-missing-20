@@ -159,9 +159,7 @@ class AgentPlatform:
         return [cast(Mapping[str, object], row) for row in raw_rows if isinstance(row, Mapping)]
 
     @staticmethod
-    def _source_by_id(
-        saas: Mapping[str, object], source_id: str
-    ) -> Mapping[str, object] | None:
+    def _source_by_id(saas: Mapping[str, object], source_id: str) -> Mapping[str, object] | None:
         return next(
             (row for row in AgentPlatform._source_rows(saas) if row.get("source_id") == source_id),
             None,
@@ -282,21 +280,14 @@ class AgentPlatform:
             "supplier_lot": registry_values.get("supplier_lot", "UNAVAILABLE_FROM_READS"),
             "certificate_id": registry_values.get("certificate_id", "UNAVAILABLE_FROM_READS"),
             "quantity": expected["quantity"],
-            "evidence_revision": registry_values.get(
-                "evidence_revision", "UNAVAILABLE_FROM_READS"
-            ),
+            "evidence_revision": registry_values.get("evidence_revision", "UNAVAILABLE_FROM_READS"),
         }
         compared = ("case_id", "purchase_order", "purchase_receipt", "purchase_invoice", "quantity")
-        missing = [
-            key
-            for key, value in tuple_values.items()
-            if self._missing(value)
-        ]
+        missing = [key for key, value in tuple_values.items() if self._missing(value)]
         missing.extend(
             key
             for key in compared
-            if self._missing(registry_values.get(key))
-            and key not in missing
+            if self._missing(registry_values.get(key)) and key not in missing
         )
         mismatched = [
             key
@@ -376,7 +367,8 @@ class AgentPlatform:
         mismatched = [
             key
             for key in required
-            if key not in missing and not self._matches(received_values.get(key), expected_values.get(key))
+            if key not in missing
+            and not self._matches(received_values.get(key), expected_values.get(key))
         ]
         status = "VERIFIED" if not missing and not mismatched else "MISMATCHED_RECEIPT"
         return {
@@ -386,17 +378,42 @@ class AgentPlatform:
             "mismatched_fields": mismatched,
         }
 
+    def _external_recovery_verified(
+        self, erp: Mapping[str, object], saas: Mapping[str, object]
+    ) -> bool:
+        """Prove a previous recovery from fresh provider reads after a server restart."""
+
+        documents = self._documents_by_kind(erp)
+        receipt = documents.get("purchase_receipt", {})
+        invoice = documents.get("purchase_invoice", {})
+        transfer = documents.get("quality_release_transfer", {})
+        correlation = self._correlation(erp, saas)
+        integration_receipt = self._integration_receipt(saas, correlation)
+        return (
+            self._text(receipt.get("status")) == "PARTIAL_QUALITY_HOLD"
+            and self._text(invoice.get("status")) == "OPEN"
+            and self._text(transfer.get("status")) == "SUBMITTED"
+            and self._matches(transfer.get("quantity"), receipt.get("rejected"))
+            and self._text(correlation.get("status")) == "FULLY_CORRELATED"
+            and self._text(integration_receipt.get("status")) == "VERIFIED"
+        )
+
     def _plan(self, erp: Mapping[str, object], saas: Mapping[str, object]) -> list[dict[str, str]]:
         correlation = self._correlation(erp, saas)
         integration_receipt = self._integration_receipt(saas, correlation)
+        external_recovery = self._external_recovery_verified(erp, saas)
         erp_ready = self._text(erp.get("status")) == "CONNECTED"
         saas_ready = self._text(saas.get("status")) == "CONNECTED"
-        complete = self._text(self._agent_run.get("state")) in {
-            "PLAN_READY",
-            "BLOCKED",
-            "VERIFYING",
-            "VERIFIED",
-        }
+        complete = (
+            self._text(self._agent_run.get("state"))
+            in {
+                "PLAN_READY",
+                "BLOCKED",
+                "VERIFYING",
+                "VERIFIED",
+            }
+            or external_recovery
+        )
         return [
             {
                 "id": "read_erp",
@@ -416,7 +433,8 @@ class AgentPlatform:
                     if integration_receipt["status"] == "VERIFIED"
                     else (
                         "WAITING"
-                        if self._execution and self._text(self._execution.get("status")) == "VERIFYING"
+                        if self._execution
+                        and self._text(self._execution.get("status")) == "VERIFYING"
                         else ("QUEUED" if not complete else "NOT_REQUIRED_YET")
                     )
                 ),
@@ -426,7 +444,9 @@ class AgentPlatform:
                 "label": "Produce guarded recovery plan",
                 "status": (
                     "DONE"
-                    if self._text(self._agent_run.get("state")) in {"PLAN_READY", "VERIFYING", "VERIFIED"}
+                    if external_recovery
+                    or self._text(self._agent_run.get("state"))
+                    in {"PLAN_READY", "VERIFYING", "VERIFIED"}
                     else ("BLOCKED" if complete else "QUEUED")
                 ),
             },
@@ -489,8 +509,17 @@ class AgentPlatform:
         hold_detected = self._text(receipt.get("status")) == "PARTIAL_QUALITY_HOLD"
         eligible = correlation["status"] == "FULLY_CORRELATED"
         verified = eligible and integration_receipt["status"] == "VERIFIED"
-        confidence = 0.91 if hold_detected and verified else (0.82 if hold_detected and eligible else 0.0)
-        recovery_verified = self._text(self._execution.get("status")) == "VERIFIED"
+        confidence = (
+            0.91 if hold_detected and verified else (0.82 if hold_detected and eligible else 0.0)
+        )
+        external_recovery = self._external_recovery_verified(erp, saas)
+        if external_recovery:
+            for node in nodes:
+                if node["id"] == "erpnext":
+                    node["status"] = "VERIFIED"
+        recovery_verified = (
+            self._text(self._execution.get("status")) == "VERIFIED" or external_recovery
+        )
         conclusion_status = (
             "VERIFIED"
             if recovery_verified
@@ -523,6 +552,29 @@ class AgentPlatform:
     ) -> dict[str, object]:
         correlation = self._correlation(erp, saas)
         integration_receipt = self._integration_receipt(saas, correlation)
+        external_recovery = self._external_recovery_verified(erp, saas)
+        agent_run = dict(self._agent_run)
+        diagnosis = dict(self._diagnosis)
+        if external_recovery and self._text(agent_run.get("state")) == "IDLE":
+            documents = self._documents_by_kind(erp)
+            transfer = documents.get("quality_release_transfer", {})
+            agent_run.update({"state": "VERIFIED", "confidence": 0.96})
+            diagnosis.update(
+                {
+                    "status": "VERIFIED",
+                    "finding": "RECOVERY_VERIFIED_FROM_LIVE_READS",
+                    "summary": (
+                        "Fresh ERPNext reads prove the prior quality release "
+                        f"{self._text(transfer.get('name'), 'transfer')} is submitted; "
+                        "the invoice is "
+                        "open and the tuple-matched Celigo receipt is verified."
+                    ),
+                    "tool_calls": [
+                        {"tool": "erpnext.read_quality_release_transfer", "status": "VERIFIED"},
+                        {"tool": "celigo.read_exact_run_receipt", "status": "VERIFIED"},
+                    ],
+                }
+            )
         return {
             "schema_version": AGENT_PLATFORM_SCHEMA_VERSION,
             "received_at": self._now(),
@@ -535,23 +587,52 @@ class AgentPlatform:
             "correlation": correlation,
             "integration_receipt": integration_receipt,
             "systems": self._systems(erp, saas),
-            "agent_run": dict(self._agent_run),
+            "agent_run": agent_run,
             "plan": self._plan(erp, saas),
             "evidence_constellation": self._constellation(erp, saas),
-            "diagnosis": dict(self._diagnosis),
-            "execution": self._execution_projection(),
+            "diagnosis": diagnosis,
+            "execution": self._execution_projection(erp, saas),
             "activity": list(self._events[-80:]),
             "latest_sequence": self._sequence,
         }
 
-    def _execution_projection(self) -> dict[str, object]:
+    def _execution_projection(
+        self, erp: Mapping[str, object], saas: Mapping[str, object]
+    ) -> dict[str, object]:
+        if not self._execution and self._external_recovery_verified(erp, saas):
+            documents = self._documents_by_kind(erp)
+            transfer = documents.get("quality_release_transfer", {})
+            invoice = documents.get("purchase_invoice", {})
+            return {
+                "available": False,
+                "status": "VERIFIED",
+                "detail": "Fresh ERPNext and Celigo reads verify the prior guarded recovery.",
+                "transfer_name": self._text(transfer.get("name")),
+                "invoice_name": self._text(invoice.get("name")),
+                "external_proof": True,
+            }
         if self._executor is None:
-            return {"available": False, "status": "WRITE_DISABLED", "detail": "External provider mutations are intentionally disabled in this demo build."}
+            return {
+                "available": False,
+                "status": "WRITE_DISABLED",
+                "detail": (
+                    "External provider mutations are intentionally disabled in this demo build."
+                ),
+            }
         if self._execution:
             return dict(self._execution)
         if self._approval:
-            return {"available": True, "status": "AUTHORIZED", "detail": "Manager approval is bound to the current guarded plan.", **self._approval}
-        return {"available": self._text(self._agent_run.get("state")) == "PLAN_READY", "status": "AWAITING_MANAGER_APPROVAL", "detail": "Demo-only execution requires Manager approval after a verified plan."}
+            return {
+                "available": True,
+                "status": "AUTHORIZED",
+                "detail": "Manager approval is bound to the current guarded plan.",
+                **self._approval,
+            }
+        return {
+            "available": self._text(self._agent_run.get("state")) == "PLAN_READY",
+            "status": "AWAITING_MANAGER_APPROVAL",
+            "detail": "Demo-only execution requires Manager approval after a verified plan.",
+        }
 
     def approve(self, manager_id: str) -> dict[str, object]:
         clean_manager = " ".join(manager_id.split())
@@ -567,7 +648,15 @@ class AgentPlatform:
                 raise ValueError("manager approval requires an executor and a fresh verified plan")
             approval_id = f"m20-approval-{self._run_number:04d}"
             self._approval = {"approval_id": approval_id, "manager_id": clean_manager}
-            self._append("manager.approval.granted", source_id="agent-platform", provider="Manager", status="APPROVED", label="Guarded recovery approved", detail="Approval is bound to the current M20 case evidence.", record_id=approval_id)
+            self._append(
+                "manager.approval.granted",
+                source_id="agent-platform",
+                provider="Manager",
+                status="APPROVED",
+                label="Guarded recovery approved",
+                detail="Approval is bound to the current M20 case evidence.",
+                record_id=approval_id,
+            )
             return self._projection(erp, saas)
 
     def execute(self, approval_id: str, idempotency_key: str) -> dict[str, object]:
@@ -579,10 +668,20 @@ class AgentPlatform:
                 or approval_id != self._text(self._approval.get("approval_id"))
                 or correlation["status"] != "FULLY_CORRELATED"
             ):
-                raise ValueError("execution requires the current Manager approval and fully verified evidence")
+                raise ValueError(
+                    "execution requires the current Manager approval and fully verified evidence"
+                )
             raw_values = correlation.get("tuple")
             values = dict(raw_values) if isinstance(raw_values, Mapping) else {}
-            result = self._executor.execute(DemoReleasePlan(case_id=self._text(values.get("case_id")), purchase_receipt=self._text(values.get("purchase_receipt")), purchase_invoice=self._text(values.get("purchase_invoice")), quantity=float(values.get("quantity") or 0), idempotency_key=idempotency_key))
+            result = self._executor.execute(
+                DemoReleasePlan(
+                    case_id=self._text(values.get("case_id")),
+                    purchase_receipt=self._text(values.get("purchase_receipt")),
+                    purchase_invoice=self._text(values.get("purchase_invoice")),
+                    quantity=float(values.get("quantity") or 0),
+                    idempotency_key=idempotency_key,
+                )
+            )
             erp_verified = bool(getattr(result, "verified", False))
             self._execution = {
                 "available": False,
@@ -596,7 +695,15 @@ class AgentPlatform:
                 "invoice_name": getattr(result, "invoice_name", ""),
                 "erp_verified": erp_verified,
             }
-            self._append("agent.execution.completed", source_id="agent-platform", provider="Missing 20 Agent", status=self._text(self._execution["status"]), label="Guarded ERP recovery completed", detail=self._text(self._execution["detail"]), record_id=self._text(self._execution.get("transfer_name")))
+            self._append(
+                "agent.execution.completed",
+                source_id="agent-platform",
+                provider="Missing 20 Agent",
+                status=self._text(self._execution["status"]),
+                label="Guarded ERP recovery completed",
+                detail=self._text(self._execution["detail"]),
+                record_id=self._text(self._execution.get("transfer_name")),
+            )
             erp, saas = self._read_all()
             return self._projection(erp, saas)
 
@@ -614,7 +721,9 @@ class AgentPlatform:
                     {
                         "available": False,
                         "status": "VERIFYING",
-                        "detail": "ERPNext is verified; waiting for a tuple-matched Celigo run receipt.",
+                        "detail": (
+                            "ERPNext is verified; waiting for a tuple-matched Celigo run receipt."
+                        ),
                     }
                 )
                 return self._projection(erp, saas)
@@ -622,7 +731,9 @@ class AgentPlatform:
                 {
                     "available": False,
                     "status": "VERIFIED",
-                    "detail": "ERPNext recovery and the independent Celigo run receipt are verified.",
+                    "detail": (
+                        "ERPNext recovery and the independent Celigo run receipt are verified."
+                    ),
                     "celigo_receipt_id": self._text(receipt.get("record_id")),
                 }
             )
@@ -729,6 +840,7 @@ class AgentPlatform:
             degraded = any(status in {"DEGRADED", "NOT_CONFIGURED"} for status in source_statuses)
             correlation = self._correlation(erp, saas)
             integration_receipt = self._integration_receipt(saas, correlation)
+            external_recovery = self._external_recovery_verified(erp, saas)
             tool_calls = [
                 {"tool": "erpnext.read_case_documents", "status": self._text(erp.get("status"))},
                 {"tool": "saas.read_correlated_records", "status": self._text(saas.get("status"))},
@@ -740,6 +852,12 @@ class AgentPlatform:
             if self._text(erp.get("status")) != "CONNECTED":
                 finding = "INCONCLUSIVE"
                 summary = "ERPNext evidence is unavailable, so the agent cannot diagnose the case."
+            elif external_recovery:
+                finding = "RECOVERY_VERIFIED_FROM_LIVE_READS"
+                summary = (
+                    "Fresh ERPNext, Airtable, and Celigo reads prove the prior guarded "
+                    "recovery is complete; no new release is proposed."
+                )
             elif quality_hold:
                 finding = "QUALITY_HOLD_DETECTED"
                 summary = (
@@ -756,15 +874,21 @@ class AgentPlatform:
             if correlation["status"] != "FULLY_CORRELATED":
                 summary += " Correlation is partial; release eligibility cannot be proven."
             elif integration_receipt["status"] != "VERIFIED":
-                summary += " A Celigo run receipt will be required only after guarded ERP execution."
-            run_state = (
-                "BLOCKED"
-                if (
-                    finding == "INCONCLUSIVE"
-                    or correlation["status"] != "FULLY_CORRELATED"
-                    or not quality_hold
+                summary += (
+                    " A Celigo run receipt will be required only after guarded ERP execution."
                 )
-                else "PLAN_READY"
+            run_state = (
+                "VERIFIED"
+                if external_recovery
+                else (
+                    "BLOCKED"
+                    if (
+                        finding == "INCONCLUSIVE"
+                        or correlation["status"] != "FULLY_CORRELATED"
+                        or not quality_hold
+                    )
+                    else "PLAN_READY"
+                )
             )
             self._diagnosis = {
                 "status": run_state,
@@ -779,10 +903,14 @@ class AgentPlatform:
                     "state": run_state,
                     "active_step": "",
                     "confidence": (
-                        0.91
-                        if finding == "QUALITY_HOLD_DETECTED"
-                        and correlation["status"] == "FULLY_CORRELATED"
-                        else (0.82 if finding == "QUALITY_HOLD_DETECTED" else 0.0)
+                        0.96
+                        if external_recovery
+                        else (
+                            0.91
+                            if finding == "QUALITY_HOLD_DETECTED"
+                            and correlation["status"] == "FULLY_CORRELATED"
+                            else (0.82 if finding == "QUALITY_HOLD_DETECTED" else 0.0)
+                        )
                     ),
                 }
             )
@@ -809,25 +937,45 @@ class AgentPlatform:
             invoice = docs.get("purchase_invoice", {})
             correlation = self._correlation(erp, saas)
             integration_receipt = self._integration_receipt(saas, correlation)
-            execution = self._execution_projection()
+            execution = self._execution_projection(erp, saas)
             normalized = clean_question.lower()
             asks_recovery = any(
                 term in normalized
-                for term in ("release", "approve", "execute", "fix", "recover", "complete", "verify")
+                for term in (
+                    "release",
+                    "approve",
+                    "execute",
+                    "fix",
+                    "recover",
+                    "complete",
+                    "verify",
+                )
             )
             asks_provenance = any(
                 term in normalized
-                for term in ("evidence", "source", "provenance", "correlation", "trace", "prove", "why")
+                for term in (
+                    "evidence",
+                    "source",
+                    "provenance",
+                    "correlation",
+                    "trace",
+                    "prove",
+                    "why",
+                )
             )
             if asks_recovery and self._text(execution.get("status")) == "VERIFIED":
                 answer = (
                     "Recovery is complete: ERPNext transfer "
-                    f"{self._text(execution.get('transfer_name'), 'unavailable')} is freshly verified; "
-                    f"invoice {self._text(execution.get('invoice_name'), 'unavailable')} is no longer held; "
+                    f"{self._text(execution.get('transfer_name'), 'unavailable')} "
+                    "is freshly verified; "
+                    f"invoice {self._text(execution.get('invoice_name'), 'unavailable')} "
+                    "is no longer held; "
                     "and the tuple-matched Celigo receipt is verified."
                 )
             elif asks_recovery and self._executor is None:
-                answer = "This observer build can diagnose the case, but provider writes are disabled."
+                answer = (
+                    "This observer build can diagnose the case, but provider writes are disabled."
+                )
             elif asks_recovery:
                 answer = (
                     "The dedicated demo executor is guarded by a verified evidence tuple and one "
@@ -835,12 +983,18 @@ class AgentPlatform:
                     f"{self._text(execution.get('status'), 'AWAITING_MANAGER_APPROVAL')}."
                 )
             elif asks_provenance:
+                tuple_values = correlation.get("tuple")
+                case_id = (
+                    self._text(tuple_values.get("case_id"))
+                    if isinstance(tuple_values, Mapping)
+                    else "the scoped case"
+                )
                 answer = (
                     "The agent correlated ERPNext receipt "
                     f"{self._text(receipt.get('name'), 'unavailable')}, invoice "
-                    f"{self._text(invoice.get('name'), 'unavailable')}, and the Airtable release tuple "
-                    f"for {self._text(correlation.get('tuple', {}).get('case_id')) if isinstance(correlation.get('tuple'), Mapping) else 'the scoped case'}. "
-                    f"Celigo receipt status is {self._text(integration_receipt.get('status'), 'UNAVAILABLE')}."
+                    f"{self._text(invoice.get('name'), 'unavailable')}, and the Airtable "
+                    f"release tuple for {case_id}. Celigo receipt status is "
+                    f"{self._text(integration_receipt.get('status'), 'UNAVAILABLE')}."
                 )
             elif "invoice" in normalized:
                 answer = (

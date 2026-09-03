@@ -23,7 +23,9 @@ class _MutableReader:
         return deepcopy(self.payload)
 
 
-def _erp(*, quality_hold: bool = True, status: str = "CONNECTED") -> dict[str, object]:
+def _erp(
+    *, quality_hold: bool = True, status: str = "CONNECTED", recovered: bool = False
+) -> dict[str, object]:
     return {
         "status": status,
         "activity": [
@@ -44,7 +46,23 @@ def _erp(*, quality_hold: bool = True, status: str = "CONNECTED") -> dict[str, o
                 "status": "PARTIAL_QUALITY_HOLD" if quality_hold else "RECEIVED",
                 "rejected": 8 if quality_hold else 0,
             },
-            {"kind": "purchase_invoice", "name": "PI-20", "status": "PAYMENT_HOLD"},
+            {
+                "kind": "purchase_invoice",
+                "name": "PI-20",
+                "status": "OPEN" if recovered else "PAYMENT_HOLD",
+            },
+            *(
+                [
+                    {
+                        "kind": "quality_release_transfer",
+                        "name": "MAT-STE-20",
+                        "status": "SUBMITTED",
+                        "quantity": 8,
+                    }
+                ]
+                if recovered
+                else []
+            ),
         ],
     }
 
@@ -123,9 +141,7 @@ def _saas(
 
 def _step(projection: dict[str, object], step_id: str) -> dict[str, object]:
     return next(
-        step
-        for step in projection["plan"]
-        if isinstance(step, dict) and step.get("id") == step_id
+        step for step in projection["plan"] if isinstance(step, dict) and step.get("id") == step_id
     )
 
 
@@ -185,9 +201,22 @@ def test_guarded_executor_waits_for_post_execution_receipt_before_closure() -> N
     waiting = platform.verify()
     assert waiting["execution"]["status"] == "VERIFYING"
 
-    row = next(item for item in saas.payload["sources"] if item["source_id"] == "celigo-quality-release")  # type: ignore[index]
-    row.update({"status": "VERIFIED", "record_id": "run-20", "label": "Run receipt", "detail": "ERP acknowledged", "evidence_kind": "RUN_RECEIPT", "erp_acknowledged": True})
-    activity_row = next(item for item in saas.payload["activity"] if item["source_id"] == "celigo-quality-release")  # type: ignore[index]
+    row = next(
+        item for item in saas.payload["sources"] if item["source_id"] == "celigo-quality-release"
+    )  # type: ignore[index]
+    row.update(
+        {
+            "status": "VERIFIED",
+            "record_id": "run-20",
+            "label": "Run receipt",
+            "detail": "ERP acknowledged",
+            "evidence_kind": "RUN_RECEIPT",
+            "erp_acknowledged": True,
+        }
+    )
+    activity_row = next(
+        item for item in saas.payload["activity"] if item["source_id"] == "celigo-quality-release"
+    )  # type: ignore[index]
     activity_row.update(row)
     verified = platform.verify()
     assert verified["execution"]["status"] == "VERIFIED"
@@ -212,6 +241,23 @@ def test_normal_receipt_uses_the_same_guarded_evidence_path_without_an_incident(
     assert projection["agent_run"]["state"] == "BLOCKED"
     assert projection["evidence_constellation"]["conclusion"]["status"] == "CLEAR"
     assert projection["execution"]["available"] is False
+
+
+def test_fresh_server_projection_recognizes_a_previously_verified_external_recovery() -> None:
+    platform = AgentPlatform(
+        _MutableReader(_erp(recovered=True)), _MutableReader(_saas(direct_receipt=True))
+    )
+
+    projection = platform.current()
+
+    assert projection["execution"]["status"] == "VERIFIED"
+    assert projection["evidence_constellation"]["conclusion"]["label"] == "RECOVERY VERIFIED"
+    assert _step(projection, "guarded_plan")["status"] == "DONE"
+
+    diagnosed = platform.diagnose()
+    assert diagnosed["agent_run"]["state"] == "VERIFIED"
+    assert diagnosed["diagnosis"]["finding"] == "RECOVERY_VERIFIED_FROM_LIVE_READS"
+    assert diagnosed["execution"]["status"] == "VERIFIED"
 
 
 def test_mismatched_registry_or_receipt_is_blocked_and_names_the_mismatch() -> None:
