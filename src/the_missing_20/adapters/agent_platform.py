@@ -332,6 +332,12 @@ class AgentPlatform:
         if receipt is None:
             return {"status": "MISSING", "record_id": "", "mismatched_fields": []}
         evidence_kind = self._text(receipt.get("evidence_kind"))
+        if evidence_kind == "RUN_RECEIPT_PENDING":
+            return {
+                "status": "PENDING",
+                "record_id": self._text(receipt.get("record_id")),
+                "mismatched_fields": [],
+            }
         if evidence_kind != "RUN_RECEIPT":
             return {
                 "status": "CONTROL_PLANE_ONLY",
@@ -484,11 +490,20 @@ class AgentPlatform:
         eligible = correlation["status"] == "FULLY_CORRELATED"
         verified = eligible and integration_receipt["status"] == "VERIFIED"
         confidence = 0.91 if hold_detected and verified else (0.82 if hold_detected and eligible else 0.0)
-        conclusion_status = "BLOCKED" if not eligible else ("GUARDED" if hold_detected else "CLEAR")
+        recovery_verified = self._text(self._execution.get("status")) == "VERIFIED"
+        conclusion_status = (
+            "VERIFIED"
+            if recovery_verified
+            else ("BLOCKED" if not eligible else ("GUARDED" if hold_detected else "CLEAR"))
+        )
         return {
             "nodes": nodes,
             "conclusion": {
-                "label": "NO RELEASE" if conclusion_status == "BLOCKED" else "GUARDED PLAN",
+                "label": (
+                    "RECOVERY VERIFIED"
+                    if conclusion_status == "VERIFIED"
+                    else ("NO RELEASE" if conclusion_status == "BLOCKED" else "GUARDED PLAN")
+                ),
                 "status": conclusion_status,
                 "confidence": confidence,
                 "latest_sequence": self._sequence,
@@ -609,6 +624,25 @@ class AgentPlatform:
                     "status": "VERIFIED",
                     "detail": "ERPNext recovery and the independent Celigo run receipt are verified.",
                     "celigo_receipt_id": self._text(receipt.get("record_id")),
+                }
+            )
+            self._diagnosis.update(
+                {
+                    "status": "VERIFIED",
+                    "integration_receipt_status": "VERIFIED",
+                    "summary": (
+                        "The agent diagnosed the ERPNext Quality Hold, completed the "
+                        "manager-gated recovery, and verified the tuple-matched Celigo run receipt."
+                    ),
+                    "tool_calls": [
+                        *[
+                            call
+                            for call in self._diagnosis.get("tool_calls", [])
+                            if isinstance(call, Mapping)
+                            and self._text(call.get("tool")) != "celigo.read_exact_run_receipt"
+                        ],
+                        {"tool": "celigo.read_exact_run_receipt", "status": "VERIFIED"},
+                    ],
                 }
             )
             self._agent_run.update({"state": "VERIFIED", "active_step": "", "confidence": 0.96})
@@ -774,11 +808,39 @@ class AgentPlatform:
             receipt = docs.get("purchase_receipt", {})
             invoice = docs.get("purchase_invoice", {})
             correlation = self._correlation(erp, saas)
+            integration_receipt = self._integration_receipt(saas, correlation)
+            execution = self._execution_projection()
             normalized = clean_question.lower()
-            if any(term in normalized for term in ("release", "approve", "execute", "fix")):
+            asks_recovery = any(
+                term in normalized
+                for term in ("release", "approve", "execute", "fix", "recover", "complete", "verify")
+            )
+            asks_provenance = any(
+                term in normalized
+                for term in ("evidence", "source", "provenance", "correlation", "trace", "prove", "why")
+            )
+            if asks_recovery and self._text(execution.get("status")) == "VERIFIED":
                 answer = (
-                    "Release eligibility cannot be proven from the current partial correlation, "
-                    "and external provider writes are disabled."
+                    "Recovery is complete: ERPNext transfer "
+                    f"{self._text(execution.get('transfer_name'), 'unavailable')} is freshly verified; "
+                    f"invoice {self._text(execution.get('invoice_name'), 'unavailable')} is no longer held; "
+                    "and the tuple-matched Celigo receipt is verified."
+                )
+            elif asks_recovery and self._executor is None:
+                answer = "This observer build can diagnose the case, but provider writes are disabled."
+            elif asks_recovery:
+                answer = (
+                    "The dedicated demo executor is guarded by a verified evidence tuple and one "
+                    "Manager approval. Its current recovery state is "
+                    f"{self._text(execution.get('status'), 'AWAITING_MANAGER_APPROVAL')}."
+                )
+            elif asks_provenance:
+                answer = (
+                    "The agent correlated ERPNext receipt "
+                    f"{self._text(receipt.get('name'), 'unavailable')}, invoice "
+                    f"{self._text(invoice.get('name'), 'unavailable')}, and the Airtable release tuple "
+                    f"for {self._text(correlation.get('tuple', {}).get('case_id')) if isinstance(correlation.get('tuple'), Mapping) else 'the scoped case'}. "
+                    f"Celigo receipt status is {self._text(integration_receipt.get('status'), 'UNAVAILABLE')}."
                 )
             elif "invoice" in normalized:
                 answer = (

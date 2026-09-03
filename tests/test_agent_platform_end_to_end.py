@@ -191,6 +191,12 @@ def test_guarded_executor_waits_for_post_execution_receipt_before_closure() -> N
     activity_row.update(row)
     verified = platform.verify()
     assert verified["execution"]["status"] == "VERIFIED"
+    assert verified["diagnosis"]["status"] == "VERIFIED"
+    assert verified["diagnosis"]["integration_receipt_status"] == "VERIFIED"
+    assert verified["evidence_constellation"]["conclusion"]["label"] == "RECOVERY VERIFIED"
+    answer = platform.answer("What evidence proves this recovery is complete?")
+    assert "Recovery is complete" in answer["answer"]
+    assert "MAT-STE-20" in answer["answer"]
 
 
 def test_normal_receipt_uses_the_same_guarded_evidence_path_without_an_incident() -> None:

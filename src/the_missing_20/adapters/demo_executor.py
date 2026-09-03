@@ -141,13 +141,25 @@ class ERPNextDemoExecutor:
             return str(rows[0].get("name", ""))
         return ""
 
+    def _warehouse_company(self, warehouse: object) -> str:
+        document = self._document("Warehouse", str(warehouse))
+        company = str(document.get("company") or "").strip()
+        if not company:
+            raise DemoExecutionBlocked("M20 warehouse does not have an owning company")
+        return company
+
     def _submit_transfer(self, plan: DemoReleasePlan, item: Mapping[str, Any]) -> str:
+        source_company = self._warehouse_company(item["rejected_warehouse"])
+        target_company = self._warehouse_company(item["warehouse"])
+        if source_company != target_company:
+            raise DemoExecutionBlocked("M20 transfer warehouses belong to different companies")
         draft = self._request(
             "/api/resource/Stock%20Entry",
             method="POST",
             payload={
                 "doctype": "Stock Entry",
                 "stock_entry_type": "Material Transfer",
+                "company": source_company,
                 "remarks": f"M20 DEMO release {plan.case_id}",
                 "items": [
                     {
@@ -158,6 +170,8 @@ class ERPNextDemoExecutor:
                         "stock_uom": item.get("stock_uom") or "Nos",
                         "s_warehouse": item["rejected_warehouse"],
                         "t_warehouse": item["warehouse"],
+                        "basic_rate": item.get("valuation_rate") or item.get("rate") or 0,
+                        "allow_zero_valuation_rate": 1,
                     }
                 ],
             },
@@ -165,14 +179,32 @@ class ERPNextDemoExecutor:
         document = draft.get("data") if isinstance(draft, Mapping) else None
         if not isinstance(document, Mapping) or not document.get("name"):
             raise DemoExecutionBlocked("ERPNext did not create a transfer draft")
+        return self._submit_document(document)
+
+    def _submit_document(self, document: Mapping[str, Any]) -> str:
+        """Submit an existing M20 transfer and require an explicit submitted read."""
+
         submitted = self._request(
             "/api/method/frappe.client.submit", method="POST", payload={"doc": document}
         )
         result = submitted.get("message") if isinstance(submitted, Mapping) else None
-        name = result.get("name") if isinstance(result, Mapping) else document.get("name")
-        if not name:
+        if not isinstance(result, Mapping) or not result.get("name"):
             raise DemoExecutionBlocked("ERPNext did not submit the transfer")
-        return str(name)
+        return str(result["name"])
+
+    def _discard_unsubmitted_transfer(self, name: str, plan: DemoReleasePlan) -> None:
+        """Remove only our exact unsubmitted, invalid draft before retrying safely."""
+
+        document = self._document("Stock Entry", name)
+        if (
+            document.get("docstatus") != 0
+            or document.get("remarks") != f"M20 DEMO release {plan.case_id}"
+        ):
+            raise DemoExecutionBlocked("existing transfer is not the exact unsubmitted M20 draft")
+        self._request(
+            f"/api/resource/Stock%20Entry/{quote(name, safe='')}",
+            method="DELETE",
+        )
 
     def _unblock_invoice(self, invoice_name: str) -> None:
         self._request(
@@ -192,7 +224,15 @@ class ERPNextDemoExecutor:
         self._validate(plan, receipt, invoice)
         item = self._transfer_item(receipt, plan.quantity)
         existing = self._existing_transfer(plan)
-        transfer_name = existing or self._submit_transfer(plan, item)
+        if existing:
+            existing_document = self._document("Stock Entry", existing)
+            if existing_document.get("docstatus") == 1:
+                transfer_name = existing
+            else:
+                self._discard_unsubmitted_transfer(existing, plan)
+                transfer_name = self._submit_transfer(plan, item)
+        else:
+            transfer_name = self._submit_transfer(plan, item)
         if invoice.get("on_hold"):
             self._unblock_invoice(plan.purchase_invoice)
         verified_transfer = self._document("Stock Entry", transfer_name)

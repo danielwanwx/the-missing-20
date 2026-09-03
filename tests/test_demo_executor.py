@@ -20,6 +20,8 @@ def _executor(*, environment: str = "demo") -> ERPNextDemoExecutor:
             data = {"name": "MAT-PRE-2026-00001", "docstatus": 1, "supplier_delivery_note": "M20-DOCK-87421", "items": [{"item_code": "M20-ECU-CTRL", "rejected_qty": 8, "rejected_warehouse": "M20 Quality Hold - M20", "warehouse": "Stores - M20", "uom": "Nos", "stock_uom": "Nos"}]}
         elif path.startswith("/api/resource/Purchase%20Invoice/"):
             data = {"name": "ACC-PINV-2026-00007", "docstatus": 1, "on_hold": False, "hold_comment": "M20 DEMO hold"}
+        elif path.startswith("/api/resource/Warehouse/"):
+            data = {"company": "Missing 20 Automotive Demo"}
         elif path.startswith("/api/resource/Stock%20Entry?"):
             data = []
         elif path == "/api/resource/Stock%20Entry":
