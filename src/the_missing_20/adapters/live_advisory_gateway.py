@@ -61,7 +61,7 @@ class DashboardAdvisoryGateway:
         result = run.result.model_dump(mode="json")
         return {
             **projection,
-            "answer": result["reason"],
+            "answer": f"{result['reason']} Next: {result['safe_next_step']}",
             "agent_advisory": {
                 "status": "COMPLETE",
                 "mode": "real_strands",

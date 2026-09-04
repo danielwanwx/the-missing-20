@@ -80,7 +80,9 @@ def test_gateway_returns_provenanced_real_result() -> None:
     response = gateway.ask("Is recovery complete?")
 
     assert observed["question"] == "Is recovery complete?"
-    assert response["answer"] == "The ERP transfer is verified."
+    expected_answer = "The ERP transfer is verified. "
+    expected_answer += "Next: Keep the deterministic control plane read-only."
+    assert response["answer"] == expected_answer
     advisory = response["agent_advisory"]
     assert advisory["status"] == "COMPLETE"
     assert advisory["result"]["write_performed"] is False
