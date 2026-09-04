@@ -25,6 +25,9 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(_root / "src"))
 
 from the_missing_20.adapters.agent_platform import AgentPlatform  # noqa: E402
+from the_missing_20.adapters.ambiguous_receipt_source import (  # noqa: E402
+    AmbiguousReceiptEvidenceSource,
+)
 from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
 from the_missing_20.adapters.erpnext_source import ERPNextEvidenceSource  # noqa: E402
 from the_missing_20.adapters.live_advisory_gateway import (  # noqa: E402
@@ -173,6 +176,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         return self.server.agent_platform  # type: ignore[attr-defined,no-any-return]
 
     @property
+    def ambiguous_receipt(self) -> AmbiguousReceiptEvidenceSource:
+        return self.server.ambiguous_receipt  # type: ignore[attr-defined,no-any-return]
+
+    @property
     def agent_advisory(self) -> DashboardAdvisoryGateway:
         return self.server.agent_advisory  # type: ignore[attr-defined,no-any-return]
 
@@ -278,6 +285,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     def _v1_get(self, route: str, query: dict[str, list[str]]) -> None:
         if route == "/api/v1/agent-platform":
             self._send_json(HTTPStatus.OK, self.agent_platform.current())
+            return
+        if route == "/api/v1/ambiguous-receipt-case":
+            self._send_json(HTTPStatus.OK, self.ambiguous_receipt.current())
             return
         if route == "/api/v1/erpnext-evidence":
             self._send_json(HTTPStatus.OK, self.erpnext_evidence.current())
@@ -529,6 +539,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             return
         if (
             route == "/api/v1/agent-platform"
+            or route == "/api/v1/ambiguous-receipt-case"
             or route == "/api/v1/scenarios"
             or route == "/api/v1/incidents"
             or route.startswith("/api/v1/incidents/")
@@ -875,6 +886,7 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         live_sources: LiveSourceRegistry | None = None,
         erpnext_evidence: ERPNextEvidenceSource | None = None,
         saas_evidence: SaaSEvidenceSource | None = None,
+        ambiguous_receipt: AmbiguousReceiptEvidenceSource | None = None,
         agent_platform: AgentPlatform | None = None,
         agent_advisory: DashboardAdvisoryGateway | None = None,
         live_sources_autostart: bool | None = None,
@@ -893,6 +905,7 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         self.saas_evidence = saas_evidence or SaaSEvidenceSource.from_environment(
             repository_root=repository_root
         )
+        self.ambiguous_receipt = ambiguous_receipt or AmbiguousReceiptEvidenceSource()
         self.agent_platform = agent_platform or AgentPlatform(
             self.erpnext_evidence,
             self.saas_evidence,
