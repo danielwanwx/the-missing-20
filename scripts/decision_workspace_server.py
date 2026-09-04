@@ -52,6 +52,7 @@ from the_missing_20.live_sources import (  # noqa: E402
     LiveSourcePoller,
     LiveSourceRegistry,
 )
+from the_missing_20.ports.agent_model import AgentProvider  # noqa: E402
 from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -897,6 +898,11 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         self.registry = registry or ExperimentRegistry(
             self.repository_root,
             data_directory=runtime_directory,
+            # The legacy graph is a local compatibility projection. Keep its
+            # harness deterministic and cost-free; the Case Console is the
+            # only surface that may invoke the separately configured real,
+            # read-only Strands advisory agent.
+            provider_mode=AgentProvider.SCRIPTED,
         )
         self.live_sources = live_sources or LiveSourceRegistry()
         self.erpnext_evidence = erpnext_evidence or ERPNextEvidenceSource.from_environment(
