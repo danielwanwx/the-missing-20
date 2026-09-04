@@ -25,10 +25,10 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(_root / "src"))
 
 from the_missing_20.adapters.agent_platform import AgentPlatform  # noqa: E402
+from the_missing_20.adapters.ambiguous_case_platform import AmbiguousCasePlatform  # noqa: E402
 from the_missing_20.adapters.ambiguous_receipt_source import (  # noqa: E402
     AmbiguousReceiptEvidenceSource,
 )
-from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
 from the_missing_20.adapters.erpnext_source import ERPNextEvidenceSource  # noqa: E402
 from the_missing_20.adapters.live_advisory_gateway import (  # noqa: E402
     DashboardAdvisoryGateway,
@@ -172,7 +172,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         return self.server.saas_evidence  # type: ignore[attr-defined,no-any-return]
 
     @property
-    def agent_platform(self) -> AgentPlatform:
+    def agent_platform(self) -> AgentPlatform | AmbiguousCasePlatform:
         return self.server.agent_platform  # type: ignore[attr-defined,no-any-return]
 
     @property
@@ -887,7 +887,7 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         erpnext_evidence: ERPNextEvidenceSource | None = None,
         saas_evidence: SaaSEvidenceSource | None = None,
         ambiguous_receipt: AmbiguousReceiptEvidenceSource | None = None,
-        agent_platform: AgentPlatform | None = None,
+        agent_platform: AgentPlatform | AmbiguousCasePlatform | None = None,
         agent_advisory: DashboardAdvisoryGateway | None = None,
         live_sources_autostart: bool | None = None,
     ) -> None:
@@ -906,12 +906,10 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             repository_root=repository_root
         )
         self.ambiguous_receipt = ambiguous_receipt or AmbiguousReceiptEvidenceSource()
-        self.agent_platform = agent_platform or AgentPlatform(
-            self.erpnext_evidence,
-            self.saas_evidence,
-            executor=ERPNextDemoExecutor.from_environment(repository_root),
+        self.agent_platform = agent_platform or AmbiguousCasePlatform()
+        self.agent_advisory = agent_advisory or DashboardAdvisoryGateway(  # type: ignore[arg-type]
+            self.agent_platform
         )
-        self.agent_advisory = agent_advisory or DashboardAdvisoryGateway(self.agent_platform)
         self.live_source_poller = LiveSourcePoller(self.live_sources)
         configured_autostart = os.environ.get("MISSING20_LIVE_SOURCES_AUTOSTART", "0")
         should_autostart = (

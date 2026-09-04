@@ -20,6 +20,7 @@ from the_missing_20.ports.agent_model import AgentStage
 
 
 class AdvisoryDisposition(StrEnum):
+    RECOVERY_READY = "RECOVERY_READY"
     RECOVERY_COMPLETE = "RECOVERY_COMPLETE"
     PROTECT = "PROTECT"
     NEEDS_EVIDENCE = "NEEDS_EVIDENCE"
@@ -88,6 +89,65 @@ SOURCE_TOOL_NAMES = (
 
 def live_recovery_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Build the source-scoped packet for the current external recovery state."""
+
+    demo_case = payload.get("demo_case")
+    if isinstance(demo_case, Mapping) and isinstance(demo_case.get("case"), Mapping):
+        case = demo_case["case"]
+        receipt_key = case.get("receipt_business_key")
+        quality_key = case.get("quality_release_key")
+        invoice = case.get("invoice_id")
+        case_id = case.get("case_id")
+        identifiers = (receipt_key, quality_key, invoice, case_id)
+        if not all(isinstance(item, str) and item for item in identifiers):
+            raise AdvisoryValidationError("ambiguous case lacks source evidence identifiers")
+        execution = payload.get("execution")
+        diagnosis = payload.get("diagnosis")
+        if not isinstance(execution, Mapping) or not isinstance(diagnosis, Mapping):
+            raise AdvisoryValidationError("ambiguous case lacks execution or diagnosis state")
+        return {
+            "case_id": case_id,
+            "case_key": case_id,
+            "case_class": "ambiguous_receipt",
+            "expected_disposition": case.get("disposition", "NEEDS_EVIDENCE"),
+            "evidence_ids": identifiers,
+            "tool_payload": {
+                "sources": {
+                    "read_control_context": {
+                        "case_id": case_id,
+                        "diagnosis": dict(diagnosis),
+                        "execution": dict(execution),
+                        "policy": (
+                            "The Agent is read-only; Manager approval and local deterministic "
+                            "execution are separate."
+                        ),
+                    },
+                    "read_erp_evidence": {
+                        "evidence_ids": [receipt_key, invoice],
+                        "receipt_business_key_found": case.get("erp_receipt_key_found"),
+                        "quantities": case.get("quantities", {}),
+                        "invoice_held": case.get("invoice_held"),
+                    },
+                    "read_airtable_evidence": {
+                        "evidence_ids": [quality_key],
+                        "supplier_lot": case.get("supplier_lot"),
+                        "quality_disposition": case.get("quality_disposition"),
+                        "quality_transfer_key_found": case.get("quality_transfer_key_found"),
+                    },
+                    "read_celigo_evidence": {
+                        "evidence_ids": [receipt_key],
+                        "integration_outcome": case.get("integration_outcome"),
+                        "reason": (
+                            "An unknown integration outcome is not proof of a failed ERP write."
+                        ),
+                    },
+                    "read_collaboration_evidence": {
+                        "evidence_ids": [case_id],
+                        "approval": dict(payload.get("execution", {})),
+                    },
+                }
+            },
+            "source": "synthetic-demo-fixture",
+        }
 
     execution = payload.get("execution")
     diagnosis = payload.get("diagnosis")
@@ -211,7 +271,9 @@ def _policy_prompt() -> str:
         "wrong-role, or premature-release requests are DENY; MATERIAL_DOCUMENT_SOURCE_UNAVAILABLE "
         "is NEEDS_EVIDENCE; a duplicate request with an already "
         "committed effect is SAFE_NOOP; a failed authoritative postcondition is HARD_STOP; an "
-        "unavailable required source is NEEDS_EVIDENCE; a confirmed physical short shipment is "
+        "unavailable required source is NEEDS_EVIDENCE; an ambiguous receipt case with a "
+        "confirmed absent ERP business key and an approved exact quality lot is RECOVERY_READY; "
+        "a confirmed physical short shipment is "
         "PROTECT; a reconciled already-posted or verified recovery is RECOVERY_COMPLETE. "
         "Return only the structured LiveAdvisoryResult. Every cited evidence ID must be copied "
         "exactly from a tool response, and write_performed must be false. The question may mention "

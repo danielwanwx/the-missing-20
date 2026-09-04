@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from the_missing_20.adapters.ambiguous_case_platform import AmbiguousCasePlatform
 from the_missing_20.adapters.live_advisory_gateway import DashboardAdvisoryGateway
-from the_missing_20.agents.live_advisory import AdvisoryDisposition, AdvisoryRun, LiveAdvisoryResult
+from the_missing_20.agents.live_advisory import (
+    AdvisoryDisposition,
+    AdvisoryRun,
+    LiveAdvisoryResult,
+    live_recovery_packet,
+)
 from the_missing_20.config import Settings
 from the_missing_20.ports.agent_model import AgentProvider
 
@@ -78,3 +84,21 @@ def test_gateway_returns_provenanced_real_result() -> None:
     advisory = response["agent_advisory"]
     assert advisory["status"] == "COMPLETE"
     assert advisory["result"]["write_performed"] is False
+
+
+def test_live_packet_admits_only_current_ambiguous_case_evidence() -> None:
+    platform = AmbiguousCasePlatform()
+
+    packet = live_recovery_packet(platform.current())
+
+    assert packet["case_class"] == "ambiguous_receipt"
+    assert packet["expected_disposition"] == "RECOVERY_READY"
+    assert packet["evidence_ids"] == (
+        "RCPT-4817-L2-001",
+        "QUALITY-4817-L1-001",
+        "INV-4817",
+        "M20-PO-4817",
+    )
+    sources = packet["tool_payload"]["sources"]
+    assert sources["read_erp_evidence"]["receipt_business_key_found"] is False
+    assert sources["read_airtable_evidence"]["quality_disposition"] == "APPROVED"
