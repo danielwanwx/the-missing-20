@@ -16,12 +16,9 @@ if __package__ in {None, ""}:
 
 from scripts.aws_preflight import PreflightError, load_identity, validate_identity
 from the_missing_20.adapters.strands_models import BedrockNovaProConfig, BedrockNovaProFactory
+from the_missing_20.agents.live_advisory import live_recovery_packet
 from the_missing_20.config import ConfigurationError, Settings
-from the_missing_20.evaluation.real_strands_matrix import (
-    live_recovery_packet,
-    load_fixture_packet,
-    run_case,
-)
+from the_missing_20.evaluation.real_strands_matrix import load_fixture_packet, run_case
 from the_missing_20.ports.agent_model import (
     AgentBudget,
     AgentBudgetExceeded,
@@ -79,13 +76,13 @@ def main() -> int:
         budget = AgentBudget(
             max_requests=40,
             max_input_tokens=200_000,
-            max_output_tokens=12_000,
+            max_output_tokens=24_000,
             max_output_tokens_per_request=800,
             prior_cost_usd=0,
             incremental_cost_cap_usd="0.20",
             cumulative_cost_cap_usd="0.20",
             per_call_timeout_seconds=45,
-            whole_run_timeout_seconds=120,
+            whole_run_timeout_seconds=300,
         )
         ledger = AgentBudgetLedger(budget)
         factory = BedrockNovaProFactory(
