@@ -180,7 +180,8 @@ def test_server_exposes_only_read_only_agent_platform_commands(tmp_path: Path) -
         )
         with urlopen(request, timeout=5) as response:
             answer = json.loads(response.read())
-        assert "writes are disabled" in answer["answer"]
+        assert "no fallback answer" in answer["answer"]
+        assert answer["agent_advisory"]["status"] == "AGENT_UNAVAILABLE"
         assert answer["execution"]["available"] is False
 
         diagnosis_request = Request(

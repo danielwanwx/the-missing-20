@@ -27,6 +27,9 @@ if __package__ in {None, ""}:
 from the_missing_20.adapters.agent_platform import AgentPlatform  # noqa: E402
 from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
 from the_missing_20.adapters.erpnext_source import ERPNextEvidenceSource  # noqa: E402
+from the_missing_20.adapters.live_advisory_gateway import (  # noqa: E402
+    DashboardAdvisoryGateway,
+)
 from the_missing_20.adapters.saas_evidence import SaaSEvidenceSource  # noqa: E402
 from the_missing_20.authority_b.models import canonical_json  # noqa: E402
 from the_missing_20.authority_b.quorum import QuorumDenied  # noqa: E402
@@ -168,6 +171,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     @property
     def agent_platform(self) -> AgentPlatform:
         return self.server.agent_platform  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def agent_advisory(self) -> DashboardAdvisoryGateway:
+        return self.server.agent_advisory  # type: ignore[attr-defined,no-any-return]
 
     def _send(
         self,
@@ -332,20 +339,14 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                             "label": "Incident",
                             **_identity(incident),
                             "status": (
-                                "ACTIVE"
-                                if active_scenario in {"incident", "golden"}
-                                else "READY"
+                                "ACTIVE" if active_scenario in {"incident", "golden"} else "READY"
                             ),
                         },
                         {
                             "id": "recovery",
                             "label": "Recovery",
                             **_identity(recovery),
-                            "status": (
-                                "READY"
-                                if recovery_session is not None
-                                else "LOCKED"
-                            ),
+                            "status": ("READY" if recovery_session is not None else "LOCKED"),
                         },
                     ],
                 },
@@ -592,7 +593,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "invalid_question",
                     "evidence questions require a text question",
                 )
-            self._send_json(HTTPStatus.OK, self.agent_platform.answer(question))
+            self._send_json(HTTPStatus.OK, self.agent_advisory.ask(question))
             return
         if route == "/api/v1/agent-platform/approve":
             manager_id = payload.get("manager_id")
@@ -611,7 +612,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "invalid_execution",
                     "execution requires approval_id and idempotency_key",
                 )
-            self._send_json(HTTPStatus.OK, self.agent_platform.execute(approval_id, idempotency_key))
+            self._send_json(
+                HTTPStatus.OK, self.agent_platform.execute(approval_id, idempotency_key)
+            )
             return
         if route == "/api/v1/agent-platform/verify":
             if payload:
@@ -814,7 +817,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         ]
         for session in self.registry.list():
             metrics = session.metrics()
-            incident_id = str(metrics["incident_id"]).replace('\\', '_').replace('"', '_')
+            incident_id = str(metrics["incident_id"]).replace("\\", "_").replace('"', "_")
             labels = f'incident_id="{incident_id}"'
             lines.extend(
                 [
@@ -873,6 +876,7 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         erpnext_evidence: ERPNextEvidenceSource | None = None,
         saas_evidence: SaaSEvidenceSource | None = None,
         agent_platform: AgentPlatform | None = None,
+        agent_advisory: DashboardAdvisoryGateway | None = None,
         live_sources_autostart: bool | None = None,
     ) -> None:
         if address[0] not in {"127.0.0.1", "localhost", "::1"}:
@@ -894,6 +898,7 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             self.saas_evidence,
             executor=ERPNextDemoExecutor.from_environment(repository_root),
         )
+        self.agent_advisory = agent_advisory or DashboardAdvisoryGateway(self.agent_platform)
         self.live_source_poller = LiveSourcePoller(self.live_sources)
         configured_autostart = os.environ.get("MISSING20_LIVE_SOURCES_AUTOSTART", "0")
         should_autostart = (
