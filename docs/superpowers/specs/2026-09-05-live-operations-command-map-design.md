@@ -44,7 +44,18 @@ Supporting systems appear below the stage they inform:
 - Jira → incident correlation.
 - Slack → manager approval evidence.
 
-Every node displays one current authoritative value and one concise state. Connectors are thin, solid, and anchored exactly to node boundaries. Aligned relations use straight paths; offset evidence relations use restrained curves or rounded orthogonal routes. Paths must not enter unrelated nodes, stop short, cross without meaning, or use glowing endpoint dots.
+Every node displays one current authoritative value and one concise state. Connectors are thin, solid, and anchored exactly to node boundaries. Aligned relations use straight paths; offset evidence relations use one restrained curve only when necessary. Paths must not enter unrelated nodes, stop short, cross without meaning, or use glowing endpoint dots.
+
+#### Connector routing contract
+
+- One business relationship produces one visible edge. A source must not connect to both a stage and the Agent when the stage-to-Agent relationship already carries the same meaning.
+- Every node exposes one input and one output anchor per direction. Edges terminate at the calculated rectangle or ellipse boundary, never at the node center and never inside its content.
+- Nodes that share a horizontal center line use one horizontal straight segment. Nodes that share a vertical center line use one vertical straight segment.
+- A curve is allowed only when the two anchors are offset or a straight segment would intersect a real node or label. It uses one cubic segment with direction-preserving tangents and the minimum practical bend.
+- Routing does not add ornamental S-curves, multiple elbows, detours around empty space, parallel duplicate lines, endpoint dots, or arrowheads that imply an unsupported direction.
+- Evidence sources connect to the nearest relevant business stage. The Agent status bar consumes the resulting correlated state; it does not require a second set of source-to-Agent lines on the Dashboard.
+- Layout is resolved before routing. Nodes may move to create a clean straight relationship instead of forcing an avoidable curve.
+- Desktop geometry tests must prove that every straight-eligible relationship is straight, every edge touches both intended boundaries, no edge crosses a node interior, and no duplicate source/target pair exists.
 
 The active event is represented by a small moving packet or current-position marker driven by the newest server event. It is not a decorative loop: when no event arrives, the marker does not move.
 
@@ -173,6 +184,8 @@ Dashboard, Investigation, and Demo Controls must consume the same incident ident
 - Investigation contains no duplicated deterministic supply-chain map.
 - Scenario Lab is absent from primary navigation and remains reachable through Demo Controls.
 - Every connector terminates on its source and target boundary.
+- Every horizontally or vertically aligned relationship renders as a straight segment.
+- No duplicate source/target pair, unnecessary bend, or source-to-Agent edge exists on the Dashboard.
 - Contrast tokens and minimum font sizes are regression-tested.
 - Existing diagnosis, chat, manager approval, execution, verification, replay, degraded, and fail-closed tests remain green.
 
