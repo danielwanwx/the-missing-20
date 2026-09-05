@@ -27,7 +27,7 @@ The theme must not use rainbow gradients, translucent muddy colors, or broad neo
 | Lime `#85A900` | Successful verification and resolved outcome |
 | Coral `#CF473C` | Incident, rejection, or blocked state |
 
-Colors are assigned through semantic classes or variables, not through position-dependent selectors. The same source or lifecycle stage must use the same solid color in its node, connector, tool receipt, and timeline event.
+Colors are assigned through semantic classes or variables, not through position-dependent selectors. Inside the Investigation topology, the same source must use the same solid color for its node and connector. Outside the topology, Signals, tool receipts, and timeline events retain light neutral surfaces and use the semantic color only for text, icons, or a narrow state marker.
 
 ## Surface hierarchy
 
@@ -35,13 +35,13 @@ Colors are assigned through semantic classes or variables, not through position-
 2. The navigation bar is an opaque light surface with a quiet divider.
 3. Signals, Investigation, Agent, Manager Decision, and Outcome are independent white floating modules with soft elevation.
 4. Inner metrics and tool rows use a cooler light-gray fill; they do not become additional framed cards.
-5. Agent remains the strongest focal node using a pale lime surface with dark text. Source nodes remain white with a solid colored edge or label.
+5. Only the Investigation topology uses fully colored nodes. ERPNext, Airtable, Celigo, Jira, Slack, Manager, and Agent each use one opaque solid fill with high-contrast text. Those nodes do not combine a white body with a colored edge, use two shades of one hue, or add a glow.
 
 The approved borderless command-canvas structure remains intact. Modules may still be focused, dragged, resized, and reset. No module is wrapped in a new descriptive container.
 
 ## Connectors and live state
 
-SVG connectors remain thin, smooth, and free of endpoint dots. Each connector inherits the solid color assigned to its source. Aligned nodes retain straight connectors; offset nodes retain direction-aware curves.
+SVG connectors remain thin, smooth, and free of endpoint dots. Each connector inherits the solid color assigned to its source. Every path must terminate at the calculated center of the appropriate node edge without entering the node interior or stopping short. Aligned nodes retain straight connectors. Offset nodes use direction-aware cubic curves with enough control-point distance to avoid cramped hooks, crossings, or visible kinks.
 
 Live events may temporarily increase connector opacity or brightness. Motion remains event-driven and must stop when the stream is paused or disconnected. Reduced-motion users receive the same status through color and labels without animation.
 
@@ -49,7 +49,7 @@ Live events may temporarily increase connector opacity or brightness. Motion rem
 
 - Replace dark global color tokens with silver-gray background, white surface, charcoal text, and readable gray-blue secondary text.
 - Update top navigation, incident ribbon, command-canvas modules, atomic nodes, evidence rows, tool receipts, timeline events, decision controls, chat input, and resolution packet to the new surface hierarchy.
-- Add semantic solid-color variants for ERPNext, Airtable, Celigo, Jira, Slack, Manager, verification, and incident states.
+- Add semantic solid-color variants for the ERPNext, Airtable, Celigo, Jira, Slack, Manager, and Agent nodes inside the Investigation topology. Keep other components on light neutral surfaces with restrained semantic accents.
 - Keep all existing DOM identifiers, event bindings, API contracts, local layout persistence, and state transitions unchanged.
 - Keep local Geist and Geist Mono assets; no new dependency or remote asset is introduced.
 
