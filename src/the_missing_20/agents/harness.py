@@ -287,12 +287,8 @@ class AdvisoryStageResult:
             ],
             "synthesis": self.synthesis.model_dump(mode="json"),
             "evaluation": self.evaluation.model_dump(mode="json"),
-            "evaluator_citation_closure": self.evaluator_citation_closure.model_dump(
-                mode="json"
-            ),
-            "evaluator_source_coverage": self.evaluator_source_coverage.model_dump(
-                mode="json"
-            ),
+            "evaluator_citation_closure": self.evaluator_citation_closure.model_dump(mode="json"),
+            "evaluator_source_coverage": self.evaluator_source_coverage.model_dump(mode="json"),
             "ai_coverage": self.ai_coverage,
             "authoritative_catalog": self.authoritative_catalog,
             "trace": self.trace.public(),
@@ -427,9 +423,7 @@ def _validate_chat_investigator(
     if not set(read_evidence_ids).issubset(allowed_evidence_ids):
         raise AgentValidationError("chat investigator read an unallowlisted evidence ID")
     referenced = {
-        evidence_id
-        for claim in result.factual_claims
-        for evidence_id in claim.evidence_ids
+        evidence_id for claim in result.factual_claims for evidence_id in claim.evidence_ids
     }
     if not referenced.issubset(allowed_evidence_ids):
         raise AgentValidationError("chat investigator cited an unallowlisted evidence ID")
@@ -968,6 +962,7 @@ class AgentHarness:
                     model_factory=self.model_factory,
                     output_payload=evaluator_payload,
                     synthesis=synthesis,
+                    evidence=evidence,
                     investigator_knowledge_citations=investigator_knowledge_citations,
                     investigator_read_evidence_ids=tuple(
                         run.read_evidence_ids for run in investigator_runs
@@ -1048,9 +1043,7 @@ class AgentHarness:
                 evaluator_citation_closure=evaluator_citation_closure,
                 evaluator_source_coverage=evaluator_source_coverage,
             )
-            action_recommendation = action_recommendation.model_copy(
-                update={"protocol": protocol}
-            )
+            action_recommendation = action_recommendation.model_copy(update={"protocol": protocol})
             coverage_ledger = coverage_ledger.model_copy(
                 update={"outcome_reason": action_recommendation.reason_code}
             )
@@ -1086,9 +1079,7 @@ class AgentHarness:
             evaluator_version=EVALUATOR_VERSION,
             agent_contract_version=AGENT_CONTRACT_VERSION,
             stop_reason=(
-                "ADVISORY_PARTIAL_CITATION_CLOSURE"
-                if partial_advisory
-                else "ASSESSMENT_VALIDATED"
+                "ADVISORY_PARTIAL_CITATION_CLOSURE" if partial_advisory else "ASSESSMENT_VALIDATED"
             ),
             evaluator_source_coverage=evaluator_source_coverage.model_dump(mode="json"),
             evaluator_citation_closure=evaluator_citation_closure.model_dump(mode="json"),

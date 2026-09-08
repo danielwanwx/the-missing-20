@@ -12,11 +12,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from the_missing_20.adapters.erpnext_source import ERPNextCredentials
-from the_missing_20.adapters.erpnext_source import _read_env_file
+from the_missing_20.adapters.erpnext_source import ERPNextCredentials, _read_env_file
 
 
 class DemoExecutionBlocked(ValueError):
@@ -30,6 +30,8 @@ class DemoReleasePlan:
     purchase_invoice: str
     quantity: float
     idempotency_key: str
+    sales_order: str = ""
+    sales_order_quantity: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +40,10 @@ class DemoExecutionResult:
     invoice_name: str
     idempotent: bool
     verified: bool
+    sales_order: str = ""
+    delivery_note: str = ""
+    sales_invoice: str = ""
+    order_to_cash_verified: bool = False
 
 
 class ERPNextDemoExecutor:
@@ -75,18 +81,42 @@ class ERPNextDemoExecutor:
 
     def _request(self, path: str, *, method: str = "GET", payload: object | None = None) -> Any:
         data = json.dumps(payload).encode("utf-8") if payload is not None else None
+        authorization = f"token {self._credentials.api_key}:{self._credentials.api_secret}"
         request = Request(
             f"{self._credentials.base_url.rstrip('/')}{path}",
             data=data,
             method=method,
             headers={
-                "Authorization": f"token {self._credentials.api_key}:{self._credentials.api_secret}",
+                "Authorization": authorization,
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "User-Agent": "TheMissing20/0.1 demo-guarded-executor",
             },
         )
-        return json.loads(self._transport(request, self._timeout_seconds).decode("utf-8"))
+        try:
+            response = self._transport(request, self._timeout_seconds)
+        except HTTPError as error:
+            detail = self._http_error_detail(error)
+            raise DemoExecutionBlocked(
+                f"ERPNext rejected {method} {path} ({error.code}): {detail}"
+            ) from error
+        return json.loads(response.decode("utf-8"))
+
+    @staticmethod
+    def _http_error_detail(error: HTTPError) -> str:
+        """Return a bounded provider message without credentials or server tracebacks."""
+
+        try:
+            payload = json.loads(error.read().decode("utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return str(error.reason or "request failed")[:300]
+        if not isinstance(payload, Mapping):
+            return str(error.reason or "request failed")[:300]
+        for key in ("message", "exception", "exc_type"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return " ".join(value.split())[:300]
+        return str(error.reason or "request failed")[:300]
 
     def _document(self, doctype: str, name: str) -> Mapping[str, Any]:
         payload = self._request(f"/api/resource/{quote(doctype, safe='')}/{quote(name, safe='')}")
@@ -99,7 +129,9 @@ class ERPNextDemoExecutor:
     def _m20_text(value: object) -> bool:
         return "M20" in str(value).upper()
 
-    def _validate(self, plan: DemoReleasePlan, receipt: Mapping[str, Any], invoice: Mapping[str, Any]) -> None:
+    def _validate(
+        self, plan: DemoReleasePlan, receipt: Mapping[str, Any], invoice: Mapping[str, Any]
+    ) -> None:
         if self._environment != "demo":
             raise DemoExecutionBlocked("provider writes require MISSING20_ENVIRONMENT=demo")
         if not plan.case_id.startswith("M20-") or not plan.idempotency_key.startswith("m20-"):
@@ -218,6 +250,140 @@ class ERPNextDemoExecutor:
             },
         )
 
+    def _existing_order_effect(
+        self,
+        doctype: str,
+        *,
+        remarks: str,
+        customer: str,
+        sales_order: str,
+    ) -> str:
+        """Find our exact submitted effect without querying a restricted text field."""
+
+        filters = [["customer", "=", customer], ["docstatus", "=", 1]]
+        query = urlencode(
+            {
+                "fields": json.dumps(["name"]),
+                "filters": json.dumps(filters),
+                "limit_page_length": "20",
+            }
+        )
+        payload = self._request(f"/api/resource/{quote(doctype, safe='')}?{query}")
+        rows = payload.get("data") if isinstance(payload, Mapping) else None
+        relationship_match = ""
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, Mapping) or not row.get("name"):
+                continue
+            document = self._document(doctype, str(row["name"]))
+            items = document.get("items")
+            if not isinstance(items, list):
+                continue
+            linked_to_order = any(
+                isinstance(item, Mapping)
+                and sales_order in {item.get("against_sales_order"), item.get("sales_order")}
+                for item in items
+            )
+            if not linked_to_order:
+                continue
+            if document.get("remarks") == remarks:
+                return str(document["name"])
+            # ERPNext currently drops caller-supplied remarks on Delivery Note
+            # mapping.  The exact submitted child-row relationship is still an
+            # authoritative idempotency key for this one-order demo scope.
+            relationship_match = relationship_match or str(document["name"])
+        return relationship_match
+
+    def _mapped_document(self, method: str, source_name: str) -> Mapping[str, Any]:
+        payload = self._request(
+            f"/api/method/{method}",
+            method="POST",
+            payload={"source_name": source_name},
+        )
+        document = payload.get("message") if isinstance(payload, Mapping) else None
+        if not isinstance(document, Mapping):
+            raise DemoExecutionBlocked(f"ERPNext mapper returned no document for {source_name}")
+        return dict(document)
+
+    def _insert_and_submit(self, document: Mapping[str, Any]) -> str:
+        doctype = str(document.get("doctype") or "")
+        if not doctype:
+            raise DemoExecutionBlocked("ERPNext mapped document has no doctype")
+        created = self._request(
+            f"/api/resource/{quote(doctype, safe='')}", method="POST", payload=document
+        )
+        draft = created.get("data") if isinstance(created, Mapping) else None
+        if not isinstance(draft, Mapping) or not draft.get("name"):
+            raise DemoExecutionBlocked(f"ERPNext did not create {doctype}")
+        return self._submit_document(draft)
+
+    def _fulfill_sales_order(self, plan: DemoReleasePlan) -> tuple[str, str, bool]:
+        """Resume and fulfill one exact M20 customer order after the quality release."""
+
+        if not plan.sales_order:
+            return "", "", False
+        order = self._document("Sales Order", plan.sales_order)
+        if order.get("docstatus") != 1 or not self._m20_text(order.get("po_no")):
+            raise DemoExecutionBlocked("sales order is not a submitted M20 demo resource")
+        if float(order.get("total_qty") or 0) != plan.sales_order_quantity:
+            raise DemoExecutionBlocked("sales order quantity is outside the approved M20 scope")
+        if str(order.get("status") or "") == "On Hold":
+            self._request(
+                "/api/method/erpnext.selling.doctype.sales_order.sales_order.update_status",
+                method="POST",
+                payload={"status": "Resume", "name": plan.sales_order},
+            )
+
+        delivery_remarks = f"M20 DEMO customer delivery {plan.case_id}"
+        invoice_remarks = f"M20 DEMO customer billing {plan.case_id}"
+        customer = str(order.get("customer") or "").strip()
+        if not customer:
+            raise DemoExecutionBlocked("M20 sales order has no customer")
+        delivery_name = self._existing_order_effect(
+            "Delivery Note",
+            remarks=delivery_remarks,
+            customer=customer,
+            sales_order=plan.sales_order,
+        )
+        invoice_name = self._existing_order_effect(
+            "Sales Invoice",
+            remarks=invoice_remarks,
+            customer=customer,
+            sales_order=plan.sales_order,
+        )
+        was_idempotent = bool(delivery_name and invoice_name)
+
+        if not delivery_name:
+            delivery = dict(
+                self._mapped_document(
+                    "erpnext.selling.doctype.sales_order.sales_order.make_delivery_note",
+                    plan.sales_order,
+                )
+            )
+            delivery["remarks"] = delivery_remarks
+            delivery_name = self._insert_and_submit(delivery)
+        if not invoice_name:
+            invoice = dict(
+                self._mapped_document(
+                    "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice",
+                    plan.sales_order,
+                )
+            )
+            invoice["remarks"] = invoice_remarks
+            invoice_name = self._insert_and_submit(invoice)
+
+        verified_order = self._document("Sales Order", plan.sales_order)
+        verified_delivery = self._document("Delivery Note", delivery_name)
+        verified_invoice = self._document("Sales Invoice", invoice_name)
+        verified = (
+            verified_delivery.get("docstatus") == 1
+            and verified_invoice.get("docstatus") == 1
+            and float(verified_order.get("per_delivered") or 0) >= 100
+            and float(verified_order.get("per_billed") or 0) >= 100
+        )
+        if not verified:
+            raise DemoExecutionBlocked("customer fulfillment did not pass fresh ERPNext rereads")
+        return delivery_name, invoice_name, was_idempotent
+
     def execute(self, plan: DemoReleasePlan) -> DemoExecutionResult:
         receipt = self._document("Purchase Receipt", plan.purchase_receipt)
         invoice = self._document("Purchase Invoice", plan.purchase_invoice)
@@ -235,12 +401,19 @@ class ERPNextDemoExecutor:
             transfer_name = self._submit_transfer(plan, item)
         if invoice.get("on_hold"):
             self._unblock_invoice(plan.purchase_invoice)
+        delivery_name, sales_invoice_name, value_idempotent = self._fulfill_sales_order(plan)
         verified_transfer = self._document("Stock Entry", transfer_name)
         verified_invoice = self._document("Purchase Invoice", plan.purchase_invoice)
-        verified = verified_transfer.get("docstatus") == 1 and not bool(verified_invoice.get("on_hold"))
+        verified = verified_transfer.get("docstatus") == 1 and not bool(
+            verified_invoice.get("on_hold")
+        )
         return DemoExecutionResult(
             transfer_name=transfer_name,
             invoice_name=plan.purchase_invoice,
-            idempotent=bool(existing),
+            idempotent=bool(existing) and (not plan.sales_order or value_idempotent),
             verified=verified,
+            sales_order=plan.sales_order,
+            delivery_note=delivery_name,
+            sales_invoice=sales_invoice_name,
+            order_to_cash_verified=bool(plan.sales_order and delivery_name and sales_invoice_name),
         )

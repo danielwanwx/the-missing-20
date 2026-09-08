@@ -1,7 +1,7 @@
 # Real-Time Dashboard and Agent Workspace Implementation Plan
 
-**Date:** 2026-08-28  
-**Status:** Approved for implementation  
+**Date:** 2026-08-28
+**Status:** Approved for implementation
 **Design source:** `docs/superpowers/specs/2026-08-28-dashboard-agent-workspace-redesign.md`
 
 ## Outcome

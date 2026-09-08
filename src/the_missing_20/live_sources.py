@@ -406,22 +406,18 @@ class AISStreamUnavailable(RuntimeError):
 
 
 class _AISWebSocket(Protocol):
-    def __enter__(self) -> _AISWebSocket:
-        ...
+    def __enter__(self) -> _AISWebSocket: ...
 
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
-    ) -> bool | None:
-        ...
+    ) -> bool | None: ...
 
-    def send(self, message: str) -> None:
-        ...
+    def send(self, message: str) -> None: ...
 
-    def recv(self, timeout: float | None = None) -> str | bytes:
-        ...
+    def recv(self, timeout: float | None = None) -> str | bytes: ...
 
 
 def _build_ais_subscription(
@@ -680,9 +676,7 @@ def correlate_route_risk(snapshots: Sequence[LiveSourceSnapshot]) -> RouteRisk:
         if snapshot.source_id == "nws-ca-alerts":
             raw_severe_alerts = snapshot.metrics.get("route_high_severity_alerts", 0)
             severe_alerts = (
-                int(raw_severe_alerts)
-                if isinstance(raw_severe_alerts, (int, float, str))
-                else 0
+                int(raw_severe_alerts) if isinstance(raw_severe_alerts, (int, float, str)) else 0
             )
             if severe_alerts:
                 reasons.append(f"{severe_alerts} severe weather alert(s) in route area")
@@ -781,9 +775,7 @@ class LiveSourceRegistry:
             return tuple(emitted)
 
     @staticmethod
-    def _is_new_observation(
-        prior: LiveSourceSnapshot | None, current: LiveSourceSnapshot
-    ) -> bool:
+    def _is_new_observation(prior: LiveSourceSnapshot | None, current: LiveSourceSnapshot) -> bool:
         if prior is None:
             return current.observed_at is not None or current.status is LiveSourceStatus.CONNECTED
         if current.observed_at is None:

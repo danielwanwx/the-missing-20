@@ -36,16 +36,16 @@ The closest public benchmark is the official
 ### Stronger than typical demos
 
 - Deterministic separation between probabilistic investigation and write authority.
-- Exact per-action two-role quorum instead of a vague “human in the loop.”
+- One case/version-bound Manager gate in the primary UI, plus a stricter two-role
+  regression harness behind it.
 - Fresh authoritative rereads, idempotent effects, postcondition verification, replay,
   and adversarial mutation tests.
 - Explicit complete, degraded, and fail-closed states.
 
 ### Gaps to close before public release
 
-- Stable useful Nova-produced investigation is not proven; the captured real result
-  is intentionally disclosed as `PARTIAL` (AI citation coverage 1/5, application
-  validation 5/5).
+- Real Strands/Nova behavior now passes the bounded 8-case and 15-case multi-turn
+  matrices. Production accuracy and generalization remain unproven.
 - AgentCore Runtime deployment, invocation, read-only role chat, and runtime-log
   evidence are implemented and proven within the redacted evidence boundary. Gateway
   and Policy are not proven and should not be implied.
@@ -61,9 +61,11 @@ The product should not open as an audit report. The judge-facing path is:
 1. Detect the 20-unit discrepancy.
 2. Let agents compare plausible causes and surface evidence.
 3. Show deterministic policy selecting an eligible recovery action.
-4. Show two distinct simulated role principals approving that exact action; the local demo
-   has no authentication or independent-human claim.
-5. Apply the bounded synthetic recovery and verify that the records reconcile.
+4. Let one declared Manager approve or reject that exact action; the local demo has no
+   authentication or independent-human claim.
+5. Apply the bounded Manager-gated recovery in the isolated ERPNext demo tenant,
+   then prove the resulting Stock Entry, Delivery Note, Sales Invoice, and balanced
+   ledgers with fresh authoritative reads.
 
 Detailed digests, claim classes, AWS evidence boundaries, and the immutable audit trail
 remain available as proof, but they are secondary to this five-step story.

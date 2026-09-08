@@ -18,6 +18,7 @@ class PublicEventType(StrEnum):
     # lifecycle events so the browser can prove that motion came from the
     # backend stream rather than from a client-side timer.
     TELEMETRY_OBSERVED = "telemetry.observed"
+    EXTERNAL_SOURCE_CHANGED = "external.source.changed"
     # Scenario Lab changes the synthetic source first. The detector observes
     # that fact in a later event; a UI control must not claim an incident.
     SOURCE_CONDITION_INJECTED = "source.condition.injected"
@@ -37,6 +38,11 @@ class PublicEventType(StrEnum):
     APPROVAL_REQUESTED = "approval.requested"
     APPROVAL_RECORDED = "approval.recorded"
     EXECUTION_STARTED = "execution.started"
+    SOURCE_READ_STARTED = "source.read.started"
+    SOURCE_READ_COMPLETED = "source.read.completed"
+    EFFECT_STARTED = "effect.started"
+    EFFECT_COMPLETED = "effect.completed"
+    VERIFICATION_STARTED = "verification.started"
     EXECUTION_COMPLETED = "execution.completed"
     VERIFICATION_COMPLETED = "verification.completed"
     CHAT_MESSAGE = "copilot.message"

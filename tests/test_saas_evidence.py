@@ -100,6 +100,48 @@ def test_saas_projection_is_correlation_scoped_and_redacts_credentials() -> None
     assert "M20-TEST" in encoded
 
 
+def test_saas_sequence_advances_only_when_external_record_state_changes() -> None:
+    state = {"celigo_status": "FAILED"}
+
+    def changing_transport(request: Request, timeout: float) -> bytes:
+        if "celigo.example" not in request.full_url:
+            return _transport(request, timeout)
+        return json.dumps(
+            {
+                "runId": "run-8",
+                "status": state["celigo_status"],
+                "erpAcknowledged": state["celigo_status"] == "COMPLETED",
+            }
+        ).encode()
+
+    source = SaaSEvidenceSource(
+        SaaSEvidenceConfig(
+            correlation_id="M20-TEST",
+            airtable_token="airtable-secret",
+            airtable_base_id="app-demo",
+            celigo_evidence_url="https://celigo.example/run",
+            celigo_api_token="celigo-secret",
+            jira_base_url="https://jira.example",
+            jira_email="demo@example.com",
+            jira_api_token="jira-secret",
+            jira_project_key="CAPA",
+            slack_bot_token="slack-secret",
+            slack_channel_id="C123",
+        ),
+        transport=changing_transport,
+    )
+
+    first = source.current()
+    unchanged = source.current()
+    state["celigo_status"] = "COMPLETED"
+    changed = source.current()
+
+    assert first["sequence"] == 1
+    assert unchanged["sequence"] == 1
+    assert unchanged["changed_at"] == first["changed_at"]
+    assert changed["sequence"] == 2
+
+
 def test_saas_projection_is_explicit_when_nothing_is_configured() -> None:
     projection = SaaSEvidenceSource(SaaSEvidenceConfig(correlation_id="M20-TEST")).current()
 

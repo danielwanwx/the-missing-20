@@ -38,9 +38,7 @@ def _availability(
                     if source in unavailable
                     else EvidenceReadStatus.AVAILABLE
                 ),
-                unavailability_reason=(
-                    "SOURCE_UNAVAILABLE" if source in unavailable else None
-                ),
+                unavailability_reason=("SOURCE_UNAVAILABLE" if source in unavailable else None),
             )
             for source in REQUIRED_AUTHORITATIVE_SOURCES
         )

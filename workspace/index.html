@@ -7,10 +7,22 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/phosphor-regular.css" />
     <link rel="stylesheet" href="/assets/phosphor-bold.css" />
-    <link rel="stylesheet" href="/style.css" />
+    <style>
+      body[data-boot-state="loading"] .topbar,
+      body[data-boot-state="loading"] .app-shell,
+      body[data-boot-state="loading"] .skip-link { visibility: hidden; }
+      body:not([data-boot-state="loading"]) .workspace-boot { display: none; }
+    </style>
+    <link rel="stylesheet" href="/style.css?v=source-driven-final-v32" />
     <title>The Missing 20 | Live operations</title>
   </head>
-  <body data-workspace-ready="false" data-connection="connecting" data-view="dashboard">
+  <body data-workspace-ready="false" data-boot-state="loading" data-connection="connecting" data-view="dashboard">
+    <div id="workspace-boot" class="workspace-boot" role="status" aria-live="polite">
+      <span class="workspace-boot-mark" aria-hidden="true"><i class="ph-bold ph-cube"></i></span>
+      <strong>The Missing 20</strong>
+      <span>Connecting to the authoritative ledger</span>
+      <i class="workspace-boot-pulse" aria-hidden="true"></i>
+    </div>
     <a class="skip-link" href="#main-content">Skip to operations</a>
 
     <header class="topbar">
@@ -23,13 +35,13 @@
           <i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboard</span>
         </button>
         <button id="tab-agent" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="agent-view" tabindex="-1" data-view="agent">
-          <i class="ph ph-graph" aria-hidden="true"></i><span>Agent Workspace</span>
-        </button>
-        <button id="tab-scenario" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="scenario-view" tabindex="-1" data-view="scenario">
-          <i class="ph ph-sliders-horizontal" aria-hidden="true"></i><span>Scenario Lab</span>
+          <i class="ph ph-graph" aria-hidden="true"></i><span>Investigation</span>
         </button>
       </nav>
       <div class="topbar-context">
+        <button id="demo-controls-toggle" class="demo-controls-toggle" type="button" aria-controls="scenario-view" aria-expanded="false">
+          <i class="ph ph-sliders-horizontal" aria-hidden="true"></i><span>Demo Controls</span>
+        </button>
         <span id="header-incident-state" class="header-incident-state">LIVE</span>
         <div class="connection-control" aria-live="polite">
           <span id="connection-dot" class="status-dot status-dot-cyan" aria-hidden="true"></span>
@@ -48,6 +60,114 @@
       </div>
 
       <section id="dashboard-view" class="view-panel dashboard-view" role="tabpanel" aria-labelledby="tab-dashboard">
+        <section id="agent-platform-console" class="agent-platform-console" aria-labelledby="platform-title" hidden>
+          <header class="platform-header">
+            <div><h1 id="platform-title">Investigation</h1><span id="platform-correlation" class="state-badge state-neutral">CORRELATION —</span></div>
+            <div class="platform-command-toolbar" aria-label="Command canvas controls">
+              <span id="platform-mode" class="state-badge state-amber">READ ONLY</span>
+              <button id="platform-arrange-mode" class="platform-tool-button" type="button" aria-label="Arrange canvas" aria-pressed="false"><i class="ph ph-arrows-out-cardinal" aria-hidden="true"></i><span>Arrange</span></button>
+              <button id="platform-reset-layout" class="platform-tool-button" type="button" aria-label="Reset canvas layout"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><span>Reset</span></button>
+            </div>
+          </header>
+
+          <section class="platform-incident-ribbon" aria-label="Current incident">
+            <div><strong id="platform-incident-code">M20</strong><span id="platform-correlation-detail">Waiting for the server-owned evidence ledger.</span></div>
+            <dl class="platform-run-metrics" aria-label="Current Strands run metrics">
+              <div><dt>Runtime</dt><dd id="platform-metric-runtime">—</dd></div>
+              <div><dt>Latency</dt><dd id="platform-metric-latency">—</dd></div>
+              <div><dt>Tools</dt><dd id="platform-metric-tools">—</dd></div>
+              <div><dt>Evidence</dt><dd id="platform-metric-evidence">—</dd></div>
+              <div><dt>Cases</dt><dd id="platform-metric-cases">8</dd></div>
+              <div><dt>Tokens</dt><dd id="platform-metric-tokens">—</dd></div>
+              <div><dt>Cost</dt><dd id="platform-metric-cost">—</dd></div>
+            </dl>
+            <span id="platform-run-state" class="state-badge state-neutral">IDLE</span>
+          </section>
+
+          <section id="platform-command-canvas" class="platform-command-canvas" data-arrange="false" aria-label="Hybrid investigation command canvas">
+            <article class="platform-signal-card platform-canvas-module" data-canvas-module="signals">
+              <header class="platform-module-header" data-module-handle>
+                <h2>Signals</h2>
+                <div><span id="platform-signal-count" class="platform-module-count">0 LIVE</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Signals"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div>
+              </header>
+              <div id="platform-case-tuple" class="platform-case-tuple"></div>
+              <div id="platform-source-receipts" class="platform-source-receipts" aria-live="polite"></div>
+              <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Signals"></button>
+            </article>
+
+            <article class="platform-agent-card platform-agent-hero platform-canvas-module" data-canvas-module="investigation">
+              <header class="platform-module-header" data-module-handle>
+                <div><span class="platform-module-kicker">STRANDS AGENT LOOP</span><h2>Investigation trace</h2></div>
+                <div><span id="platform-diagnosis-status" class="state-badge state-neutral">IDLE</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Investigation"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div>
+              </header>
+              <ol id="platform-loop-stages" class="platform-loop-stages" aria-label="Agent investigation stages">
+                <li data-loop-stage="observe"><i class="ph ph-pulse" aria-hidden="true"></i><span>Observe</span></li>
+                <li data-loop-stage="retrieve"><i class="ph ph-stack" aria-hidden="true"></i><span>Retrieve</span></li>
+                <li data-loop-stage="reconcile"><i class="ph ph-git-merge" aria-hidden="true"></i><span>Reconcile</span></li>
+                <li data-loop-stage="evaluate"><i class="ph ph-scales" aria-hidden="true"></i><span>Evaluate</span></li>
+                <li data-loop-stage="decide"><i class="ph ph-shield-check" aria-hidden="true"></i><span>Decide</span></li>
+                <li data-loop-stage="verify"><i class="ph ph-seal-check" aria-hidden="true"></i><span>Verify</span></li>
+              </ol>
+              <div id="platform-investigation-map" class="platform-investigation-map">
+                <svg id="platform-investigation-links" class="platform-investigation-links" aria-hidden="true"></svg>
+                <button class="platform-investigation-node" type="button" data-investigation-node="erpnext"><i class="ph ph-factory" aria-hidden="true"></i><strong>ERPNext</strong></button>
+                <button class="platform-investigation-node" type="button" data-investigation-node="airtable"><i class="ph ph-table" aria-hidden="true"></i><strong>Airtable</strong></button>
+                <button class="platform-investigation-node" type="button" data-investigation-node="celigo"><i class="ph ph-plugs-connected" aria-hidden="true"></i><strong>Celigo</strong></button>
+                <button class="platform-investigation-node" type="button" data-investigation-node="jira"><i class="ph ph-kanban" aria-hidden="true"></i><strong>Jira</strong></button>
+                <button class="platform-investigation-node" type="button" data-investigation-node="slack"><i class="ph ph-chat-centered-dots" aria-hidden="true"></i><strong>Slack</strong></button>
+                <button class="platform-investigation-node platform-agent-node" type="button" data-investigation-node="agent"><i class="ph-bold ph-robot" aria-hidden="true"></i><strong>Agent</strong></button>
+                <button class="platform-investigation-node platform-manager-node" type="button" data-investigation-node="manager"><i class="ph ph-user-check" aria-hidden="true"></i><strong>Manager</strong></button>
+              </div>
+              <p id="platform-diagnosis-summary" class="platform-diagnosis-summary">Read correlated evidence across connected systems.</p>
+              <div id="platform-reconciled-findings" class="platform-reconciled-findings" aria-live="polite"></div>
+              <div id="platform-hypotheses" class="platform-hypotheses" aria-live="polite"></div>
+              <div id="platform-agent-conclusion" class="platform-agent-conclusion"><strong id="platform-conclusion">NO RELEASE</strong><span id="platform-confidence" class="platform-confidence">—</span></div>
+              <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Investigation"></button>
+            </article>
+
+            <aside class="platform-console-card platform-canvas-module" data-canvas-module="agent-console">
+              <header class="platform-module-header" data-module-handle>
+                <h2>Agent</h2>
+                <div><span id="platform-strands-status" class="state-badge state-neutral">STRANDS —</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Agent Console"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div>
+              </header>
+              <div id="platform-tool-calls" class="platform-tool-calls platform-tool-ledger" aria-label="Agent-selected tools"></div>
+              <div class="platform-runtime-head"><span>SDK flight recorder</span><span id="platform-runtime-count" class="sequence-label">0 hooks</span></div>
+              <ol id="platform-runtime-trace" class="platform-runtime-trace" aria-label="Strands SDK lifecycle trace" aria-live="polite"></ol>
+              <div class="platform-activity-head"><span>Live activity</span><span id="platform-event-count" class="sequence-label">0 events</span></div>
+              <ol id="platform-activity" class="platform-activity" aria-live="polite"></ol>
+              <div class="platform-control-actions"><button id="platform-diagnose" class="button button-primary" type="button"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Start investigation</button><button id="platform-stop" class="button button-quiet" type="button" hidden>Pause</button></div>
+              <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Agent Console"></button>
+            </aside>
+
+            <aside class="platform-chat-card platform-canvas-module" data-canvas-module="conversation">
+              <header class="platform-module-header" data-module-handle><div><span class="platform-module-kicker">HUMAN ↔ AGENT</span><h2>Evidence conversation</h2></div><div><span id="platform-answer-status" class="state-badge state-neutral">READY</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Evidence Conversation"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div></header>
+              <section id="platform-answer" class="platform-answer" hidden aria-live="polite"><div class="platform-answer-head"><span>Case-scoped conversation</span><span id="platform-answer-trace" class="platform-answer-trace"></span></div><div id="platform-answer-text" class="platform-conversation"></div><div id="platform-answer-evidence" class="platform-tool-calls"></div></section>
+              <form id="platform-question-form" class="platform-question-form"><label class="sr-only" for="platform-question">Ask the evidence agent</label><input id="platform-question" maxlength="500" placeholder="Ask a question, then continue with a follow-up…" /><button id="platform-question-submit" class="button button-primary" type="submit">Ask Agent</button></form>
+              <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Evidence Conversation"></button>
+            </aside>
+
+            <aside class="platform-decision-card platform-canvas-module" data-canvas-module="decision">
+              <header class="platform-module-header" data-module-handle><h2>Manager decision</h2><div><span id="platform-review-status" class="state-badge state-neutral">—</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Manager Decision"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div></header>
+              <p id="platform-review-detail" class="platform-review-detail">No decision requested.</p>
+              <div id="platform-decision-scope" class="platform-decision-scope" aria-live="polite"></div>
+              <div id="platform-execution-actions" class="platform-execution-actions" hidden><button id="platform-approve-execute" class="button button-primary" type="button">Approve &amp; execute</button><button id="platform-reject-plan" class="button button-quiet" type="button">Reject plan</button></div>
+              <div id="platform-guard" class="platform-guard"><i class="ph ph-lock-key" aria-hidden="true"></i><span>READ-ONLY OBSERVER</span></div>
+              <p id="platform-write-disabled" class="platform-disabled-note"><i class="ph ph-shield-check" aria-hidden="true"></i>Waiting for a bounded decision.</p>
+              <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Manager Decision"></button>
+            </aside>
+
+            <section id="platform-outcome" class="platform-outcome-rail platform-canvas-module" data-canvas-module="outcome" aria-live="polite">
+              <header class="platform-module-header" data-module-handle><h2>Outcome</h2><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Outcome"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></header>
+              <div><strong id="platform-outcome-status">WAITING</strong><span id="platform-outcome-summary">No recovery effect has been issued.</span></div>
+              <div id="platform-state-transition" class="platform-state-transition" hidden></div>
+              <details id="platform-resolution-packet" class="platform-resolution-packet" hidden><summary><span>Inspect Resolution Packet</span><strong id="platform-packet-id"></strong></summary><p id="platform-packet-summary"></p><div id="platform-packet-scope" class="platform-packet-scope"></div><div id="platform-packet-trace" class="platform-packet-scope"></div><div id="platform-packet-timestamps" class="platform-packet-scope"></div><div id="platform-packet-evidence" class="platform-tool-calls"></div></details>
+              <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Outcome"></button>
+            </section>
+
+            <aside id="platform-node-popover" class="platform-node-popover" hidden aria-live="polite"><button id="platform-node-popover-close" class="platform-icon-button" type="button" aria-label="Close node details"><i class="ph ph-x" aria-hidden="true"></i></button><strong id="platform-node-popover-title"></strong><span id="platform-node-popover-status"></span><p id="platform-node-popover-detail"></p><dl id="platform-node-popover-metrics" class="platform-node-popover-metrics"></dl><div class="component-action-row"><button id="platform-node-popover-action" class="platform-node-popover-action" type="button">Ask Agent</button><a id="platform-node-popover-external" class="component-external-link" href="#" target="_blank" rel="noopener noreferrer" hidden><i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Open service</span></a></div></aside>
+            <aside id="platform-evidence-drawer" class="platform-evidence-drawer" hidden aria-live="polite"><button id="platform-evidence-drawer-close" class="platform-icon-button" type="button" aria-label="Close evidence"><i class="ph ph-x" aria-hidden="true"></i></button><span id="platform-evidence-provider" class="object-label"></span><h2 id="platform-evidence-id"></h2><p id="platform-evidence-summary"></p><dl><div><dt>Revision</dt><dd id="platform-evidence-revision"></dd></div><div><dt>Observed</dt><dd id="platform-evidence-observed"></dd></div><div><dt>Provenance</dt><dd id="platform-evidence-provenance"></dd></div></dl><div id="platform-evidence-details" class="platform-evidence-details"></div></aside>
+          </section>
+        </section>
         <div class="dashboard-grid">
           <aside id="agent-rail" class="agent-rail" aria-label="Agents investigating">
             <div id="agent-rail-title" class="rail-title">Agents<br />investigating</div>
@@ -55,7 +175,7 @@
             <div id="dashboard-agents" class="agent-rail-list"></div>
           </aside>
 
-          <div class="dashboard-main">
+          <div class="dashboard-main dashboard-command-layout">
             <div class="view-bar">
               <h1 id="incident-title">Supply Chain Flow</h1>
               <div class="view-bar-actions">
@@ -70,25 +190,105 @@
               <div class="flow-stage-heading">
                 <div><span class="object-label">SUPPLY CHAIN FLOW</span><h2 id="flow-title">Live movement</h2></div>
                 <div class="flow-kpis" aria-label="Current flow totals">
+                  <span class="flow-kpi-live"><b id="flow-window-count">—</b><small>changed records</small></span>
                   <span><b id="expected-count">—</b><small>expected</small></span>
                   <span><b id="recorded-count">—</b><small>recorded</small></span>
                   <span class="flow-kpi-alert"><b id="queue-count">—</b><small>gap</small></span>
+                  <span class="flow-kpi-live"><b id="flow-ledger-sequence">—</b><small>ledger seq</small></span>
                 </div>
               </div>
               <div id="flow-map" class="flow-map" aria-label="Warehouse to message queue to ERP to invoice"></div>
+              <svg id="dashboard-evidence-links" class="dashboard-evidence-links" aria-hidden="true"></svg>
+              <div id="dashboard-evidence-map" class="dashboard-evidence-map" aria-label="Connected evidence sources">
+                <button class="dashboard-evidence-node" type="button" data-dashboard-evidence="jira"><i class="ph ph-kanban" aria-hidden="true"></i><strong>Jira</strong><span>—</span></button>
+                <button class="dashboard-evidence-node" type="button" data-dashboard-evidence="celigo"><i class="ph ph-plugs-connected" aria-hidden="true"></i><strong>Celigo</strong><span>—</span></button>
+                <button class="dashboard-evidence-node" type="button" data-dashboard-evidence="airtable"><i class="ph ph-table" aria-hidden="true"></i><strong>Airtable Quality</strong><span>—</span></button>
+                <button class="dashboard-evidence-node" type="button" data-dashboard-evidence="slack"><i class="ph ph-chat-centered-dots" aria-hidden="true"></i><strong>Slack</strong><span>—</span></button>
+              </div>
               <div id="unit-density-strip" class="unit-density-strip" role="img" aria-label="Unit record density"></div>
               <div id="flow-selection-detail" class="flow-selection-detail" aria-live="polite"></div>
               <details class="unit-inspector"><summary><i class="ph ph-cursor-click" aria-hidden="true"></i>Inspect exceptions</summary><div id="unit-anomaly-list" class="unit-anomaly-list" aria-label="Record exceptions"></div><div id="unit-detail" aria-live="polite"><span class="detail-placeholder">Select an exception to inspect its authoritative record.</span></div></details>
             </section>
 
+            <aside class="dashboard-event-rail" aria-labelledby="dashboard-event-title">
+              <div class="dashboard-event-heading"><h2 id="dashboard-event-title">Live events</h2><span id="dashboard-event-count">0</span></div>
+              <ol id="dashboard-event-feed" class="dashboard-event-feed newest-at-bottom" aria-live="polite"></ol>
+              <div id="dashboard-event-now" class="dashboard-event-now"><span>NOW</span><i aria-hidden="true"></i></div>
+            </aside>
+
+            <section class="business-impact" aria-labelledby="business-impact-title">
+              <div class="business-impact-heading">
+                <div><span class="object-label">OPERATING ECONOMICS</span><h2 id="business-impact-title">Business impact</h2></div>
+                <div class="business-impact-status" aria-label="Commercial status">
+                  <span id="business-supplier-status" class="business-status-chip">SUPPLIER —</span>
+                  <span id="business-invoice-status" class="business-status-chip">INVOICE —</span>
+                  <span id="business-order-status" class="business-status-chip">ORDER —</span>
+                </div>
+              </div>
+              <div class="business-metric-grid">
+                <article class="business-metric" data-business-metric="availability"><span>Inventory available</span><strong id="business-availability">—</strong><small>physical arrival</small></article>
+                <article class="business-metric" data-business-metric="reconciliation"><span>ERP reconciled</span><strong id="business-reconciliation">—</strong><small>receipt + quality</small></article>
+                <article class="business-metric" data-business-metric="working-capital"><span>Working capital at risk</span><strong id="business-working-capital">—</strong><small>unavailable material</small></article>
+                <article class="business-metric" data-business-metric="invoice-hold"><span>Invoice value on hold</span><strong id="business-invoice-hold">—</strong><small>payment control</small></article>
+                <article class="business-metric" data-business-metric="unit-cost"><span>PO unit cost</span><strong id="business-unit-cost">—</strong><small>purchase order</small></article>
+                <article class="business-metric" data-business-metric="price-variance"><span>Purchase price variance</span><strong id="business-price-variance">—</strong><small>invoice vs PO</small></article>
+                <article class="business-metric" data-business-metric="quality-hold"><span>Quality hold value</span><strong id="business-quality-hold">—</strong><small>blocked inventory</small></article>
+                <article class="business-metric" data-business-metric="value-protected"><span>Billed revenue</span><strong id="business-value-protected">—</strong><small>sales invoice reread</small></article>
+                <article class="business-metric" data-business-metric="booked-revenue"><span>Booked revenue</span><strong id="business-booked-revenue">—</strong><small>customer order</small></article>
+                <article class="business-metric" data-business-metric="revenue-risk"><span>Revenue at risk</span><strong id="business-revenue-at-risk">—</strong><small>counterfactual hold</small></article>
+                <article class="business-metric" data-business-metric="delivered"><span>Delivered</span><strong id="business-delivered-quantity">—</strong><small>delivery note reread</small></article>
+                <article class="business-metric" data-business-metric="gross-spread"><span>Gross spread</span><strong id="business-gross-spread">—</strong><small>invoice − PO basis</small></article>
+              </div>
+              <details class="business-economics-details">
+                <summary><span>Break down exposure</span><i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+                <div class="business-economics-body">
+                  <section class="exposure-waterfall" aria-labelledby="exposure-waterfall-title">
+                    <h3 id="exposure-waterfall-title">Exposure split</h3>
+                    <div class="exposure-row" data-exposure="receipt"><span>Receipt exception</span><div><i id="receipt-gap-bar"></i></div><strong id="business-receipt-gap">—</strong></div>
+                    <div class="exposure-row" data-exposure="quality"><span>Quality hold</span><div><i id="quality-hold-bar"></i></div><strong id="business-quality-hold-detail">—</strong></div>
+                    <div class="exposure-row exposure-total" data-exposure="total"><span>Total at risk</span><div><i id="working-capital-bar"></i></div><strong id="business-working-capital-detail">—</strong></div>
+                  </section>
+                  <section class="economics-comparison" aria-labelledby="economics-comparison-title">
+                    <h3 id="economics-comparison-title">PO vs invoice</h3>
+                    <dl>
+                      <div><dt>PO line</dt><dd id="business-po-line-value">—</dd></div>
+                      <div><dt>Invoice</dt><dd id="business-invoice-value">—</dd></div>
+                      <div><dt>Invoice unit</dt><dd id="business-invoice-unit-price">—</dd></div>
+                      <div><dt>Price delta</dt><dd id="business-price-delta">—</dd></div>
+                      <div><dt>Available stock</dt><dd id="business-available-value">—</dd></div>
+                      <div><dt>Delivery complete</dt><dd id="business-delivery-completion">—</dd></div>
+                    </dl>
+                  </section>
+                </div>
+              </details>
+              <section class="connected-operations" aria-labelledby="connected-operations-title">
+                <div class="connected-operations-heading">
+                  <div><span class="object-label">CONNECTED OPERATIONS</span><h3 id="connected-operations-title">Plant to customer</h3></div>
+                  <div id="operations-risk-signal" class="operations-risk-signal" data-tone="normal"><strong id="operations-risk-score">—</strong><span id="operations-risk-band">WAITING</span></div>
+                </div>
+                <div id="operations-risk-reasons" class="operations-risk-reasons" aria-live="polite"></div>
+                <div class="operations-metric-grid">
+                  <article><span>Shift OEE</span><strong id="operations-oee">—</strong></article>
+                  <article><span>Schedule attained</span><strong id="operations-schedule">—</strong></article>
+                  <article><span>Units at risk</span><strong id="operations-units-risk">—</strong></article>
+                  <article><span>Revenue at risk</span><strong id="operations-revenue-risk">—</strong></article>
+                  <article><span>Margin at risk</span><strong id="operations-margin-risk">—</strong></article>
+                  <article><span>Days of supply</span><strong id="operations-days-supply">—</strong></article>
+                  <article><span>Inbound OTIF · 90d</span><strong id="operations-inbound-otif">—</strong></article>
+                  <article><span>Supplier PPM · 90d</span><strong id="operations-supplier-ppm">—</strong></article>
+                </div>
+              </section>
+              <div class="business-impact-source"><i class="ph ph-database" aria-hidden="true"></i><span>PO · receipt · quality · customer order · delivery · customer invoice · GL</span><strong id="business-impact-sequence">LEDGER —</strong></div>
+            </section>
+
             <section class="diagram-deck" aria-label="Live control tower diagrams">
               <article class="diagram-panel diagram-reconciliation" aria-labelledby="reconciliation-diagram-title">
                 <div class="diagram-heading">
-                  <div><span class="object-label">RECONCILIATION</span><h2 id="reconciliation-diagram-title">Expected vs recorded</h2></div>
+                  <div><span class="object-label">LIVE FLOW</span><h2 id="reconciliation-diagram-title">Stage throughput</h2></div>
                   <span id="trend-time" class="diagram-cursor-label">LIVE</span>
                 </div>
-                <div class="chart-legend" aria-label="Reconciliation series"><span class="legend-expected">Expected</span><span class="legend-recorded">Recorded</span><span class="legend-gap">Gap</span></div>
-                <canvas id="dashboard-chart" class="diagram-canvas" width="920" height="220" tabindex="0" role="img" aria-label="Expected, recorded, and gap quantities over the live event timeline"></canvas>
+                <div class="chart-legend" aria-label="Live flow series"><span class="legend-expected">Warehouse</span><span class="legend-recorded">ERP posted</span><span class="legend-gap">Exception</span></div>
+                <canvas id="dashboard-chart" class="diagram-canvas" width="920" height="220" tabindex="0" role="img" aria-label="Warehouse, ERP posted, and exception quantities over the live event timeline"></canvas>
               </article>
 
               <article class="diagram-panel diagram-health" aria-labelledby="flow-health-title">
@@ -103,6 +303,24 @@
                 </div>
               </article>
 
+              <article class="diagram-panel diagram-business" aria-labelledby="business-trend-title">
+                <div class="diagram-heading">
+                  <div><span class="object-label">FINANCIAL EVIDENCE</span><h2 id="business-trend-title">Risk to billed revenue</h2></div>
+                  <span id="business-trend-time" class="diagram-cursor-label">LIVE</span>
+                </div>
+                <div class="chart-legend" aria-label="Financial evidence series"><span class="legend-capital-risk">Working capital risk</span><span class="legend-invoice-hold">Supplier invoice hold</span><span class="legend-value-protected">Billed revenue</span></div>
+                <canvas id="business-impact-chart" class="diagram-canvas" width="920" height="190" tabindex="0" role="img" aria-label="Working capital risk, supplier invoice hold, and observed billed revenue over the external event timeline"></canvas>
+              </article>
+
+              <article class="diagram-panel diagram-operations" aria-labelledby="operations-trend-title">
+                <div class="diagram-heading">
+                  <div><span class="object-label">HISTORICAL OPERATING WINDOW</span><h2 id="operations-trend-title">Risk, output &amp; OEE</h2></div>
+                  <span id="operations-trend-time" class="diagram-cursor-label">90 DAYS</span>
+                </div>
+                <div class="chart-legend" aria-label="Connected operating series"><span class="legend-risk-score">Risk score</span><span class="legend-schedule">Schedule</span><span class="legend-oee">OEE</span></div>
+                <canvas id="operations-history-chart" class="diagram-canvas" width="920" height="190" tabindex="0" role="img" aria-label="Risk score, schedule attainment, and OEE over the disclosed synthetic 90-day operating window"></canvas>
+              </article>
+
               <article class="diagram-panel diagram-risk" aria-labelledby="external-risk-title">
                 <div class="diagram-heading">
                   <div><span class="object-label">EXTERNAL CONTEXT</span><h2 id="external-risk-title">Route signals</h2></div>
@@ -114,13 +332,26 @@
               </article>
             </section>
 
+            <section id="dashboard-agent-status" class="dashboard-agent-status" aria-label="Agent lifecycle">
+              <div><span class="dashboard-agent-orb" aria-hidden="true"><i class="ph-bold ph-robot"></i></span><strong id="dashboard-agent-stage">Monitoring</strong></div>
+              <div class="dashboard-agent-facts"><span><b id="dashboard-agent-evidence">0</b> evidence</span><span><b id="dashboard-agent-tool-count">0</b> checks</span><span><b id="dashboard-agent-event-count">0</b> events</span><span><b id="dashboard-agent-provider">—</b> runtime</span><span><b id="dashboard-agent-confidence">—</b> confidence</span></div>
+              <button id="dashboard-open-investigation" class="button button-primary" type="button">Open Investigation</button>
+            </section>
+
+            <aside id="dashboard-component-inspector" class="dashboard-component-inspector" hidden aria-live="polite">
+              <button id="dashboard-component-inspector-close" class="platform-icon-button" type="button" aria-label="Close component details"><i class="ph ph-x" aria-hidden="true"></i></button>
+              <span id="dashboard-component-inspector-kind" class="object-label">LIVE COMPONENT</span>
+              <div class="dashboard-component-inspector-heading"><h2 id="dashboard-component-inspector-title">Component</h2><span id="dashboard-component-inspector-status" class="state-badge state-neutral">WAITING</span></div>
+              <p id="dashboard-component-inspector-purpose"></p>
+              <dl id="dashboard-component-inspector-metrics"></dl>
+              <div class="component-action-row"><button id="dashboard-component-inspector-action" class="button button-primary" type="button">Open Investigation</button><a id="dashboard-component-inspector-external" class="component-external-link" href="#" target="_blank" rel="noopener noreferrer" hidden><i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Open service</span></a></div>
+            </aside>
+
             <div class="dashboard-lower">
               <section id="live-panel" class="ops-pane incidents-pane live-panel" aria-labelledby="live-title">
                 <div class="pane-heading"><h2 id="live-title">Active incidents</h2></div>
                 <div class="incident-list">
                   <div class="incident-row incident-row-static is-active" role="status" aria-live="polite" data-incident-row="active"><span class="incident-icon"><i class="ph-bold ph-warning-circle" aria-hidden="true"></i></span><span><strong>Queue exception</strong><small id="incident-row-detail">Waiting for telemetry</small></span></div>
-                  <div class="incident-row incident-row-static" data-incident-row="duplicate"><span class="incident-icon is-ok"><i class="ph-bold ph-check-circle" aria-hidden="true"></i></span><span><strong>Duplicate posting prevention</strong><small>Resolved · history</small></span></div>
-                  <div class="incident-row incident-row-static" data-incident-row="sync"><span class="incident-icon is-ok"><i class="ph-bold ph-check-circle" aria-hidden="true"></i></span><span><strong>ERP sync delay</strong><small>Resolved · history</small></span></div>
                   <div id="incident-empty" class="incident-empty" hidden><i class="ph-bold ph-check-circle" aria-hidden="true"></i><span><strong>No active incidents</strong><small>All records are reconciled</small></span></div>
                 </div>
                 <div id="latest-event" class="latest-event"><strong>Waiting for stream</strong><span>Live activity will appear here.</span></div>
@@ -148,7 +379,7 @@
                 <div class="pane-heading"><h2 id="provenance-title">Reconciliation</h2><span id="provenance-sequence" class="sequence-label">seq —</span></div>
                 <div class="chart-legend" aria-label="Reconciliation series"><span class="legend-expected">Expected</span><span class="legend-recorded">Recorded</span><span class="legend-gap">Gap</span></div>
                 <canvas id="reconciliation-chart" class="reconciliation-canvas" width="480" height="180" tabindex="0" role="img" aria-label="Expected, recorded, and gap quantities over the live event timeline"></canvas>
-                <details class="provenance-details"><summary>Source details</summary><div class="provenance-row"><span class="status-dot status-dot-cyan" aria-hidden="true"></span><strong id="provenance-source">Synthetic enterprise flow</strong></div><p id="provenance-detail" class="flow-stat-detail">Live SSE ledger · awaiting first observation.</p></details>
+                <details class="provenance-details"><summary>Source details</summary><div class="provenance-row"><span class="status-dot status-dot-cyan" aria-hidden="true"></span><strong id="provenance-source">External source changes</strong></div><p id="provenance-detail" class="flow-stat-detail">Live SSE ledger · awaiting first source version.</p></details>
               </section>
             </div>
           </div>
@@ -156,6 +387,18 @@
       </section>
 
       <section id="agent-view" class="view-panel agent-view" role="tabpanel" aria-labelledby="tab-agent" hidden>
+        <section id="agent-normal-state" class="agent-normal-state" aria-labelledby="agent-normal-title" hidden>
+          <header><span class="agent-normal-orb" aria-hidden="true"><i class="ph-bold ph-robot"></i></span><div><span class="state-badge state-lime">MONITORING</span><h1 id="agent-normal-title">No investigation needs attention</h1></div></header>
+          <div class="agent-normal-sources" aria-label="Connected evidence sources">
+            <span><i class="ph ph-factory" aria-hidden="true"></i>ERPNext<strong>LIVE</strong></span>
+            <span><i class="ph ph-table" aria-hidden="true"></i>Airtable<strong>LIVE</strong></span>
+            <span><i class="ph ph-plugs-connected" aria-hidden="true"></i>Celigo<strong>LIVE</strong></span>
+            <span><i class="ph ph-kanban" aria-hidden="true"></i>Jira<strong>LIVE</strong></span>
+            <span><i class="ph ph-chat-centered-dots" aria-hidden="true"></i>Slack<strong>LIVE</strong></span>
+          </div>
+          <div class="agent-normal-proof"><strong>100 / 100</strong><span>last monitored records reconciled</span><strong id="agent-normal-sequence">—</strong><span>ledger events</span></div>
+          <button id="agent-normal-run-incident" class="button button-incident" type="button"><i class="ph ph-broadcast" aria-hidden="true"></i>Inject incident</button>
+        </section>
         <div class="workspace-layout">
           <aside class="source-rail" aria-label="Supply chain flow">
             <div class="workspace-rail-heading"><span class="object-label">SUPPLY CHAIN</span><span id="workspace-state" class="state-badge state-cyan">LIVE</span></div>
@@ -176,41 +419,34 @@
             </section>
             <section id="agent-graph" class="operations-map agent-system-panel" aria-label="Closed-loop agent operations map">
               <div class="graph-map-heading"><span class="object-label">LIVE CONTROL LOOP</span></div>
-              <div class="graph-sources" aria-label="Admitted evidence source groups">
-                <div class="graph-source-group" data-graph-source="queue" data-source-group="receipt-retry">
-                  <span class="graph-port graph-port-out" data-port="queue-out" aria-hidden="true"></span>
-                  <i class="ph ph-queue" aria-hidden="true"></i><strong>Queue</strong>
-                </div>
-                <div class="graph-source-group" data-graph-source="shipment" data-source-group="shipment-evidence">
-                  <span class="graph-port graph-port-out" data-port="shipment-out" aria-hidden="true"></span>
-                  <i class="ph ph-warehouse" aria-hidden="true"></i><strong>ERP</strong>
-                </div>
-                <div class="graph-source-group" data-graph-source="duplicate" data-source-group="duplicate-posting">
-                  <span class="graph-port graph-port-out" data-port="duplicate-out" aria-hidden="true"></span>
-                  <i class="ph ph-invoice" aria-hidden="true"></i><strong>Invoice</strong>
-                </div>
+              <div class="graph-plane-label graph-plane-label-supply"><strong>DETERMINISTIC SUPPLY CHAIN</strong></div>
+              <div class="graph-supply-chain" aria-label="Deterministic supply chain data plane">
+                <div class="graph-supply-node" data-supply-node="warehouse"><span class="graph-port graph-port-flow-out" data-port="warehouse-out" aria-hidden="true"></span><i class="ph ph-warehouse" aria-hidden="true"></i><strong>Warehouse</strong></div>
+                <div class="graph-supply-node" data-supply-node="queue"><span class="graph-port graph-port-flow-in" data-port="queue-in" aria-hidden="true"></span><span class="graph-port graph-port-flow-out" data-port="queue-out" aria-hidden="true"></span><i class="ph ph-queue" aria-hidden="true"></i><strong>Queue</strong></div>
+                <div class="graph-supply-node" data-supply-node="erp"><span class="graph-port graph-port-flow-in" data-port="erp-in" aria-hidden="true"></span><span class="graph-port graph-port-flow-out" data-port="erp-out" aria-hidden="true"></span><span class="graph-port graph-port-boundary-out" data-port="erp-boundary-out" aria-hidden="true"></span><i class="ph ph-factory" aria-hidden="true"></i><strong>ERP</strong></div>
+                <div class="graph-supply-node" data-supply-node="invoice"><span class="graph-port graph-port-flow-in" data-port="invoice-in" aria-hidden="true"></span><span class="graph-port graph-port-return-in" data-port="invoice-return-in" aria-hidden="true"></span><i class="ph ph-invoice" aria-hidden="true"></i><strong>Invoice</strong></div>
               </div>
-              <div id="incident-packet-node" class="graph-incident-packet graph-node-card" data-graph-node="incident-packet">
-                <span class="graph-port graph-port-in" data-port="incident-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="incident-out" aria-hidden="true"></span>
-                <i class="ph ph-warning-circle" aria-hidden="true"></i><strong>Incident</strong>
+              <div class="graph-boundary" aria-label="Incident and read-only evidence boundary">
+                <div id="incident-packet-node" class="graph-incident-packet graph-node-card" data-graph-node="incident-packet"><span class="graph-port graph-port-in" data-port="incident-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="incident-out" aria-hidden="true"></span><i class="ph ph-warning-circle" aria-hidden="true"></i><strong>Incident</strong></div>
+                <div id="evidence-api-node" class="graph-evidence-api graph-node-card" data-graph-node="evidence-api"><span class="graph-port graph-port-in" data-port="evidence-api-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="evidence-api-out" aria-hidden="true"></span><i class="ph ph-lock-key-open" aria-hidden="true"></i><strong>Evidence API</strong></div>
               </div>
               <div id="orchestrator-node" class="orchestrator-node" data-agent-id="orchestrator" role="button" tabindex="0" aria-pressed="false" aria-label="Orchestrator, team mode">
-                <span class="graph-port graph-port-in" data-port="orchestrator-in" aria-hidden="true"></span><span class="graph-port graph-port-out graph-port-coordination-left" data-port="orchestrator-out-left" aria-hidden="true"></span><span class="graph-port graph-port-out graph-port-coordination-middle" data-port="orchestrator-out-middle" aria-hidden="true"></span><span class="graph-port graph-port-out graph-port-coordination-right" data-port="orchestrator-out-right" aria-hidden="true"></span>
-                <span class="node-pulse" aria-hidden="true"></span><i class="ph-bold ph-robot orchestrator-icon" aria-hidden="true"></i><strong>Orchestrator</strong><span id="orchestrator-status" class="state-badge state-lime">MONITORING</span>
+                <span class="graph-port graph-port-in" data-port="orchestrator-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="orchestrator-out" aria-hidden="true"></span>
+                <span class="node-pulse" aria-hidden="true"></span><i class="ph-bold ph-robot orchestrator-icon" aria-hidden="true"></i><strong>Orchestrator</strong><span id="orchestrator-status" class="state-badge state-neutral">—</span>
               </div>
               <div id="agent-graph-links" class="agent-graph-links" aria-hidden="true"></div>
               <div id="agent-nodes" class="agent-nodes" aria-label="Investigator roles"></div>
               <div id="synthesis-node" class="synthesis-node graph-node-card" data-graph-node="synthesis">
-                <span class="graph-port graph-port-in graph-port-synthesis-left" data-port="synthesis-in-left" aria-hidden="true"></span><span class="graph-port graph-port-in graph-port-synthesis-middle" data-port="synthesis-in-middle" aria-hidden="true"></span><span class="graph-port graph-port-in graph-port-synthesis-right" data-port="synthesis-in-right" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="synthesis-out" aria-hidden="true"></span>
-                <i class="ph ph-git-merge" aria-hidden="true"></i><strong>Synthesis</strong><span id="synthesis-status" class="state-badge state-lime">MONITORING</span>
+                <span class="graph-port graph-port-in" data-port="synthesis-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="synthesis-out" aria-hidden="true"></span>
+                <i class="ph ph-git-merge" aria-hidden="true"></i><strong>Synthesis</strong><span id="synthesis-status" class="state-badge state-neutral" hidden></span>
               </div>
               <div class="graph-lifecycle" aria-label="Recovery lifecycle">
-                <div class="graph-step" data-graph-step="safety" data-graph-node="safety"><span class="graph-port graph-port-in" data-port="safety-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="safety-out" aria-hidden="true"></span><i class="ph ph-shield-check" aria-hidden="true"></i><strong>Safety Gate</strong><small data-graph-step-status>MONITORING</small></div>
-                <div class="graph-step" data-graph-step="approval" data-graph-node="approval"><span class="graph-port graph-port-in" data-port="approval-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="approval-out" aria-hidden="true"></span><i class="ph ph-users-three" aria-hidden="true"></i><strong>Two-role approval</strong><small data-graph-step-status>MONITORING</small></div>
-                <div class="graph-step" data-graph-step="execution" data-graph-node="execution"><span class="graph-port graph-port-in" data-port="execution-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="execution-out" aria-hidden="true"></span><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><strong>Controlled recovery</strong><small data-graph-step-status>MONITORING</small></div>
-                <div class="graph-step" data-graph-step="verification" data-graph-node="verification"><span class="graph-port graph-port-in" data-port="verification-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="verification-out" aria-hidden="true"></span><i class="ph ph-check-circle" aria-hidden="true"></i><strong>Verification</strong><small data-graph-step-status>MONITORING</small></div>
+                <div class="graph-step" data-graph-step="safety" data-graph-node="safety"><span class="graph-port graph-port-in" data-port="safety-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="safety-out" aria-hidden="true"></span><i class="ph ph-shield-check" aria-hidden="true"></i><strong>Safety Gate</strong><small data-graph-step-status hidden></small></div>
+                <div class="graph-step" data-graph-step="approval" data-graph-node="approval"><span class="graph-port graph-port-in" data-port="approval-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="approval-out" aria-hidden="true"></span><i class="ph ph-user-check" aria-hidden="true"></i><strong>Manager approval</strong><small data-graph-step-status hidden></small></div>
+                <div class="graph-step" data-graph-step="execution" data-graph-node="execution"><span class="graph-port graph-port-in" data-port="execution-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="execution-out" aria-hidden="true"></span><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><strong>Controlled recovery</strong><small data-graph-step-status hidden></small></div>
+                <div class="graph-step" data-graph-step="verification" data-graph-node="verification"><span class="graph-port graph-port-in" data-port="verification-in" aria-hidden="true"></span><span class="graph-port graph-port-out" data-port="verification-out" aria-hidden="true"></span><i class="ph ph-check-circle" aria-hidden="true"></i><strong>Verification</strong><small data-graph-step-status hidden></small></div>
               </div>
-              <div class="graph-loop-label"><span>Closed loop verified</span></div>
+              <div class="graph-loop-label" hidden><span>Closed loop verified</span></div>
             </section>
 
             <section class="workspace-timeline" aria-labelledby="timeline-title"><div class="timeline-heading"><h2 id="timeline-title">Reconciliation timeline</h2><span id="timeline-cursor-label" class="timeline-now">LIVE</span></div><div class="timeline-phases"><span>Before incident</span><span>Investigation &amp; recovery</span><span>After recovery</span></div><div id="reconciliation-timeline" class="timeline-track" aria-label="Ordered reconciliation events"></div><div id="timeline-cursor" class="timeline-cursor" aria-hidden="true"></div></section>
@@ -235,7 +471,7 @@
               </section>
             </section>
 
-            <section id="decision-panel" class="decision-panel rail-panel" data-rail-panel="decision" aria-labelledby="decision-title" hidden><div class="right-heading"><div><span class="object-label">RECOVERY</span><h2 id="decision-title">Decision gate</h2></div><span id="decision-status" class="state-badge state-neutral">Not prepared</span></div><div class="decision-rail" aria-label="Recovery lifecycle"><div class="decision-step" data-decision-step="proposal"><span class="step-number">1</span><strong>Prepare</strong></div><div class="decision-step" data-decision-step="approval"><span class="step-number">2</span><strong>Approve</strong></div><div class="decision-step" data-decision-step="execution"><span class="step-number">3</span><strong>Execute</strong></div><div class="decision-step" data-decision-step="verification"><span class="step-number">4</span><strong>Verify</strong></div></div><div id="decision-intent" class="decision-intent"><span class="detail-placeholder">Prepare a recovery proposal when the case is ready.</span></div><div id="approval-roles" class="approval-roles"></div><div class="decision-actions"><button id="prepare-button" class="button button-secondary" type="button">Prepare recovery</button><button id="execute-button" class="button button-primary" type="button" disabled><i class="ph ph-play" aria-hidden="true"></i>Execute</button></div></section>
+            <section id="decision-panel" class="decision-panel rail-panel" data-rail-panel="decision" aria-labelledby="decision-title" hidden><div class="right-heading"><div><span class="object-label">RECOVERY</span><h2 id="decision-title">Decision gate</h2></div><span id="decision-status" class="state-badge state-neutral">Not prepared</span></div><div class="decision-rail" aria-label="Recovery lifecycle"><div class="decision-step" data-decision-step="proposal"><span class="step-number">1</span><strong>Prepare</strong></div><div class="decision-step" data-decision-step="approval"><span class="step-number">2</span><strong>Manager</strong></div><div class="decision-step" data-decision-step="execution"><span class="step-number">3</span><strong>Execute</strong></div><div class="decision-step" data-decision-step="verification"><span class="step-number">4</span><strong>Verify</strong></div></div><div id="decision-intent" class="decision-intent"><span class="detail-placeholder">Prepare a recovery proposal when the case is ready.</span></div><div id="approval-roles" class="approval-roles"></div><div class="decision-actions"><button id="prepare-button" class="button button-secondary" type="button">Prepare recovery</button><button id="execute-button" class="button button-primary" type="button" disabled><i class="ph ph-play" aria-hidden="true"></i>Execute</button></div></section>
 
             <details id="activity-drawer" class="activity-drawer"><summary><span><i class="ph ph-activity" aria-hidden="true"></i><strong>Live activity</strong></span><span id="operation-count" class="sequence-label">0 events</span></summary><section class="activity-panel" aria-labelledby="activity-title"><div class="right-heading"><h2 id="activity-title">Live activity</h2><span class="timeline-now">NOW</span></div><ol id="operation-feed" class="operation-feed" aria-live="polite"></ol><details class="trace-drawer"><summary>Full immutable trace</summary><ol id="full-operation-feed" class="operation-feed trace-feed"></ol></details></section></details>
             <details class="evidence-drawer"><summary><i class="ph ph-list-magnifying-glass" aria-hidden="true"></i>Evidence returned</summary><p id="evidence-status" class="evidence-status" hidden role="status"></p><div id="evidence-packets" class="evidence-packets"></div></details>
@@ -243,11 +479,11 @@
         </div>
       </section>
 
-      <section id="scenario-view" class="view-panel scenario-view" role="tabpanel" aria-labelledby="tab-scenario" hidden><div class="scenario-shell"><div class="view-bar"><div><span class="object-label">SCENARIO LAB</span><h1>Source conditions</h1></div><span class="health-live"><i class="ph ph-pulse" aria-hidden="true"></i>LIVE DATA</span></div><section class="scenario-controls"><div class="scenario-switch" role="group" aria-label="Scenario"><button id="scenario-normal" class="scenario-button is-selected" type="button" data-scenario="normal" aria-pressed="true">Normal</button><button id="scenario-incident" class="scenario-button" type="button" data-scenario="incident" aria-pressed="false" disabled>Inject incident</button><button id="scenario-recovery" class="scenario-button" type="button" data-scenario="recovery" aria-pressed="false" disabled>Recovery</button></div><button id="golden-incident" class="button button-quiet scenario-golden" type="button" disabled><i class="ph ph-star" aria-hidden="true"></i>Golden incident</button><a id="observability-link" class="observability-link" href="/metrics" target="_blank" rel="noreferrer">Metrics</a><p id="scenario-status" class="scenario-status" aria-live="polite">Select a source condition.</p><p id="scenario-error" class="scenario-error" role="alert" hidden></p></section></div></section>
+      <section id="scenario-view" class="view-panel scenario-view" role="dialog" aria-modal="false" aria-labelledby="scenario-title" hidden><div class="scenario-shell"><div class="view-bar"><div><span class="object-label">DEMO CONTROLS</span><h1 id="scenario-title">Source conditions</h1></div><button id="demo-controls-close" class="platform-icon-button" type="button" aria-label="Close demo controls"><i class="ph ph-x" aria-hidden="true"></i></button></div><section class="scenario-controls"><div class="scenario-switch" role="group" aria-label="Scenario"><button id="scenario-normal" class="scenario-button is-selected" type="button" data-scenario="normal" aria-pressed="true">Normal</button><button id="scenario-incident" class="scenario-button" type="button" data-scenario="incident" aria-pressed="false" disabled>Inject incident</button><button id="scenario-recovery" class="scenario-button" type="button" data-scenario="recovery" aria-pressed="false" disabled>Recovery</button></div><div class="counterfactual-switch" role="group" aria-label="Counterfactual incident"><button class="button button-quiet" type="button" data-counterfactual="uncommitted_receipt">Split recovery</button><button class="button button-quiet" type="button" data-counterfactual="lost_ack">Lost acknowledgement</button><button class="button button-quiet" type="button" data-counterfactual="wrong_quality_lot">Wrong quality lot</button><button class="button button-quiet" type="button" data-counterfactual="lookup_unavailable">Authority unavailable</button><button class="button button-quiet" type="button" data-counterfactual="physical_shortage">Physical shortage</button><button class="button button-quiet" type="button" data-counterfactual="transfer_already_present">Transfer replay</button><button class="button button-quiet" type="button" data-counterfactual="evidence_conflict">Evidence conflict</button></div><button id="golden-incident" class="button button-quiet scenario-golden" type="button" disabled><i class="ph ph-star" aria-hidden="true"></i>Golden incident</button><a id="observability-link" class="observability-link" href="/metrics" target="_blank" rel="noreferrer">Metrics</a><p id="scenario-status" class="scenario-status" aria-live="polite">Select a source condition.</p><p id="scenario-error" class="scenario-error" role="alert" hidden></p></section></div></section>
 
       <div class="compatibility-state" aria-hidden="true"><span id="incident-subtitle"></span><span id="incident-id"></span><span id="trace-id"></span><span id="missing-count"></span><span id="hero-expected"></span><span id="hero-recorded"></span><span id="hero-queue"></span><span id="hero-sequence"></span><span id="mode-dot"></span><span id="mode-label"></span><span id="mode-detail"></span><span id="live-heartbeat"></span><span id="metric-throughput"></span><span id="metric-queue-depth"></span><span id="metric-active-agents"></span><span id="metric-sequence"></span><span id="spark-throughput"></span><span id="spark-queue"></span><span id="spark-agents"></span><span id="spark-ledger"></span><div hidden><button id="dashboard-start-investigation" type="button"></button><button id="agent-start-investigation" type="button"></button><button id="dashboard-replay-investigation" type="button"></button></div></div>
     </main>
     <footer class="site-footer"><span>THE MISSING 20</span><span id="footer-status">Ledger connecting</span></footer>
-    <script src="/app.js" defer></script>
+    <script src="/app.js?v=source-driven-final-v32" defer></script>
   </body>
 </html>

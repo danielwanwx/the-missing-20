@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "The Missing 20：可验证的 Agent 闭环架构",
+    "output": "docs/architecture/the-missing-20-live-architecture.html",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [1540, 800],
+    "views": [
+      {"id": "observe", "label": "观察与取证", "focus": ["dashboard", "decision_api", "erpnext", "saas_evidence", "strands"], "note": "从真实外部系统读取当前状态，并把每条证据绑定到来源记录。"},
+      {"id": "decide", "label": "诊断与决策", "focus": ["strands", "aws_agent", "policy", "manager"], "note": "模型负责调查和解释，确定性策略与 Manager 保留业务权限。"},
+      {"id": "recover", "label": "执行与验证", "focus": ["manager", "executor", "erpnext", "verifier", "ledger", "dashboard"], "note": "批准后的受控写入必须经过权威重读、跨系统回执和可审计记录。"},
+      {"id": "aws", "label": "AWS 运行证据", "focus": ["strands", "aws_agent"], "note": "AgentCore Runtime 是单独验证的部署证据，不伪装成当前本地 UI 请求路径。"}
+    ]
+  },
+  "components": [
+    {"id": "dashboard", "type": "frontend", "label": "Operations Command Center", "sublabel": "Dashboard · Investigation · Human chat", "pos": [40, 365], "size": [175, 80]},
+    {"id": "decision_api", "type": "backend", "label": "Decision Workspace API", "sublabel": "REST · ordered SSE · recovery state", "pos": [285, 365], "size": [175, 80]},
+    {"id": "erpnext", "type": "external", "label": "ERPNext Demo Tenant", "sublabel": "库存 · 采购 · 交付 · 开票 · GL", "pos": [1265, 80], "size": [175, 80]},
+    {"id": "saas_evidence", "type": "external", "label": "SaaS Evidence Plane", "sublabel": "Airtable · Celigo · Jira · Slack", "pos": [530, 80], "size": [175, 80]},
+    {"id": "strands", "type": "backend", "label": "Strands Investigation Loop", "sublabel": "6 scoped tools · typed result · SDK hooks", "pos": [530, 365], "size": [175, 80]},
+    {"id": "aws_agent", "type": "cloud", "label": "AWS Agent Runtime", "sublabel": "Nova Pro · AgentCore proof", "pos": [530, 650], "size": [175, 80]},
+    {"id": "policy", "type": "security", "label": "Deterministic Policy", "sublabel": "状态 · 关联 · 范围 · 幂等检查", "pos": [775, 365], "size": [175, 80]},
+    {"id": "manager", "type": "security", "label": "Manager Gate", "sublabel": "case-bound approval / rejection", "pos": [1020, 365], "size": [175, 80]},
+    {"id": "executor", "type": "backend", "label": "Guarded Executor", "sublabel": "批准范围内的真实 ERPNext 写入", "pos": [1265, 365], "size": [175, 80]},
+    {"id": "verifier", "type": "backend", "label": "Independent Verifier", "sublabel": "权威重读 · Celigo 回执 · 余额验证", "pos": [1265, 650], "size": [175, 80]},
+    {"id": "ledger", "type": "database", "label": "SQLite Event Ledger", "sublabel": "有序事件 · 恢复 · regression coverage", "pos": [1020, 650], "size": [175, 80]}
+  ],
+  "connections": [
+    {"id": "ui_api", "from": "dashboard", "to": "decision_api", "label": "REST / SSE", "variant": "emphasis"},
+    {"id": "api_agent", "from": "decision_api", "to": "strands", "variant": "emphasis"},
+    {"id": "saas_agent", "from": "saas_evidence", "to": "strands", "label": "fresh reads", "variant": "emphasis", "labelAt": [618, 174]},
+    {"id": "agent_model", "from": "strands", "to": "aws_agent", "label": "Nova calls", "variant": "dashed", "labelAt": [618, 459]},
+    {"id": "agent_policy", "from": "strands", "to": "policy", "label": "typed advisory", "variant": "security", "labelAt": [740, 459]},
+    {"id": "policy_manager", "from": "policy", "to": "manager", "label": "eligible plan", "variant": "security"},
+    {"id": "manager_executor", "from": "manager", "to": "executor", "label": "approval", "variant": "security"},
+    {"id": "executor_erp", "from": "executor", "to": "erpnext", "label": "idempotent write", "variant": "emphasis"},
+    {"id": "executor_verify", "from": "executor", "to": "verifier", "label": "fresh reread", "variant": "emphasis", "labelAt": [1353, 459]},
+    {"id": "verify_ledger", "from": "verifier", "to": "ledger", "label": "verified packet", "variant": "emphasis", "labelAt": [1230, 744]}
+  ],
+  "cards": [
+    {"dot": "cyan", "title": "Agent 的能力", "items": ["读取并关联五个系统的证据", "比较多种原因并解释不确定性", "通过 SDK hooks 流式展示真实调查过程"]},
+    {"dot": "rose", "title": "人类保留的权力", "items": ["模型不能批准或执行写操作", "Manager 只批准当前 case-bound 计划", "版本、范围或证据变化即 fail closed"]},
+    {"dot": "emerald", "title": "闭环证明", "items": ["写入后重新读取 ERPNext 权威状态", "Celigo 回执与 Stock / GL 平衡交叉验证", "幂等保护由确定性回归测试覆盖"]}
+  ]
+}

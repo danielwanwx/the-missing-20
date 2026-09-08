@@ -1,0 +1,2980 @@
+{
+  "activity": [
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000028",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_erp_evidence",
+      "occurred_at": "2026-09-07T16:47:36.822142+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0002",
+      "sequence": 28,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000029",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_airtable_evidence",
+      "occurred_at": "2026-09-07T16:47:36.822748+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0002",
+      "sequence": 29,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000030",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_celigo_evidence",
+      "occurred_at": "2026-09-07T16:47:36.823322+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0002",
+      "sequence": 30,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000031",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_collaboration_evidence",
+      "occurred_at": "2026-09-07T16:47:36.824098+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0002",
+      "sequence": 31,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000032",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read reconcile_source_records",
+      "occurred_at": "2026-09-07T16:47:36.824705+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0002",
+      "sequence": 32,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only advisory returned RECOVERY_READY; deterministic policy retains authority.",
+      "event_id": "agent-platform-000033",
+      "event_type": "agent.strands.completed",
+      "label": "Strands investigation completed",
+      "occurred_at": "2026-09-07T16:47:36.825255+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0002",
+      "sequence": 33,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Conversation turn 1 cited 8 evidence records.",
+      "event_id": "agent-platform-000034",
+      "event_type": "human.agent.conversation.completed",
+      "label": "Evidence Agent answered",
+      "occurred_at": "2026-09-07T16:48:19.343921+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 34,
+      "source_id": "agent-platform",
+      "status": "ANSWERED"
+    },
+    {
+      "detail": "Conversation turn 2 cited 8 evidence records.",
+      "event_id": "agent-platform-000035",
+      "event_type": "human.agent.conversation.completed",
+      "label": "Evidence Agent answered",
+      "occurred_at": "2026-09-07T16:48:38.484154+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 35,
+      "source_id": "agent-platform",
+      "status": "ANSWERED"
+    },
+    {
+      "detail": "Approval is bound to the current M20 case evidence.",
+      "event_id": "agent-platform-000036",
+      "event_type": "manager.approval.granted",
+      "label": "Guarded recovery approved",
+      "occurred_at": "2026-09-07T16:49:05.654635+00:00",
+      "provenance": "live",
+      "provider": "Manager",
+      "read_only": true,
+      "record_id": "m20-approval-0002",
+      "sequence": 36,
+      "source_id": "agent-platform",
+      "status": "APPROVED"
+    },
+    {
+      "detail": "ERPNext write completed. Waiting for the independent Celigo run receipt.",
+      "event_id": "agent-platform-000037",
+      "event_type": "agent.execution.completed",
+      "label": "Guarded ERP recovery completed",
+      "occurred_at": "2026-09-07T16:49:08.767561+00:00",
+      "provenance": "live-provider-write",
+      "provider": "Missing 20 Agent",
+      "read_only": false,
+      "record_id": "MAT-STE-2026-00001",
+      "sequence": 37,
+      "source_id": "agent-platform",
+      "status": "VERIFYING"
+    },
+    {
+      "detail": "Verified live provider recovery is bound to its evidence, approval, and reread.",
+      "event_id": "agent-platform-000038",
+      "event_type": "agent.resolution_packet.issued",
+      "label": "Resolution packet issued",
+      "occurred_at": "2026-09-07T16:49:12.505954+00:00",
+      "provenance": "live-provider-write",
+      "provider": "Missing 20 Agent",
+      "read_only": false,
+      "record_id": "resolution-d5e21cf26d88",
+      "sequence": 38,
+      "source_id": "agent-platform",
+      "status": "VERIFIED"
+    },
+    {
+      "detail": "ERPNext recovery and the independent Celigo run receipt are verified.",
+      "event_id": "agent-platform-000039",
+      "event_type": "agent.execution.verified",
+      "label": "Closed-loop recovery verified",
+      "occurred_at": "2026-09-07T16:49:12.507016+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "6a99e57c1d35fb241cec8ad6",
+      "sequence": 39,
+      "source_id": "agent-platform",
+      "status": "VERIFIED"
+    },
+    {
+      "detail": "Airtable did not return a usable release record.",
+      "event_id": "agent-platform-000040",
+      "event_type": "provider.read.observed",
+      "label": "Registry read degraded",
+      "occurred_at": "2026-09-07T19:50:26.896024+00:00",
+      "provenance": "live",
+      "provider": "Airtable · Supplier Quality Registry",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 40,
+      "source_id": "airtable-quality-registry",
+      "status": "DEGRADED"
+    },
+    {
+      "detail": "The dedicated Celigo run-receipt registry could not be read.",
+      "event_id": "agent-platform-000041",
+      "event_type": "provider.read.observed",
+      "label": "Celigo receipt read degraded",
+      "occurred_at": "2026-09-07T19:50:26.897966+00:00",
+      "provenance": "live",
+      "provider": "Celigo · quality.release",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 41,
+      "source_id": "celigo-quality-release",
+      "status": "DEGRADED"
+    },
+    {
+      "change_count": 0,
+      "detail": "20 units · USD 42,000 · On Hold",
+      "event_id": "agent-platform-000042",
+      "event_type": "provider.read.observed",
+      "label": "ERP read · customer order SAL-ORD-2026-00006",
+      "metrics": {
+        "billed_revenue": 0.0,
+        "booked_revenue": 42000.0,
+        "customer_order_quantity": 20.0,
+        "delivered_quantity": 0.0,
+        "expected": 20.0,
+        "gap": 0.0,
+        "invoice_count": 20.0,
+        "invoice_held": false,
+        "invoice_hold_value": 0.0,
+        "physically_arrived": 20.0,
+        "po_unit_cost": 1200.0,
+        "purchase_price_variance": 0.0,
+        "quality_hold": 0.0,
+        "receipt_unresolved": 0.0,
+        "recorded": 20.0,
+        "revenue_at_risk": 42000.0,
+        "source_sequence": 1,
+        "value_protected": 0.0,
+        "working_capital_at_risk": 0.0
+      },
+      "occurred_at": "2026-09-07T19:59:30.515269+00:00",
+      "provenance": "live",
+      "provider": "ERPNext / Frappe Cloud",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 42,
+      "source_id": "erpnext-missing20",
+      "source_sequence": 1,
+      "status": "HELD"
+    },
+    {
+      "detail": "Observing the scoped quality-release case.",
+      "event_id": "agent-platform-000043",
+      "event_type": "agent.run.observing",
+      "label": "Agent run opened",
+      "occurred_at": "2026-09-07T20:00:29.401022+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0003",
+      "sequence": 43,
+      "source_id": "agent-platform",
+      "status": "OBSERVING"
+    },
+    {
+      "detail": "ERP, registry, and integration-receipt reads were planned.",
+      "event_id": "agent-platform-000044",
+      "event_type": "agent.run.planning",
+      "label": "Investigation plan created",
+      "occurred_at": "2026-09-07T20:00:29.402494+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0003",
+      "sequence": 44,
+      "source_id": "agent-platform",
+      "status": "PLANNING"
+    },
+    {
+      "detail": "Reading correlated provider evidence; provider writes remain disabled.",
+      "event_id": "agent-platform-000045",
+      "event_type": "agent.diagnosis.started",
+      "label": "Automatic diagnosis started",
+      "occurred_at": "2026-09-07T20:00:29.403364+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 45,
+      "source_id": "agent-platform",
+      "status": "DIAGNOSING"
+    },
+    {
+      "detail": "Evidence authority, correlation completeness, and guard conditions were evaluated.",
+      "event_id": "agent-platform-000046",
+      "event_type": "agent.run.reasoning",
+      "label": "Agent evaluated evidence",
+      "occurred_at": "2026-09-07T20:00:31.216079+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0003",
+      "sequence": 46,
+      "source_id": "agent-platform",
+      "status": "REASONING"
+    },
+    {
+      "detail": "Procurement recovery is verified, but ERPNext customer order SAL-ORD-2026-00006 still has 42,000 of booked revenue awaiting a manager-gated delivery and billing reread.",
+      "event_id": "agent-platform-000047",
+      "event_type": "agent.diagnosis.completed",
+      "label": "Diagnosis completed",
+      "occurred_at": "2026-09-07T20:00:31.217267+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 47,
+      "source_id": "agent-platform",
+      "status": "PLAN_READY"
+    },
+    {
+      "detail": "No model conclusion was used; deterministic safety controls remain in force.",
+      "event_id": "agent-platform-000048",
+      "event_type": "agent.strands.degraded",
+      "label": "Strands investigation unavailable",
+      "occurred_at": "2026-09-07T20:00:33.033852+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0003",
+      "sequence": 48,
+      "source_id": "agent-platform",
+      "status": "DEGRADED"
+    },
+    {
+      "detail": "Observing the scoped quality-release case.",
+      "event_id": "agent-platform-000049",
+      "event_type": "agent.run.observing",
+      "label": "Agent run opened",
+      "occurred_at": "2026-09-07T21:19:15.934893+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0004",
+      "sequence": 49,
+      "source_id": "agent-platform",
+      "status": "OBSERVING"
+    },
+    {
+      "detail": "ERP, registry, and integration-receipt reads were planned.",
+      "event_id": "agent-platform-000050",
+      "event_type": "agent.run.planning",
+      "label": "Investigation plan created",
+      "occurred_at": "2026-09-07T21:19:15.936899+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0004",
+      "sequence": 50,
+      "source_id": "agent-platform",
+      "status": "PLANNING"
+    },
+    {
+      "detail": "Reading correlated provider evidence; provider writes remain disabled.",
+      "event_id": "agent-platform-000051",
+      "event_type": "agent.diagnosis.started",
+      "label": "Automatic diagnosis started",
+      "occurred_at": "2026-09-07T21:19:15.937767+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 51,
+      "source_id": "agent-platform",
+      "status": "DIAGNOSING"
+    },
+    {
+      "detail": "Evidence authority, correlation completeness, and guard conditions were evaluated.",
+      "event_id": "agent-platform-000052",
+      "event_type": "agent.run.reasoning",
+      "label": "Agent evaluated evidence",
+      "occurred_at": "2026-09-07T21:19:17.728020+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0004",
+      "sequence": 52,
+      "source_id": "agent-platform",
+      "status": "REASONING"
+    },
+    {
+      "detail": "Procurement recovery is verified, but ERPNext customer order SAL-ORD-2026-00006 still has 42,000 of booked revenue awaiting a manager-gated delivery and billing reread.",
+      "event_id": "agent-platform-000053",
+      "event_type": "agent.diagnosis.completed",
+      "label": "Diagnosis completed",
+      "occurred_at": "2026-09-07T21:19:17.728927+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 53,
+      "source_id": "agent-platform",
+      "status": "PLAN_READY"
+    },
+    {
+      "detail": "No model conclusion was used; deterministic safety controls remain in force.",
+      "event_id": "agent-platform-000054",
+      "event_type": "agent.strands.degraded",
+      "label": "Strands investigation unavailable",
+      "occurred_at": "2026-09-07T21:19:19.535128+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0004",
+      "sequence": 54,
+      "source_id": "agent-platform",
+      "status": "DEGRADED"
+    },
+    {
+      "detail": "Observing the scoped quality-release case.",
+      "event_id": "agent-platform-000055",
+      "event_type": "agent.run.observing",
+      "label": "Agent run opened",
+      "occurred_at": "2026-09-07T21:49:24.718413+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 55,
+      "source_id": "agent-platform",
+      "status": "OBSERVING"
+    },
+    {
+      "detail": "ERP, registry, and integration-receipt reads were planned.",
+      "event_id": "agent-platform-000056",
+      "event_type": "agent.run.planning",
+      "label": "Investigation plan created",
+      "occurred_at": "2026-09-07T21:49:24.720526+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 56,
+      "source_id": "agent-platform",
+      "status": "PLANNING"
+    },
+    {
+      "detail": "Reading correlated provider evidence; provider writes remain disabled.",
+      "event_id": "agent-platform-000057",
+      "event_type": "agent.diagnosis.started",
+      "label": "Automatic diagnosis started",
+      "occurred_at": "2026-09-07T21:49:24.721482+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 57,
+      "source_id": "agent-platform",
+      "status": "DIAGNOSING"
+    },
+    {
+      "detail": "Evidence authority, correlation completeness, and guard conditions were evaluated.",
+      "event_id": "agent-platform-000058",
+      "event_type": "agent.run.reasoning",
+      "label": "Agent evaluated evidence",
+      "occurred_at": "2026-09-07T21:49:26.510790+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 58,
+      "source_id": "agent-platform",
+      "status": "REASONING"
+    },
+    {
+      "detail": "Procurement recovery is verified, but ERPNext customer order SAL-ORD-2026-00006 still has 42,000 of booked revenue awaiting a manager-gated delivery and billing reread.",
+      "event_id": "agent-platform-000059",
+      "event_type": "agent.diagnosis.completed",
+      "label": "Diagnosis completed",
+      "occurred_at": "2026-09-07T21:49:26.512467+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 59,
+      "source_id": "agent-platform",
+      "status": "PLAN_READY"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000060",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_control_context",
+      "occurred_at": "2026-09-07T21:49:42.999391+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 60,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000061",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_erp_evidence",
+      "occurred_at": "2026-09-07T21:49:43.000491+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 61,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000062",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_airtable_evidence",
+      "occurred_at": "2026-09-07T21:49:43.001327+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 62,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000063",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_celigo_evidence",
+      "occurred_at": "2026-09-07T21:49:43.002128+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 63,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000064",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_collaboration_evidence",
+      "occurred_at": "2026-09-07T21:49:43.002888+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 64,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000065",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read reconcile_source_records",
+      "occurred_at": "2026-09-07T21:49:43.003685+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 65,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only advisory returned NEEDS_EVIDENCE; deterministic policy retains authority.",
+      "event_id": "agent-platform-000066",
+      "event_type": "agent.strands.completed",
+      "label": "Strands investigation completed",
+      "occurred_at": "2026-09-07T21:49:43.004875+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0005",
+      "sequence": 66,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Observing the scoped quality-release case.",
+      "event_id": "agent-platform-000067",
+      "event_type": "agent.run.observing",
+      "label": "Agent run opened",
+      "occurred_at": "2026-09-07T21:57:41.958918+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 67,
+      "source_id": "agent-platform",
+      "status": "OBSERVING"
+    },
+    {
+      "detail": "ERP, registry, and integration-receipt reads were planned.",
+      "event_id": "agent-platform-000068",
+      "event_type": "agent.run.planning",
+      "label": "Investigation plan created",
+      "occurred_at": "2026-09-07T21:57:41.960455+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 68,
+      "source_id": "agent-platform",
+      "status": "PLANNING"
+    },
+    {
+      "detail": "Reading correlated provider evidence; provider writes remain disabled.",
+      "event_id": "agent-platform-000069",
+      "event_type": "agent.diagnosis.started",
+      "label": "Automatic diagnosis started",
+      "occurred_at": "2026-09-07T21:57:41.961838+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 69,
+      "source_id": "agent-platform",
+      "status": "DIAGNOSING"
+    },
+    {
+      "detail": "Evidence authority, correlation completeness, and guard conditions were evaluated.",
+      "event_id": "agent-platform-000070",
+      "event_type": "agent.run.reasoning",
+      "label": "Agent evaluated evidence",
+      "occurred_at": "2026-09-07T21:57:43.761383+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 70,
+      "source_id": "agent-platform",
+      "status": "REASONING"
+    },
+    {
+      "detail": "Procurement recovery is verified, but ERPNext customer order SAL-ORD-2026-00006 still has 42,000 of booked revenue awaiting a manager-gated delivery and billing reread.",
+      "event_id": "agent-platform-000071",
+      "event_type": "agent.diagnosis.completed",
+      "label": "Diagnosis completed",
+      "occurred_at": "2026-09-07T21:57:43.762961+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 71,
+      "source_id": "agent-platform",
+      "status": "PLAN_READY"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000072",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_control_context",
+      "occurred_at": "2026-09-07T21:57:49.474669+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 72,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000073",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_erp_evidence",
+      "occurred_at": "2026-09-07T21:57:49.475763+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 73,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000074",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_airtable_evidence",
+      "occurred_at": "2026-09-07T21:57:49.476631+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 74,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000075",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_celigo_evidence",
+      "occurred_at": "2026-09-07T21:57:49.477412+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 75,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000076",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_collaboration_evidence",
+      "occurred_at": "2026-09-07T21:57:49.478175+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 76,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000077",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read reconcile_source_records",
+      "occurred_at": "2026-09-07T21:57:49.478926+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 77,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only advisory returned RECOVERY_READY; deterministic policy retains authority.",
+      "event_id": "agent-platform-000078",
+      "event_type": "agent.strands.completed",
+      "label": "Strands investigation completed",
+      "occurred_at": "2026-09-07T21:57:49.479656+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0006",
+      "sequence": 78,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Observing the scoped quality-release case.",
+      "event_id": "agent-platform-000079",
+      "event_type": "agent.run.observing",
+      "label": "Agent run opened",
+      "occurred_at": "2026-09-07T21:59:58.991087+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 79,
+      "source_id": "agent-platform",
+      "status": "OBSERVING"
+    },
+    {
+      "detail": "ERP, registry, and integration-receipt reads were planned.",
+      "event_id": "agent-platform-000080",
+      "event_type": "agent.run.planning",
+      "label": "Investigation plan created",
+      "occurred_at": "2026-09-07T21:59:58.992475+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 80,
+      "source_id": "agent-platform",
+      "status": "PLANNING"
+    },
+    {
+      "detail": "Reading correlated provider evidence; provider writes remain disabled.",
+      "event_id": "agent-platform-000081",
+      "event_type": "agent.diagnosis.started",
+      "label": "Automatic diagnosis started",
+      "occurred_at": "2026-09-07T21:59:58.994116+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 81,
+      "source_id": "agent-platform",
+      "status": "DIAGNOSING"
+    },
+    {
+      "detail": "Evidence authority, correlation completeness, and guard conditions were evaluated.",
+      "event_id": "agent-platform-000082",
+      "event_type": "agent.run.reasoning",
+      "label": "Agent evaluated evidence",
+      "occurred_at": "2026-09-07T22:00:00.860747+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 82,
+      "source_id": "agent-platform",
+      "status": "REASONING"
+    },
+    {
+      "detail": "Procurement recovery is verified, but ERPNext customer order SAL-ORD-2026-00006 still has 42,000 of booked revenue awaiting a manager-gated delivery and billing reread.",
+      "event_id": "agent-platform-000083",
+      "event_type": "agent.diagnosis.completed",
+      "label": "Diagnosis completed",
+      "occurred_at": "2026-09-07T22:00:00.862328+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 83,
+      "source_id": "agent-platform",
+      "status": "PLAN_READY"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000084",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_control_context",
+      "occurred_at": "2026-09-07T22:00:14.708275+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 84,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000085",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_erp_evidence",
+      "occurred_at": "2026-09-07T22:00:14.709883+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 85,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000086",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_airtable_evidence",
+      "occurred_at": "2026-09-07T22:00:14.711068+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 86,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000087",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_celigo_evidence",
+      "occurred_at": "2026-09-07T22:00:14.712083+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 87,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000088",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read read_collaboration_evidence",
+      "occurred_at": "2026-09-07T22:00:14.712858+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 88,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only source tool returned a scoped evidence packet.",
+      "event_id": "agent-platform-000089",
+      "event_type": "agent.strands.tool.completed",
+      "label": "Strands read reconcile_source_records",
+      "occurred_at": "2026-09-07T22:00:14.713835+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 89,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Read-only advisory returned RECOVERY_READY; deterministic policy retains authority.",
+      "event_id": "agent-platform-000090",
+      "event_type": "agent.strands.completed",
+      "label": "Strands investigation completed",
+      "occurred_at": "2026-09-07T22:00:14.714761+00:00",
+      "provenance": "live",
+      "provider": "Strands",
+      "read_only": true,
+      "record_id": "agent-run-0007",
+      "sequence": 90,
+      "source_id": "agent-platform",
+      "status": "COMPLETE"
+    },
+    {
+      "detail": "Conversation turn 1 cited 8 evidence records.",
+      "event_id": "agent-platform-000091",
+      "event_type": "human.agent.conversation.completed",
+      "label": "Evidence Agent answered",
+      "occurred_at": "2026-09-07T22:00:43.483858+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 91,
+      "source_id": "agent-platform",
+      "status": "ANSWERED"
+    },
+    {
+      "detail": "Conversation turn 2 cited 8 evidence records.",
+      "event_id": "agent-platform-000092",
+      "event_type": "human.agent.conversation.completed",
+      "label": "Evidence Agent answered",
+      "occurred_at": "2026-09-07T22:01:14.091419+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 92,
+      "source_id": "agent-platform",
+      "status": "ANSWERED"
+    },
+    {
+      "detail": "Approval is bound to the current M20 case evidence.",
+      "event_id": "agent-platform-000093",
+      "event_type": "manager.approval.granted",
+      "label": "Guarded recovery approved",
+      "occurred_at": "2026-09-07T22:01:42.916508+00:00",
+      "provenance": "live",
+      "provider": "Manager",
+      "read_only": true,
+      "record_id": "m20-approval-0007",
+      "sequence": 93,
+      "source_id": "agent-platform",
+      "status": "APPROVED"
+    },
+    {
+      "change_count": 1,
+      "detail": "20 units · USD 42,000 · To Deliver and Bill",
+      "event_id": "agent-platform-000094",
+      "event_type": "provider.read.observed",
+      "label": "ERP read · customer order SAL-ORD-2026-00006",
+      "metrics": {
+        "billed_revenue": 0.0,
+        "booked_revenue": 42000.0,
+        "customer_order_quantity": 20.0,
+        "delivered_quantity": 0.0,
+        "expected": 20.0,
+        "gap": 0.0,
+        "invoice_count": 20.0,
+        "invoice_held": false,
+        "invoice_hold_value": 0.0,
+        "physically_arrived": 20.0,
+        "po_unit_cost": 1200.0,
+        "purchase_price_variance": 0.0,
+        "quality_hold": 0.0,
+        "receipt_unresolved": 0.0,
+        "recorded": 20.0,
+        "revenue_at_risk": 42000.0,
+        "source_sequence": 2,
+        "value_protected": 0.0,
+        "working_capital_at_risk": 0.0
+      },
+      "occurred_at": "2026-09-07T22:01:48.486160+00:00",
+      "provenance": "live",
+      "provider": "ERPNext / Frappe Cloud",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 94,
+      "source_id": "erpnext-missing20",
+      "source_sequence": 2,
+      "status": "VERIFIED"
+    },
+    {
+      "detail": "Approval is bound to the current M20 case evidence.",
+      "event_id": "agent-platform-000095",
+      "event_type": "manager.approval.granted",
+      "label": "Guarded recovery approved",
+      "occurred_at": "2026-09-07T22:02:00.228110+00:00",
+      "provenance": "live",
+      "provider": "Manager",
+      "read_only": true,
+      "record_id": "m20-approval-0007",
+      "sequence": 95,
+      "source_id": "agent-platform",
+      "status": "APPROVED"
+    },
+    {
+      "detail": "Approval is bound to the current M20 case evidence.",
+      "event_id": "agent-platform-000096",
+      "event_type": "manager.approval.granted",
+      "label": "Guarded recovery approved",
+      "occurred_at": "2026-09-07T22:04:08.300739+00:00",
+      "provenance": "live",
+      "provider": "Manager",
+      "read_only": true,
+      "record_id": "m20-approval-0007",
+      "sequence": 96,
+      "source_id": "agent-platform",
+      "status": "APPROVED"
+    },
+    {
+      "detail": "Approval is bound to the current M20 case evidence.",
+      "event_id": "agent-platform-000097",
+      "event_type": "manager.approval.granted",
+      "label": "Guarded recovery approved",
+      "occurred_at": "2026-09-07T22:05:34.095849+00:00",
+      "provenance": "live",
+      "provider": "Manager",
+      "read_only": true,
+      "record_id": "m20-approval-0007",
+      "sequence": 97,
+      "source_id": "agent-platform",
+      "status": "APPROVED"
+    },
+    {
+      "detail": "Approval is bound to the current M20 case evidence.",
+      "event_id": "agent-platform-000098",
+      "event_type": "manager.approval.granted",
+      "label": "Guarded recovery approved",
+      "occurred_at": "2026-09-07T22:06:45.822654+00:00",
+      "provenance": "live",
+      "provider": "Manager",
+      "read_only": true,
+      "record_id": "m20-approval-0007",
+      "sequence": 98,
+      "source_id": "agent-platform",
+      "status": "APPROVED"
+    },
+    {
+      "detail": "ERPNext write completed. Waiting for the independent Celigo run receipt.",
+      "event_id": "agent-platform-000099",
+      "event_type": "agent.execution.completed",
+      "label": "Guarded ERP recovery completed",
+      "occurred_at": "2026-09-07T22:06:53.499918+00:00",
+      "provenance": "live-provider-write",
+      "provider": "Missing 20 Agent",
+      "read_only": false,
+      "record_id": "MAT-STE-2026-00001",
+      "sequence": 99,
+      "source_id": "agent-platform",
+      "status": "VERIFYING"
+    },
+    {
+      "change_count": 1,
+      "detail": "20 units · USD 42,000 · Completed",
+      "event_id": "agent-platform-000100",
+      "event_type": "provider.read.observed",
+      "label": "ERP read · customer order SAL-ORD-2026-00006",
+      "metrics": {
+        "billed_revenue": 42000.0,
+        "booked_revenue": 42000.0,
+        "customer_order_quantity": 20.0,
+        "delivered_quantity": 0.0,
+        "expected": 20.0,
+        "gap": 0.0,
+        "invoice_count": 20.0,
+        "invoice_held": false,
+        "invoice_hold_value": 0.0,
+        "physically_arrived": 20.0,
+        "po_unit_cost": 1200.0,
+        "purchase_price_variance": 0.0,
+        "quality_hold": 0.0,
+        "receipt_unresolved": 0.0,
+        "recorded": 20.0,
+        "revenue_at_risk": 0.0,
+        "source_sequence": 3,
+        "value_protected": 42000.0,
+        "working_capital_at_risk": 0.0
+      },
+      "occurred_at": "2026-09-07T22:06:55.837359+00:00",
+      "provenance": "live",
+      "provider": "ERPNext / Frappe Cloud",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 100,
+      "source_id": "erpnext-missing20",
+      "source_sequence": 3,
+      "status": "VERIFIED"
+    },
+    {
+      "change_count": 1,
+      "detail": "Billed USD 42,000 from the verified order",
+      "event_id": "agent-platform-000101",
+      "event_type": "provider.read.observed",
+      "label": "ERP read · customer invoice ACC-SINV-2026-00006",
+      "metrics": {
+        "billed_revenue": 42000.0,
+        "booked_revenue": 42000.0,
+        "customer_order_quantity": 20.0,
+        "delivered_quantity": 0.0,
+        "expected": 20.0,
+        "gap": 0.0,
+        "invoice_count": 20.0,
+        "invoice_held": false,
+        "invoice_hold_value": 0.0,
+        "physically_arrived": 20.0,
+        "po_unit_cost": 1200.0,
+        "purchase_price_variance": 0.0,
+        "quality_hold": 0.0,
+        "receipt_unresolved": 0.0,
+        "recorded": 20.0,
+        "revenue_at_risk": 0.0,
+        "source_sequence": 3,
+        "value_protected": 42000.0,
+        "working_capital_at_risk": 0.0
+      },
+      "occurred_at": "2026-09-07T22:06:55.838800+00:00",
+      "provenance": "live",
+      "provider": "ERPNext / Frappe Cloud",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 101,
+      "source_id": "erpnext-missing20",
+      "source_sequence": 3,
+      "status": "VERIFIED"
+    },
+    {
+      "detail": "Verified live provider recovery is bound to its evidence, approval, and reread.",
+      "event_id": "agent-platform-000102",
+      "event_type": "agent.resolution_packet.issued",
+      "label": "Resolution packet issued",
+      "occurred_at": "2026-09-07T22:07:00.527255+00:00",
+      "provenance": "live-provider-write",
+      "provider": "Missing 20 Agent",
+      "read_only": false,
+      "record_id": "resolution-e89ee9e450ba",
+      "sequence": 102,
+      "source_id": "agent-platform",
+      "status": "VERIFIED"
+    },
+    {
+      "detail": "ERPNext recovery and the independent Celigo run receipt are verified.",
+      "event_id": "agent-platform-000103",
+      "event_type": "agent.execution.verified",
+      "label": "Closed-loop recovery verified",
+      "occurred_at": "2026-09-07T22:07:00.528676+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "6a99e57c1d35fb241cec8ad6",
+      "sequence": 103,
+      "source_id": "agent-platform",
+      "status": "VERIFIED"
+    },
+    {
+      "detail": "20 units posted from the customer order",
+      "event_id": "agent-platform-000104",
+      "event_type": "provider.read.observed",
+      "label": "ERP read · delivery MAT-DN-2026-00001",
+      "occurred_at": "2026-09-07T22:15:21.478521+00:00",
+      "provenance": "live",
+      "provider": "ERPNext / Frappe Cloud",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 104,
+      "source_id": "erpnext-missing20",
+      "status": "VERIFIED"
+    },
+    {
+      "detail": "Conversation turn 3 cited 8 evidence records.",
+      "event_id": "agent-platform-000105",
+      "event_type": "human.agent.conversation.completed",
+      "label": "Evidence Agent answered",
+      "occurred_at": "2026-09-07T22:19:51.801539+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 105,
+      "source_id": "agent-platform",
+      "status": "ANSWERED"
+    },
+    {
+      "detail": "Conversation turn 4 cited 8 evidence records.",
+      "event_id": "agent-platform-000106",
+      "event_type": "human.agent.conversation.completed",
+      "label": "Evidence Agent answered",
+      "occurred_at": "2026-09-07T22:20:20.574571+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 106,
+      "source_id": "agent-platform",
+      "status": "ANSWERED"
+    },
+    {
+      "detail": "Conversation turn 5 cited 8 evidence records.",
+      "event_id": "agent-platform-000107",
+      "event_type": "human.agent.conversation.completed",
+      "label": "Evidence Agent answered",
+      "occurred_at": "2026-09-07T22:26:47.564164+00:00",
+      "provenance": "live",
+      "provider": "Missing 20 Agent",
+      "read_only": true,
+      "record_id": "",
+      "sequence": 107,
+      "source_id": "agent-platform",
+      "status": "ANSWERED"
+    }
+  ],
+  "agent_run": {
+    "active_step": "",
+    "confidence": 0.96,
+    "run_id": "agent-run-0007",
+    "state": "VERIFIED"
+  },
+  "business_impact": {
+    "available_inventory_value": 24000.0,
+    "billed_revenue": 42000.0,
+    "booked_revenue": 42000.0,
+    "currency": "USD",
+    "erp_reconciliation_percent": 100.0,
+    "inventory_availability_percent": 100.0,
+    "invoice_hold_value": 0.0,
+    "invoice_price_delta_percent": 0.0,
+    "invoice_status": "OPEN",
+    "invoice_unit_price": 1200.0,
+    "invoice_value": 24000.0,
+    "po_line_value": 24000.0,
+    "po_unit_cost": 1200.0,
+    "provenance": "ERPNext / Frappe Cloud live read",
+    "purchase_price_variance": 0.0,
+    "quality_hold_percent": 0.0,
+    "quality_hold_value": 0.0,
+    "receipt_gap_percent": 0.0,
+    "receipt_gap_value": 0.0,
+    "revenue_at_risk": 0.0,
+    "source_sequence": 1,
+    "supplier_delivery_completion_percent": 100.0,
+    "supplier_payment_hold": false,
+    "supplier_status": "ACTIVE",
+    "value_protected": 42000.0,
+    "value_protected_classification": "OBSERVED_BILLED_REVENUE",
+    "working_capital_at_risk": 0.0
+  },
+  "case_id": "M20-ECU-2026-00011-LOT-A",
+  "case_projection": {
+    "case": {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "delivery_note": "MAT-DN-2026-00001",
+      "invoice_held": false,
+      "purchase_invoice": "ACC-PINV-2026-00007",
+      "purchase_order": "PUR-ORD-2026-00011",
+      "purchase_receipt": "MAT-PRE-2026-00001",
+      "quality_release_transfer": "MAT-STE-2026-00001",
+      "quantities": {
+        "available": 20.0,
+        "ordered": 20.0,
+        "physically_arrived": 20.0,
+        "quality_hold": 0.0,
+        "receipt_unresolved": 0.0
+      },
+      "sales_invoice": "ACC-SINV-2026-00006",
+      "sales_order": "SAL-ORD-2026-00006"
+    },
+    "provenance": "live-read",
+    "read_only": true,
+    "source_sequence": 1
+  },
+  "conversation": [
+    {
+      "answer": "Disposition: RECOVERY_READY. Customer order held due to zero delivered quantity and no delivery note or sales invoice. Quality transfer present, but exact held lot transfer not present. Integration attempt quantity is 0.0, and integration business key is present in ERP. Ledger read complete, physical received quantity matches ordered quantity. Supplier active, no payment hold. Safe recovery scope is to deliver ordered quantity and create sales invoice. Next: Manager approval required before delivering ordered quantity and creating sales invoice.",
+      "context_turns": 0,
+      "created_at": "2026-09-07T22:00:43.483849+00:00",
+      "evidence_ids": [
+        "M20-ECU-2026-00011-LOT-A",
+        "ACC-PINV-2026-00007",
+        "PUR-ORD-2026-00011",
+        "MAT-PRE-2026-00001",
+        "MAT-PRE-2026-00001:ledger",
+        "SAL-ORD-2026-00006",
+        "MAT-STE-2026-00001",
+        "MAT-PRE-2026-00001:available"
+      ],
+      "latency_ms": 5860,
+      "provider": {
+        "mode": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "provider": "bedrock",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "question": "Why is the customer order held, which alternatives did you rule out, and what evidence proves the safe recovery scope?",
+      "run_id": "agent-run-0007",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "turn_id": "turn-001",
+      "usage": {
+        "incremental_cost_usd": 0.0075936,
+        "input_tokens": 6908,
+        "output_tokens": 646,
+        "request_count": 2,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    {
+      "answer": "Disposition: RECOVERY_READY. Booked revenue is $42,000, billed revenue is $0. Stop if customer order status is not ORDER_HELD or if customer delivered quantity is not 0.0. Next: Manager approval required before delivering ordered quantity and creating sales invoice.",
+      "context_turns": 1,
+      "created_at": "2026-09-07T22:01:14.091412+00:00",
+      "evidence_ids": [
+        "M20-ECU-2026-00011-LOT-A",
+        "ACC-PINV-2026-00007",
+        "PUR-ORD-2026-00011",
+        "MAT-PRE-2026-00001",
+        "MAT-PRE-2026-00001:ledger",
+        "SAL-ORD-2026-00006",
+        "recv8NiUZzO4YjPLo",
+        "6a99e57c1d35fb241cec8ad6"
+      ],
+      "latency_ms": 10852,
+      "provider": {
+        "mode": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "provider": "bedrock",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "question": "How much revenue is booked versus actually billed, and exactly what condition would make you stop instead of asking the manager to execute?",
+      "run_id": "agent-run-0007",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "read_airtable_evidence",
+        "reconcile_source_records"
+      ],
+      "turn_id": "turn-002",
+      "usage": {
+        "incremental_cost_usd": 0.021184,
+        "input_tokens": 22444,
+        "output_tokens": 1009,
+        "request_count": 5,
+        "source_cache_hits": 1,
+        "validation_retries": 0
+      }
+    },
+    {
+      "answer": "Disposition: RECOVERY_COMPLETE. Recovery complete. Customer order status is BILLED_VERIFIED, delivered quantity is 20.0, billed revenue is $42,000.00, delivery note is MAT-DN-2026-00001, sales invoice is ACC-SINV-2026-00006. Ledger read complete, physical received quantity matches ordered quantity. Supplier active, no payment hold. Integration attempt quantity is 0.0, but business key is present in ERP. Exact held lot transfer not present, but held lots are in physical scans, quality transfer completed. Invoice status is OPEN. Next: No recovery action remains. Monitor open invoice.",
+      "context_turns": 2,
+      "created_at": "2026-09-07T22:19:51.801531+00:00",
+      "evidence_ids": [
+        "M20-ECU-2026-00011-LOT-A",
+        "ACC-PINV-2026-00007",
+        "PUR-ORD-2026-00011",
+        "MAT-PRE-2026-00001",
+        "MAT-PRE-2026-00001:ledger",
+        "SAL-ORD-2026-00006",
+        "MAT-DN-2026-00001",
+        "ACC-SINV-2026-00006"
+      ],
+      "latency_ms": 6952,
+      "provider": {
+        "mode": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "provider": "bedrock",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "question": "What authoritative evidence proves the recovery is complete? Cite the exact Sales Order, Delivery Note, Sales Invoice, delivered quantity, billed revenue, and explain whether this proves causal revenue increase.",
+      "run_id": "agent-run-0007",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "turn_id": "turn-003",
+      "usage": {
+        "incremental_cost_usd": 0.0084928,
+        "input_tokens": 7764,
+        "output_tokens": 713,
+        "request_count": 2,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    {
+      "answer": "Rejected by the deterministic causal-claim validator. The live ERP reread proves delivery, billing, and the observed $42,000 accounting outcome; this demo does not prove that the platform caused incremental revenue.",
+      "context_turns": 3,
+      "created_at": "2026-09-07T22:20:20.574559+00:00",
+      "evidence_ids": [
+        "M20-ECU-2026-00011-LOT-A",
+        "ACC-PINV-2026-00007",
+        "PUR-ORD-2026-00011",
+        "MAT-PRE-2026-00001",
+        "MAT-PRE-2026-00001:ledger",
+        "SAL-ORD-2026-00006",
+        "MAT-DN-2026-00001",
+        "ACC-SINV-2026-00006"
+      ],
+      "latency_ms": 11548,
+      "provider": {
+        "mode": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "provider": "bedrock",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "question": "List the exact authoritative record IDs and observed financial outcome after recovery. Was causal revenue uplift proven?",
+      "run_id": "agent-run-0007",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "turn_id": "turn-004",
+      "usage": {
+        "incremental_cost_usd": 0.0156376,
+        "input_tokens": 14459,
+        "output_tokens": 1272,
+        "request_count": 3,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      },
+      "validation_status": "REJECTED_CAUSAL_CLAIM"
+    },
+    {
+      "answer": "Disposition: RECOVERY_COMPLETE. Observed financial outcome: Customer order status is BILLED_VERIFIED, delivered quantity is 20.0, billed revenue is $42,000.00, delivery note is MAT-DN-2026-00001, sales invoice is ACC-SINV-2026-00006. Ledger read complete, physical received quantity matches ordered quantity. Supplier active, no payment hold. Integration attempt quantity is 0.0, but business key is present in ERP. Exact held lot transfer not present, but held lots are in physical scans, quality transfer completed. Invoice status is OPEN. Causal revenue uplift not proven. Next: No recovery action remains. Monitor open invoice.",
+      "context_turns": 3,
+      "created_at": "2026-09-07T22:26:47.564155+00:00",
+      "evidence_ids": [
+        "M20-ECU-2026-00011-LOT-A",
+        "ACC-PINV-2026-00007",
+        "PUR-ORD-2026-00011",
+        "MAT-PRE-2026-00001",
+        "MAT-PRE-2026-00001:ledger",
+        "SAL-ORD-2026-00006",
+        "MAT-DN-2026-00001",
+        "ACC-SINV-2026-00006"
+      ],
+      "latency_ms": 10872,
+      "provider": {
+        "mode": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "provider": "bedrock",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "question": "What is the observed financial outcome, and does this evidence prove that the platform caused incremental revenue? Cite the authoritative ERP records.",
+      "run_id": "agent-run-0007",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "turn_id": "turn-005",
+      "usage": {
+        "incremental_cost_usd": 0.015296,
+        "input_tokens": 14388,
+        "output_tokens": 1183,
+        "request_count": 3,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    }
+  ],
+  "correlation": {
+    "mismatched_fields": [],
+    "missing_fields": [],
+    "registry_tuple": {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "certificate_id": "M20-COC-LOT-A-R3",
+      "evidence_revision": "R3",
+      "purchase_invoice": "ACC-PINV-2026-00007",
+      "purchase_order": "PUR-ORD-2026-00011",
+      "purchase_receipt": "MAT-PRE-2026-00001",
+      "quantity": "8",
+      "supplier_lot": "ECU-2026-LOT-A"
+    },
+    "release_eligibility": "DEMO_GUARDED",
+    "status": "FULLY_CORRELATED",
+    "tuple": {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "certificate_id": "M20-COC-LOT-A-R3",
+      "evidence_revision": "R3",
+      "purchase_invoice": "ACC-PINV-2026-00007",
+      "purchase_order": "PUR-ORD-2026-00011",
+      "purchase_receipt": "MAT-PRE-2026-00001",
+      "quantity": 8.0,
+      "supplier_lot": "ECU-2026-LOT-A"
+    }
+  },
+  "demo_case": {
+    "case": {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "delivery_note": "MAT-DN-2026-00001",
+      "invoice_held": false,
+      "purchase_invoice": "ACC-PINV-2026-00007",
+      "purchase_order": "PUR-ORD-2026-00011",
+      "purchase_receipt": "MAT-PRE-2026-00001",
+      "quality_release_transfer": "MAT-STE-2026-00001",
+      "quantities": {
+        "available": 20.0,
+        "ordered": 20.0,
+        "physically_arrived": 20.0,
+        "quality_hold": 0.0,
+        "receipt_unresolved": 0.0
+      },
+      "sales_invoice": "ACC-SINV-2026-00006",
+      "sales_order": "SAL-ORD-2026-00006"
+    },
+    "provenance": "live-read",
+    "read_only": true,
+    "source_sequence": 1
+  },
+  "diagnosis": {
+    "confidence": 0.91,
+    "correlation_status": "FULLY_CORRELATED",
+    "finding": "CUSTOMER_ORDER_AWAITING_VERIFIED_FULFILLMENT",
+    "hypotheses": [
+      {
+        "id": "quality_hold",
+        "label": "Inventory remains in Quality Hold",
+        "status": "ELIMINATED"
+      },
+      {
+        "id": "invoice_payment_hold",
+        "label": "Invoice remains held after inventory reconciliation",
+        "status": "ELIMINATED"
+      },
+      {
+        "id": "correlation_gap",
+        "label": "Source records refer to different receipts",
+        "status": "ELIMINATED"
+      },
+      {
+        "id": "customer_order_value_gap",
+        "label": "Customer order is not yet delivered and billed",
+        "status": "SUPPORTED"
+      },
+      {
+        "id": "journal_is_causal",
+        "label": "Slack or Jira alone proves the root cause",
+        "status": "ELIMINATED"
+      }
+    ],
+    "integration_receipt_status": "VERIFIED",
+    "status": "VERIFIED",
+    "strands_investigation": {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "case_version": null,
+      "evidence_findings": {
+        "evidence_ids": [
+          "M20-ECU-2026-00011-LOT-A",
+          "ACC-PINV-2026-00007",
+          "PUR-ORD-2026-00011",
+          "MAT-PRE-2026-00001",
+          "MAT-PRE-2026-00001:ledger",
+          "SAL-ORD-2026-00006",
+          "MAT-STE-2026-00001",
+          "MAT-PRE-2026-00001:available",
+          "recv8NiUZzO4YjPLo",
+          "6a99e57c1d35fb241cec8ad6",
+          "MAT-PRE-2026-00001:physical",
+          "QRC-1",
+          "1788480444.928749"
+        ],
+        "join_keys": {
+          "integration_business_key": "MAT-PRE-2026-00001:receipt-post",
+          "integration_lot": "ECU-2026-LOT-A",
+          "line": 1,
+          "purchase_order": "PUR-ORD-2026-00011",
+          "shipment": "MAT-PRE-2026-00001:physical"
+        },
+        "observations": {
+          "completed_quality_transfer_present": true,
+          "customer_billed_revenue": 0.0,
+          "customer_booked_revenue": 42000.0,
+          "customer_delivered_quantity": 0.0,
+          "customer_delivery_note": null,
+          "customer_order_present": true,
+          "customer_order_quantity": 20.0,
+          "customer_order_status": "ORDER_HELD",
+          "customer_sales_invoice": null,
+          "duplicate_supplier_invoice_ids": [],
+          "duplicate_supplier_invoice_present": false,
+          "erp_accounted_quantity": 20.0,
+          "erp_available_quantity": 20.0,
+          "erp_quality_inspection_quantity": 0,
+          "exact_held_lot_quality_dispositions": [],
+          "exact_held_lot_transfer_present": false,
+          "held_lots": [],
+          "held_lots_present_in_physical_scans": true,
+          "integration_attempt_quantity": 0.0,
+          "integration_attempt_response": "ACKNOWLEDGED",
+          "integration_attempt_uom": "EA",
+          "integration_business_key_present_in_erp": true,
+          "integration_conversion_factor": 1,
+          "integration_normalized_quantity": 0.0,
+          "integration_source_po_revision": "R3",
+          "invoice_currency": "USD",
+          "invoice_quantity": 20.0,
+          "invoice_status": "OPEN",
+          "invoice_unit_price": 1200.0,
+          "ledger_pagination_complete": true,
+          "ledger_read_status": "COMPLETE",
+          "physical_received_quantity": 20.0,
+          "po_currency": "USD",
+          "po_revision": "R3",
+          "po_unit_price": 1200.0,
+          "supplier_payment_hold": false,
+          "supplier_status": "ACTIVE"
+        },
+        "policy": {
+          "checks": {
+            "already_complete": true,
+            "authoritative_read_complete": true,
+            "commercial_terms_match": true,
+            "customer_order_complete": false,
+            "customer_order_read_complete": true,
+            "customer_order_requires_fulfillment": true,
+            "duplicate_supplier_invoice_absent": true,
+            "exact_held_lot_approved": false,
+            "exact_held_lot_transfer_present": false,
+            "integration_attempt_matches_gap": true,
+            "integration_business_key_present": true,
+            "invoice_release_ready": false,
+            "lot_trace_matches": true,
+            "physical_quantity_reconciles": true,
+            "source_po_revision_matches": true,
+            "supplier_active": true,
+            "uom_conversion_known": true
+          },
+          "disposition": "RECOVERY_READY",
+          "manager_approval_required": true,
+          "reason": "Procurement is reconciled, but the customer order remains undelivered or unbilled; Manager approval is required for bounded fulfillment and billing.",
+          "write_authority": "NONE"
+        }
+      },
+      "latency_ms": 13755,
+      "mode": "real_strands",
+      "provider": {
+        "mode": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "provider": "bedrock",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "result": {
+        "disposition": "RECOVERY_READY",
+        "evidence_ids": [
+          "M20-ECU-2026-00011-LOT-A",
+          "ACC-PINV-2026-00007",
+          "PUR-ORD-2026-00011",
+          "MAT-PRE-2026-00001",
+          "MAT-PRE-2026-00001:ledger",
+          "SAL-ORD-2026-00006",
+          "MAT-STE-2026-00001",
+          "recv8NiUZzO4YjPLo"
+        ],
+        "reason": "Customer order held, customer delivered and billed quantities are 0. ERP accounted and available quantities match invoice quantity. Physical received quantity is 20. Integration attempt quantity is 0, but integration business key is present in ERP. Ledger read is complete, supplier payment hold is false.",
+        "safe_next_step": "Require Manager approval before bounded write.",
+        "write_performed": false
+      },
+      "run_id": null,
+      "runtime_events": [
+        {
+          "projected_input_tokens": 2977,
+          "sequence": 1,
+          "type": "model.started"
+        },
+        {
+          "duration_ms": 2388,
+          "sequence": 2,
+          "type": "model.succeeded"
+        },
+        {
+          "sequence": 3,
+          "tool": "read_control_context",
+          "tool_use_id": "tooluse_3hE9S9JqtZw7sIvABp9Ykv",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 4,
+          "tool": "read_erp_evidence",
+          "tool_use_id": "tooluse_2U28MDwUnJad77EdDJwdu8",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 5,
+          "tool": "read_airtable_evidence",
+          "tool_use_id": "tooluse_1CzVJGRx1RPjVJ3hs7OuDc",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 6,
+          "tool": "read_celigo_evidence",
+          "tool_use_id": "tooluse_paV4AWEBxHsOpsz6Fj7bwq",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 7,
+          "tool": "read_collaboration_evidence",
+          "tool_use_id": "tooluse_ut1gaxmqEnwjEY3GXvru7Z",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 8,
+          "tool": "reconcile_source_records",
+          "tool_use_id": "tooluse_26B3mv2XUoVwnw1ugUSUql",
+          "type": "tool.started"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 9,
+          "tool": "read_control_context",
+          "tool_use_id": "tooluse_3hE9S9JqtZw7sIvABp9Ykv",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 10,
+          "tool": "read_erp_evidence",
+          "tool_use_id": "tooluse_2U28MDwUnJad77EdDJwdu8",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 11,
+          "tool": "read_airtable_evidence",
+          "tool_use_id": "tooluse_1CzVJGRx1RPjVJ3hs7OuDc",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 12,
+          "tool": "read_celigo_evidence",
+          "tool_use_id": "tooluse_paV4AWEBxHsOpsz6Fj7bwq",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 13,
+          "tool": "read_collaboration_evidence",
+          "tool_use_id": "tooluse_ut1gaxmqEnwjEY3GXvru7Z",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 14,
+          "tool": "reconcile_source_records",
+          "tool_use_id": "tooluse_26B3mv2XUoVwnw1ugUSUql",
+          "type": "tool.succeeded"
+        },
+        {
+          "projected_input_tokens": 3588,
+          "sequence": 15,
+          "type": "model.started"
+        },
+        {
+          "duration_ms": 7481,
+          "sequence": 16,
+          "type": "model.succeeded"
+        },
+        {
+          "sequence": 17,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_fFO71D3iuIrOlKnnuo2cZS",
+          "type": "tool.started"
+        },
+        {
+          "duration_ms": 0,
+          "sequence": 18,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_fFO71D3iuIrOlKnnuo2cZS",
+          "type": "tool.succeeded"
+        },
+        {
+          "projected_input_tokens": 5606,
+          "sequence": 19,
+          "type": "model.started"
+        },
+        {
+          "duration_ms": 3882,
+          "sequence": 20,
+          "type": "model.succeeded"
+        },
+        {
+          "sequence": 21,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_qPFO1PhEYKGTuhNssk76uR",
+          "type": "tool.started"
+        },
+        {
+          "duration_ms": 0,
+          "sequence": 22,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_qPFO1PhEYKGTuhNssk76uR",
+          "type": "tool.succeeded"
+        }
+      ],
+      "status": "COMPLETE",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "incremental_cost_usd": 0.0144888,
+        "input_tokens": 12475,
+        "output_tokens": 1409,
+        "request_count": 3,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    "summary": "The agent diagnosed the ERPNext Quality Hold, completed the manager-gated recovery, and verified the tuple-matched Celigo run receipt.",
+    "tool_calls": [
+      {
+        "status": "CONNECTED",
+        "tool": "erpnext.read_case_documents"
+      },
+      {
+        "status": "CONNECTED",
+        "tool": "saas.read_correlated_records"
+      },
+      {
+        "status": "ORDER_HELD",
+        "tool": "erpnext.read_customer_order_to_cash"
+      },
+      {
+        "status": "VERIFIED",
+        "tool": "celigo.read_exact_run_receipt"
+      }
+    ]
+  },
+  "evidence_catalog": {
+    "1788480444.928749": {
+      "evidence_id": "1788480444.928749",
+      "fields": [
+        {
+          "label": "status",
+          "value": "VERIFIED"
+        },
+        {
+          "label": "source",
+          "value": "slack-quality-alerts"
+        }
+      ],
+      "observed_at": "2026-09-08T00:16:20.094727+00:00",
+      "provenance": "live-provider-read",
+      "provider": "Slack · #quality-release-incidents",
+      "revision": "ebfa68e3d5d1cbc0",
+      "summary": "[M20 VERIFIED] M20-ECU-2026-00011-LOT-A — ERP recovery completed for MAT-PRE-2026-00001 — registry revision R3."
+    },
+    "6a99e57c1d35fb241cec8ad6": {
+      "evidence_id": "6a99e57c1d35fb241cec8ad6",
+      "fields": [
+        {
+          "label": "status",
+          "value": "VERIFIED"
+        },
+        {
+          "label": "source",
+          "value": "celigo-quality-release"
+        }
+      ],
+      "observed_at": "2026-09-08T00:16:20.094727+00:00",
+      "provenance": "live-provider-read",
+      "provider": "Celigo · quality.release",
+      "revision": "0f74777b7a8b9d1e",
+      "summary": "ERP acknowledgement and the Celigo flow ID are recorded."
+    },
+    "ACC-PINV-2026-00007": {
+      "evidence_id": "ACC-PINV-2026-00007",
+      "fields": [
+        {
+          "label": "status",
+          "value": "OPEN"
+        },
+        {
+          "label": "bill no",
+          "value": "M20-VNDR-87421"
+        },
+        {
+          "label": "on hold",
+          "value": false
+        },
+        {
+          "label": "hold comment",
+          "value": "M20 DEMO: payment hold pending three-way match. 8 ECU controllers are in Quality Hold after rejected incoming inspection."
+        },
+        {
+          "label": "grand total",
+          "value": 24000.0
+        },
+        {
+          "label": "currency",
+          "value": "USD"
+        },
+        {
+          "label": "linked receipts",
+          "value": [
+            "MAT-PRE-2026-00001"
+          ]
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "2057433693b70fc3",
+      "summary": "Authoritative ERPNext purchase invoice is OPEN."
+    },
+    "ACC-SINV-2026-00006": {
+      "evidence_id": "ACC-SINV-2026-00006",
+      "fields": [
+        {
+          "label": "status",
+          "value": "SUBMITTED"
+        },
+        {
+          "label": "customer",
+          "value": "M20 Pacific Fleet Service"
+        },
+        {
+          "label": "quantity",
+          "value": 20.0
+        },
+        {
+          "label": "billed revenue",
+          "value": 42000.0
+        },
+        {
+          "label": "outstanding amount",
+          "value": 42000.0
+        },
+        {
+          "label": "currency",
+          "value": "USD"
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "954eb7a93fd5d56c",
+      "summary": "Authoritative ERPNext sales invoice is SUBMITTED."
+    },
+    "MAT-DN-2026-00001": {
+      "evidence_id": "MAT-DN-2026-00001",
+      "fields": [
+        {
+          "label": "status",
+          "value": "SUBMITTED"
+        },
+        {
+          "label": "customer",
+          "value": "M20 Pacific Fleet Service"
+        },
+        {
+          "label": "quantity",
+          "value": 20.0
+        },
+        {
+          "label": "value",
+          "value": 42000.0
+        },
+        {
+          "label": "currency",
+          "value": "USD"
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "338860ac76e1276f",
+      "summary": "Authoritative ERPNext delivery note is SUBMITTED."
+    },
+    "MAT-PRE-2026-00001": {
+      "evidence_id": "MAT-PRE-2026-00001",
+      "fields": [
+        {
+          "label": "status",
+          "value": "RELEASED_AFTER_QUALITY_HOLD"
+        },
+        {
+          "label": "delivery note",
+          "value": "M20-DOCK-87421"
+        },
+        {
+          "label": "received",
+          "value": 20.0
+        },
+        {
+          "label": "accepted",
+          "value": 12.0
+        },
+        {
+          "label": "rejected",
+          "value": 8.0
+        },
+        {
+          "label": "quality hold remaining",
+          "value": 0.0
+        },
+        {
+          "label": "quality hold warehouse",
+          "value": "M20 Quality Hold - M20"
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "0724d5b8683ac44f",
+      "summary": "Authoritative ERPNext purchase receipt is RELEASED_AFTER_QUALITY_HOLD."
+    },
+    "MAT-PRE-2026-00001:ledger": {
+      "assertions": {
+        "debits_equal_credits": true,
+        "general_ledger_present": true,
+        "stock_ledger_present": true
+      },
+      "evidence_id": "MAT-PRE-2026-00001:ledger",
+      "general_ledger_entries": [
+        {
+          "account": "Stock In Hand - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 0.0,
+          "debit": 14400.0,
+          "name": "ACC-GLE-2026-00043",
+          "party": "None",
+          "party_type": "None",
+          "posting_date": "2026-09-01",
+          "voucher_no": "MAT-PRE-2026-00001",
+          "voucher_type": "Purchase Receipt"
+        },
+        {
+          "account": "Stock Received But Not Billed - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 14400.0,
+          "debit": 0.0,
+          "name": "ACC-GLE-2026-00044",
+          "party": "None",
+          "party_type": "None",
+          "posting_date": "2026-09-01",
+          "voucher_no": "MAT-PRE-2026-00001",
+          "voucher_type": "Purchase Receipt"
+        },
+        {
+          "account": "Creditors - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 24000.0,
+          "debit": 0.0,
+          "name": "ACC-GLE-2026-00045",
+          "party": "M20 Controller Systems Ltd.",
+          "party_type": "Supplier",
+          "posting_date": "2026-09-01",
+          "voucher_no": "ACC-PINV-2026-00007",
+          "voucher_type": "Purchase Invoice"
+        },
+        {
+          "account": "Stock Received But Not Billed - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 0.0,
+          "debit": 24000.0,
+          "name": "ACC-GLE-2026-00046",
+          "party": "None",
+          "party_type": "None",
+          "posting_date": "2026-09-01",
+          "voucher_no": "ACC-PINV-2026-00007",
+          "voucher_type": "Purchase Invoice"
+        },
+        {
+          "account": "Stock In Hand - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 14400.0,
+          "debit": 0.0,
+          "name": "ACC-GLE-2026-00047",
+          "party": "None",
+          "party_type": "None",
+          "posting_date": "2026-09-07",
+          "voucher_no": "MAT-DN-2026-00001",
+          "voucher_type": "Delivery Note"
+        },
+        {
+          "account": "Cost of Goods Sold - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 0.0,
+          "debit": 14400.0,
+          "name": "ACC-GLE-2026-00048",
+          "party": "None",
+          "party_type": "None",
+          "posting_date": "2026-09-07",
+          "voucher_no": "MAT-DN-2026-00001",
+          "voucher_type": "Delivery Note"
+        },
+        {
+          "account": "Debtors - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 0.0,
+          "debit": 42000.0,
+          "name": "ACC-GLE-2026-00049",
+          "party": "M20 Pacific Fleet Service",
+          "party_type": "Customer",
+          "posting_date": "2026-09-07",
+          "voucher_no": "ACC-SINV-2026-00006",
+          "voucher_type": "Sales Invoice"
+        },
+        {
+          "account": "Sales - M20",
+          "company": "Missing 20 Automotive Demo",
+          "credit": 42000.0,
+          "debit": 0.0,
+          "name": "ACC-GLE-2026-00050",
+          "party": "None",
+          "party_type": "None",
+          "posting_date": "2026-09-07",
+          "voucher_no": "ACC-SINV-2026-00006",
+          "voucher_type": "Sales Invoice"
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "ceaff59514f9f4f1",
+      "stock_entries": [
+        {
+          "actual_qty": 12.0,
+          "company": "Missing 20 Automotive Demo",
+          "item_code": "M20-ECU-CTRL",
+          "name": "MAT-SLE-2026-00017",
+          "posting_date": "2026-09-01",
+          "posting_time": "23:55:51.897935",
+          "qty_after_transaction": 12.0,
+          "stock_value_difference": 14400.0,
+          "voucher_no": "MAT-PRE-2026-00001",
+          "voucher_type": "Purchase Receipt",
+          "warehouse": "Stores - M20"
+        },
+        {
+          "actual_qty": 8.0,
+          "company": "Missing 20 Automotive Demo",
+          "item_code": "M20-ECU-CTRL",
+          "name": "MAT-SLE-2026-00018",
+          "posting_date": "2026-09-01",
+          "posting_time": "23:55:51.897935",
+          "qty_after_transaction": 8.0,
+          "stock_value_difference": 0.0,
+          "voucher_no": "MAT-PRE-2026-00001",
+          "voucher_type": "Purchase Receipt",
+          "warehouse": "M20 Quality Hold - M20"
+        },
+        {
+          "actual_qty": -8.0,
+          "company": "Missing 20 Automotive Demo",
+          "item_code": "M20-ECU-CTRL",
+          "name": "MAT-SLE-2026-00019",
+          "posting_date": "2026-09-03",
+          "posting_time": "14:45:41.880889",
+          "qty_after_transaction": 0.0,
+          "stock_value_difference": 0.0,
+          "voucher_no": "MAT-STE-2026-00001",
+          "voucher_type": "Stock Entry",
+          "warehouse": "M20 Quality Hold - M20"
+        },
+        {
+          "actual_qty": 8.0,
+          "company": "Missing 20 Automotive Demo",
+          "item_code": "M20-ECU-CTRL",
+          "name": "MAT-SLE-2026-00020",
+          "posting_date": "2026-09-03",
+          "posting_time": "14:45:41.880889",
+          "qty_after_transaction": 20.0,
+          "stock_value_difference": 0.0,
+          "voucher_no": "MAT-STE-2026-00001",
+          "voucher_type": "Stock Entry",
+          "warehouse": "Stores - M20"
+        },
+        {
+          "actual_qty": -20.0,
+          "company": "Missing 20 Automotive Demo",
+          "item_code": "M20-ECU-CTRL",
+          "name": "MAT-SLE-2026-00021",
+          "posting_date": "2026-09-07",
+          "posting_time": "15:06:50.559457",
+          "qty_after_transaction": 0.0,
+          "stock_value_difference": -14400.0,
+          "voucher_no": "MAT-DN-2026-00001",
+          "voucher_type": "Delivery Note",
+          "warehouse": "Stores - M20"
+        }
+      ],
+      "summary": "5 Stock Ledger rows and 8 GL rows were freshly read. Debit 94,800.00 equals credit 94,800.00; balance assertion VERIFIED.",
+      "totals": {
+        "credit": 94800.0,
+        "debit": 94800.0,
+        "stock_value_difference": 0.0
+      }
+    },
+    "MAT-STE-2026-00001": {
+      "evidence_id": "MAT-STE-2026-00001",
+      "fields": [
+        {
+          "label": "status",
+          "value": "SUBMITTED"
+        },
+        {
+          "label": "quantity",
+          "value": 8.0
+        },
+        {
+          "label": "source warehouse",
+          "value": "M20 Quality Hold - M20"
+        },
+        {
+          "label": "target warehouse",
+          "value": "Stores - M20"
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "4de3977adb1de8cb",
+      "summary": "Authoritative ERPNext quality release transfer is SUBMITTED."
+    },
+    "PUR-ORD-2026-00011": {
+      "evidence_id": "PUR-ORD-2026-00011",
+      "fields": [
+        {
+          "label": "status",
+          "value": "SUBMITTED"
+        },
+        {
+          "label": "quantity",
+          "value": 20.0
+        },
+        {
+          "label": "supplier",
+          "value": "M20 Controller Systems Ltd."
+        },
+        {
+          "label": "unit rate",
+          "value": 1200.0
+        },
+        {
+          "label": "line value",
+          "value": 24000.0
+        },
+        {
+          "label": "currency",
+          "value": "USD"
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "bb089f2cedbe365d",
+      "summary": "Authoritative ERPNext purchase order is SUBMITTED."
+    },
+    "QRC-1": {
+      "evidence_id": "QRC-1",
+      "fields": [
+        {
+          "label": "status",
+          "value": "VERIFIED"
+        },
+        {
+          "label": "source",
+          "value": "jira-capa"
+        }
+      ],
+      "observed_at": "2026-09-08T00:16:20.094727+00:00",
+      "provenance": "live-provider-read",
+      "provider": "Jira · CAPA",
+      "revision": "bdd0f73a68f8f31e",
+      "summary": "CAPA · quality-release sync failed · M20-ECU-2026-00011-LOT-A"
+    },
+    "SAL-ORD-2026-00006": {
+      "evidence_id": "SAL-ORD-2026-00006",
+      "fields": [
+        {
+          "label": "status",
+          "value": "Completed"
+        },
+        {
+          "label": "customer",
+          "value": "M20 Pacific Fleet Service"
+        },
+        {
+          "label": "customer purchase order",
+          "value": "M20-FLEET-PO-2026-0907-A"
+        },
+        {
+          "label": "quantity",
+          "value": 20.0
+        },
+        {
+          "label": "booked value",
+          "value": 42000.0
+        },
+        {
+          "label": "currency",
+          "value": "USD"
+        },
+        {
+          "label": "delivered percent",
+          "value": 100.0
+        },
+        {
+          "label": "billed percent",
+          "value": 100.0
+        },
+        {
+          "label": "delivery date",
+          "value": "2026-09-08"
+        }
+      ],
+      "observed_at": "2026-09-08T02:14:43.080799+00:00",
+      "provenance": "live-provider-read",
+      "provider": "ERPNext / Frappe Cloud",
+      "revision": "cd9489671ee4fc11",
+      "summary": "Authoritative ERPNext sales order is Completed."
+    },
+    "recv8NiUZzO4YjPLo": {
+      "evidence_id": "recv8NiUZzO4YjPLo",
+      "fields": [
+        {
+          "label": "status",
+          "value": "VERIFIED"
+        },
+        {
+          "label": "source",
+          "value": "airtable-quality-registry"
+        }
+      ],
+      "observed_at": "2026-09-08T00:16:20.094727+00:00",
+      "provenance": "live-provider-read",
+      "provider": "Airtable · Supplier Quality Registry",
+      "revision": "de7d9a46c2694b3d",
+      "summary": "Lot ECU-2026-LOT-A · 8 approved · correlation matched"
+    }
+  },
+  "evidence_constellation": {
+    "conclusion": {
+      "confidence": 0.0,
+      "label": "RECOVERY VERIFIED",
+      "latest_sequence": 107,
+      "status": "VERIFIED"
+    },
+    "integration_receipt": {
+      "mismatched_fields": [],
+      "missing_fields": [],
+      "record_id": "6a99e57c1d35fb241cec8ad6",
+      "status": "VERIFIED"
+    },
+    "nodes": [
+      {
+        "id": "erpnext",
+        "label": "ERPNext",
+        "latest_sequence": 101,
+        "position": "TOP",
+        "role": "OPERATIONAL",
+        "status": "VERIFIED"
+      },
+      {
+        "id": "airtable",
+        "label": "Airtable",
+        "latest_sequence": 40,
+        "position": "RIGHT",
+        "role": "REGISTRY",
+        "status": "VERIFIED"
+      },
+      {
+        "id": "celigo",
+        "label": "Celigo",
+        "latest_sequence": 6,
+        "position": "BOTTOM",
+        "role": "RUN RECEIPT",
+        "status": "VERIFIED"
+      },
+      {
+        "id": "jira",
+        "label": "Jira",
+        "latest_sequence": 7,
+        "position": "LEFT",
+        "role": "WORKFLOW",
+        "status": "VERIFIED"
+      },
+      {
+        "id": "slack",
+        "label": "Slack",
+        "latest_sequence": 8,
+        "position": "LEFT",
+        "role": "COLLABORATION",
+        "status": "VERIFIED"
+      }
+    ]
+  },
+  "execution": {
+    "approval_id": "m20-approval-0007",
+    "approved_quantity": 8.0,
+    "available": false,
+    "celigo_receipt_id": "6a99e57c1d35fb241cec8ad6",
+    "delivery_note": "MAT-DN-2026-00001",
+    "detail": "ERPNext recovery and the independent Celigo run receipt are verified.",
+    "erp_verified": true,
+    "executed_at": "2026-09-07T22:06:53.499874+00:00",
+    "idempotency_key": "m20-order-to-cash-20260907-final",
+    "invoice_name": "ACC-PINV-2026-00007",
+    "order_to_cash_verified": true,
+    "pre_state": {
+      "integration_receipt_status": "VERIFIED",
+      "invoice_status": "OPEN",
+      "receipt_status": "RELEASED_AFTER_QUALITY_HOLD"
+    },
+    "sales_invoice": "ACC-SINV-2026-00006",
+    "sales_order": "SAL-ORD-2026-00006",
+    "status": "VERIFIED",
+    "transfer_name": "MAT-STE-2026-00001",
+    "verified_at": "2026-09-07T22:07:00.527211+00:00"
+  },
+  "human_review": {
+    "action": "NONE",
+    "can_stop": false,
+    "reason": "Recovery is independently verified by fresh source reads.",
+    "required": false,
+    "status": "COMPLETE"
+  },
+  "integration_receipt": {
+    "mismatched_fields": [],
+    "missing_fields": [],
+    "record_id": "6a99e57c1d35fb241cec8ad6",
+    "status": "VERIFIED"
+  },
+  "judge_proof": {
+    "evidence_records": 13,
+    "ledger_events": 107,
+    "provider": {
+      "mode": "bedrock",
+      "model": "us.amazon.nova-pro-v1:0",
+      "provider": "bedrock",
+      "region": "us-west-2",
+      "transport": "strands_bedrock_model"
+    },
+    "runtime": "real_strands",
+    "sdk_hook_events": 22,
+    "source_checks": 6,
+    "verified": true
+  },
+  "latest_sequence": 107,
+  "mode": {
+    "execution_available": true,
+    "provenance": "live-read",
+    "provider_writes": "DEMO_GUARDED",
+    "read_only": false
+  },
+  "plan": [
+    {
+      "id": "read_erp",
+      "label": "Read ERP receipt + invoice",
+      "status": "DONE"
+    },
+    {
+      "id": "correlate_registry",
+      "label": "Correlate release registry",
+      "status": "DONE"
+    },
+    {
+      "id": "validate_run",
+      "label": "Validate integration receipt",
+      "status": "DONE"
+    },
+    {
+      "id": "guarded_plan",
+      "label": "Produce guarded recovery plan",
+      "status": "DONE"
+    },
+    {
+      "id": "read_customer_order",
+      "label": "Read customer order",
+      "status": "DONE"
+    },
+    {
+      "id": "verify_customer_value",
+      "label": "Verify delivery + billing",
+      "status": "DONE"
+    }
+  ],
+  "received_at": "2026-09-08T02:14:45.404092+00:00",
+  "resolution_packet": {
+    "agent_trace": {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "case_version": null,
+      "evidence_findings": {
+        "evidence_ids": [
+          "M20-ECU-2026-00011-LOT-A",
+          "ACC-PINV-2026-00007",
+          "PUR-ORD-2026-00011",
+          "MAT-PRE-2026-00001",
+          "MAT-PRE-2026-00001:ledger",
+          "SAL-ORD-2026-00006",
+          "MAT-STE-2026-00001",
+          "MAT-PRE-2026-00001:available",
+          "recv8NiUZzO4YjPLo",
+          "6a99e57c1d35fb241cec8ad6",
+          "MAT-PRE-2026-00001:physical",
+          "QRC-1",
+          "1788480444.928749"
+        ],
+        "join_keys": {
+          "integration_business_key": "MAT-PRE-2026-00001:receipt-post",
+          "integration_lot": "ECU-2026-LOT-A",
+          "line": 1,
+          "purchase_order": "PUR-ORD-2026-00011",
+          "shipment": "MAT-PRE-2026-00001:physical"
+        },
+        "observations": {
+          "completed_quality_transfer_present": true,
+          "customer_billed_revenue": 0.0,
+          "customer_booked_revenue": 42000.0,
+          "customer_delivered_quantity": 0.0,
+          "customer_delivery_note": null,
+          "customer_order_present": true,
+          "customer_order_quantity": 20.0,
+          "customer_order_status": "ORDER_HELD",
+          "customer_sales_invoice": null,
+          "duplicate_supplier_invoice_ids": [],
+          "duplicate_supplier_invoice_present": false,
+          "erp_accounted_quantity": 20.0,
+          "erp_available_quantity": 20.0,
+          "erp_quality_inspection_quantity": 0,
+          "exact_held_lot_quality_dispositions": [],
+          "exact_held_lot_transfer_present": false,
+          "held_lots": [],
+          "held_lots_present_in_physical_scans": true,
+          "integration_attempt_quantity": 0.0,
+          "integration_attempt_response": "ACKNOWLEDGED",
+          "integration_attempt_uom": "EA",
+          "integration_business_key_present_in_erp": true,
+          "integration_conversion_factor": 1,
+          "integration_normalized_quantity": 0.0,
+          "integration_source_po_revision": "R3",
+          "invoice_currency": "USD",
+          "invoice_quantity": 20.0,
+          "invoice_status": "OPEN",
+          "invoice_unit_price": 1200.0,
+          "ledger_pagination_complete": true,
+          "ledger_read_status": "COMPLETE",
+          "physical_received_quantity": 20.0,
+          "po_currency": "USD",
+          "po_revision": "R3",
+          "po_unit_price": 1200.0,
+          "supplier_payment_hold": false,
+          "supplier_status": "ACTIVE"
+        },
+        "policy": {
+          "checks": {
+            "already_complete": true,
+            "authoritative_read_complete": true,
+            "commercial_terms_match": true,
+            "customer_order_complete": false,
+            "customer_order_read_complete": true,
+            "customer_order_requires_fulfillment": true,
+            "duplicate_supplier_invoice_absent": true,
+            "exact_held_lot_approved": false,
+            "exact_held_lot_transfer_present": false,
+            "integration_attempt_matches_gap": true,
+            "integration_business_key_present": true,
+            "invoice_release_ready": false,
+            "lot_trace_matches": true,
+            "physical_quantity_reconciles": true,
+            "source_po_revision_matches": true,
+            "supplier_active": true,
+            "uom_conversion_known": true
+          },
+          "disposition": "RECOVERY_READY",
+          "manager_approval_required": true,
+          "reason": "Procurement is reconciled, but the customer order remains undelivered or unbilled; Manager approval is required for bounded fulfillment and billing.",
+          "write_authority": "NONE"
+        }
+      },
+      "latency_ms": 13755,
+      "mode": "real_strands",
+      "provider": {
+        "mode": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "provider": "bedrock",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "result": {
+        "disposition": "RECOVERY_READY",
+        "evidence_ids": [
+          "M20-ECU-2026-00011-LOT-A",
+          "ACC-PINV-2026-00007",
+          "PUR-ORD-2026-00011",
+          "MAT-PRE-2026-00001",
+          "MAT-PRE-2026-00001:ledger",
+          "SAL-ORD-2026-00006",
+          "MAT-STE-2026-00001",
+          "recv8NiUZzO4YjPLo"
+        ],
+        "reason": "Customer order held, customer delivered and billed quantities are 0. ERP accounted and available quantities match invoice quantity. Physical received quantity is 20. Integration attempt quantity is 0, but integration business key is present in ERP. Ledger read is complete, supplier payment hold is false.",
+        "safe_next_step": "Require Manager approval before bounded write.",
+        "write_performed": false
+      },
+      "run_id": null,
+      "runtime_events": [
+        {
+          "projected_input_tokens": 2977,
+          "sequence": 1,
+          "type": "model.started"
+        },
+        {
+          "duration_ms": 2388,
+          "sequence": 2,
+          "type": "model.succeeded"
+        },
+        {
+          "sequence": 3,
+          "tool": "read_control_context",
+          "tool_use_id": "tooluse_3hE9S9JqtZw7sIvABp9Ykv",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 4,
+          "tool": "read_erp_evidence",
+          "tool_use_id": "tooluse_2U28MDwUnJad77EdDJwdu8",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 5,
+          "tool": "read_airtable_evidence",
+          "tool_use_id": "tooluse_1CzVJGRx1RPjVJ3hs7OuDc",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 6,
+          "tool": "read_celigo_evidence",
+          "tool_use_id": "tooluse_paV4AWEBxHsOpsz6Fj7bwq",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 7,
+          "tool": "read_collaboration_evidence",
+          "tool_use_id": "tooluse_ut1gaxmqEnwjEY3GXvru7Z",
+          "type": "tool.started"
+        },
+        {
+          "sequence": 8,
+          "tool": "reconcile_source_records",
+          "tool_use_id": "tooluse_26B3mv2XUoVwnw1ugUSUql",
+          "type": "tool.started"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 9,
+          "tool": "read_control_context",
+          "tool_use_id": "tooluse_3hE9S9JqtZw7sIvABp9Ykv",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 10,
+          "tool": "read_erp_evidence",
+          "tool_use_id": "tooluse_2U28MDwUnJad77EdDJwdu8",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 11,
+          "tool": "read_airtable_evidence",
+          "tool_use_id": "tooluse_1CzVJGRx1RPjVJ3hs7OuDc",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 12,
+          "tool": "read_celigo_evidence",
+          "tool_use_id": "tooluse_paV4AWEBxHsOpsz6Fj7bwq",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 13,
+          "tool": "read_collaboration_evidence",
+          "tool_use_id": "tooluse_ut1gaxmqEnwjEY3GXvru7Z",
+          "type": "tool.succeeded"
+        },
+        {
+          "duration_ms": 1,
+          "sequence": 14,
+          "tool": "reconcile_source_records",
+          "tool_use_id": "tooluse_26B3mv2XUoVwnw1ugUSUql",
+          "type": "tool.succeeded"
+        },
+        {
+          "projected_input_tokens": 3588,
+          "sequence": 15,
+          "type": "model.started"
+        },
+        {
+          "duration_ms": 7481,
+          "sequence": 16,
+          "type": "model.succeeded"
+        },
+        {
+          "sequence": 17,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_fFO71D3iuIrOlKnnuo2cZS",
+          "type": "tool.started"
+        },
+        {
+          "duration_ms": 0,
+          "sequence": 18,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_fFO71D3iuIrOlKnnuo2cZS",
+          "type": "tool.succeeded"
+        },
+        {
+          "projected_input_tokens": 5606,
+          "sequence": 19,
+          "type": "model.started"
+        },
+        {
+          "duration_ms": 3882,
+          "sequence": 20,
+          "type": "model.succeeded"
+        },
+        {
+          "sequence": 21,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_qPFO1PhEYKGTuhNssk76uR",
+          "type": "tool.started"
+        },
+        {
+          "duration_ms": 0,
+          "sequence": 22,
+          "tool": "LiveAdvisoryResult",
+          "tool_use_id": "tooluse_qPFO1PhEYKGTuhNssk76uR",
+          "type": "tool.succeeded"
+        }
+      ],
+      "status": "COMPLETE",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "incremental_cost_usd": 0.0144888,
+        "input_tokens": 12475,
+        "output_tokens": 1409,
+        "request_count": 3,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    "approval": {
+      "approval_id": "m20-approval-0007",
+      "approved_at": "2026-09-07T22:06:45.822648+00:00",
+      "case_tuple": {
+        "case_id": "M20-ECU-2026-00011-LOT-A",
+        "certificate_id": "M20-COC-LOT-A-R3",
+        "evidence_revision": "R3",
+        "purchase_invoice": "ACC-PINV-2026-00007",
+        "purchase_order": "PUR-ORD-2026-00011",
+        "purchase_receipt": "MAT-PRE-2026-00001",
+        "quantity": 8.0,
+        "supplier_lot": "ECU-2026-LOT-A"
+      },
+      "erp_sequence": 1,
+      "erp_state_digest": "2854061bcdd7b48952397635880f5dcbe3d2c71940e85e8865b9317ef59ccefe",
+      "manager_id": "M20 Demo Manager",
+      "plan_digest": "8bb09f293e6cff13e1335e8a3b812199be517c28fb644bbbd80bc4490a8e2f05",
+      "run_id": "agent-run-0007",
+      "saas_sequence": 1,
+      "saas_state_digest": "b717c96d7fa1ca0b5fb9409aaacd5f181c4b89a1ef346845d3ab6d1b0d19b312",
+      "scope": "M20_DEMO_RECOVERY_AND_CUSTOMER_FULFILLMENT"
+    },
+    "case_tuple": {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "certificate_id": "M20-COC-LOT-A-R3",
+      "evidence_revision": "R3",
+      "purchase_invoice": "ACC-PINV-2026-00007",
+      "purchase_order": "PUR-ORD-2026-00011",
+      "purchase_receipt": "MAT-PRE-2026-00001",
+      "quality_transfer_quantity": 8.0,
+      "quantity": 8.0,
+      "receipt_post_quantity": 0.0,
+      "supplier_lot": "ECU-2026-LOT-A"
+    },
+    "effects": {
+      "celigo_receipt": "6a99e57c1d35fb241cec8ad6",
+      "delivery_note": "MAT-DN-2026-00001",
+      "invoice": "ACC-PINV-2026-00007",
+      "quality_release_transfer": "MAT-STE-2026-00001",
+      "sales_invoice": "ACC-SINV-2026-00006",
+      "sales_order": "SAL-ORD-2026-00006"
+    },
+    "evidence": [
+      {
+        "provider": "ERPNext",
+        "record_id": "MAT-PRE-2026-00001",
+        "source_id": "erpnext-missing20"
+      },
+      {
+        "provider": "Airtable · Supplier Quality Registry",
+        "record_id": "recv8NiUZzO4YjPLo",
+        "source_id": "airtable-quality-registry"
+      },
+      {
+        "provider": "Celigo · quality.release",
+        "record_id": "6a99e57c1d35fb241cec8ad6",
+        "source_id": "celigo-quality-release"
+      },
+      {
+        "provider": "Jira · CAPA",
+        "record_id": "QRC-1",
+        "source_id": "jira-capa"
+      },
+      {
+        "provider": "Slack · #quality-release-incidents",
+        "record_id": "1788480444.928749",
+        "source_id": "slack-quality-alerts"
+      }
+    ],
+    "execution": {
+      "approval_id": "m20-approval-0007",
+      "idempotency_key": "m20-order-to-cash-20260907-final",
+      "status": "VERIFIED"
+    },
+    "finding": "CUSTOMER_ORDER_AWAITING_VERIFIED_FULFILLMENT",
+    "guard": "MANAGER_APPROVED_GUARDED_RECOVERY",
+    "packet_id": "resolution-4e31c17a733e",
+    "policy": {
+      "authority": "DETERMINISTIC_CONTROL_PLANE",
+      "finding": "CUSTOMER_ORDER_AWAITING_VERIFIED_FULFILLMENT",
+      "status": "VERIFIED"
+    },
+    "post_state": {
+      "available": 20.0,
+      "customer_billed_revenue": 42000.0,
+      "customer_order_status": "Completed",
+      "integration_receipt_status": "VERIFIED",
+      "invoice_status": "OPEN",
+      "receipt_status": "RELEASED_AFTER_QUALITY_HOLD"
+    },
+    "pre_state": {
+      "available": 20.0,
+      "integration_receipt_status": "VERIFIED",
+      "invoice_status": "OPEN",
+      "receipt_status": "RELEASED_AFTER_QUALITY_HOLD"
+    },
+    "provenance": "live-provider-write",
+    "status": "VERIFIED",
+    "timestamps": {
+      "approved_at": "2026-09-07T22:06:45.822648+00:00",
+      "executed_at": "2026-09-07T22:06:53.499874+00:00",
+      "verified_at": "2026-09-07T22:07:00.527211+00:00"
+    }
+  },
+  "schema_version": "missing20-agent-platform/v1",
+  "systems": [
+    {
+      "authority": "Authoritative operational evidence and guarded business effects",
+      "detail": "Purchase order, receipt, and invoice read together.",
+      "id": "erpnext",
+      "label": "ERP evidence read",
+      "name": "ERPNext",
+      "read_only": false,
+      "record_id": "erpnext-missing20",
+      "status": "CONNECTED",
+      "write_state": "MANAGER_GATED"
+    },
+    {
+      "authority": "Release registry evidence; partial until tuple matches",
+      "detail": "Lot ECU-2026-LOT-A · 8 approved · correlation matched",
+      "id": "airtable",
+      "label": "Registry read · APPROVED",
+      "name": "Airtable",
+      "read_only": true,
+      "record_id": "recv8NiUZzO4YjPLo",
+      "status": "VERIFIED",
+      "write_state": "DISABLED"
+    },
+    {
+      "authority": "Journal only; cannot prove a release",
+      "detail": "CAPA · quality-release sync failed · M20-ECU-2026-00011-LOT-A",
+      "id": "jira",
+      "label": "CAPA read · To Do",
+      "name": "Jira",
+      "read_only": true,
+      "record_id": "QRC-1",
+      "status": "VERIFIED",
+      "write_state": "DISABLED"
+    },
+    {
+      "authority": "Post-execution run receipt; cannot authorize an ERP release",
+      "detail": "ERP acknowledgement and the Celigo flow ID are recorded.",
+      "id": "celigo",
+      "label": "Celigo run receipt · VERIFIED",
+      "name": "Celigo",
+      "read_only": true,
+      "record_id": "6a99e57c1d35fb241cec8ad6",
+      "status": "VERIFIED",
+      "write_state": "DISABLED"
+    },
+    {
+      "authority": "Journal only; cannot prove a release",
+      "detail": "[M20 VERIFIED] M20-ECU-2026-00011-LOT-A — ERP recovery completed for MAT-PRE-2026-00001 — registry revision R3.",
+      "id": "slack",
+      "label": "Incident notification read",
+      "name": "Slack",
+      "read_only": true,
+      "record_id": "1788480444.928749",
+      "status": "VERIFIED",
+      "write_state": "DISABLED"
+    }
+  ],
+  "value_proof": {
+    "assertions": {
+      "billed_revenue_is_observed": true,
+      "causal_revenue_increase_proven": false,
+      "customer_invoice_posted": true,
+      "customer_order_observed": true,
+      "delivery_posted": true,
+      "order_to_cash_closed_loop_verified": true
+    },
+    "counterfactual": {
+      "classification": "COUNTERFACTUAL_NOT_OBSERVED",
+      "revenue_at_risk_if_hold_persists": 0.0
+    },
+    "currency": "USD",
+    "documents": {
+      "delivery_note": "MAT-DN-2026-00001",
+      "sales_invoice": "ACC-SINV-2026-00006",
+      "sales_order": "SAL-ORD-2026-00006"
+    },
+    "estimated": {
+      "gross_spread_note": "Sales invoice less scoped purchase-order value; excludes labor, freight, tax, and overhead."
+    },
+    "observed": {
+      "billed_revenue": 42000.0,
+      "booked_revenue": 42000.0,
+      "delivered_quantity": 20.0,
+      "gross_spread": 18000.0,
+      "order_quantity": 20.0,
+      "purchase_cost_basis": 24000.0
+    },
+    "provenance": "ERPNext / Frappe Cloud live reread",
+    "status": "BILLED_VERIFIED"
+  }
+}

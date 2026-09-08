@@ -1,16 +1,18 @@
-# Known Limitations — Private Review
+# Known Limitations — Release Review
 
 The limitations below are part of the acceptance boundary and are shown deliberately.
 
 | Area | Disposition | Consequence |
 | --- | --- | --- |
-| Stable real Nova usefulness | `NOT_PROVEN` | The redacted real result is partial: AI-authored citation coverage is 1/5 while application authoritative validation is 5/5. The package uses the scripted trace for the repeatable investigation story and does not claim stable usefulness. |
+| Real Nova usefulness | `PROVEN` on the bounded demo set | Real Strands/Nova passed 8/8 case variants and 15/15 multi-turn cases. This does not establish production accuracy, generalization, or an SLO. |
 | AgentCore Runtime | `PROVEN` within the redacted boundary | The proof records Runtime deployment, invocation, and runtime logs. Trace delivery is a partial configuration warning; this is not a general service-level SLO claim. |
 | AgentCore Gateway and Policy | `NOT_PROVEN` | No Gateway or Policy behavior is evidenced or claimed. |
-| Cost accounting | Engineering estimate only | The fresh real investigation and role chat added an estimated `$0.0491432`; the cumulative known estimate is `$0.2240576`. Transport cycles are not described as model calls. This is not an AWS invoice. |
+| Cost accounting | Engineering estimate only | Per-run and matrix estimates are recorded in the cited artifacts. Transport cycles are not described as model calls. This is not an AWS invoice. |
 | Advisory authority | Hard boundary | Models cannot classify state, grant, execute, verify, replay, or change policy. A provider failure is visible as `DEGRADED`; it does not fabricate content or write. |
-| Production impact | Not measured | All scenarios, metrics, and records are synthetic. No savings, reliability, or customer outcome number is claimed. |
-| Workspace controls | Scoped synthetic controls | Copilot and advisory tools are read-only. Structured controls can mutate only the local synthetic experiment, require two distinct simulated role principals, and make no authentication or independent-human claim. |
+| Production impact | Not measured | Five SaaS tenants contain purpose-built demo records, not customer production records. Delivery, billing, and USD 42,000 are observed demo-tenant accounting facts; causal revenue uplift, savings, reliability, and customer outcomes are not claimed. |
+| External change transport | Poll + semantic versioning | The demo detects changes through bounded read-only polling, not provider webhooks. Unchanged polls retain their source sequence and create no UI motion; a semantic provider change creates one ordered `external.source.changed` ledger event. |
+| Workspace controls | Isolated demo-tenant controls | Agent tools remain read-only. One declared Manager persona can authorize only a policy-approved, idempotent write to exact M20-scoped ERPNext demo records; this is not an authentication or independent-human claim. |
+| Runtime topology | Two proven paths | The latest case matrices and local UI use direct Strands Bedrock transport. AgentCore Runtime deployment/invocation is separate redacted evidence; the package does not imply the local UI currently routes through that Runtime. |
 | Final release | Pending human gate | A source-repository push does not authorize a public video, hosted demo, or Devpost submission. |
 | Credentials and data | Excluded | No credentials, employer/customer data, private incident, runbook, or confidential provenance is in scope. |
 
@@ -25,6 +27,6 @@ state.
 ## Next evidence needed (not part of M7)
 
 Future work would require a separately approved product direction and human gates for
-Gateway/Policy evidence, stable real-model usefulness, production impact measurement,
-public release, or production data. This private package does not imply or schedule
+Gateway/Policy evidence, production-model accuracy, production impact measurement,
+hosted release, or production data. This release package does not imply or schedule
 that work.

@@ -9,13 +9,18 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from time import sleep
 from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
 
-from scripts.decision_workspace_server import DecisionWorkspaceHandler, DecisionWorkspaceServer
+from scripts.decision_workspace_server import (
+    DecisionWorkspaceHandler,
+    DecisionWorkspaceServer,
+    _browser_snapshot,
+)
 from the_missing_20.authority_b import workspace_demo
 from the_missing_20.authority_b.lifecycle import (
     LIFECYCLE_ARTIFACT_PATH,
@@ -30,7 +35,7 @@ from the_missing_20.authority_b.workspace_demo import (
     _hypotheses_from_golden,
     build_decision_workspace,
 )
-from the_missing_20.experiment.session import ExperimentSession
+from the_missing_20.experiment.session import ExperimentRegistry, ExperimentSession
 from the_missing_20.live_sources import (
     LiveSourceRegistry,
     LiveSourceSnapshot,
@@ -38,6 +43,26 @@ from the_missing_20.live_sources import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_dashboard_ledger_does_not_change_without_an_external_trigger(tmp_path: Path) -> None:
+    registry = ExperimentRegistry(
+        ROOT,
+        data_directory=tmp_path / "source-driven-runtime",
+        periodic_telemetry_enabled=False,
+    )
+    try:
+        session = registry.get("missing-20-normal")
+        before = session.snapshot()["projection_sequence"]
+        sleep(1.7)
+        after = session.snapshot()["projection_sequence"]
+
+        assert before == after
+        latest = session.snapshot()["telemetry"]["latest"]
+        assert latest is not None
+        assert latest["trigger"]["kind"] == "external_source_baseline"
+    finally:
+        registry.close()
 
 
 def _resign_payload(payload: dict[str, object]) -> None:
@@ -255,6 +280,46 @@ def _request(url: str, method: str = "GET") -> tuple[int, bytes, dict[str, str]]
             return response.status, response.read(), dict(response.headers.items())
     except HTTPError as exc:
         return exc.code, exc.read(), dict(exc.headers.items())
+
+
+def test_browser_snapshot_bounds_the_bootstrap_ledger_without_losing_current_truth() -> None:
+    events = [
+        {
+            "sequence": sequence,
+            "event_type": "incident.detected" if sequence == 1 else "telemetry.observed",
+            "payload": {"sample": "x" * 4_096},
+        }
+        for sequence in range(1, 2_001)
+    ]
+    events[20]["event_type"] = "investigation.started"
+    events[40]["event_type"] = "evaluation.completed"
+    snapshot = {
+        "incident_id": "missing-20-001-run-1",
+        "projection_sequence": 2_000,
+        "events": events,
+        "activity": events,
+        "units": [{"unit_id": "U-1"}],
+        "evidence": [{"evidence_id": "E-1"}],
+    }
+
+    projected = _browser_snapshot(snapshot)
+
+    assert projected["projection_sequence"] == 2_000
+    assert projected["units"] == snapshot["units"]
+    assert projected["evidence"] == snapshot["evidence"]
+    assert projected["events"][-1]["sequence"] == 2_000
+    assert {item["event_type"] for item in projected["events"]} >= {
+        "incident.detected",
+        "investigation.started",
+        "evaluation.completed",
+    }
+    assert len(projected["events"]) <= 112
+    assert projected["event_window"] == {
+        "total": 2_000,
+        "returned": len(projected["events"]),
+        "truncated": True,
+    }
+    assert len(snapshot["events"]) == 2_000
 
 
 def test_workspace_server_is_local_with_scoped_synthetic_commands() -> None:

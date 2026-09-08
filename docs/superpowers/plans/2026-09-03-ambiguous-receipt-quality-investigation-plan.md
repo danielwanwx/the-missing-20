@@ -1,6 +1,6 @@
 # Ambiguous Receipt and Quality Investigation — Implementation Plan
 
-**Design:** `docs/superpowers/specs/2026-09-03-ambiguous-receipt-quality-investigation-design.md`  
+**Design:** `docs/superpowers/specs/2026-09-03-ambiguous-receipt-quality-investigation-design.md`
 **Outcome:** a disclosed-synthetic, source-correlated 100-unit incident with a
 recorded 80/8/12 opening state, a real advisory investigation boundary, deterministic
 recovery and two safe-stop counterfactuals.

@@ -75,8 +75,9 @@ def test_structured_output_sends_canonical_schema_to_fake_runtime(
         separators=(",", ":"),
     )
     assert schema in captured_prompts[0]
-    assert "Return exactly one JSON object that validates against this JSON Schema." in (
-        captured_prompts[0]
+    assert (
+        "Return exactly one JSON object that validates against this JSON Schema."
+        in (captured_prompts[0])
     )
     assert len(schema.encode("utf-8")) <= model.MAX_STRUCTURED_SCHEMA_BYTES
 
@@ -131,9 +132,7 @@ def test_mocked_agentcore_transport_returns_runtime_session_identity(
     model = _model()
     response = {
         "runtimeSessionId": "runtime-session-from-provider",
-        "response": io.BytesIO(
-            b'{"output":{"finding":"queue lag","confidence":0.91}}'
-        ),
+        "response": io.BytesIO(b'{"output":{"finding":"queue lag","confidence":0.91}}'),
     }
 
     class FakeClient:
@@ -202,9 +201,7 @@ def test_factory_preserves_frozen_read_plan_and_emits_it_before_remote(
             runtime_arn="arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/fake"
         )
     )
-    plan = (
-        {"tool": "read_admitted_evidence", "arguments": {"evidence_id": "e-1"}},
-    )
+    plan = ({"tool": "read_admitted_evidence", "arguments": {"evidence_id": "e-1"}},)
     model = factory.create(
         stage=AgentStage.RETRYABLE_INVESTIGATOR,
         output_payload={},
@@ -231,9 +228,7 @@ def test_factory_preserves_frozen_read_plan_and_emits_it_before_remote(
             ],
         )
     )
-    assert events[1]["contentBlockStart"]["start"]["toolUse"]["name"] == (
-        "read_admitted_evidence"
-    )
+    assert events[1]["contentBlockStart"]["start"]["toolUse"]["name"] == ("read_admitted_evidence")
     assert json.loads(events[2]["contentBlockDelta"]["delta"]["toolUse"]["input"]) == {
         "evidence_id": "e-1"
     }
@@ -324,9 +319,7 @@ def test_structured_stream_uses_exact_input_schema_and_candidate_only(
     )
     assert len(captured_prompts) == 1
     assert expected_schema in captured_prompts[0]
-    assert events[1]["contentBlockStart"]["start"]["toolUse"]["name"] == (
-        "FakeStructuredResult"
-    )
+    assert events[1]["contentBlockStart"]["start"]["toolUse"]["name"] == ("FakeStructuredResult")
     assert json.loads(events[2]["contentBlockDelta"]["delta"]["toolUse"]["input"]) == candidate
     assert "must-not-escape" not in json.dumps(events, sort_keys=True)
 
@@ -338,10 +331,14 @@ def test_runtime_envelope_does_not_unwrap_valid_singleton_output_field(
 
     def fake_invoke(prompt: str) -> tuple[object, int, int]:
         del prompt
-        return {
-            "output": {"output": "application result"},
-            "metadata": {"request_id": "must-not-escape"},
-        }, 12, 8
+        return (
+            {
+                "output": {"output": "application result"},
+                "metadata": {"request_id": "must-not-escape"},
+            },
+            12,
+            8,
+        )
 
     monkeypatch.setattr(model, "_invoke", fake_invoke)
     events = asyncio.run(
@@ -373,10 +370,14 @@ def test_structured_stream_rejects_non_object_and_never_renders_metadata(
 
     def fake_invoke(prompt: str) -> tuple[object, int, int]:
         del prompt
-        return {
-            "output": ["not", "an", "object"],
-            "metadata": {"request_id": "must-not-escape"},
-        }, 12, 8
+        return (
+            {
+                "output": ["not", "an", "object"],
+                "metadata": {"request_id": "must-not-escape"},
+            },
+            12,
+            8,
+        )
 
     monkeypatch.setattr(model, "_invoke", fake_invoke)
     with pytest.raises(AgentProviderUnavailable, match="invalid structured output"):

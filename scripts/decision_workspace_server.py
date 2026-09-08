@@ -1,10 +1,10 @@
 """Local HTTP adapter for the Missing 20 decision workspace.
 
 The legacy ``/api/workspace`` route remains a read-only artifact endpoint for the
-existing acceptance tests. The ``/api/v1`` routes expose the synthetic experiment
-and a read-only multi-SaaS evidence projection used by the Dashboard. They are
-local, loopback-oriented routes only; the agent-platform endpoint can read narrow
-provider evidence but has no provider mutation capability.
+existing acceptance tests. The ``/api/v1`` routes expose the deterministic experiment
+and a multi-SaaS evidence projection used by the Dashboard. They are local,
+loopback-oriented routes only. Agent tools remain read-only; an explicitly configured
+demo-tenant executor may apply one Manager-gated, idempotent ERPNext recovery.
 """
 
 from __future__ import annotations
@@ -29,9 +29,17 @@ from the_missing_20.adapters.ambiguous_case_platform import AmbiguousCasePlatfor
 from the_missing_20.adapters.ambiguous_receipt_source import (  # noqa: E402
     AmbiguousReceiptEvidenceSource,
 )
-from the_missing_20.adapters.erpnext_source import ERPNextEvidenceSource  # noqa: E402
+from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
+from the_missing_20.adapters.erpnext_source import (  # noqa: E402
+    ERPNextEvidenceSource,
+    _read_env_file,
+)
+from the_missing_20.adapters.external_source_change import (  # noqa: E402
+    ExternalSourceChangeDetector,
+)
 from the_missing_20.adapters.live_advisory_gateway import (  # noqa: E402
     DashboardAdvisoryGateway,
+    connected_competition_investigation_packet,
 )
 from the_missing_20.adapters.saas_evidence import SaaSEvidenceSource  # noqa: E402
 from the_missing_20.authority_b.models import canonical_json  # noqa: E402
@@ -69,6 +77,8 @@ STATIC_ASSETS = {
     "/assets/phosphor-bold.css": ("phosphor-bold.css", "text/css; charset=utf-8"),
     "/assets/Phosphor.woff2": ("Phosphor.woff2", "font/woff2"),
     "/assets/Phosphor-Bold.woff2": ("Phosphor-Bold.woff2", "font/woff2"),
+    "/assets/geist-latin.woff2": ("geist-latin.woff2", "font/woff2"),
+    "/assets/geist-mono-latin.woff2": ("geist-mono-latin.woff2", "font/woff2"),
 }
 STATIC_ASSET_ROOT = (STATIC_ROOT / "assets").resolve()
 API_SCHEMA_VERSION = "missing20-experiment-api/v1"
@@ -78,6 +88,24 @@ SSE_HEARTBEAT_SECONDS = 10.0
 # legible without inventing an event: every frame is still read directly from
 # the authoritative public ledger.
 SSE_EVENT_PACING_SECONDS = 0.12
+BROWSER_EVENT_TAIL_LIMIT = 96
+BROWSER_EVENT_ANCHORS = frozenset(
+    {
+        "source.condition.injected",
+        "incident.detected",
+        "investigation.started",
+        "agent.started",
+        "agent.completed",
+        "evaluation.completed",
+        "recovery.prepared",
+        "approval.requested",
+        "approval.recorded",
+        "execution.started",
+        "execution.completed",
+        "verification.started",
+        "verification.completed",
+    }
+)
 
 
 class APIRequestError(Exception):
@@ -109,7 +137,11 @@ def _headers(content_type: str, content_length: int | None = None) -> dict[str, 
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
         "Content-Security-Policy": (
-            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            # The command canvas uses bounded client-side positioning for
+            # draggable modules, graph anchors, and live metric bars. Permit
+            # style attributes while keeping scripts, connections, images,
+            # frames, and form submissions locked to this local origin.
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
             "connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; "
             "frame-ancestors 'none'"
         ),
@@ -117,6 +149,55 @@ def _headers(content_type: str, content_length: int | None = None) -> dict[str, 
     if content_length is not None:
         headers["Content-Length"] = str(content_length)
     return headers
+
+
+def _browser_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Bound initial browser history while preserving current authoritative state.
+
+    The immutable ledger remains available through cursor-based SSE.  Shipping
+    thousands of historical payloads before the browser can render its first
+    frame turns an old demo run into a multi-megabyte bootstrap response.  The
+    browser only needs the recent tail plus lifecycle anchors to reconstruct a
+    truthful starting view and subscribe from the latest sequence.
+    """
+
+    raw_events = snapshot.get("events")
+    events = (
+        [item for item in raw_events if isinstance(item, dict)]
+        if isinstance(raw_events, list)
+        else []
+    )
+    selected = events[-BROWSER_EVENT_TAIL_LIMIT:]
+    latest_anchors: dict[str, dict[str, Any]] = {}
+    first_detection: dict[str, Any] | None = None
+    for event in events:
+        event_type = str(event.get("event_type") or event.get("event") or "")
+        if (
+            event_type in {"source.condition.injected", "incident.detected"}
+            and first_detection is None
+        ):
+            first_detection = event
+        if event_type in BROWSER_EVENT_ANCHORS:
+            latest_anchors[event_type] = event
+    by_sequence: dict[int, dict[str, Any]] = {}
+    for event in (
+        ([first_detection] if first_detection is not None else [])
+        + list(latest_anchors.values())
+        + selected
+    ):
+        sequence = event.get("sequence")
+        if isinstance(sequence, int) and not isinstance(sequence, bool):
+            by_sequence[sequence] = event
+    bounded = [by_sequence[key] for key in sorted(by_sequence)]
+    projected = dict(snapshot)
+    projected["events"] = bounded
+    projected["activity"] = bounded
+    projected["event_window"] = {
+        "total": len(events),
+        "returned": len(bounded),
+        "truncated": len(bounded) < len(events),
+    }
+    return projected
 
 
 def _identity(snapshot: dict[str, object]) -> dict[str, object]:
@@ -183,6 +264,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     @property
     def agent_advisory(self) -> DashboardAdvisoryGateway:
         return self.server.agent_advisory  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def case_console_source_mode(self) -> str:
+        return self.server.case_console_source_mode  # type: ignore[attr-defined,no-any-return]
 
     def _send(
         self,
@@ -287,14 +372,21 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         if route == "/api/v1/agent-platform":
             self._send_json(HTTPStatus.OK, self.agent_platform.current())
             return
+        if route == "/api/v1/agent-platform/events":
+            self._send_agent_platform_sse(query)
+            return
         if route == "/api/v1/ambiguous-receipt-case":
             self._send_json(HTTPStatus.OK, self.ambiguous_receipt.current())
             return
         if route == "/api/v1/erpnext-evidence":
-            self._send_json(HTTPStatus.OK, self.erpnext_evidence.current())
+            projection = self.erpnext_evidence.current()
+            self.server.observe_external_change("erpnext", projection)  # type: ignore[attr-defined]
+            self._send_json(HTTPStatus.OK, projection)
             return
         if route == "/api/v1/saas-evidence":
-            self._send_json(HTTPStatus.OK, self.saas_evidence.current())
+            projection = self.saas_evidence.current()
+            self.server.observe_external_change("saas", projection)  # type: ignore[attr-defined]
+            self._send_json(HTTPStatus.OK, projection)
             return
         if route == "/api/v1/live-sources":
             self._send_json(HTTPStatus.OK, self.live_sources.current())
@@ -326,13 +418,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                 if active_scenario in {"incident", "golden"}
                 else None
             )
-            incident = (
-                incident_candidate.snapshot()
-                if incident_candidate is not None
-                else self.registry.scenario_incident_identity()
-            )
+            incident = incident_candidate.snapshot() if incident_candidate is not None else None
             recovery_session = self.registry.latest_verified()
-            recovery = recovery_session.snapshot() if recovery_session is not None else normal
+            recovery = recovery_session.snapshot() if recovery_session is not None else None
             self._send_json(
                 HTTPStatus.OK,
                 {
@@ -348,16 +436,19 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                         {
                             "id": "incident",
                             "label": "Incident",
-                            **_identity(incident),
+                            **(_identity(incident) if incident is not None else {}),
                             "status": (
                                 "ACTIVE" if active_scenario in {"incident", "golden"} else "READY"
                             ),
+                            "launch_method": "POST" if incident is None else "OPEN",
+                            "deep_link_available": incident is not None,
                         },
                         {
                             "id": "recovery",
                             "label": "Recovery",
-                            **_identity(recovery),
+                            **(_identity(recovery) if recovery is not None else {}),
                             "status": ("READY" if recovery_session is not None else "LOCKED"),
+                            "deep_link_available": recovery is not None,
                         },
                     ],
                 },
@@ -396,7 +487,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         session = self._session(incident_id)
         snapshot = session.snapshot()
         if len(parts) == 1:
-            if query.get("compact") == ["1"]:
+            if query.get("projection") == ["browser"]:
+                snapshot = _browser_snapshot(snapshot)
+            elif query.get("compact") == ["1"]:
                 # Browser-smoke captures validate the authoritative projection,
                 # not the complete historical ledger. Keep the same lifecycle
                 # state while omitting large collections that the client does
@@ -441,6 +534,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         after = self._after_sequence(query, self.headers.get("Last-Event-ID"))
         replay = query.get("replay") == ["1"]
         latest = session.ledger.latest_sequence(session.incident_id)
+        replay_target = latest if replay else None
         if after > latest:
             raise APIRequestError(
                 HTTPStatus.BAD_REQUEST,
@@ -450,7 +544,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         for key, value in _headers("text/event-stream; charset=utf-8").items():
             self.send_header(key, value)
-        self.send_header("Connection", "keep-alive")
+        self.send_header("Connection", "close" if replay else "keep-alive")
+        if replay:
+            self.close_connection = True
         self.end_headers()
         try:
             # Keep the stream open for the lifetime of the browser subscription.
@@ -475,6 +571,8 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     self.wfile.flush()
                     return
                 events = session.events_since(after)
+                if replay_target is not None:
+                    events = tuple(event for event in events if event.sequence <= replay_target)
                 if events:
                     for event in events:
                         wire_event = event.model_dump(mode="json")
@@ -486,7 +584,13 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                         self.wfile.write(frame)
                         self.wfile.flush()
                         after = event.sequence
-                        time.sleep(SSE_EVENT_PACING_SECONDS)
+                        # Replay restores persisted truth; it is not a synthetic
+                        # animation. Catch it up immediately, then let the live
+                        # subscription provide the reviewer-visible cadence.
+                        if not replay:
+                            time.sleep(SSE_EVENT_PACING_SECONDS)
+                    if replay_target is not None and after >= replay_target:
+                        return
                     continue
                 if replay:
                     # A replay is a finite re-emission of the immutable ledger;
@@ -498,25 +602,95 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             return
 
+    def _send_agent_platform_sse(self, query: dict[str, list[str]]) -> None:
+        """Stream only activity appended by the Case Console server ledger."""
+
+        after = self._after_sequence(query, self.headers.get("Last-Event-ID"))
+        self.send_response(HTTPStatus.OK)
+        for key, value in _headers("text/event-stream; charset=utf-8").items():
+            self.send_header(key, value)
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+        try:
+            idle_since = time.monotonic()
+            while True:
+                events = self.agent_platform.events_since(after)
+                if events:
+                    for event in events:
+                        raw_sequence = event.get("sequence")
+                        if not isinstance(raw_sequence, int):
+                            continue
+                        sequence = raw_sequence
+                        frame = (
+                            f"id: {sequence}\n"
+                            "event: case.activity\n"
+                            f"data: {canonical_json(event)}\n\n"
+                        ).encode()
+                        self.wfile.write(frame)
+                        self.wfile.flush()
+                        after = sequence
+                    idle_since = time.monotonic()
+                    continue
+                if time.monotonic() - idle_since >= SSE_HEARTBEAT_SECONDS:
+                    self.wfile.write(b": heartbeat\n\n")
+                    self.wfile.flush()
+                    idle_since = time.monotonic()
+                time.sleep(0.15)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         route = parsed.path
         query = parse_qs(parsed.query, keep_blank_values=True)
         if route == "/healthz":
-            provider_truth = self.registry.provider_truth()
+            compatibility_truth = self.registry.provider_truth()
+            platform_truth_reader = getattr(self.agent_platform, "runtime_truth", None)
+            platform_truth = platform_truth_reader() if callable(platform_truth_reader) else {}
+            advisory_truth_reader = getattr(self.agent_advisory, "runtime_truth", None)
+            advisory_truth = advisory_truth_reader() if callable(advisory_truth_reader) else {}
+            provider_calls = bool(
+                compatibility_truth["calls_observed"] or platform_truth.get("calls_observed", False)
+            )
+            provider_mode = str(
+                (
+                    platform_truth.get("provider_mode")
+                    if platform_truth.get("calls_observed")
+                    else None
+                )
+                or advisory_truth.get("provider_mode")
+                or compatibility_truth["mode"]
+            )
+            provider_configured = bool(
+                advisory_truth.get("provider_configured", False)
+                or compatibility_truth["configured"]
+            )
+            external_writes = str(platform_truth.get("external_provider_writes", "disabled"))
+            write_scope = str(
+                platform_truth.get(
+                    "write_scope",
+                    "local_synthetic_only"
+                    if self.case_console_source_mode == "synthetic"
+                    else "read_only",
+                )
+            )
             self._send_json(
                 HTTPStatus.OK,
                 {
                     "status": "ok",
                     "local_synthetic_commands": True,
-                    "provider_calls": provider_truth["calls_observed"],
-                    "provider_mode": provider_truth["mode"],
-                    "provider_configured": provider_truth["configured"],
-                    "write_scope": "local_synthetic_only",
-                    "external_provider_writes": "disabled",
+                    "provider_calls": provider_calls,
+                    "provider_mode": provider_mode,
+                    "provider_configured": provider_configured,
+                    "write_scope": write_scope,
+                    "external_provider_writes": external_writes,
                     "advisory_tools_read_only": True,
                     "live_sources": True,
                     "external_context_only": True,
+                    "paths": {
+                        "hero_case_console": {**platform_truth, **advisory_truth},
+                        "legacy_compatibility_harness": compatibility_truth,
+                    },
                     "schema_version": WORKSPACE_SCHEMA_VERSION,
                     "experiment_api": API_SCHEMA_VERSION,
                 },
@@ -540,6 +714,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             return
         if (
             route == "/api/v1/agent-platform"
+            or route == "/api/v1/agent-platform/events"
             or route == "/api/v1/ambiguous-receipt-case"
             or route == "/api/v1/scenarios"
             or route == "/api/v1/incidents"
@@ -589,13 +764,59 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
 
     def _v1_post(self, route: str, payload: dict[str, object]) -> None:
         if route == "/api/v1/agent-platform/diagnose":
+            if set(payload) - {"operator_id"}:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "unexpected_payload",
+                    "diagnosis accepts only the human operator identity",
+                )
+            operator_id = payload.get("operator_id")
+            if not isinstance(operator_id, str) or not operator_id.strip():
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "diagnosis_authorization_required",
+                    "diagnosis requires an explicit human operator identity",
+                )
+            authorize = getattr(self.agent_platform, "authorize_diagnosis", None)
+            if callable(authorize):
+                authorize(operator_id)
+            claim = getattr(self.agent_platform, "claim_diagnosis", None)
+            if callable(claim):
+                projection, started = claim()
+                if not started:
+                    self._send_json(HTTPStatus.OK, projection)
+                    return
+            else:
+                projection = self.agent_platform.diagnose()
+            advisory = self.agent_advisory.investigate(projection)
+            self._send_json(
+                HTTPStatus.OK, self.agent_platform.record_strands_investigation(advisory)
+            )
+            return
+        if route == "/api/v1/agent-platform/counterfactual":
+            variant = payload.get("variant")
+            if not isinstance(variant, str):
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_counterfactual",
+                    "counterfactual requires a named variant",
+                )
+            if not isinstance(self.agent_platform, AmbiguousCasePlatform):
+                raise APIRequestError(
+                    HTTPStatus.CONFLICT,
+                    "unsupported_counterfactual_mode",
+                    "counterfactuals are isolated synthetic-tenant cases",
+                )
+            self._send_json(HTTPStatus.OK, self.agent_platform.reset_variant(variant))
+            return
+        if route == "/api/v1/agent-platform/stop":
             if payload:
                 raise APIRequestError(
                     HTTPStatus.BAD_REQUEST,
                     "unexpected_payload",
-                    "automatic diagnosis does not accept provider commands",
+                    "pause preserves evidence and accepts no provider commands",
                 )
-            self._send_json(HTTPStatus.OK, self.agent_platform.diagnose())
+            self._send_json(HTTPStatus.OK, self.agent_platform.stop())
             return
         if route == "/api/v1/agent-platform/ask":
             question = payload.get("question")
@@ -614,6 +835,45 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     HTTPStatus.BAD_REQUEST, "invalid_manager", "approval requires manager_id"
                 )
             self._send_json(HTTPStatus.OK, self.agent_platform.approve(manager_id))
+            return
+        if route == "/api/v1/agent-platform/reject":
+            manager_id = payload.get("manager_id")
+            reason = payload.get("reason")
+            if not isinstance(manager_id, str) or not isinstance(reason, str):
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_rejection",
+                    "rejection requires manager_id and reason",
+                )
+            reject = getattr(self.agent_platform, "reject_plan", None)
+            if not callable(reject):
+                raise APIRequestError(
+                    HTTPStatus.CONFLICT,
+                    "unsupported_rejection_mode",
+                    "plan rejection is unavailable for this platform mode",
+                )
+            self._send_json(HTTPStatus.OK, reject(manager_id, reason))
+            return
+        if route == "/api/v1/agent-platform/approve-and-execute":
+            manager_id = payload.get("manager_id")
+            idempotency_key = payload.get("idempotency_key")
+            if not isinstance(manager_id, str) or not isinstance(idempotency_key, str):
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_approval",
+                    "approval requires manager_id and idempotency_key",
+                )
+            approve_execute_verify = getattr(self.agent_platform, "approve_execute_verify", None)
+            if not callable(approve_execute_verify):
+                raise APIRequestError(
+                    HTTPStatus.CONFLICT,
+                    "unsupported_execution_mode",
+                    "one-click guarded execution is unavailable for this platform mode",
+                )
+            self._send_json(
+                HTTPStatus.OK,
+                approve_execute_verify(manager_id, idempotency_key),
+            )
             return
         if route == "/api/v1/agent-platform/execute":
             approval_id = payload.get("approval_id")
@@ -673,6 +933,14 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                         else None
                     )
                 )
+            if scenario in {"incident", "golden"} and isinstance(
+                self.agent_platform, AmbiguousCasePlatform
+            ):
+                # The current Case Console is the authoritative judge path.
+                # A newly admitted legacy compatibility session must begin
+                # with the same fresh case/run truth, never a persisted result
+                # from a previous demo take.
+                self.agent_platform.reset()
             snapshot = session.snapshot()
             if scenario == "recovery" and snapshot.get("execution", {}).get("verified") is not True:
                 raise APIRequestError(
@@ -770,7 +1038,11 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             "/api/v1/scenarios",
             "/api/v1/agent-platform/ask",
             "/api/v1/agent-platform/diagnose",
+            "/api/v1/agent-platform/counterfactual",
+            "/api/v1/agent-platform/stop",
             "/api/v1/agent-platform/approve",
+            "/api/v1/agent-platform/reject",
+            "/api/v1/agent-platform/approve-and-execute",
             "/api/v1/agent-platform/execute",
             "/api/v1/agent-platform/verify",
         }
@@ -903,6 +1175,10 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             # only surface that may invoke the separately configured real,
             # read-only Strands advisory agent.
             provider_mode=AgentProvider.SCRIPTED,
+            # Dashboard motion is source-driven: the initial authoritative
+            # snapshot is visible, then the ledger stays still until an
+            # operator/source transition or workflow event actually occurs.
+            periodic_telemetry_enabled=False,
         )
         self.live_sources = live_sources or LiveSourceRegistry()
         self.erpnext_evidence = erpnext_evidence or ERPNextEvidenceSource.from_environment(
@@ -911,11 +1187,53 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         self.saas_evidence = saas_evidence or SaaSEvidenceSource.from_environment(
             repository_root=repository_root
         )
+        self.external_source_changes = ExternalSourceChangeDetector()
         self.ambiguous_receipt = ambiguous_receipt or AmbiguousReceiptEvidenceSource()
-        self.agent_platform = agent_platform or AmbiguousCasePlatform()
-        self.agent_advisory = agent_advisory or DashboardAdvisoryGateway(  # type: ignore[arg-type]
-            self.agent_platform
-        )
+        # The default remains the deterministic synthetic tenant used by the
+        # recorded judge path.  A real authorised read path is opt-in so a
+        # missing token can never silently turn a production-looking demo into
+        # a degraded mock.  External writes stay disabled unless the dedicated
+        # M20 demo tenant is explicitly selected.
+        source_mode = os.environ.get("MISSING20_CASE_CONSOLE_SOURCE", "synthetic").strip().lower()
+        self.case_console_source_mode = source_mode
+        if agent_platform is not None:
+            self.agent_platform = agent_platform
+        elif source_mode == "live":
+            executor = (
+                ERPNextDemoExecutor.from_environment(repository_root)
+                if os.environ.get("MISSING20_ENVIRONMENT", "").strip().lower() == "demo"
+                else None
+            )
+            self.agent_platform = AgentPlatform(
+                self.erpnext_evidence,
+                self.saas_evidence,
+                executor=executor,
+                state_path=(runtime_directory / "agent-platform-state.json")
+                if runtime_directory is not None
+                else None,
+            )
+        elif source_mode == "synthetic":
+            case_console_store = (
+                runtime_directory / "case-console.sqlite3"
+                if runtime_directory is not None
+                else None
+            )
+            self.agent_platform = AmbiguousCasePlatform(store_path=case_console_store)
+        else:
+            raise ValueError("MISSING20_CASE_CONSOLE_SOURCE must be synthetic or live")
+        if agent_advisory is not None:
+            self.agent_advisory = agent_advisory
+        elif isinstance(self.agent_platform, AmbiguousCasePlatform):
+            self.agent_advisory = DashboardAdvisoryGateway(
+                self.agent_platform,
+                packet_factory=lambda projection: connected_competition_investigation_packet(
+                    projection,
+                    erp_evidence=self.erpnext_evidence.current(),
+                    saas_evidence=self.saas_evidence.current(),
+                ),
+            )
+        else:
+            self.agent_advisory = DashboardAdvisoryGateway(self.agent_platform)
         self.live_source_poller = LiveSourcePoller(self.live_sources)
         configured_autostart = os.environ.get("MISSING20_LIVE_SOURCES_AUTOSTART", "0")
         should_autostart = (
@@ -926,6 +1244,20 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         super().__init__(address, DecisionWorkspaceHandler)
         if should_autostart:
             self.live_source_poller.start()
+
+    def observe_external_change(self, source_id: str, projection: dict[str, object]) -> None:
+        """Bridge a semantic provider version into the active incident ledger."""
+
+        change = self.external_source_changes.observe(source_id, projection)
+        if change is None:
+            return
+        _scenario, incident_id = self.registry.active_scenario()
+        session = self.registry.get(incident_id)
+        session.record_external_source_change(
+            source_id=source_id,
+            source_sequence=int(change["source_sequence"]),
+            change=change,
+        )
 
     def shutdown(self) -> None:
         """Stop session producers as the serving loop is asked to terminate."""
@@ -943,14 +1275,19 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
 
 
 def main() -> int:
+    for key, value in _read_env_file(ROOT / ".env").items():
+        os.environ.setdefault(key, value)
+    # A clean clone must remain runnable without private provider credentials.
+    # Connected-source and Bedrock modes are explicit Makefile targets.
+    os.environ.setdefault("MISSING20_CASE_CONSOLE_SOURCE", "synthetic")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument(
         "--runtime-directory",
         type=Path,
-        default=None,
-        help="directory for the local synthetic session ledger (defaults to a temporary directory)",
+        default=ROOT / ".missing20-runtime",
+        help="directory for durable local synthetic ledgers and Case Console state",
     )
     args = parser.parse_args()
     try:

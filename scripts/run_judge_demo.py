@@ -1,4 +1,4 @@
-"""Run the private seven-step judge demo's clean-state acceptance check.
+"""Run the legacy deterministic package's clean-state acceptance check.
 
 The check validates the persisted package and regenerates deterministic lifecycle/M6/
 workspace inputs in a temporary clean repository.  It never starts a server and never
@@ -42,7 +42,7 @@ def main() -> int:
                 "persisted private audit differs from a clean-state deterministic regeneration"
             )
         print(
-            "The Missing 20 private judge demo: PASS "
+            "The Missing 20 legacy deterministic package: PASS "
             f"({persisted.package_status}, {persisted.total_duration_seconds // 60}:"
             f"{persisted.total_duration_seconds % 60:02d}, digest={persisted.audit_digest})"
         )
@@ -51,9 +51,12 @@ def main() -> int:
                 f"{step.ordinal}. {step.start_seconds:03d}–{step.end_seconds:03d}s "
                 f"{step.title} [{step.evidence_class.value}]"
             )
-        print("provider_calls=0 new_cost_usd=0 ready_to_submit=false")
+        print(
+            "legacy_path=true provider_calls=0 new_cost_usd=0 ready_to_submit=false "
+            "hero_path_proof=artifacts/audits/2026-09-07-current-hero-proof.json"
+        )
     except (M7PackageError, OSError, TypeError, ValueError) as exc:
-        print(f"The Missing 20 private judge demo: BLOCKED ({exc})", file=sys.stderr)
+        print(f"The Missing 20 legacy deterministic package: BLOCKED ({exc})", file=sys.stderr)
         return 2
     return 0
 

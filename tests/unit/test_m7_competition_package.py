@@ -35,7 +35,11 @@ def _copy_package_inputs(destination: Path) -> None:
         "src",
         "tests",
     ):
-        shutil.copytree(ROOT / directory, destination / directory)
+        shutil.copytree(
+            ROOT / directory,
+            destination / directory,
+            ignore=shutil.ignore_patterns("runtime") if directory == "artifacts" else None,
+        )
 
 
 def _resign(payload: dict[str, object]) -> None:

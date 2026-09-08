@@ -1,8 +1,8 @@
 # Milestone 3: Safety Counterexamples and Golden v1
 
-**Status:** Implementation accepted by the independent Chief Architect after the final Golden v1 gate  
-**Date:** 2026-08-25  
-**Parent design:** [`2026-08-25-the-missing-20-design.md`](2026-08-25-the-missing-20-design.md)  
+**Status:** Implementation accepted by the independent Chief Architect after the final Golden v1 gate
+**Date:** 2026-08-25
+**Parent design:** [`2026-08-25-the-missing-20-design.md`](2026-08-25-the-missing-20-design.md)
 **Accepted foundation:** [`2026-08-25-milestone-2-deterministic-vertical-slice-design.md`](2026-08-25-milestone-2-deterministic-vertical-slice-design.md)
 
 ## 1. Decision

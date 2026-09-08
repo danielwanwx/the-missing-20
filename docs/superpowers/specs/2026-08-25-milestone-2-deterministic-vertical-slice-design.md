@@ -1,8 +1,8 @@
 # Milestone 2 Deterministic Vertical Slice Design
 
 **Status:** Implementation accepted by Chief Architect after five independent gate reviews
-**Date:** 2026-08-25  
-**Parent design:** [`2026-08-25-the-missing-20-design.md`](2026-08-25-the-missing-20-design.md)  
+**Date:** 2026-08-25
+**Parent design:** [`2026-08-25-the-missing-20-design.md`](2026-08-25-the-missing-20-design.md)
 **Implementation plan:** [`../plans/2026-08-25-the-missing-20-implementation-plan.md`](../plans/2026-08-25-the-missing-20-implementation-plan.md)
 
 ## 1. Goal and boundary

@@ -43,9 +43,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    registry = LiveSourceRegistry(
-        (NWSAlertsAdapter(), NOAAWaterLevelAdapter(), AISStreamAdapter())
-    )
+    registry = LiveSourceRegistry((NWSAlertsAdapter(), NOAAWaterLevelAdapter(), AISStreamAdapter()))
     try:
         registry.poll_once(force=True)
         payload = registry.current(poll=False)
@@ -58,11 +56,14 @@ def main() -> int:
         for source in sources
         if source["source_id"] != "aisstream-port-los-angeles"
     }
-    http_ok = all(
-        str(source.get("status"))
-        in {LiveSourceStatus.CONNECTED.value, LiveSourceStatus.STALE.value}
-        for source in http_sources.values()
-    ) and len(http_sources) == 2
+    http_ok = (
+        all(
+            str(source.get("status"))
+            in {LiveSourceStatus.CONNECTED.value, LiveSourceStatus.STALE.value}
+            for source in http_sources.values()
+        )
+        and len(http_sources) == 2
+    )
     artifact = {
         "schema_version": payload["schema_version"],
         "status": "PASS" if http_ok else "DEGRADED",

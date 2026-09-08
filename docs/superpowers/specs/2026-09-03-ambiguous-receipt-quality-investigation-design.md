@@ -1,9 +1,9 @@
 # Ambiguous Receipt and Quality Investigation Design
 
-**Status:** approved for implementation by the project owner on 2026-09-03  
+**Status:** approved for implementation by the project owner on 2026-09-03
 **Scope:** replace the demo's single `100 expected / 80 recorded` explanation with a
-production-shaped, disclosed-synthetic purchase-to-pay investigation.  
-**Evidence basis:** [procurement exception reality check](../../research/2026-09-03-procurement-exception-reality-check.md).
+production-shaped, disclosed-synthetic purchase-to-pay investigation.
+**Evidence basis:** [submission and winner README benchmark](../../research/2026-09-07-submission-and-winner-readme-benchmark.md).
 
 ## Goal
 

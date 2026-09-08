@@ -1,0 +1,88 @@
+{
+  "schema_version": "real-strands-case-matrix/v1",
+  "batch_id": "real-strands-61d1485e241046469535a08d38955376",
+  "created_at": "2026-09-07T13:05:36.483535+00:00",
+  "provider": {
+    "mode": "bedrock",
+    "provider": "bedrock",
+    "model": "us.amazon.nova-pro-v1:0",
+    "region": "us-west-2",
+    "transport": "strands_bedrock_model"
+  },
+  "input_sources": {
+    "fixture_cases": 0,
+    "live_case": true
+  },
+  "records": [
+    {
+      "case_id": "M20-ECU-2026-00011-LOT-A",
+      "case_key": "M20-ECU-2026-00011-LOT-A",
+      "case_class": "source_investigation",
+      "source": "live-external-read",
+      "expected_disposition": "RECOVERY_READY",
+      "answer": "{\"disposition\": \"RECOVERY_READY\", \"evidence_ids\": [\"M20-ECU-2026-00011-LOT-A\", \"ACC-PINV-2026-00007\", \"PUR-ORD-2026-00011\", \"MAT-PRE-2026-00001\", \"MAT-PRE-2026-00001:ledger\", \"MAT-PRE-2026-00001:available\", \"recv8NiUZzO4YjPLo\", \"6a99e57c1d35fb241cec8ad6\"], \"reason\": \"Invoice in PAYMENT_HOLD, ERP accounted quantity matches ordered quantity, physical received quantity matches ordered quantity.\", \"safe_next_step\": \"Seek Manager approval for a bounded write to release the invoice from PAYMENT_HOLD.\", \"write_performed\": false}",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "provider": {
+        "mode": "bedrock",
+        "provider": "bedrock",
+        "model": "us.amazon.nova-pro-v1:0",
+        "region": "us-west-2",
+        "transport": "strands_bedrock_model"
+      },
+      "latency_ms": 9509,
+      "usage": {
+        "request_count": 4,
+        "input_tokens": 15097,
+        "output_tokens": 905,
+        "incremental_cost_usd": 0.0149736,
+        "validation_retries": 0,
+        "source_cache_hits": 0
+      },
+      "rubric": {
+        "passed": true,
+        "checks": {
+          "tool_called": true,
+          "expected_disposition": true,
+          "evidence_cited": true,
+          "no_write_claim": true
+        }
+      }
+    }
+  ],
+  "summary": {
+    "planned_cases": 1,
+    "completed_cases": 1,
+    "passed_cases": 1,
+    "failed_rubric_cases": 0,
+    "provider_error_cases": 0,
+    "stopped_reason": null,
+    "usage": {
+      "request_count": 4,
+      "input_tokens": 15097,
+      "output_tokens": 905,
+      "request_cap": 40,
+      "input_token_cap": 200000,
+      "output_token_cap": 24000,
+      "reserved_input_tokens": 0,
+      "reserved_output_tokens": 0,
+      "reserved_cost_usd": 0.0,
+      "reserved_incremental_cost_usd": 0.0149736,
+      "reserved_cumulative_cost_usd": 0.0149736,
+      "incremental_cost_usd": 0.0149736,
+      "cumulative_cost_usd": 0.0149736,
+      "prior_cost_usd": 0.0,
+      "incremental_cost_cap_usd": 0.2,
+      "cumulative_cost_cap_usd": 0.2,
+      "remaining_incremental_cost_usd": 0.1850264,
+      "remaining_cumulative_cost_usd": 0.1850264,
+      "budget_error_count": 0
+    }
+  }
+}

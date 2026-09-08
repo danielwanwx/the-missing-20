@@ -2,7 +2,7 @@
 
 This module is intentionally a read-only composition boundary.  It validates the
 already-proven local lifecycle and M6 evidence, checks the private demo documents and
-static workspace for unsafe claims or external resources, and emits a canonical audit
+static workspace for unsafe claims or unapproved external resources, and emits a canonical audit
 manifest.  It never imports an AWS SDK and never opens a network connection.
 """
 
@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Final, Literal, cast
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -78,7 +79,6 @@ M7_SUBMISSION_PATHS: Final[tuple[str, ...]] = (
     "docs/submission/evidence-matrix.md",
     "docs/submission/judging-map.md",
     "docs/submission/known-limitations.md",
-    "docs/submission/private-submission-draft.md",
 )
 M7_SCRIPT_PATHS: Final[tuple[str, ...]] = (
     "scripts/audit_competition_package.py",
@@ -144,7 +144,6 @@ M7_SOURCE_ROLES: Final[Mapping[str, str]] = {
     "docs/submission/evidence-matrix.md": "EVIDENCE_MATRIX",
     "docs/submission/judging-map.md": "JUDGING_MAP",
     "docs/submission/known-limitations.md": "KNOWN_LIMITATIONS",
-    "docs/submission/private-submission-draft.md": "PRIVATE_SUBMISSION_DRAFT",
     "scripts/audit_competition_package.py": "PACKAGE_AUDITOR",
     "scripts/run_judge_demo.py": "JUDGE_DEMO_RUNNER",
     "workspace/app.js": "READ_ONLY_WORKSPACE_SCRIPT",
@@ -425,7 +424,7 @@ def _read_sources(repository_root: Path) -> tuple[M7SourceArtifact, ...]:
             source_text = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise M7PackageError(f"M7 source is not UTF-8: {relative}") from exc
-        if _REMOTE_URL.search(source_text):
+        if _unapproved_remote_urls(source_text):
             raise M7PackageError(f"M7 source contains a remote URL: {relative}")
         if _SECRET.search(source_text):
             raise M7PackageError(f"M7 source contains secret-like text: {relative}")
@@ -980,7 +979,31 @@ def _validate_browser_smoke(value: Mapping[str, Any]) -> None:
         raise M7PackageError("M7 browser smoke does not prove the 390px responsive boundary")
 
 
-_REMOTE_URL = re.compile(r"https?://(?!127\.0\.0\.1|localhost)", re.IGNORECASE)
+_REMOTE_URL = re.compile(r"https?://[^\s'\"<>]+", re.IGNORECASE)
+_APPROVED_EXTERNAL_HOSTS: Final[frozenset[str]] = frozenset(
+    {
+        "missing20.v.frappe.cloud",
+        "airtable.com",
+        "integrator.io",
+        "shrikisgood.atlassian.net",
+        "app.slack.com",
+    }
+)
+
+
+def _unapproved_remote_urls(text: str) -> tuple[str, ...]:
+    """Return outbound URLs that are not local or an explicitly reviewed demo tenant."""
+
+    rejected: list[str] = []
+    for match in _REMOTE_URL.finditer(text):
+        url = match.group(0).rstrip(".,);]")
+        hostname = (urlsplit(url).hostname or "").lower()
+        if hostname in {"127.0.0.1", "localhost"} or hostname in _APPROVED_EXTERNAL_HOSTS:
+            continue
+        rejected.append(url)
+    return tuple(rejected)
+
+
 _SECRET = re.compile(
     r"AKIA[0-9A-Z]{16}|-----BEGIN .*PRIVATE KEY-----|aws_secret_access_key|"
     r"(?:secret|password|token)\s*[:=]\s*['\"][^'\"]+['\"]",
@@ -1013,7 +1036,7 @@ def _validate_package_text(repository_root: Path) -> None:
             text = (repository_root / relative).read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             raise M7PackageError(f"M7 package text is unreadable: {relative}") from exc
-        if _REMOTE_URL.search(text):
+        if _unapproved_remote_urls(text):
             raise M7PackageError(f"M7 package contains a remote URL: {relative}")
         if _SECRET.search(text):
             raise M7PackageError(f"M7 package contains secret-like text: {relative}")
@@ -1417,8 +1440,8 @@ def _build_checks() -> tuple[M7AcceptanceCheck, ...]:
         M7AcceptanceCheck(
             check_id="truth_boundary_scan",
             detail=(
-                "Private package text contains no secret-like material, remote resource, "
-                "prohibited provenance, or overclaim."
+                "Private package text contains no secret-like material, unapproved remote "
+                "resource, prohibited provenance, or overclaim."
             ),
             source_refs=(M7_SPEC_PATH, M7_SUBMISSION_PATHS[0], M7_SCRIPT_PATHS[0]),
         ),
@@ -1428,7 +1451,7 @@ def _build_checks() -> tuple[M7AcceptanceCheck, ...]:
                 "The package is PRIVATE_READY_TO_BE_JUDGED and explicitly not ready to "
                 "submit or publish."
             ),
-            source_refs=("docs/submission/private-submission-draft.md", M7_SPEC_PATH),
+            source_refs=("docs/submission/known-limitations.md", M7_SPEC_PATH),
         ),
     )
 
@@ -1512,7 +1535,14 @@ def regenerate_clean_state(repository_root: Path) -> M7PrivateAudit:
         ):
             source = root / directory
             if source.is_dir():
-                shutil.copytree(source, clean_root / directory)
+                shutil.copytree(
+                    source,
+                    clean_root / directory,
+                    # The running demo owns transient SQLite journals here.
+                    # Runtime state is not a competition-package input and must
+                    # not make a clean-state audit race the live server.
+                    ignore=shutil.ignore_patterns("runtime") if directory == "artifacts" else None,
+                )
         # Importing the existing local builders is safe: they use synthetic SQLite and
         # fixed local artifacts only.  No AWS/provider client is created by these calls.
         from the_missing_20.authority_b.aws_proof import write_m6_aws_proof  # noqa: PLC0415

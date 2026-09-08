@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import the_missing_20.agents.evaluator as evaluator_module
 import the_missing_20.agents.harness as harness_module
 from the_missing_20.adapters.clocks import ManualClock
 from the_missing_20.adapters.local_knowledge import LocalKnowledgeRepository
@@ -25,6 +26,27 @@ from the_missing_20.experiment.session import ExperimentSession
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "fixtures/scenarios/retryable-document-lock.json"
+
+
+def test_evaluator_receives_original_admitted_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    case, evidence, availability = _detected(tmp_path)
+    captured = []
+    original = evaluator_module._evaluator_prompt
+
+    def capture(context):
+        captured.append(context)
+        return original(context)
+
+    monkeypatch.setattr(evaluator_module, "_evaluator_prompt", capture)
+    AgentHarness(
+        model_factory=ScriptedStrandsFactory(),
+        knowledge=LocalKnowledgeRepository(ROOT / "fixtures/knowledge"),
+        source_availability=availability,
+    ).run(case_id=case.case_id, trace_id="rebaseline-trace", evidence=evidence)
+    assert captured
+    assert captured[0]["evidence"] == [item.model_dump(mode="json") for item in evidence]
 
 
 def _detected(tmp_path: Path) -> tuple[Case, tuple[EvidenceItem, ...], SourceAvailabilitySet]:
@@ -98,9 +120,9 @@ def test_authority_b_decision_is_identical_when_advisory_is_partial(
         trace_id="rebaseline-trace",
         source_availability=availability,
     )
-    synthesis["factual_claims"][0]["evidence_ids"] = synthesis["factual_claims"][0][
-        "evidence_ids"
-    ][:-1]
+    synthesis["factual_claims"][0]["evidence_ids"] = synthesis["factual_claims"][0]["evidence_ids"][
+        :-1
+    ]
     monkeypatch.setattr(
         harness_module,
         "_profile_outputs",

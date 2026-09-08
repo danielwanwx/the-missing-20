@@ -1,6 +1,6 @@
 # Award-Ready Hero Workflow Design
 
-**Status:** approved by the project owner on 2026-09-04  
+**Status:** approved by the project owner on 2026-09-04
 **Purpose:** turn the Case Console into the single, truthful, recoverable
 competition demo path.
 

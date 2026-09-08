@@ -229,10 +229,7 @@ class PublicEventLedger:
             ).fetchall()
         events = tuple(
             reversed(
-                tuple(
-                    PublicIncidentEvent.model_validate_json(row["event_json"])
-                    for row in rows
-                )
+                tuple(PublicIncidentEvent.model_validate_json(row["event_json"]) for row in rows)
             )
         )
         if events:

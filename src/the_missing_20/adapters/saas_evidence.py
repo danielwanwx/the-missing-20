@@ -12,6 +12,7 @@ import base64
 import json
 import os
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,6 +64,40 @@ class SaaSEvidenceSource:
         self._transport = transport or self._default_transport
         self._timeout_seconds = timeout_seconds
         self._sequence = 0
+        self._last_fingerprint = ""
+        self._last_changed_at: datetime | None = None
+
+    def _finalize(self, projection: dict[str, object], now: datetime) -> dict[str, object]:
+        """Advance the cursor only when a provider record actually changes."""
+
+        semantic_sources = [
+            {key: value for key, value in item.items() if key != "occurred_at"}
+            for item in projection.get("sources", [])
+            if isinstance(item, Mapping)
+        ]
+        fingerprint = json.dumps(
+            {"status": projection.get("status"), "sources": semantic_sources},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        if fingerprint != self._last_fingerprint:
+            self._sequence += 1
+            self._last_fingerprint = fingerprint
+            self._last_changed_at = now
+        changed_at = self._last_changed_at or now
+        sources = [
+            {**item, "occurred_at": changed_at.isoformat()}
+            for item in projection.get("sources", [])
+            if isinstance(item, Mapping)
+        ]
+        return {
+            **projection,
+            "sequence": self._sequence,
+            "received_at": now.isoformat(),
+            "changed_at": changed_at.isoformat(),
+            "sources": sources,
+            "activity": sources,
+        }
 
     @classmethod
     def from_environment(cls, *, repository_root: Path) -> SaaSEvidenceSource:
@@ -167,10 +202,7 @@ class SaaSEvidenceSource:
             "quantity": "Approved Quantity",
             "evidence_revision": "Evidence Revision",
         }
-        return {
-            key: fields.get(field_name, "")
-            for key, field_name in field_names.items()
-        }
+        return {key: fields.get(field_name, "") for key, field_name in field_names.items()}
 
     @staticmethod
     def _run_correlation_fields(payload: Mapping[str, object]) -> dict[str, object]:
@@ -361,9 +393,7 @@ class SaaSEvidenceSource:
 
         config = self._config
         if not (
-            config.airtable_token
-            and config.airtable_base_id
-            and config.airtable_receipt_table
+            config.airtable_token and config.airtable_base_id and config.airtable_receipt_table
         ):
             return None
         query = urlencode({"maxRecords": "25"})
@@ -580,20 +610,25 @@ class SaaSEvidenceSource:
     def current(self) -> dict[str, object]:
         """Return only display-safe, source-attributed evidence rows."""
 
-        self._sequence += 1
         now = datetime.now(UTC)
-        sources = [self._airtable(now), self._celigo(now), self._jira(now), self._slack(now)]
+        # The providers are independent read-only evidence sources. Fetching
+        # them concurrently keeps UI hydration bounded by the slowest provider
+        # instead of the sum of all four SaaS round trips.
+        readers = (self._airtable, self._celigo, self._jira, self._slack)
+        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="m20-saas-read") as pool:
+            sources = list(pool.map(lambda reader: reader(now), readers))
         configured = [source for source in sources if source["status"] != "NOT_CONFIGURED"]
         connected = [source for source in configured if source["status"] not in {"DEGRADED"}]
-        return {
-            "schema_version": SAAS_EVIDENCE_SCHEMA_VERSION,
-            "correlation_id": self._config.correlation_id,
-            "sequence": self._sequence,
-            "received_at": now.isoformat(),
-            "read_only": True,
-            "status": "CONNECTED"
-            if configured and len(connected) == len(configured)
-            else ("DEGRADED" if configured else "NOT_CONFIGURED"),
-            "sources": sources,
-            "activity": sources,
-        }
+        return self._finalize(
+            {
+                "schema_version": SAAS_EVIDENCE_SCHEMA_VERSION,
+                "correlation_id": self._config.correlation_id,
+                "read_only": True,
+                "status": "CONNECTED"
+                if configured and len(connected) == len(configured)
+                else ("DEGRADED" if configured else "NOT_CONFIGURED"),
+                "sources": sources,
+                "activity": sources,
+            },
+            now,
+        )

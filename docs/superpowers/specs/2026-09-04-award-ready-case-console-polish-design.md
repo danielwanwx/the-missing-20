@@ -1,7 +1,7 @@
 # Award-Ready Case Console Polish Design
 
-**Status:** approved by the project owner on 2026-09-04  
-**Scope:** the judge-facing Case Console and its existing real Strands workflow  
+**Status:** approved by the project owner on 2026-09-04
+**Scope:** the judge-facing Case Console and its existing real Strands workflow
 **Goal:** make one truthful end-to-end case legible in a five-minute recorded demo
 
 ## Decision

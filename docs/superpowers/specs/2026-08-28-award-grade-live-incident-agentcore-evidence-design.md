@@ -1,7 +1,7 @@
 # The Missing 20 Award-Grade Live Incident and AgentCore Evidence Design
 
-**Status:** Approved product direction, frozen implementation specification  
-**Date:** 2026-08-28  
+**Status:** Approved product direction, frozen implementation specification
+**Date:** 2026-08-28
 **Scope:** Judge-facing live experience, real AgentCore proof, and synthetic impact benchmark
 
 ## Decision

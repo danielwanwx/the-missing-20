@@ -1,154 +1,213 @@
-# Devpost Submission Draft — The Missing 20
+# Devpost Submission Copy — The Missing 20
 
-**State:** `DEVPOST DRAFT CREATED — NOT PUBLIC / NOT SUBMITTED`
+**Submission:** `1162519`
+**State:** repository and written content ready; public video pending
+**Track:** Professional Agents
 
-Devpost draft: `submission 1162519` under the official Agents for Humans Hackathon.
-Project overview is saved; project details remain intentionally incomplete until the
-required public demo video is available. Public repository version: commit `a4df5bf`.
+## Core fields
 
-This is a field-ready English draft for the Agents for Humans Devpost form. Replace
-the marked placeholders only after the repository, video, and testing access have
-passed the final release gate. Never paste AWS credentials, account identifiers,
-runtime ARNs, or session tokens into Devpost or this repository.
-
-## Submission fields
-
-| Devpost field | Draft value |
+| Field | Final copy |
 | --- | --- |
 | Project title | **The Missing 20 — Agents for Humans** |
-| Track | **Professional Agents** |
-| Short tagline | **Find the gap. Prove the cause. Close it safely.** |
-| Repository URL | `https://github.com/danielwanwx/the-missing-20` |
-| Demo video | `[PASTE PUBLIC YOUTUBE/VIMEO URL — five minutes or less]` |
-| Live demo URL | `[OPTIONAL: PASTE PUBLIC, FREE, JUDGE-ACCESSIBLE URL]` |
-| AWS Builder ID | `[ENTER DIRECTLY IN THE AUTHENTICATED DEVPOST FORM; DO NOT STORE HERE]` |
+| Tagline | **Find the gap. Prove the cause. Close it safely.** |
+| Repository | `https://github.com/danielwanwx/the-missing-20` |
+| Video | Public YouTube/Vimeo URL, maximum five minutes — pending final production |
+| Live demo | Optional; do not add until stable and freely accessible through October 8 |
+| AWS Builder ID | Enter directly in Devpost; never store the account email in the repository |
 
-## Project description
+## Inspiration
 
-Operations teams lose time when a supply-chain handoff does not reconcile. The
-warehouse says 100 units shipped; the ERP says 80; the missing 20 may be a retryable
-message, a physical short shipment, or a duplicate-posting problem. A plausible answer
-is not enough: an unsafe recovery can create a second discrepancy.
+Supply-chain incidents rarely live in one system. A warehouse sees the physical
+shipment, an ERP owns financial and inventory truth, an integration platform records
+attempts and acknowledgements, a quality registry owns the lot disposition, and the
+actual operating context is scattered across tickets and chat. A person can spend
+hours joining those fragments—and a careless retry can duplicate inventory or create
+an unsupported invoice.
 
-The Missing 20 turns that incident into a guided, inspectable workflow. A Strands
-orchestrator coordinates three specialized investigators. Each investigator uses
-audited read-only tools to inspect the synthetic queue, ERP, shipment, and invoice
-evidence, then hands competing hypotheses, citations, uncertainty, and missing
-evidence back to the orchestrator. An Incident Copilot lets an operator ask a current-
-state question and understand the team's reasoning.
+We built The Missing 20 for the moment when the visible number is only a symptom. The
+goal is not to replace the operator with an unconstrained model. It is to let an agent
+perform the uncertain evidence work, stop for a human when a consequential decision is
+ready, and then prove the business effect against authoritative systems.
 
-The AI is intentionally advisory. Deterministic application code independently owns
-authoritative evidence validation, state classification, action eligibility, policy,
-and the write boundary. When a recovery is eligible, two distinct simulated role
-principals must approve that exact action. `ControlledExecutor` then applies a bounded,
-idempotent synthetic effect, rereads authoritative state, verifies the postcondition,
-and proves that replay adds zero effects. Neither the model nor one role can approve
-or execute an operational action.
+## What it does
 
-## What the judge can see
+The hero case follows a 20-unit automotive controller shipment. Twelve units are
+accepted into Stores and eight are quality-held, while a downstream USD 42,000
+customer order is still undelivered and unbilled. ERPNext, Airtable, Celigo, Jira, and
+Slack each expose a different fragment; no single source contains a safe answer.
 
-1. The Dashboard receives an ordered live API/SSE trace: 100 expected, 80 recorded,
-   and the exact 20-unit gap.
-2. Agent Workspace shows the Strands orchestrator, three investigator roles, audited
-   tool calls, evidence handoffs, hypotheses, and the read-only chat.
-3. The operator asks why the gap exists and sees the evidence boundary rather than a
-   hidden model claim.
-4. Deterministic policy prepares a safe receipt restart, then a separate invoice
-   release intent; each requires its own two-role quorum.
-5. Controlled recovery closes the gap, verification reaches 100/100, and replay
-   produces no duplicate effect.
+The Missing 20 runs the incident through one inspectable loop:
 
-The five-minute video should follow this order: problem and user, live discrepancy,
-parallel investigation, conversational explanation, human decision, controlled
-recovery, verification, and the explicit degraded/fail-closed behavior.
+1. An external demo-system change advances a semantic source version and the ordered
+   event ledger. The Dashboard does not generate decorative traffic.
+2. A Strands agent runs six bounded read/reconciliation tools, compares competing
+   causes, and streams its evidence, SDK hooks, latency, tokens, and typed result.
+3. The operator asks multi-turn questions and opens the exact source records cited by
+   the Agent.
+4. Deterministic application code reconstructs the business facts and decides whether
+   any bounded recovery is admissible.
+5. One Manager approves or rejects a packet bound to the current case, evidence tuple,
+   plan digest, scope, source versions, and idempotency key.
+6. The guarded executor performs only the approved ERPNext demo-tenant write.
+7. Fresh ERPNext and Celigo reads verify the outcome. Deterministic regression tests
+   separately cover duplicate-effect protection; the live capture proves one
+   Manager-approved bounded execution bundle producing the captured record set.
 
-## How AWS and Strands are used
+The verified result is concrete: 20/20 units delivered, Sales Order
+`SAL-ORD-2026-00006`, Delivery Note `MAT-DN-2026-00001`, Sales Invoice
+`ACC-SINV-2026-00006`, USD 42,000 observed billed revenue, balanced Stock/GL entries,
+and an independently correlated Celigo receipt.
 
-**Strands Agents SDK** provides the agent layer: a fixed orchestrator, three
-specialized investigators, audited read tools, structured outputs, synthesis/evaluation,
-streaming lifecycle events, evidence handoffs, and role-specific conversation. This
-is multi-agent investigation and explanation, not a chatbot placed in front of a
-database.
+![The Missing 20 architecture](https://raw.githubusercontent.com/danielwanwx/the-missing-20/main/docs/architecture/the-missing-20-live-architecture.visual-check.1440x900.light.png)
 
-**Amazon Bedrock Nova Pro through AgentCore Runtime** is the real advisory integration
-boundary. The redacted proof records a READY direct-code Runtime deployment, a real
-invocation, runtime logs, a completed read-only role chat, and an authority-boundary
-refusal. The deployed path exposes no business-write tool.
+## How we built it
 
-The real Nova investigation is reported honestly as `PARTIAL`: three investigators
-completed, AI-authored citation coverage was 1/5 admitted records, and deterministic
-application validation independently covered 5/5. The product labels stable real-Nova
-usefulness `NOT_PROVEN`. AgentCore Gateway and Policy are not claimed. All business
-records and scenarios are synthetic, and no production business impact is claimed.
+### Strands investigation layer
+
+The agent layer uses the Strands Agents SDK with Amazon Bedrock Nova Pro. It includes
+a bounded orchestrator, scoped source tools, structured/typed advisory output,
+competing hypotheses, synthesis and evaluator feedback, evidence handoffs, and SDK
+lifecycle hooks that drive the visible Investigation flight recorder. The same case
+scope powers a multi-turn evidence conversation.
+
+The latest real-provider evaluation covers 8/8 ambiguous case variants and 15/15
+multi-turn cases (45 dialogue turns), including recovery-ready, reconcile-only, deny,
+needs-evidence, Manager approve, and Manager reject paths.
+
+### Deterministic control layer
+
+Model output is treated as untrusted advisory data. Deterministic code independently
+owns evidence integrity, state classification, action eligibility, policy, approval
+binding, execution, verification, and replay. The model has no tool that can approve,
+write, or mark a case verified.
+
+The only external write path is restricted to exact M20-scoped records in an isolated
+ERPNext demo tenant. It requires a current policy-approved packet plus one bound Manager
+decision. A successful API response is not enough: authoritative rereads, accounting
+invariants, a cross-system receipt, and idempotency checks must pass before closure.
+
+### Live product and runtime
+
+Python and Pydantic implement the domain contracts and adapters. SQLite stores the
+durable ordered event ledger. REST plus Server-Sent Events project the same backend
+state into the Dashboard and Investigation workspace. The browser exposes source
+parameters, record IDs, external links, agent-tool activity, conversation, human
+decision, and the final Resolution Packet.
+
+The current local hero UI uses direct Strands Bedrock transport. Amazon Bedrock
+AgentCore Runtime is separately proven through a READY direct-code deployment, a real
+invocation, runtime logs, read-only role chat, and an authority-boundary refusal. We do
+not imply that the local UI currently routes through that Runtime, and we do not claim
+AgentCore Gateway or Policy.
+
+## Architecture
+
+The architecture is designed around one non-negotiable boundary: probabilistic
+investigation must never silently become operational authority.
+
+Read the diagram from left to right:
+
+- Operations Command Center admits a case and renders ordered backend state.
+- Decision Workspace API coordinates source versions, durable case state, and SSE.
+- Strands retrieves evidence from ERPNext, Airtable, Celigo, Jira, and Slack and calls
+  Nova Pro for evidence-grounded investigation.
+- Deterministic Policy validates the facts and creates an eligible bounded plan.
+- Manager Gate preserves the consequential human decision.
+- Guarded Executor performs the exact idempotent ERPNext demo-tenant execution bundle.
+- Independent Verifier rereads authoritative state, checks Celigo and accounting
+  evidence, and records a durable Resolution Packet.
+
+Canonical static diagram:
+`docs/architecture/the-missing-20-live-architecture.visual-check.1440x900.light.png`
+
+Interactive diagram:
+`docs/architecture/the-missing-20-live-architecture.html`
+
+## Challenges we ran into
+
+### A plausible model answer is not operational proof
+
+Early versions could explain a discrepancy but did not adequately separate a model
+recommendation from a safe business action. We introduced a typed advisory contract,
+independent deterministic policy, a case-bound Manager decision, and an executor that
+cannot accept arbitrary model-generated operations.
+
+### Multiple systems can be individually correct and collectively misleading
+
+Quantity alone was too shallow. We had to reconcile business keys, supplier lot,
+source revision, physical scans, integration acknowledgement, quality disposition,
+customer fulfillment, Stock Ledger, and GL. The Agent now compares alternative causes
+and states exactly which evidence would make it stop.
+
+### “Live” can still look mocked
+
+Auto-incrementing counters made an earlier dashboard feel animated rather than real.
+We replaced them with semantic source versioning: unchanged external reads create no
+event and no visual movement; an actual source or workflow transition produces one
+ordered event that every view consumes.
+
+### Completion must survive refresh and restart
+
+A convincing demo cannot lose its Agent run, approval, conversation, or Resolution
+Packet when the browser or server restarts. The event ledger and persisted verified
+run restore the same authoritative state instead of reconstructing a cosmetic success.
+
+## Accomplishments that we are proud of
+
+- A real Manager-gated write to an external ERPNext demo tenant, followed by fresh
+  document, Stock Ledger, and GL reads.
+- A complete order-to-cash outcome with exact Sales Order, Delivery Note, Sales
+  Invoice, Celigo receipt, and observed USD 42,000 billing evidence.
+- Six real Strands source/reconciliation tools, typed output, evaluator feedback, and
+  22 visible SDK lifecycle events in the verified hero run.
+- Multi-turn, evidence-cited human/Agent conversation that cannot mutate business
+  state.
+- Eight real-provider scenario variants and fifteen multi-turn cases, including
+  approve, reject, deny, and insufficient-evidence behavior.
+- Fail-closed degraded and invalid states plus regression-tested idempotency.
+- A responsive product UI and an independently validated interactive architecture.
+
+These are bounded demo-environment results. We do not claim production accuracy,
+production customer impact, or causal incremental revenue.
+
+## What we learned
+
+The strongest role for an enterprise agent is not “make every decision.” It is to make
+expensive evidence work fast, visible, and reviewable. LLMs are valuable where the path
+is uncertain: choosing tools, comparing hypotheses, finding contradictions, and
+explaining what remains unknown. Deterministic systems are essential where truth and
+authority matter: eligibility, accounting invariants, approval scope, effects, and
+verification.
+
+We also learned that human-in-the-loop should not mean stopping after every step. The
+Agent investigates autonomously and asks for a person only at the consequential
+boundary. “Know when to stop” is both a product behavior and a safety property.
+
+## What's next
+
+- Add production authentication and independently verified Manager identities.
+- Replace bounded polling with signed provider webhooks where available.
+- Add more ERP and integration connectors behind the same typed evidence contracts.
+- Run longitudinal production-style evaluations for accuracy, latency, cost, and
+  operator time saved.
+- Measure business impact with a controlled baseline before making causal ROI claims.
+- Route the product UI through AgentCore Runtime only after that hosted path passes the
+  same evidence and authority tests.
 
 ## Built with
 
 - Strands Agents SDK
 - Amazon Bedrock Nova Pro
 - Amazon Bedrock AgentCore Runtime
-- Python 3.12, SQLite, and ordered Server-Sent Events
+- ERPNext / Frappe Cloud
+- Airtable, Celigo, Jira, and Slack
+- Python 3.12, Pydantic, SQLite, and Server-Sent Events
 - Vanilla JavaScript/CSS and Phosphor Icons
-
-## Run and test locally
-
-Requirements: Python 3.12+, Node.js 20+, and `uv`.
-
-```bash
-uv venv .venv
-make bootstrap PYTHON=.venv/bin/python
-make check
-make golden
-make golden-v2
-make workspace-smoke
-make judge-demo
-```
-
-To open the interactive product:
-
-```bash
-PYTHONPATH=src .venv/bin/python scripts/decision_workspace_server.py
-```
-
-Open the printed local URL, click **Start Investigation**, and follow Dashboard →
-Agent Workspace → Copilot → Prepare → two role approvals → Execute → Verify → Replay.
-The default path is local, synthetic, and makes no provider call. `?mode=degraded`
-shows advisory-provider failure without weakening deterministic safety; `?mode=invalid`
-shows the fail-closed view when authoritative lifecycle evidence is unavailable.
 
 ## Evidence and limitations
 
-- Local detection, deterministic policy, per-action quorum, controlled effects,
-  authoritative reread, verification, and replay: **PROVEN** with synthetic data.
-- Scripted Strands investigation and agent experience: **SCRIPTED_PROVEN** and
-  reproducible locally.
-- AgentCore Runtime deployment, invocation, observability, and read-only role chat:
-  **PROVEN** within the redacted evidence boundary.
-- Real Nova advisory usefulness: **PARTIAL**; AI citations 1/5, application validation
-  5/5; stable usefulness remains **NOT_PROVEN**.
-- AgentCore Gateway/Policy and production impact: **NOT_PROVEN / not claimed**.
-- The local role principals are scripted test identities, not independent human
-  authentication. No external system is writable from the demo.
-
-Machine-readable proof and the complete claim boundary are in
-[`docs/submission/evidence-matrix.md`](evidence-matrix.md) and
-[`artifacts/aws/2026-08-30-devpost-real-acceptance.json`](../../artifacts/aws/2026-08-30-devpost-real-acceptance.json).
-
-## Pre-existing work and release notes
-
-The repository provenance ledger records the project foundation and any prior
-conceptual influence in [`docs/provenance.md`](../provenance.md). Before submitting,
-the entrant must confirm eligibility and disclose any material pre-submission work
-required by the official rules. The final public package must include the source,
-README, MIT license, architecture diagram, English description, and a public video no
-longer than five minutes. The repository already exists publicly; the reviewed local
-changes still require a deliberate push. Video upload, live hosting, and Devpost
-submission remain separate release actions.
-
-## One-paragraph closing pitch
-
-The Missing 20 uses agents where investigation is uncertain and expensive, and
-deterministic controls where operational truth matters. Strands investigators explain
-what may have happened; the application validates what is actually admissible; two
-roles decide; `ControlledExecutor` performs only the bounded approved effect; and
-verification plus replay prove the result. The model can help an operator understand
-the incident, but it cannot quietly turn a plausible story into a business write.
+The complete claim-to-proof mapping is in the public
+[release evidence matrix](https://github.com/danielwanwx/the-missing-20/blob/main/docs/submission/evidence-matrix.md). Purpose-built synthetic
+business records are used across the demo services; credentials are excluded from the
+repository. Production accuracy, AgentCore Gateway/Policy, production data, and causal
+revenue uplift are explicitly not claimed.

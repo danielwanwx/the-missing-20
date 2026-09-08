@@ -170,8 +170,7 @@ class SQLiteCaseStore:
         if tuple(item.evidence_id for item in evidence) != genesis.detector_evidence_ids:
             raise InvalidEventPayload("detector evidence does not match immutable genesis")
         if any(
-            item.case_id != case.case_id or item.trace_id != genesis.trace_id
-            for item in evidence
+            item.case_id != case.case_id or item.trace_id != genesis.trace_id for item in evidence
         ):
             raise InvalidEventPayload("detector evidence identity does not match genesis")
 

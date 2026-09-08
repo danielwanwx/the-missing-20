@@ -1,10 +1,10 @@
 # The Missing 20 Implementation Plan
 
 **Status:** Milestones 0–3 accepted; Milestone 4 design is next
-**Date:** 2026-08-25  
-**Deadline:** 2026-09-14 at 5:00 PM PDT  
-**Track:** Professional Agents  
-**Repository:** <https://github.com/danielwanwx/the-missing-20>  
+**Date:** 2026-08-25
+**Deadline:** 2026-09-14 at 5:00 PM PDT
+**Track:** Professional Agents
+**Repository:** <https://github.com/danielwanwx/the-missing-20>
 **Design source of truth:** [`../specs/2026-08-25-the-missing-20-design.md`](../specs/2026-08-25-the-missing-20-design.md)
 
 ## 1. Outcome
@@ -146,7 +146,7 @@ Directories are created only when their first executable file is added.
 
 ### Milestone 0: Environment and repository contract
 
-**Target:** August 25–26  
+**Target:** August 25–26
 **Goal:** A clean checkout is reproducible and safe before product code begins.
 
 #### Tasks
@@ -211,7 +211,7 @@ make aws-smoke AWS_CONFIRM=0
 
 ### Milestone 1: Domain contracts and state machine
 
-**Target:** August 27  
+**Target:** August 27
 **Goal:** Encode the approved contracts and transitions before adapters or agents.
 
 #### Tasks
@@ -242,7 +242,7 @@ make aws-smoke AWS_CONFIRM=0
 
 **Gate:** Completed and accepted by the independent Chief Architect on August 25, 2026.
 
-**Target:** August 28–30  
+**Target:** August 28–30
 **Goal:** Complete the entire primary case locally without an LLM.
 **Detailed execution contract:** [`../specs/2026-08-25-milestone-2-deterministic-vertical-slice-design.md`](../specs/2026-08-25-milestone-2-deterministic-vertical-slice-design.md)
 
@@ -295,7 +295,7 @@ make aws-smoke AWS_CONFIRM=0
 
 **Gate:** Completed and accepted by the independent Chief Architect on August 26, 2026.
 
-**Target:** August 31  
+**Target:** August 31
 **Goal:** Prove the product is a controlled resolution harness, not an auto-write demo.
 
 #### Tasks
@@ -329,7 +329,7 @@ make golden
 
 ### Milestone 4: Multi-agent investigation and evaluation harness
 
-**Target:** September 1–4  
+**Target:** September 1–4
 **Goal:** Replace the deterministic diagnosis stub with real Strands investigators while preserving deterministic authority.
 
 #### Tasks
@@ -374,7 +374,7 @@ make golden
 
 ### Milestone 5: Typed API and decision workspace
 
-**Target:** September 5–7  
+**Target:** September 5–7
 **Goal:** Deliver a complete product experience around the verified backend.
 
 #### Backend endpoints
@@ -422,7 +422,7 @@ The local-only principal comes from server configuration or a dedicated demo hea
 
 ### Milestone 6: AWS proof integration and cloud adapters
 
-**Target:** September 8–10  
+**Target:** September 8–10
 **Goal:** Integrate only the AWS capabilities proven by the August 28 gate and retain evidence for every cloud claim.
 
 #### Required P0: AgentCore Runtime
@@ -468,7 +468,7 @@ Stretch items are attempted only after P0, the local safety loop, the UI recordi
 
 ### Milestone 7: Demo hardening and submission package
 
-**Target:** September 11–13  
+**Target:** September 11–13
 **Goal:** Freeze a judge-ready product and leave September 14 for recovery only.
 
 #### Tasks

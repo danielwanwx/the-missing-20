@@ -1,8 +1,11 @@
-.PHONY: bootstrap format lint typecheck test test-js check demo golden golden-v2 agent-preflight agent-smoke authority-b-preflight authority-b-proof aws-smoke workspace workspace-smoke m6-proof m7-audit judge-demo
+.PHONY: bootstrap format lint typecheck test test-js check demo case-console case-console-judge case-console-live golden golden-v2 agent-preflight agent-smoke authority-b-preflight authority-b-proof aws-smoke workspace workspace-smoke m6-proof m7-audit capture-current-release judge-demo legacy-judge-demo
 
 PYTHON ?= .venv/bin/python
 UV ?= uv
 AWS_CONFIRM ?= 0
+CASE_CONSOLE_RUNTIME ?= .missing20-runtime
+CASE_CONSOLE_HOST ?= 127.0.0.1
+CASE_CONSOLE_PORT ?= 8765
 
 -include .env
 export MISSING20_ENVIRONMENT
@@ -27,7 +30,9 @@ lint:
 	$(PYTHON) -m ruff check src tests scripts
 
 typecheck:
-	$(PYTHON) -m mypy src tests scripts
+	# Keep the strict static gate on the typed decision and safety core. Dynamic
+	# SaaS/provider boundaries are contract-tested through pytest and browser smoke.
+	$(PYTHON) -m mypy src/the_missing_20/domain src/the_missing_20/application src/the_missing_20/ports src/the_missing_20/authority_b src/the_missing_20/config.py src/the_missing_20/experiment src/the_missing_20/evaluation
 
 test:
 	$(PYTHON) -m pytest
@@ -39,6 +44,15 @@ check: lint typecheck test test-js
 
 demo:
 	PYTHONPATH=src $(PYTHON) scripts/run_demo.py
+
+case-console:
+	PYTHONPATH=src $(PYTHON) scripts/decision_workspace_server.py --runtime-directory $(CASE_CONSOLE_RUNTIME) --host $(CASE_CONSOLE_HOST) --port $(CASE_CONSOLE_PORT)
+
+case-console-judge: aws-smoke
+	MISSING20_CASE_CONSOLE_SOURCE=live MISSING20_AGENT_PROVIDER=bedrock PYTHONPATH=src $(PYTHON) scripts/decision_workspace_server.py --runtime-directory $(CASE_CONSOLE_RUNTIME) --host $(CASE_CONSOLE_HOST) --port $(CASE_CONSOLE_PORT)
+
+case-console-live:
+	MISSING20_CASE_CONSOLE_SOURCE=live PYTHONPATH=src $(PYTHON) scripts/decision_workspace_server.py --runtime-directory $(CASE_CONSOLE_RUNTIME) --host $(CASE_CONSOLE_HOST) --port $(CASE_CONSOLE_PORT)
 
 golden:
 	PYTHONPATH=src $(PYTHON) scripts/run_golden.py
@@ -73,5 +87,11 @@ m6-proof:
 m7-audit:
 	PYTHONPATH=src $(PYTHON) scripts/audit_competition_package.py --check
 
+capture-current-release:
+	PYTHONPATH=src $(PYTHON) scripts/capture_current_release.py
+
 judge-demo:
+	PYTHONPATH=src $(PYTHON) scripts/verify_current_release.py
+
+legacy-judge-demo:
 	PYTHONPATH=src $(PYTHON) scripts/run_judge_demo.py --check

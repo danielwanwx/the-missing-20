@@ -5,28 +5,27 @@ official competition criteria.
 
 | Judging dimension | Five-minute moment | Evidence and honest boundary |
 | --- | --- | --- |
-| Technical implementation | Steps 2–6: Strands investigation, policy, quorum, execution, verification, replay | `PROVEN`: real local SQLite-backed application path, typed records, fail-closed mutation tests, two effects, zero replay delta. Strands orchestrator + three investigators, audited tools, structured handoffs, and the redacted AgentCore Runtime deployment/invocation/role-chat proof are visible; Nova usefulness remains `PARTIAL`. |
+| Technical implementation | Steps 2–6: connected reads, Strands investigation, policy, Manager gate, execution, verification | `PROVEN`: five connected demo-source readers feed a real Bedrock Nova investigation through six bounded tools; typed policy owns a Manager-gated ERPNext demo-tenant recovery, independent Celigo receipt verification, and authoritative reread. Duplicate protection is proven separately by deterministic regression, not claimed as a second live replay. AgentCore Runtime deployment remains a separately proven deployment boundary, not the latest UI execution path. |
 | Design | Step 3: advisory/operational separation | `PROVEN`: model output has no operational or write authority; deterministic policy has no advisory-shaped input. |
-| Potential impact | Steps 1–4: investigate a discrepancy and choose a safe next action | Demonstrates a repeatable operations pattern for supply-chain teams: reconcile a 20-unit gap, reduce investigation burden, and prevent unsafe duplicate recovery. All scenarios are synthetic; no production impact metric is claimed. |
-| Creativity and originality | Steps 2, 5, and 7: competing investigators, per-action quorum, explicit degraded disclosure | `SCRIPTED_PROVEN` for the reproducible advisory path; the redacted real run is `PARTIAL` (AI citations 1/5, application validation 5/5). AgentCore Runtime deployment/invocation/observability are `PROVEN`; Gateway, Policy, and stable real Nova usefulness remain `NOT_PROVEN`. |
-| Presentation | Live Dashboard, Agent Workspace, and seven timed narration beats | The product leads the judge from the 100/80/20 gap through visible agent work, evidence-backed Copilot answers, scripted simulated role-principal approval, controlled recovery, and 100/100 verification. |
+| Potential impact | Steps 1–4: investigate a discrepancy and choose a safe next action | Demonstrates a repeatable operations pattern for supply-chain teams: reconcile a 20-unit shipment split across receipt, quality, and customer-fulfillment states; reduce investigation burden; and prevent unsafe duplicate recovery. All scenarios are synthetic; no production impact metric is claimed. |
+| Creativity and originality | Steps 2, 5, and 7: cross-system reconciliation, hybrid autonomy, explicit degraded disclosure | `PROVEN` on the bounded demo set: 8/8 real-model variants and 15/15 multi-turn cases. The model investigates and explains; deterministic policy knows when to stop; a Manager intervenes only at the write boundary. |
+| Presentation | Live Dashboard, Investigation workspace, and seven timed narration beats | The product leads the judge from a 20-unit shipment split 12 accepted / 8 quality-held and a blocked USD 42,000 order through visible agent work, evidence-backed answers, one case-bound Manager decision, controlled recovery, and verified 20/20 delivery and billing. |
 
 ## What a judge should verify
 
-1. `make judge-demo` succeeds from the current checkout and reports a clean
-   regeneration rather than only reading a stale result.
-2. The Dashboard renders exactly 100 API-backed unit records and the Agent Workspace
+1. `make judge-demo` succeeds from the current checkout, verifies the manifest's
+   SHA-256 binding to the raw live API capture, and checks cross-source release invariants.
+2. The Dashboard renders the exact 20-unit API-backed order state and the Investigation workspace
    exposes actual Strands tool calls, evidence IDs, handoffs, and ordered event sequence.
-3. The lifecycle shows two different actions and roles, authoritative after-reads,
-   verification, and replay delta `0`.
-4. The real role chat is read-only and cannot approve or execute; local synthetic
-   recovery requires two distinct simulated role principals and fails closed when the
-   live stream or authoritative lifecycle is absent.
+3. The primary lifecycle shows one declared Manager approve or reject the bound plan,
+   followed by scoped ERPNext demo-tenant effects, authoritative after-reads,
+   independent Celigo receipt verification. Deterministic tests separately cover replay safety.
+4. The real Agent is read-only and cannot approve or execute. The legacy two-role
+   Authority-B harness is regression evidence, not a second primary product flow.
 
 ## Claims intentionally withheld
 
-Do not score or repeat this package as proof of stable real Nova usefulness, AgentCore
+Do not score or repeat this package as proof of production-model accuracy, AgentCore
 Gateway or Policy behavior, production impact, production data, or public submission
-readiness. Runtime deployment, invocation, and observability are proven only within
-the redacted evidence boundary; stable model usefulness and production outcomes are
-explicitly `NOT_PROVEN` or pending a human gate.
+readiness. The latest UI path uses direct Strands Bedrock transport; AgentCore Runtime
+deployment/invocation/observability are proven separately within the redacted boundary.

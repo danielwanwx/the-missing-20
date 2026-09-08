@@ -1,6 +1,6 @@
 # Human-Governed Live Case Console Design
 
-**Status:** approved by the project owner on 2026-09-04  
+**Status:** approved by the project owner on 2026-09-04
 **Scope:** make the case console visibly human-governed while preserving autonomous,
 read-only investigation and deterministic recovery controls.
 

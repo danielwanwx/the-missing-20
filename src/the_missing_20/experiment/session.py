@@ -91,8 +91,9 @@ BASE_TIME = datetime(2026, 8, 28, 0, 0, tzinfo=UTC)
 SIGNING_KEY = b"missing20-local-experiment-only"
 DEFAULT_FIXTURE_RELATIVE = Path("fixtures/scenarios/retryable-document-lock.json")
 HEALTHY_FIXTURE_RELATIVE = Path("fixtures/scenarios/healthy-flow.json")
-TELEMETRY_INTERVAL_SECONDS = 4.0
+TELEMETRY_INTERVAL_SECONDS = 1.5
 TELEMETRY_WINDOW_SIZE = 20
+FLOW_RUN_OBSERVATIONS = 10
 
 # Case Console actions are deliberately a small, typed vocabulary.  The browser
 # may render labels, but it must dispatch by these stable identifiers rather than
@@ -199,9 +200,7 @@ class _SessionAgentEventSink(AgentEventSink):
                 stage=event.stage,
                 existing=payload.get("provider_metadata"),
                 error_code=(
-                    str(payload["error_code"])
-                    if payload.get("error_code") is not None
-                    else None
+                    str(payload["error_code"]) if payload.get("error_code") is not None else None
                 ),
             )
         self._session._append(
@@ -245,6 +244,7 @@ class ExperimentSession:
         auto_start: bool = False,
         auto_start_after_detection: bool = False,
         telemetry_enabled: bool = False,
+        telemetry_autostart: bool = True,
         defer_detection: bool = False,
         telemetry_clock: Callable[[], datetime] | Any | None = None,
         provider_mode: AgentProvider | str | None = None,
@@ -310,6 +310,7 @@ class ExperimentSession:
         # to the same public ledger.  It never mutates business records or case
         # state; its only purpose is to make the connected source visibly alive.
         self._telemetry_enabled = telemetry_enabled
+        self._telemetry_autostart = telemetry_autostart
         # Normal-flow capture time is wall-clock arrival time, independent of the
         # deterministic lifecycle clock used for case/event transitions. Tests may
         # inject a callable or a clock object with ``now()`` to avoid sleeping.
@@ -326,6 +327,7 @@ class ExperimentSession:
         self._auto_start_after_detection = auto_start_after_detection
         self._intents: dict[str, AuthorizationIntent] = {}
         self._command_results: dict[str, dict[str, Any]] = {}
+        self._execution_workers: dict[str, Thread] = {}
 
         self.ledger = PublicEventLedger(self.data_directory / "public-events.sqlite")
         self._agent_event_sink = _SessionAgentEventSink(self)
@@ -361,8 +363,16 @@ class ExperimentSession:
         self._recover_persisted_source_transition()
         self._ensure_detection()
         self._restore_telemetry_index()
-        if self._telemetry_enabled:
+        if self._telemetry_enabled and self._telemetry_autostart:
             self._start_telemetry()
+        elif self._telemetry_enabled and self._telemetry_index == 0:
+            self.publish_telemetry(
+                trigger={
+                    "kind": "external_source_baseline",
+                    "source_system": "authoritative-enterprise",
+                    "change_count": 0,
+                }
+            )
         if auto_start:
             self.start_investigation()
 
@@ -408,7 +418,13 @@ class ExperimentSession:
             return
         # Publish the first observation before returning the scenario snapshot so
         # the first browser paint already has a real stream record to render.
-        self.publish_telemetry()
+        self.publish_telemetry(
+            trigger={
+                "kind": "periodic_capture",
+                "source_system": "synthetic-enterprise",
+                "change_count": 0,
+            }
+        )
         self._telemetry_thread = Thread(
             target=self._telemetry_worker,
             name=f"missing20-telemetry-{self.incident_id}",
@@ -421,7 +437,13 @@ class ExperimentSession:
 
         while not self._telemetry_stop.wait(TELEMETRY_INTERVAL_SECONDS):
             try:
-                self.publish_telemetry()
+                self.publish_telemetry(
+                    trigger={
+                        "kind": "periodic_capture",
+                        "source_system": "synthetic-enterprise",
+                        "change_count": 0,
+                    }
+                )
             except (OSError, ValueError):
                 # A temporary/session database failure must not spin a busy
                 # producer.  The browser will surface a disconnected stream and
@@ -437,7 +459,53 @@ class ExperimentSession:
             thread.join(timeout=2)
         self._telemetry_thread = None
 
-    def publish_telemetry(self) -> PublicIncidentEvent | None:
+    def _staged_flow_projection(
+        self,
+        *,
+        observation_index: int,
+        enterprise: Any,
+        counts: dict[str, int],
+    ) -> dict[str, Any]:
+        """Project one deterministic, ledger-backed pass through the four stages.
+
+        Healthy operations continuously open a new 100-unit flow window after
+        the previous window has completed and rested for two observations.  A
+        faulted incident never cycles: its current run advances to the
+        authoritative 100/100/80/80 terminal state and then holds there.
+        """
+
+        faulted = counts["queue_failed"] > 0
+        if faulted:
+            run_number = 1
+            run_observation = min(observation_index, FLOW_RUN_OBSERVATIONS)
+        else:
+            run_number = ((observation_index - 1) // FLOW_RUN_OBSERVATIONS) + 1
+            run_observation = ((observation_index - 1) % FLOW_RUN_OBSERVATIONS) + 1
+        limits = {
+            "warehouse": counts["total"],
+            "message_queue": counts["total"],
+            "erp": counts["erp_recorded"],
+            "invoice": min(int(enterprise.invoice.quantity), counts["erp_recorded"]),
+        }
+        lags = {"warehouse": 0, "message_queue": 1, "erp": 2, "invoice": 3}
+        stage_counts = {
+            stage: min(
+                limit,
+                max(0, run_observation - lags[stage]) * TELEMETRY_WINDOW_SIZE,
+            )
+            for stage, limit in limits.items()
+        }
+        return {
+            "flow_run_id": f"{self.incident_id}:flow:{run_number:06d}",
+            "flow_run_observation_index": run_observation,
+            "stage_counts": stage_counts,
+            "flow_run_complete": all(stage_counts[key] == limit for key, limit in limits.items()),
+            "authoritative": True,
+        }
+
+    def publish_telemetry(
+        self, *, trigger: dict[str, Any] | None = None
+    ) -> PublicIncidentEvent | None:
         """Read enterprise truth and append one normal-flow telemetry event.
 
         The observation is deliberately not a synthetic UI tick: all business
@@ -460,13 +528,31 @@ class ExperimentSession:
             counts = self._unit_counts(enterprise)
             self._telemetry_index += 1
             observation_index = self._telemetry_index
+            trigger_payload = trigger or {
+                "kind": "explicit_capture",
+                "source_system": "authoritative-enterprise",
+                "change_count": 0,
+            }
+            source_driven = trigger_payload.get("kind") in {
+                "external_source_baseline",
+                "external_scenario_change",
+            }
             recorded_ids = tuple(
                 item.unit_id
                 for item in enterprise.supply_units
                 if item.status is SupplyUnitStatus.ERP_RECORDED
             )
-            if recorded_ids:
-                window_size = min(TELEMETRY_WINDOW_SIZE, len(recorded_ids))
+            if source_driven:
+                requested_window = int(trigger_payload.get("change_count") or 0)
+                observed_unit_ids = recorded_ids[-requested_window:] if requested_window else ()
+            elif recorded_ids:
+                # A real rolling window is not a metronome. Keep the source
+                # deterministic for tests while varying the observed batch
+                # size so throughput, sparklines, and activity visibly react
+                # to changing backend records instead of replaying 20 forever.
+                window_pattern = (13, 21, 17, 26, 19, 24, 16, 22)
+                requested_window = window_pattern[(observation_index - 1) % len(window_pattern)]
+                window_size = min(requested_window, len(recorded_ids))
                 offset = ((observation_index - 1) * window_size) % len(recorded_ids)
                 observed_unit_ids = tuple(
                     recorded_ids[(offset + index) % len(recorded_ids)]
@@ -479,10 +565,29 @@ class ExperimentSession:
             # dashboard cannot mistake a recycled order item for throughput.
             batch_id = f"{self.incident_id}:flow-batch:{observation_index:06d}"
             batch_record_ids = tuple(
-                f"{batch_id}:record:{index:03d}"
-                for index in range(len(observed_unit_ids))
+                f"{batch_id}:record:{index:03d}" for index in range(len(observed_unit_ids))
             )
             observed_record_count = len(batch_record_ids)
+            staged_flow = (
+                {
+                    "flow_run_id": f"{self.incident_id}:source-version:{observation_index:06d}",
+                    "flow_run_observation_index": observation_index,
+                    "stage_counts": {
+                        "warehouse": counts["total"],
+                        "message_queue": counts["total"],
+                        "erp": counts["erp_recorded"],
+                        "invoice": min(int(enterprise.invoice.quantity), counts["erp_recorded"]),
+                    },
+                    "flow_run_complete": counts["queue_failed"] == 0,
+                    "authoritative": True,
+                }
+                if source_driven
+                else self._staged_flow_projection(
+                    observation_index=observation_index,
+                    enterprise=enterprise,
+                    counts=counts,
+                )
+            )
             return self._append(
                 PublicEventType.TELEMETRY_OBSERVED,
                 actor="synthetic-enterprise-source",
@@ -504,6 +609,7 @@ class ExperimentSession:
                     "observed_record_count": observed_record_count,
                     "window_record_count": observed_record_count,
                     "observed_unit_ids": list(observed_unit_ids),
+                    "trigger": trigger_payload,
                     # Kept as a compatibility alias for older consumers. Charts
                     # must use the authoritative unit_counts fields below, not
                     # this bounded observation-window size.
@@ -515,8 +621,31 @@ class ExperimentSession:
                     # invoice state from ERP state.
                     "invoice_count": enterprise.invoice.quantity,
                     "unit_counts": counts,
+                    **staged_flow,
                 },
             )
+
+    def record_external_source_change(
+        self, *, source_id: str, source_sequence: int, change: dict[str, Any]
+    ) -> PublicIncidentEvent:
+        """Append one provider-version change to the shared ordered ledger."""
+
+        return self._append(
+            PublicEventType.EXTERNAL_SOURCE_CHANGED,
+            actor=source_id,
+            status=str(change.get("status") or "CHANGED"),
+            case_version=self._current_case_version(),
+            correlation_id=self.trace_id,
+            idempotency_key=f"external-source:{source_id}:{source_sequence}",
+            payload={
+                **change,
+                "trigger": {
+                    "kind": "external_source_change",
+                    "source_system": source_id,
+                    "change_count": int(change.get("change_count") or 0),
+                },
+            },
+        )
 
     def _source_condition_committed(self) -> bool:
         """Return whether Scenario Lab has recorded its source transaction."""
@@ -590,9 +719,7 @@ class ExperimentSession:
             updated_at=BASE_TIME,
         )
 
-    def _append_source_condition_event(
-        self, outbox: SourceConditionOutbox
-    ) -> PublicIncidentEvent:
+    def _append_source_condition_event(self, outbox: SourceConditionOutbox) -> PublicIncidentEvent:
         """Publish the exact immutable source envelope, idempotently."""
 
         return self._append(
@@ -722,8 +849,8 @@ class ExperimentSession:
         genesis = DetectionGenesis(
             case_id=self.case_id,
             trace_id=self.trace_id,
-                fixture_path="fixtures/scenarios/healthy-flow.json",
-                fixture_digest=hashlib.sha256(self.fixture_path.read_bytes()).hexdigest(),
+            fixture_path="fixtures/scenarios/healthy-flow.json",
+            fixture_digest=hashlib.sha256(self.fixture_path.read_bytes()).hexdigest(),
             initial_case_json=case.model_dump_json(),
             detection_facts={
                 "ordered_quantity": snapshot.purchase_order.ordered_quantity,
@@ -785,7 +912,14 @@ class ExperimentSession:
             # Capture the post-fault source state immediately so the browser has
             # an ordered 100/100/0 -> 100/80/20 transition even before the
             # background cadence emits its next observation.
-            self.publish_telemetry()
+            self.publish_telemetry(
+                trigger={
+                    "kind": "external_scenario_change",
+                    "source_system": "scenario-lab",
+                    "source_record_id": outbox.post_state.failed_message.message_id,
+                    "change_count": len(outbox.affected_unit_ids),
+                }
+            )
             return event
 
     def _mark_investigation_started(self) -> None:
@@ -929,9 +1063,7 @@ class ExperimentSession:
             if self._awaiting_source_condition() or self._source_transition_pending():
                 raise QuorumDenied("source condition must be injected before investigation")
             if self._advisory_terminally_degraded():
-                raise QuorumDenied(
-                    "advisory workflow is durably degraded; start a fresh incident"
-                )
+                raise QuorumDenied("advisory workflow is durably degraded; start a fresh incident")
             if self.store.get_case(self.case_id).status is CaseStatus.CLOSED:
                 raise QuorumDenied(
                     "closed incident can only replay its existing investigation ledger"
@@ -1755,7 +1887,41 @@ class ExperimentSession:
             quorum=self._quorum,
             clock=self._clock,
         )
-        effects_before = len(self.enterprise.read_snapshot().business_effects)
+        self._append_once(
+            PublicEventType.SOURCE_READ_STARTED,
+            actor="controlled-executor",
+            status="RUNNING",
+            case_version=self._current_case_version(),
+            correlation_id=execution_id,
+            idempotency_key=f"experiment:source-read-started:{slug}",
+            payload={"source": "Queue · ERP · Invoice", "execution_id": execution_id},
+        )
+        source_snapshot = self.enterprise.read_snapshot()
+        source_counts = self._unit_counts(source_snapshot)
+        self._append_once(
+            PublicEventType.SOURCE_READ_COMPLETED,
+            actor="controlled-executor",
+            status="COMPLETE",
+            case_version=self._current_case_version(),
+            correlation_id=execution_id,
+            idempotency_key=f"experiment:source-read-completed:{slug}",
+            payload={
+                "source": "Queue · ERP · Invoice",
+                "execution_id": execution_id,
+                "record_count": source_counts["total"],
+                "duration_ms": 0,
+            },
+        )
+        effects_before = len(source_snapshot.business_effects)
+        self._append_once(
+            PublicEventType.EFFECT_STARTED,
+            actor="controlled-executor",
+            status="RUNNING",
+            case_version=self._current_case_version(),
+            correlation_id=execution_id,
+            idempotency_key=f"experiment:effect-started:{slug}",
+            payload={"execution_id": execution_id, "tool": intent.tool.value},
+        )
         try:
             receipt, _ = executor.execute(
                 grant,
@@ -1795,6 +1961,19 @@ class ExperimentSession:
             # The synthetic enterprise is append-only.  A negative delta means
             # the replay proof is malformed and must never be presented as safe.
             raise QuorumDenied("replay effect count moved backwards")
+        self._append_once(
+            PublicEventType.EFFECT_COMPLETED,
+            actor="controlled-executor",
+            status="COMMITTED",
+            case_version=self._current_case_version(),
+            correlation_id=execution_id,
+            idempotency_key=f"experiment:effect-completed:{slug}",
+            payload={
+                "execution_id": execution_id,
+                "tool": intent.tool.value,
+                "effect_count": effects_after_first,
+            },
+        )
         self._append(
             PublicEventType.EXECUTION_COMPLETED,
             actor="controlled-executor",
@@ -1814,7 +1993,21 @@ class ExperimentSession:
                 "replay_effect_delta": replay_effect_delta,
             },
         )
+        self._append_once(
+            PublicEventType.VERIFICATION_STARTED,
+            actor="deterministic-verifier",
+            status="RUNNING",
+            case_version=self._current_case_version(),
+            correlation_id=execution_id,
+            idempotency_key=f"experiment:verification-started:{slug}",
+            payload={"execution_id": execution_id, "source": "Queue · ERP · Invoice"},
+        )
         final_snapshot = self.enterprise.read_snapshot()
+        # The verification-completed event is the browser's durable readiness
+        # boundary. Admit the fresh post-effect evidence first so the next
+        # manager action cannot observe a completed verification while this
+        # execution is still writing its evidence packet.
+        self._refresh_evidence()
         self._append(
             PublicEventType.VERIFICATION_COMPLETED,
             actor="deterministic-verifier",
@@ -1833,10 +2026,59 @@ class ExperimentSession:
                 "replay_same_receipt": replay_receipt == receipt,
             },
         )
-        self._refresh_evidence()
         response = self.snapshot()
         self._command_results[idempotency_key] = response
         return response
+
+    def accept_execution(self, *, intent_id: str, idempotency_key: str) -> dict[str, Any]:
+        """Accept one approved execution and complete it on a bounded worker."""
+
+        intent = self._load_intent(intent_id)
+        if intent is None:
+            raise QuorumDenied("unknown authorization intent")
+        slug = intent.tool.value.replace("_", "-")
+        execution_id = f"execution:{self.incident_id}:{slug}"
+        grant = self._quorum.get_grant(intent_id)
+        status = self._quorum.get_intent(intent_id).status
+        if grant is None or status not in {QuorumStatus.GRANTED, QuorumStatus.CONSUMED}:
+            raise QuorumDenied("Manager approval is required before execution")
+        self._append_execution_started(
+            intent_id=intent_id,
+            execution_id=execution_id,
+            tool=intent.tool.value,
+            slug=slug,
+        )
+        worker = self._execution_workers.get(execution_id)
+        if worker is None or not worker.is_alive():
+            worker = Thread(
+                target=self._execution_worker,
+                kwargs={
+                    "intent_id": intent_id,
+                    "idempotency_key": idempotency_key,
+                    "execution_id": execution_id,
+                },
+                name=f"missing20-execution-{slug}",
+                daemon=True,
+            )
+            self._execution_workers[execution_id] = worker
+            worker.start()
+        return {
+            **self.snapshot(),
+            "command": "execution_accepted",
+            "accepted": True,
+            "execution_id": execution_id,
+            "intent_id": intent_id,
+        }
+
+    def _execution_worker(self, *, intent_id: str, idempotency_key: str, execution_id: str) -> None:
+        try:
+            self.execute_decision(intent_id=intent_id, idempotency_key=idempotency_key)
+        except Exception:
+            # execute_decision persists the bounded blocked event. The SSE stream
+            # is the authoritative error projection for the browser.
+            pass
+        finally:
+            self._execution_workers.pop(execution_id, None)
 
     def _append_execution_started(
         self,
@@ -1878,6 +2120,39 @@ class ExperimentSession:
             },
         )
 
+    def _append_once(
+        self,
+        event_type: PublicEventType,
+        *,
+        actor: str,
+        status: str,
+        case_version: int,
+        correlation_id: str,
+        idempotency_key: str,
+        payload: dict[str, Any] | None = None,
+    ) -> PublicIncidentEvent:
+        """Append a display event once and reuse it across crash recovery."""
+
+        prior = next(
+            (
+                event
+                for event in self.ledger.all_events(self.incident_id)
+                if event.idempotency_key == idempotency_key
+            ),
+            None,
+        )
+        if prior is not None:
+            return prior
+        return self._append(
+            event_type,
+            actor=actor,
+            status=status,
+            case_version=case_version,
+            correlation_id=correlation_id,
+            idempotency_key=idempotency_key,
+            payload=payload,
+        )
+
     def chat(
         self,
         question: str,
@@ -1895,9 +2170,7 @@ class ExperimentSession:
         ):
             raise QuorumDenied("case console is available after a source incident is detected")
         if self._advisory_terminally_degraded():
-            raise QuorumDenied(
-                "advisory workflow is durably degraded; start a fresh incident"
-            )
+            raise QuorumDenied("advisory workflow is durably degraded; start a fresh incident")
         command_seen = self._register_command(
             idempotency_key=idempotency_key,
             command_kind="chat",
@@ -2018,13 +2291,13 @@ class ExperimentSession:
             item.evidence_id
             for item in latest_evidence
             if item.source_type
-                in {
+            in {
                 EvidenceSourceType.FAILED_MESSAGE_QUEUE,
                 EvidenceSourceType.ERP_RECEIPT,
                 EvidenceSourceType.WAREHOUSE,
                 EvidenceSourceType.INVOICE,
                 EvidenceSourceType.MATERIAL_DOCUMENT,
-                }
+            }
         ]
         if chat_run is not None:
             citations = [
@@ -2051,9 +2324,8 @@ class ExperimentSession:
             )
         )
         next_step_question = "next" in lowered
-        retryable_question = (
-            "retryable" in lowered
-            and any(word in lowered for word in ("evidence", "queue", "message", "prove"))
+        retryable_question = "retryable" in lowered and any(
+            word in lowered for word in ("evidence", "queue", "message", "prove")
         )
         status_proof_next_question = (
             status_question
@@ -2197,8 +2469,10 @@ class ExperimentSession:
                     )
                 )
             intent = "explain_evaluator_decision"
-        elif not intent and "compare" not in lowered and any(
-            word in lowered for word in ("why", "reason", "cause", "hypothesis")
+        elif (
+            not intent
+            and "compare" not in lowered
+            and any(word in lowered for word in ("why", "reason", "cause", "hypothesis"))
         ):
             if run is None:
                 answer = "The investigator session is unavailable; no hypothesis is authoritative."
@@ -2350,7 +2624,8 @@ class ExperimentSession:
                 ),
             }
             for event in events
-            if event.get("event_type") in {
+            if event.get("event_type")
+            in {
                 PublicEventType.INCIDENT_DETECTED.value,
                 PublicEventType.VERIFICATION_COMPLETED.value,
             }
@@ -2402,9 +2677,7 @@ class ExperimentSession:
                     # Source rows may already be 80/20 while their outbox event
                     # is waiting for a public-ledger retry. Keep that state
                     # truthful and explicitly distinguish it from detection.
-                    case = self._source_transition_case_projection(
-                        enterprise, case_id=self.case_id
-                    )
+                    case = self._source_transition_case_projection(enterprise, case_id=self.case_id)
                 elif not self._awaiting_source_condition():
                     raise
                 else:
@@ -2421,9 +2694,7 @@ class ExperimentSession:
             unit_rows = [_json(item) for item in enterprise.supply_units]
             event_rows = [_json(item) for item in events]
             telemetry_events = tuple(
-                event
-                for event in events
-                if event.event_type is PublicEventType.TELEMETRY_OBSERVED
+                event for event in events if event.event_type is PublicEventType.TELEMETRY_OBSERVED
             )
             latest_telemetry = telemetry_events[-1] if telemetry_events else None
             telemetry_history = [
@@ -2933,6 +3204,7 @@ class ExperimentRegistry:
         *,
         data_directory: Path | None = None,
         provider_mode: AgentProvider | str | None = None,
+        periodic_telemetry_enabled: bool = True,
     ) -> None:
         self.repository_root = repository_root.resolve()
         self.data_directory = (
@@ -2944,6 +3216,7 @@ class ExperimentRegistry:
         self.provider_mode = AgentProvider.parse(
             provider_mode or os.environ.get("MISSING20_AGENT_PROVIDER", "scripted")
         )
+        self.periodic_telemetry_enabled = periodic_telemetry_enabled
         self._incident_generation = 0
         # Scenario selection is a server-side control-plane state. The browser
         # also persists the selected scenario and exact incident ID in its URL,
@@ -2982,6 +3255,10 @@ class ExperimentRegistry:
                     incident_id=incident_id,
                     defer_detection=deferred,
                     telemetry_enabled=deferred,
+                    # Opening history never restarts the telemetry producer.
+                    # The detector may still finish a crash-interrupted handoff;
+                    # every command remains guarded by the durable ledger.
+                    telemetry_autostart=False,
                     auto_start_after_detection=deferred,
                     provider_mode=self.provider_mode,
                 )
@@ -2993,6 +3270,7 @@ class ExperimentRegistry:
                 incident_id=incident_id,
                 fixture_path=self.repository_root / "fixtures/scenarios/healthy-flow.json",
                 telemetry_enabled=True,
+                telemetry_autostart=self.periodic_telemetry_enabled,
                 provider_mode=self.provider_mode,
             )
             self._sessions[incident_id] = session
@@ -3006,9 +3284,10 @@ class ExperimentRegistry:
         while True:
             self._incident_generation += 1
             incident_id = f"missing-20-001-run-{self._incident_generation}"
-            if incident_id not in self._sessions and not (
-                self.data_directory / incident_id
-            ).exists():
+            if (
+                incident_id not in self._sessions
+                and not (self.data_directory / incident_id).exists()
+            ):
                 self._scenario_candidate_id = incident_id
                 return incident_id
 
@@ -3026,9 +3305,10 @@ class ExperimentRegistry:
             while True:
                 self._incident_generation += 1
                 incident_id = f"missing-20-001-run-{self._incident_generation}"
-                if incident_id not in self._sessions and not (
-                    self.data_directory / incident_id
-                ).exists():
+                if (
+                    incident_id not in self._sessions
+                    and not (self.data_directory / incident_id).exists()
+                ):
                     break
         elif incident_id in self._sessions or (self.data_directory / incident_id).exists():
             raise ScenarioTransitionDenied("incident ID is already registered")
@@ -3038,6 +3318,7 @@ class ExperimentRegistry:
             incident_id=incident_id,
             defer_detection=defer_detection,
             telemetry_enabled=telemetry_enabled,
+            telemetry_autostart=self.periodic_telemetry_enabled,
             auto_start_after_detection=auto_start_after_detection,
             provider_mode=self.provider_mode,
         )
@@ -3079,11 +3360,15 @@ class ExperimentRegistry:
         """Explicitly reset selection to the healthy flow without deleting history."""
 
         with self._lock:
+            was_normal = self._active_scenario == "normal"
             self._active_scenario = "normal"
             self._active_incident_id = "missing-20-normal"
             # A subsequent Incident gets a new candidate; prior runs remain
-            # durable and inspectable through their exact IDs.
-            self._scenario_candidate_id = None
+            # durable and inspectable through their exact IDs. Re-selecting an
+            # already active Normal view is idempotent and must not invalidate
+            # the candidate ID a reviewer just received from the catalog.
+            if not was_normal:
+                self._scenario_candidate_id = None
             return self.get("missing-20-normal")
 
     def select_incident(self, *, requested_incident_id: str | None = None) -> ExperimentSession:
@@ -3091,9 +3376,7 @@ class ExperimentRegistry:
 
         with self._lock:
             if self._active_scenario != "normal":
-                raise ScenarioTransitionDenied(
-                    "return to Normal before starting another incident"
-                )
+                raise ScenarioTransitionDenied("return to Normal before starting another incident")
             candidate_id = self._reserve_incident_id_locked()
             if requested_incident_id and requested_incident_id != candidate_id:
                 raise ScenarioTransitionDenied("incident ID does not match the scenario catalog")
@@ -3116,9 +3399,7 @@ class ExperimentRegistry:
 
         with self._lock:
             if self._active_scenario != "normal":
-                raise ScenarioTransitionDenied(
-                    "return to Normal before starting another incident"
-                )
+                raise ScenarioTransitionDenied("return to Normal before starting another incident")
             session = self._new_incident_locked(defer_detection=True, telemetry_enabled=True)
             session.inject_source_condition()
             self._active_scenario = "golden"
@@ -3163,7 +3444,25 @@ class ExperimentRegistry:
         """Return the newest closed run whose verification is authoritative."""
 
         with self._lock:
-            for session in reversed(tuple(self._sessions.values())):
+            persisted_ids = sorted(
+                (
+                    path.name
+                    for path in self.data_directory.iterdir()
+                    if path.is_dir() and path.name.startswith("missing-20-001-run-")
+                ),
+                key=lambda incident_id: (self.data_directory / incident_id).stat().st_mtime_ns,
+                reverse=True,
+            )
+            ordered: list[ExperimentSession] = list(reversed(tuple(self._sessions.values())))
+            known = {session.incident_id for session in ordered}
+            for incident_id in persisted_ids:
+                if incident_id in known:
+                    continue
+                try:
+                    ordered.append(self.get(incident_id))
+                except (EventLedgerError, LookupError, OSError, ValueError):
+                    continue
+            for session in ordered:
                 snapshot = session.snapshot()
                 if (
                     snapshot.get("incident", {}).get("status") == "CLOSED"

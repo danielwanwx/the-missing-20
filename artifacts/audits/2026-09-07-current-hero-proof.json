@@ -1,0 +1,82 @@
+{
+  "schema_version": "missing20-public-hero-proof/v1",
+  "captured_at": "2026-09-07T22:07:00.527211+00:00",
+  "source_capture": {
+    "path": "artifacts/audits/2026-09-07-current-hero-live-snapshot.json",
+    "endpoint": "/api/v1/agent-platform",
+    "sha256": "3626c7fefeb442ce80991b3d5ed3bdd9d60f8d2842ec80540c01baca1e921628",
+    "contains_raw_provider_projection": true
+  },
+  "environment": {
+    "business_data": "purpose-built competition records",
+    "erp_scope": "isolated external ERPNext demo tenant",
+    "source_provenance": "live-read",
+    "provider_writes": "DEMO_GUARDED"
+  },
+  "case": {
+    "case_id": "M20-ECU-2026-00011-LOT-A",
+    "purchase_order": "PUR-ORD-2026-00011",
+    "purchase_receipt": "MAT-PRE-2026-00001",
+    "purchase_invoice": "ACC-PINV-2026-00007",
+    "supplier_lot": "ECU-2026-LOT-A",
+    "quality_release_quantity": 8.0,
+    "currency": "USD"
+  },
+  "agent": {
+    "runtime": "real_strands",
+    "provider": "bedrock",
+    "model": "us.amazon.nova-pro-v1:0",
+    "region": "us-west-2",
+    "tool_calls": [
+      "read_control_context",
+      "read_erp_evidence",
+      "read_airtable_evidence",
+      "read_celigo_evidence",
+      "read_collaboration_evidence",
+      "reconcile_source_records"
+    ],
+    "sdk_hook_events": 22,
+    "request_count": 3,
+    "input_tokens": 12475,
+    "output_tokens": 1409,
+    "incremental_cost_usd": 0.0144888,
+    "disposition": "RECOVERY_READY",
+    "write_performed": false
+  },
+  "approval": {
+    "approval_id": "m20-approval-0007",
+    "manager_id": "M20 Demo Manager",
+    "plan_digest": "8bb09f293e6cff13e1335e8a3b812199be517c28fb644bbbd80bc4490a8e2f05",
+    "scope": "M20_DEMO_RECOVERY_AND_CUSTOMER_FULFILLMENT",
+    "run_id": "agent-run-0007"
+  },
+  "execution": {
+    "status": "VERIFIED",
+    "provenance": "live-provider-write",
+    "idempotency_key": "m20-order-to-cash-20260907-final",
+    "quality_release_transfer": "MAT-STE-2026-00001",
+    "sales_order": "SAL-ORD-2026-00006",
+    "delivery_note": "MAT-DN-2026-00001",
+    "sales_invoice": "ACC-SINV-2026-00006",
+    "celigo_receipt": "6a99e57c1d35fb241cec8ad6",
+    "erp_verified": true,
+    "order_to_cash_verified": true
+  },
+  "verified_postconditions": {
+    "available_quantity": 20.0,
+    "delivered_quantity": 20.0,
+    "customer_order_status": "Completed",
+    "customer_billed_revenue": 42000.0,
+    "supplier_invoice_status": "OPEN",
+    "working_capital_at_risk": 0.0,
+    "stock_ledger_balanced": true,
+    "general_ledger_balanced": true,
+    "integration_receipt_status": "VERIFIED"
+  },
+  "claim_boundary": {
+    "production_data": false,
+    "production_accuracy_proven": false,
+    "causal_revenue_increase_proven": false,
+    "agentcore_gateway_or_policy_proven": false
+  }
+}

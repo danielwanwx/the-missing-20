@@ -1,80 +1,58 @@
-# The Missing 20 — Five-Minute Judge Demo
+# The Missing 20 — Five-Minute Demo Script
 
-**Development status:** ready to be judged locally; video and Devpost submission are not ready.
-**Data:** synthetic only.
-**Runtime:** local synthetic incident API, ordered SSE ledger, Dashboard, and Agent
-Workspace; no AWS/provider call is made by the demo runner. A separate redacted
-artifact records the configured real AgentCore Runtime deployment/invocation boundary,
-real Nova advisory run, and read-only role chat; the default offline path does not call
-that provider.
+**Target length:** 4:35–4:50.
+**Primary path:** Dashboard → Investigation → Manager decision → verified closure.
+**Disclosure:** all enterprise records are purpose-built demo data. The hero path reads
+and writes an isolated ERPNext/Frappe Cloud tenant, invokes Strands/Nova, and reads
+correlated SaaS records; AgentCore Runtime remains separate redacted deployment proof.
 
-## Before the timer
+## Story in one sentence
 
-From the repository root, run:
+Five enterprise systems disagree about twenty units; a Strands agent correlates the
+evidence, a deterministic control plane constrains the remedy, one Manager keeps the
+stop-or-release decision, and an authoritative reread proves whether the fix worked.
 
-```bash
-make judge-demo
-```
+## Timed script
 
-The command performs a clean-state regeneration in a temporary directory and validates
-the persisted audit. It does not trust a stale successful JSON artifact. To inspect
-the interactive UI, run:
+| Time | Screen and action | Spoken narration |
+| --- | --- | --- |
+| 0:00–0:25 | Open **Dashboard** in the healthy baseline. Let the live sequence and event feed move for several seconds. | “Supply-chain teams rarely have one source of truth. ERP, integration, quality, ticketing, and collaboration tools each hold part of the answer. The Missing 20 turns those disconnected facts into one live, human-controlled investigation loop.” |
+| 0:25–0:50 | Open the linked ERPNext record, apply the prepared demo exception, and return to the Dashboard. | “Twenty controllers physically arrived. Twelve entered Stores and eight remain quality-held, while a USD 42,000 customer order is still undelivered and unbilled. That is the symptom—not the diagnosis. The external demo-tenant source change is what advances this Dashboard and its ordered backend ledger.” |
+| 0:50–1:20 | Point to live movement, system states, working capital, the held USD 42,000 customer order, and the scrolling event feed. Click one source node to expose its parameters and external-system link. | “ERPNext records the receipt and customer order. Airtable carries the exact-lot quality disposition. Celigo carries an integration attempt and independent receipt. Jira and Slack add operating context, but cannot prove the root cause. USD 42,000 remains explicitly labeled as counterfactual revenue at risk—not revenue earned.” |
+| 1:20–1:45 | Click **Investigation**. Ask: “Why is this not a physical shortage, and what must be reread before any retry?” | “Before starting a model run, an operator can question the evidence agent. The answer is case-scoped, cites the source records it used, and has no approval or write capability.” |
+| 1:45–2:35 | Click **Authorize diagnosis**. Let the trace advance. Highlight Observe → Retrieve → Reconcile → Evaluate → Decide, bounded source tools, SDK hooks, and changing metrics. | “Now the Strands loop runs six bounded read and reconciliation tools for this case. It reconciles business keys and quantities, tests competing causes, records tool calls and evaluator feedback, and streams every state transition. This is not a pre-baked animation—the visible sequence, events, tools, latency, tokens, and evidence all come from the backend run.” |
+| 2:35–3:10 | Expand the diagnosis and evidence. Ask a follow-up such as: “What exact recovery scope is safe, and what would make you stop?” | “The agent rules out physical shortage and duplicate receipt, proves that the exact eight-unit lot is eligible for release, and binds the remaining customer fulfillment scope. It also explains the stop conditions: stale evidence, a conflicting business key, an unapproved lot, or an incomplete ledger read. The model recommends; deterministic policy independently decides whether the packet is admissible.” |
+| 3:10–3:35 | Show **Manager decision**. Briefly show Reject as an available human path, then choose **Approve & execute** for the hero run. | “The system knows when to stop for a human. One Manager reviews a packet bound to this case version, evidence tuple, plan digest, scope, and idempotency key. Reject creates no effect. Approve writes only the exact M20-scoped records in the isolated ERPNext demo tenant.” |
+| 3:35–4:10 | Watch execution and verification. Return to Dashboard when it reaches verified. Open the Sales Invoice from the metric inspector. | “The executor applies the bounded eight-unit quality release, resumes the exact customer order, and creates its delivery and sales invoice. The case closes only after fresh ERPNext document, stock-ledger, GL, and Celigo receipt reads verify the effects. USD 42,000 now changes from revenue at risk to observed billed revenue.” |
+| 4:10–4:35 | Show the interactive architecture for 15–20 seconds. | “The reusable pattern is the product: connectors and read tools on the left; Strands investigation and AgentCore advisory runtime in the middle; deterministic policy, Manager authority, idempotent execution, reread, and an immutable evidence ledger on the right. No model write authority crosses that boundary.” |
+| 4:35–4:50 | End on the verified Dashboard. | “The Missing 20 uses agents where investigation is uncertain, deterministic controls where truth matters, and human review only when a consequential decision is ready. Find the gap. Prove the cause. Close it safely.” |
 
-```bash
-PYTHONPATH=src .venv/bin/python scripts/decision_workspace_server.py
-```
+## Required visible proof
 
-Then open the local root URL printed by the server. The initial page waits for an
-explicit **Start Investigation** click; the same control is available on Dashboard and
-Agent Workspace. The Dashboard receives the same ordered events as the backend and
-renders every unit. Open **Agent Workspace** to watch the paced orchestrator,
-investigators, tools, evidence, and handoffs. Ask the Copilot a question, then point to
-the redacted AgentCore Runtime role-chat proof for the same read-only conversational
-boundary. Prepare
-**Receipt Message Restart**, approve it as the two scripted simulated role principals,
-execute, and verify the 100/100 result. Then prepare the separate **Invoice Release**
-action and approve it again with both simulated role principals; the final gate is
-`VERIFIED · CLOSED` with no inherited quorum. After closure, **Replay Investigation**
-only re-emits the existing immutable ledger; it cannot start a new operational run.
-Operational controls are restricted to local synthetic state; Copilot remains advisory
-and no route can write to an external system. `make m7-audit` runs the direct package
-audit.
+- The live sequence changes and at least three new events enter while the camera stays
+  on Dashboard.
+- Clicking a system opens real identifiers, source status, and an external-system link.
+- The Investigation run visibly changes tools, hooks, stage, latency, token, evidence,
+  and confidence fields.
+- At least two conversational turns remain visible and cite case evidence.
+- The Manager controls are absent before a plan is ready and appear only at the gate.
+- Verification shows the authoritative before/after state. Describe replay safety as
+  deterministic regression coverage, not as a second live attempt.
+- After returning to the healthy Dashboard, Investigation still opens the verified
+  run, six-tool trace, conversation, approval, source receipts, and Resolution Packet.
+- The architecture stays on screen long enough to read the authority boundary.
 
-## Seven timed beats across five visual stages (5:00 maximum)
+## Backup branch
 
-The timer is deliberately fixed and contiguous. Each step names the screen to show,
-what to say, and the evidence boundary a judge should retain.
+If the real provider is unavailable, do not pretend the model completed. Show the
+visible degraded state and say: “The advisory layer is unavailable, so the system does
+not invent a diagnosis or unlock recovery.” Then restart the local controlled hero run.
+Do not spend the primary video switching through every negative mode.
 
-| Time | Step | Show and say | Evidence |
-| --- | --- | --- | --- |
-| 0:00–0:35 | 1. Detect the gap | On **Dashboard**, point to 100 warehouse records, 80 ERP records, and the 20 exact IDs held at the queue; click **Start Investigation** when ready. | `PROVEN`: local API, ordered ledger, lifecycle evidence, detector genesis. |
-| 0:35–1:25 | 2. Investigate in parallel | Open **Agent Workspace**. Watch the paced ordered trace: the Strands orchestrator starts three bounded investigators, which call audited read tools, collect evidence, and hand results to synthesis. | `SCRIPTED_PROVEN`: scripted Strands trace; synthetic only. |
-| 1:25–2:00 | 3. Keep AI advisory | Ask Copilot which evidence proves the gap. “The agent explains and cites; it cannot approve or execute.” Show the redacted Runtime role-chat record as the real-provider counterpart. | AgentCore Runtime deployment/invocation/observability and read-only role chat `PROVEN`; Nova advisory result `PARTIAL` (AI citations 1/5, application validation 5/5); stable usefulness `NOT_PROVEN`. |
-| 2:00–2:35 | 4. Decide deterministically | Choose **Prepare recovery**. “Code checks authoritative facts and permits only a recovery that cannot create a duplicate.” | `PROVEN`: policy, case/version, source and invariant checks. |
-| 2:35–3:35 | 5. Authorize and execute | Approve **Receipt Message Restart** with the two distinct simulated role principals and execute it; then prepare **Invoice Release** and approve that new intent with both principals again. “Neither AI nor one role principal can act alone, and approvals do not carry across actions.” | `PROVEN`: per-action quorum, signed grants, ControlledExecutor, two-effect ledger. |
-| 3:35–4:20 | 6. Verify and replay | Show 100/100 after receipt recovery, then the final `VERIFIED · CLOSED` gate after invoice release. Optionally click **Replay Investigation** to re-emit the immutable investigation ledger; it creates no action or effect. “Each action is reread and executor replay proves no duplicate change.” | `PROVEN`: receipt/effect/snapshot closure for both actions, executor replay delta `0`, and immutable ledger replay. |
-| 4:20–5:00 | 7. State the limits | Switch to `degraded`, then `invalid`. “AI can fail without weakening safety; missing authoritative evidence fails closed.” | Explicit `PROVEN`, `SCRIPTED_PROVEN`, `PARTIAL`, and `NOT_PROVEN`; Gateway/Policy, stable usefulness, and production impact remain unclaimed. |
+## Claims to avoid
 
-## Closing line
-
-“The Missing 20 uses AI where investigation is expensive and uncertain, deterministic
-policy where operational truth matters, and humans where authorization belongs. The
-model can explain a path; only validated facts, policy, a fresh two-role approval for
-each action, controlled execution, verification, and replay can close it.”
-
-## Failure/degradation branch
-
-If the advisory provider is unavailable, switch to `?mode=degraded`. The operational
-projection remains the same deterministic lifecycle, while live investigation, agent
-graph, hypotheses, traces, evidence, and Copilot surfaces are hidden and the failure is
-labeled. If an authoritative lifecycle record is missing or invalid, switch to
-`?mode=invalid`; operational panels are hidden and the page says `UNAVAILABLE`. Neither
-branch invents an approval, effect, pass, or closed state.
-
-## Operator boundary
-
-This run card is a private judging aid. It does not authorize a provider request,
-new cloud deployment, public release, video upload, or Devpost submission. The
-historical Runtime proof is redacted and immutable evidence; the demo runner itself
-uses local synthetic data. The final `ready-to-be-judged` product decision is a human
-gate.
+- Do not describe synthetic records as production customer data.
+- Do not claim AgentCore Gateway or Policy.
+- Do not claim stable production Nova accuracy from one acceptance run.
+- Do not say the primary UI requires two approvers. The legacy Authority-B regression
+  harness is separate from the one-Manager competition interaction.

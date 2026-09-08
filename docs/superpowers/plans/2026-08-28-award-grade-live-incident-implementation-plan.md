@@ -1,6 +1,6 @@
 # Award-Grade Live Incident Implementation Plan
 
-**Design:** `docs/superpowers/specs/2026-08-28-award-grade-live-incident-agentcore-evidence-design.md`  
+**Design:** `docs/superpowers/specs/2026-08-28-award-grade-live-incident-agentcore-evidence-design.md`
 **Delivery model:** small independently verifiable slices; Luna implements, primary agent verifies, independent reviewer gates material milestones.
 
 ## Slice 1: Connected Normal Flow

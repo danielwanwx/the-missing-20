@@ -425,9 +425,7 @@ class SyntheticEnterprise:
             raise EnterprisePreconditionFailed("source transition envelope is malformed") from exc
 
     @classmethod
-    def _source_condition_outbox_row(
-        cls, row: sqlite3.Row | None
-    ) -> SourceConditionOutbox | None:
+    def _source_condition_outbox_row(cls, row: sqlite3.Row | None) -> SourceConditionOutbox | None:
         if row is None:
             return None
         try:
@@ -685,7 +683,8 @@ class SyntheticEnterprise:
                 and not pre_state.business_effects
                 and len(units) == purchase_order.ordered_quantity
                 and actual_unit_ids == tuple(sorted(actual_unit_ids))
-                and set(actual_unit_ids) == set(
+                and set(actual_unit_ids)
+                == set(
                     f"{expected_purchase_order_id}-{expected_line_id}-unit-{index:03d}"
                     for index in range(1, purchase_order.ordered_quantity + 1)
                 )
@@ -733,9 +732,7 @@ class SyntheticEnterprise:
                 ),
             ).rowcount
             if changed != 1:
-                raise EnterprisePreconditionFailed(
-                    "ERP receipt changed during source transaction"
-                )
+                raise EnterprisePreconditionFailed("ERP receipt changed during source transaction")
             changed = connection.execute(
                 "UPDATE invoices SET revision = revision + 1, state = ?, "
                 "hold_reason = ?, released_by_execution_id = NULL "
@@ -750,9 +747,7 @@ class SyntheticEnterprise:
                 ),
             ).rowcount
             if changed != 1:
-                raise EnterprisePreconditionFailed(
-                    "invoice changed during source transaction"
-                )
+                raise EnterprisePreconditionFailed("invoice changed during source transaction")
             for unit in target_units:
                 changed = connection.execute(
                     "UPDATE supply_units SET current_stage = ?, status = ?, "

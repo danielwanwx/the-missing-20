@@ -1,0 +1,333 @@
+{
+  "created_at": "2026-09-06T07:58:26.694762+00:00",
+  "scope": "Real Bedrock model; synthetic raw business records; no writes",
+  "limitations": [
+    "Business sources are production-shaped synthetic records, not customer production data",
+    "Tools are case/run scoped and accept a query, but this fixture returns an admitted batch",
+    "Quantity coverage is a deterministic completeness check, not a semantic judge",
+    "Repairs receive evidence-derived evaluator feedback; inspect validation_retries"
+  ],
+  "repetitions": 1,
+  "cases": [
+    {
+      "variant": "uncommitted_receipt",
+      "repetition": 1,
+      "expected": "RECOVERY_READY",
+      "status": "PASS",
+      "result": {
+        "disposition": "RECOVERY_READY",
+        "evidence_ids": [
+          "INV-4817",
+          "PO-4817",
+          "ERP-READ-4817",
+          "MAT-401",
+          "MAT-402",
+          "QA-901",
+          "ATTEMPT-551",
+          "SCAN-703"
+        ],
+        "reason": "Invoice INV-4817 is held due to a quality inspection hold on lot LOT-B (8 units). The physical received quantity matches the ordered quantity of 100. The integration attempt for lot LOT-C (12 units) timed out, but the business key is not present in the ERP. Manager approval is required before the bounded write.",
+        "safe_next_step": "Manager approval is required before the bounded write.",
+        "write_performed": false
+      },
+      "tools": [
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "read_control_context",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 5,
+        "input_tokens": 17342,
+        "output_tokens": 1286,
+        "incremental_cost_usd": 0.0179888,
+        "validation_retries": 1,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 13134,
+      "decisive_sources_read": true
+    },
+    {
+      "variant": "lost_ack",
+      "repetition": 1,
+      "expected": "DENY",
+      "status": "PASS",
+      "result": {
+        "disposition": "DENY",
+        "evidence_ids": [
+          "ALERT-4817",
+          "INV-4817",
+          "PO-4817",
+          "ERP-READ-4817",
+          "QA-901",
+          "QA-902",
+          "ATTEMPT-551",
+          "SCAN-703"
+        ],
+        "reason": "The invoice matching failure is due to the integration business key already existing in the ERP. The ERP accounted quantity is 100, the ERP available quantity is 92, and the ERP quality inspection quantity is 8. The exact held lot (LOT-B) has an approved quality disposition, and there is no transfer present for the held lot. The integration attempt quantity is 12, and the response is TIMEOUT. The invoice quantity is 100, and the invoice status is HELD. The ledger pagination is complete, and the ledger read status is COMPLETE. The physical received quantity is 100.",
+        "safe_next_step": "DENY",
+        "write_performed": false
+      },
+      "tools": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 8,
+        "input_tokens": 25556,
+        "output_tokens": 1607,
+        "incremental_cost_usd": 0.0255872,
+        "validation_retries": 0,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 15563,
+      "decisive_sources_read": true
+    },
+    {
+      "variant": "wrong_quality_lot",
+      "repetition": 1,
+      "expected": "DENY",
+      "status": "PASS",
+      "result": {
+        "disposition": "DENY",
+        "evidence_ids": [
+          "ALERT-4817",
+          "INV-4817",
+          "ERP-READ-4817",
+          "QA-901",
+          "QA-902",
+          "ATTEMPT-551",
+          "ASN-902",
+          "SCAN-703"
+        ],
+        "reason": "Invoice INV-4817 is held due to pending quality approval of LOT-B. The ERP accounted quantity is 88, the ERP available quantity is 80, the ERP quality inspection quantity is 8, and the physical received quantity is 100. The integration attempt quantity is 12, but the response is TIMEOUT. The integration business key is not present in the ERP. Wait for the quality approval of LOT-B.",
+        "safe_next_step": "Wait for the quality approval of LOT-B.",
+        "write_performed": false
+      },
+      "tools": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 5,
+        "input_tokens": 14938,
+        "output_tokens": 1072,
+        "incremental_cost_usd": 0.0153808,
+        "validation_retries": 0,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 11257,
+      "decisive_sources_read": true
+    },
+    {
+      "variant": "lookup_unavailable",
+      "repetition": 1,
+      "expected": "NEEDS_EVIDENCE",
+      "status": "PASS",
+      "result": {
+        "disposition": "NEEDS_EVIDENCE",
+        "evidence_ids": [
+          "INV-4817",
+          "PO-4817",
+          "ERP-READ-4817",
+          "ATTEMPT-551",
+          "SCAN-701",
+          "SCAN-702",
+          "SCAN-703",
+          "QA-901"
+        ],
+        "reason": "Invoice INV-4817 failed matching due to an unavailable ERP ledger read and a mismatched integration attempt quantity. The physical received quantity matches the ordered quantity, but the integration attempt quantity does not. Further investigation is needed.",
+        "safe_next_step": "Wait for the ERP ledger read to become available and investigate the cause of the timeout attempt.",
+        "write_performed": false
+      },
+      "tools": [
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "read_control_context",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 4,
+        "input_tokens": 12205,
+        "output_tokens": 1017,
+        "incremental_cost_usd": 0.0130184,
+        "validation_retries": 0,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 9753,
+      "decisive_sources_read": true
+    },
+    {
+      "variant": "physical_shortage",
+      "repetition": 1,
+      "expected": "DENY",
+      "status": "PASS",
+      "result": {
+        "disposition": "DENY",
+        "evidence_ids": [
+          "INV-4817",
+          "PO-4817",
+          "ERP-READ-4817",
+          "MAT-401",
+          "MAT-402",
+          "QA-901",
+          "ATTEMPT-551",
+          "SCAN-703"
+        ],
+        "reason": "Invoice INV-4817 is in a state where the ledger read is complete, the exact held lot is approved with no transfer, the integration business key is not present, and the physical quantity does not reconcile. The integration attempt matches the gap, and the quality hold quantity is 8. The receipt attempt quantity is 12. Therefore, the discrepancy is classified as DENY because the physical quantity does not reconcile with the ordered quantity.",
+        "safe_next_step": "Stop the combined recovery and preserve the evidence for reconciliation.",
+        "write_performed": false
+      },
+      "tools": [
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "read_control_context",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 7,
+        "input_tokens": 28589,
+        "output_tokens": 2101,
+        "incremental_cost_usd": 0.0295944,
+        "validation_retries": 2,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 20442,
+      "decisive_sources_read": true
+    },
+    {
+      "variant": "transfer_already_present",
+      "repetition": 1,
+      "expected": "DENY",
+      "status": "PASS",
+      "result": {
+        "disposition": "DENY",
+        "evidence_ids": [
+          "ALERT-4817",
+          "INV-4817",
+          "PO-4817",
+          "ERP-READ-4817",
+          "QA-XFER-READ",
+          "XFER-4817",
+          "ATTEMPT-551",
+          "SCAN-703"
+        ],
+        "reason": "The invoice matching failed due to an existing quality transfer for the exact held lot (LOT-B). The integration attempt quantity (12) does not match the ERP gap (12). The ledger read is complete, and the integration business key is not present in the ERP.",
+        "safe_next_step": "Inform the operator that the case is denied due to the existing quality transfer.",
+        "write_performed": false
+      },
+      "tools": [
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "read_control_context",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 4,
+        "input_tokens": 12520,
+        "output_tokens": 933,
+        "incremental_cost_usd": 0.0130016,
+        "validation_retries": 0,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 9179,
+      "decisive_sources_read": true
+    },
+    {
+      "variant": "evidence_conflict",
+      "repetition": 1,
+      "expected": "NEEDS_EVIDENCE",
+      "status": "PASS",
+      "result": {
+        "disposition": "NEEDS_EVIDENCE",
+        "evidence_ids": [
+          "ALERT-4817",
+          "INV-4817",
+          "PO-4817",
+          "ERP-READ-4817",
+          "QA-901",
+          "ATTEMPT-551",
+          "ASN-902",
+          "SCAN-703"
+        ],
+        "reason": "Invoice INV-4817 is held due to a four-way matching failure. The ERP accounted quantity is 88, with 80 available and 8 in quality inspection. The exact held lot (LOT-B) is approved, and there is no transfer present. The integration attempt for LOT-C with a quantity of 10 does not match the ERP gap of 12. The business key is not present in the ERP. The physical received quantity is 100. This case is classified as NEEDS_EVIDENCE because the integration attempt quantity does not match the ERP gap.",
+        "safe_next_step": "Further evidence is needed to resolve the discrepancy.",
+        "write_performed": false
+      },
+      "tools": [
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "read_control_context",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 6,
+        "input_tokens": 22454,
+        "output_tokens": 1710,
+        "incremental_cost_usd": 0.0234352,
+        "validation_retries": 1,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 16741,
+      "decisive_sources_read": true
+    },
+    {
+      "variant": "normal_complete",
+      "repetition": 1,
+      "expected": "RECOVERY_COMPLETE",
+      "status": "PASS",
+      "result": {
+        "disposition": "RECOVERY_COMPLETE",
+        "evidence_ids": [
+          "ALERT-4817",
+          "INV-4817",
+          "PO-4817",
+          "ERP-READ-4817",
+          "ATTEMPT-551",
+          "ASN-902",
+          "SCAN-701",
+          "SCAN-702"
+        ],
+        "reason": "The invoice INV-4817 failed matching because the integration business key RCPT-4817-L2 already exists in the ERP, and there is no quality inspection quantity. The invoice status is OPEN, and the physical received quantity is 100. The exact held lot is not approved, and the integration attempt does not match the gap. However, the deterministic control-plane disposition is RECOVERY_COMPLETE, indicating that no further recovery action is needed.",
+        "safe_next_step": "No recovery action remains; keep monitoring the open invoice.",
+        "write_performed": false
+      },
+      "tools": [
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "read_control_context",
+        "reconcile_source_records"
+      ],
+      "usage": {
+        "request_count": 7,
+        "input_tokens": 27501,
+        "output_tokens": 1798,
+        "incremental_cost_usd": 0.0277544,
+        "validation_retries": 2,
+        "source_cache_hits": 0
+      },
+      "latency_ms": 18569,
+      "decisive_sources_read": true
+    }
+  ]
+}

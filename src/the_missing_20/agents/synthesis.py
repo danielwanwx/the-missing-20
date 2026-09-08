@@ -60,8 +60,7 @@ def _synthesis_prompt(context: dict[str, Any]) -> str:
         "a relation merely to fill coverage. Claim IDs must be unique, and evidence IDs "
         "must be copied exactly from the supplied validated context. "
         "Remain advisory and read-only; never recommend, authorize, or execute an action."
-        "\n\nVALIDATED INVESTIGATOR CONTEXT:\n"
-        + json.dumps(context, sort_keys=True)
+        "\n\nVALIDATED INVESTIGATOR CONTEXT:\n" + json.dumps(context, sort_keys=True)
     )
 
 

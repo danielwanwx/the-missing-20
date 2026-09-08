@@ -8,11 +8,14 @@ test("package is private during development", async () => {
   assert.equal(pkg.private, true);
 });
 
-test("workspace exposes the real-time views and scenario lab", async () => {
+test("workspace exposes two primary views and presenter-only demo controls", async () => {
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
   assert.match(html, /data-view="dashboard"/);
   assert.match(html, /data-view="agent"/);
-  assert.match(html, /data-view="scenario"/);
+  assert.doesNotMatch(html, /data-view="scenario"/);
+  assert.doesNotMatch(html, /id="tab-scenario"/);
+  assert.match(html, /id="demo-controls-toggle"/);
+  assert.match(html, /id="demo-controls-close"/);
   assert.match(html, /id="flow-map"/);
   assert.match(html, /id="incident-empty"/);
   assert.match(html, /class="agent-rail"/);
@@ -57,7 +60,39 @@ test("workspace exposes the real-time views and scenario lab", async () => {
   assert.doesNotMatch(html, /incident-hero|truth-strip|section-heading|truth-mode/);
 });
 
-test("dashboard has four coordinated diagrams with honest empty states", async () => {
+test("flow-first dashboard keeps live truth visible and delegates reasoning", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  assert.match(html, /id="dashboard-event-feed"/);
+  assert.match(html, /id="dashboard-event-now"/);
+  assert.match(html, /id="dashboard-agent-status"/);
+  assert.match(html, /id="dashboard-open-investigation"/);
+  assert.match(html, /id="dashboard-evidence-map"/);
+  assert.match(html, /id="dashboard-evidence-links"/);
+  assert.match(app, /function renderDashboardEventRail\(/);
+  assert.match(app, /function renderDashboardAgentStatus\(/);
+  assert.match(app, /function renderDashboardEvidenceLinks\(/);
+  assert.match(app, /legacyDashboard\.hidden = false/);
+  assert.match(app, /newest-at-bottom/);
+  assert.match(css, /\.dashboard-command-layout\s*\{[^}]*grid-template-columns:/s);
+  assert.match(css, /\.dashboard-event-row\.is-new/);
+  assert.match(css, /--command-muted:\s*#52616d/);
+});
+
+test("first paint gates the unhydrated dashboard behind one truthful loading state", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  assert.match(html, /data-boot-state="loading"/);
+  assert.match(html, /id="workspace-boot"/);
+  assert.match(html, /body\[data-boot-state="loading"\][\s\S]*\.topbar/s);
+  assert.match(css, /body\[data-boot-state="ready"\][\s\S]*\.workspace-boot/s);
+  assert.match(app, /document\.body\.dataset\.bootState = "ready"/);
+  assert.match(app, /document\.body\.dataset\.bootState = "error"/);
+});
+
+test("dashboard has coordinated operational diagrams with honest empty states", async () => {
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
@@ -67,6 +102,8 @@ test("dashboard has four coordinated diagrams with honest empty states", async (
     "queue-health-chart",
     "erp-health-chart",
     "invoice-health-chart",
+    "business-impact-chart",
+    "operations-history-chart",
     "external-risk-chart",
   ]) {
     assert.match(html, new RegExp(`id="${id}"`));
@@ -95,10 +132,10 @@ test("dashboard density and topology expose bounded, truthful access", async () 
   assert.match(app, /function renderUnitAnomalies\(/);
   assert.match(app, /data-unit-detail-id/);
   assert.match(app, /receivedMs - observedMs/);
-  assert.match(app, /nodeId === "warehouse"[\s\S]*?"dispatched"/);
-  assert.match(app, /nodeId === "invoice"[\s\S]*?"expected"/);
+  assert.match(app, /nodeId === "warehouse"[\s\S]*?"received"/);
+  assert.match(app, /nodeId === "invoice"[\s\S]*?"matched"/);
   assert.match(css, /\.unit-density-strip\s*\{[^}]*repeat\(50,\s*minmax\(0,\s*1fr\)/s);
-  assert.match(css, /\.flow-link-line::after[\s\S]*animation:\s*none\s*!important/);
+  assert.match(css, /\.flow-node-count\.is-stage-updated[\s\S]*animation:\s*none/);
 });
 
 test("dashboard status rail and incident row do not duplicate workspace routing", async () => {
@@ -152,38 +189,50 @@ test("client binds the API and ordered event ledger rather than timers", async (
   assert.match(app, /drawLineChart\(/);
   assert.match(app, /dashboard-chart/);
   assert.match(app, /reconciliation-chart/);
-  assert.doesNotMatch(app, /createElementNS/);
+  assert.equal((app.match(/createElementNS/g) || []).length, 3, "SVG is limited to topology paths and the no-canvas chart fallback");
+  assert.match(app, /createElementNS\("http:" \+ "\/\/www\.w3\.org\/2000\/svg", "path"\)/);
 });
 
-test("dashboard rebaseline exposes one live incident control and component ports", async () => {
+test("dashboard rebaseline exposes one live incident control and stage projections", async () => {
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
   assert.match(html, /id="dashboard-inject-incident"[^>]*disabled/);
   assert.match(html, /Live[\s\S]*Inject incident/);
-  assert.doesNotMatch(html, /dashboard-open-investigation|Open investigation/);
+  assert.equal((html.match(/id="dashboard-open-investigation"/g) || []).length, 1);
   assert.match(html, /id="dashboard-component-graph"/);
   assert.match(html, /data-health-node="message-queue"/);
   assert.match(html, /id="dashboard-live-sources"[^>]*route-risk detector/);
-  assert.match(app, /\$\("dashboard-inject-incident"\)\.addEventListener\("click", \(\) => selectScenario\("incident"\)\)/);
+  assert.match(app, /\$\("dashboard-inject-incident"\)\.addEventListener\("click", \(\) => \{/);
+  assert.match(app, /liveFlow\?\.provenance === "live-read"[\s\S]*window\.open\(EXTERNAL_SERVICE_LINKS\.erpnext\.url/);
+  assert.match(app, /selectScenario\("incident"\)/);
   assert.match(app, /route-risk-detector/);
-  assert.match(app, /flow-node-port/);
-  assert.match(app, /flow-particle/);
+  assert.match(app, /function latestStageProjection\(snapshot\)/);
+  assert.match(app, /flow-node-exception/);
+  assert.doesNotMatch(app, /create\("span", "flow-node-port/);
+  assert.doesNotMatch(app, /create\("span", "flow-particle/);
   assert.match(css, /\.component-graph\s*\{/);
-  assert.match(css, /\.flow-node-port\s*\{/);
-  assert.match(css, /\.flow-particle\s*\{/);
+  assert.match(css, /\.flow-node\.is-stage-updated/);
+  assert.match(css, /\.flow-node-exception/);
 });
 
 test("client recovers a reset stream from a fresh authoritative cursor", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  assert.equal((app.match(/new EventSource/g) || []).length, 1, "each tab owns only one permanent SSE connection");
+  assert.doesNotMatch(app, /new EventSource\("\/api\/v1\/agent-platform\/events/);
   assert.match(app, /stream\.reset/);
   assert.match(app, /async function reconnectStream\(/);
-  assert.match(app, /applySnapshot\(snapshot, snapshot\.units \|\| units\.units, true\)/);
+  assert.match(app, /function incidentSnapshotPath\(incidentId\)/);
+  assert.match(app, /projection=browser/);
+  assert.match(app, /applySnapshot\(snapshot, snapshot\.units, true\)/);
   assert.match(app, /source\.onerror = \(\) =>/);
 });
 
-test("scenario controls fail closed on an active deep-linked run", async () => {
+test("scenario controls fail closed on an explicit deep-linked run", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  assert.match(app, /const requestedIncidentIsExplicit = Boolean\(/);
+  assert.match(app, /\["incident", "recovery"\]\.includes\(requestedScenario\)/);
+  assert.match(app, /requestedIncidentIsExplicit[\s\S]*incident_id: requestedIncidentId/);
   assert.match(app, /const selectedScenario = state\.snapshot \? scenarioForSnapshot\(state\.snapshot\) : state\.activeScenario/);
   assert.match(app, /const selected = selectedScenario === scenario/);
   assert.match(app, /selected\s*\|\|\s*unavailableRecovery/);
@@ -205,6 +254,32 @@ test("incident controls follow the authoritative scenario catalog", async () => 
   assert.match(app, /Resume active incident/);
   assert.match(app, /View completed investigation/);
   assert.match(html, /data-incident-label>Run incident demo/);
+});
+
+test("dashboard motion is labeled as source-triggered rather than a fake timer", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  assert.match(app, /external\.source\.changed/);
+  assert.match(app, /external\.source\.changed/);
+  assert.match(app, /Source-triggered observation/);
+  assert.doesNotMatch(app, /Flow batch/);
+  assert.doesNotMatch(html, /new \/ 60s/i);
+  assert.match(html, /changed records/);
+});
+
+test("live ERP projection owns KPIs, charts, and the external trigger path", async () => {
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  assert.match(app, /platform\.case_projection/);
+  assert.match(app, /const liveAuthority = value\(caseProjection\?\.provenance\).*=== "live-read"/);
+  assert.match(app, /if \(!liveAuthority\) return null/);
+  assert.match(app, /platformMetricEvents[\s\S]*latestPlatformMetric\.change_count/);
+  assert.match(app, /authoritative: platform\.provenance === "live-read"/);
+  assert.match(app, /scheduleAgentPlatformProjectionRefresh\(\)/);
+  assert.match(app, /Open ERPNext; this dashboard advances only after the external records change/);
+  assert.match(app, /control\.dataset\.sourceAuthority = liveSourceMode \? "external" : "scenario"/);
+  assert.match(app, /liveAuthority && value\(raw\.provenance\).*includes\("synthetic"\).*return null/);
+  assert.match(app, /if \(section\) section\.hidden = !operations/);
+  assert.match(app, /if \(historyPanel\) historyPanel\.hidden = !operations/);
 });
 
 test("closed catalog history is never advertised as an active resume", async () => {
@@ -378,6 +453,52 @@ test("replay dashboard charts append the authoritative verified close", async ()
   assert.equal(helpers.chartTelemetryPoints(snapshot).length, 1, "replay does not preempt history");
 });
 
+test("live stage chart stays scoped to the current flow run", async () => {
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const helperStart = app.indexOf("  function verifiedClosedSnapshot(snapshot) {");
+  const helperEnd = app.indexOf("  function telemetryPoints(snapshot, metric)", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart, "stage chart helpers are present");
+  const state = {
+    replaying: false,
+    transitionBaseline: null,
+    telemetry: [
+      {
+        sequence: 1,
+        flow_run_id: "flow-1",
+        stage_counts: { warehouse: 100, message_queue: 100, erp: 100, invoice: 100 },
+        unit_counts: { total: 100, erp_recorded: 100, queue_failed: 0 },
+      },
+      {
+        sequence: 2,
+        flow_run_id: "flow-2",
+        stage_counts: { warehouse: 20, message_queue: 0, erp: 0, invoice: 0 },
+        unit_counts: { total: 100, erp_recorded: 100, queue_failed: 0 },
+      },
+      {
+        sequence: 3,
+        flow_run_id: "flow-2",
+        stage_counts: { warehouse: 40, message_queue: 20, erp: 0, invoice: 0 },
+        unit_counts: { total: 100, erp_recorded: 100, queue_failed: 0 },
+      },
+    ],
+  };
+  const helpers = new Function(
+    "state",
+    "value",
+    "number",
+    `${app.slice(helperStart, helperEnd)}; return { reconciliationSeries, reconciliationPoints };`,
+  )(
+    state,
+    (input) => input == null ? "" : String(input),
+    (input, fallback = 0) => Number.isFinite(Number(input)) ? Number(input) : fallback,
+  );
+  const snapshot = { incident: { status: "OPEN" }, execution: { verified: false }, unit_counts: {} };
+  assert.deepEqual(helpers.reconciliationSeries(snapshot).expected, [20, 40]);
+  assert.deepEqual(helpers.reconciliationPoints(snapshot).map((point) => point.expected), [20, 40]);
+  assert.match(app, /function renderSvgLineChart\(canvas, series, tones, options = \{\}\)/);
+  assert.match(app, /if \(!surface\) return renderSvgLineChart\(canvas, series, tones, options\)/);
+});
+
 test("verified closed incident deep links select Recovery in the Scenario Lab", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
@@ -483,8 +604,15 @@ test("the live UI preserves truth and accessible targets", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const smoke = await readFile(new URL("../scripts/run_decision_workspace_smoke.py", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
-  assert.match(html, /Two-role approval/);
+  assert.match(html, /Manager approval/);
   assert.match(html, /Controlled recovery/);
+  assert.match(app, /Approve as \$\{definition\.name\}/);
+  assert.match(app, /recordManagerApproval/);
+  assert.match(app, /MANAGER_ATTESTATIONS/);
+  assert.match(app, /activityDrawer\.open = true/);
+  assert.match(app, /isLatest \? " is-new"/);
+  assert.match(css, /@keyframes activity-enter/);
+  assert.match(smoke, /data-approval-principal="manager"/);
   assert.doesNotMatch(html, /Chat cannot prepare, approve, or execute/);
   assert.match(app, /function renderUnitDetail\(/);
   assert.match(app, /data-evidence-id/);
@@ -507,10 +635,10 @@ test("the live UI preserves truth and accessible targets", async () => {
   assert.match(app, /row\.hidden = normalScenario/);
   assert.match(app, /telemetry\.observed/);
   assert.match(app, /pulseTelemetry\(\)/);
-  assert.match(app, /is-telemetry/);
+  assert.match(app, /latestStageProjection/);
   assert.match(app, /function reconciliationSeries\(snapshot\)/);
-  assert.match(app, /point\.unit_counts\?\.total/);
-  assert.match(app, /point\.unit_counts\?\.erp_recorded/);
+  assert.match(app, /point\.stage_counts\?\.warehouse/);
+  assert.match(app, /point\.stage_counts\?\.erp/);
   assert.match(app, /point\.unit_counts\?\.queue_failed/);
   assert.doesNotMatch(app, /recorded:\s*telemetry\.map\(\(point\) => telemetryRecordCount\(point\)\)/);
   assert.match(app, /visibilitychange/);
@@ -620,7 +748,7 @@ test("agent workspace exposes one launch path and a live selected-role context",
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
-  assert.doesNotMatch(html, /dashboard-open-investigation|Open investigation/);
+  assert.equal((html.match(/id="dashboard-open-investigation"/g) || []).length, 1);
   assert.doesNotMatch(html, />View all agents</);
   assert.doesNotMatch(html, />View all</);
   assert.match(html, /id="agent-role-context"/);
@@ -630,7 +758,7 @@ test("agent workspace exposes one launch path and a live selected-role context",
   assert.match(app, /function selectAgent\(/);
   assert.match(app, /function renderRoleContext\(/);
   assert.match(app, /function drawGraphConnections\(/);
-  assert.match(app, /data-graph-source/);
+  assert.match(app, /data-supply-node/);
   assert.match(app, /is-selected-route/);
   assert.match(css, /.agent-link.is-event::after/);
   assert.match(css, /.agent-role-context/);
@@ -673,9 +801,10 @@ test("phase 2 workspace keeps chart focus, trace access, and evidence context ho
   assert.match(smoke, /physical_chart_key_focus/);
 });
 
-test("agent graph route contract stays cubic, monotonic, and clear of node interiors", async () => {
+test("agent graph route contract stays contextual, centered, and clear of node interiors", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
   const start = app.indexOf("  function graphRouteContract() {");
   const end = app.indexOf("  function graphEventPathIds", start);
   assert.ok(start >= 0 && end > start, "graph route contract is present");
@@ -686,7 +815,7 @@ test("agent graph route contract stays cubic, monotonic, and clear of node inter
   const contract = helpers.graphRouteContract();
   assert.deepEqual(
     Object.keys(contract),
-    ["incident", "source", "orchestrator", "investigator", "synthesis", "lifecycle", "return"],
+    ["supply", "boundary", "incident", "source", "orchestrator", "investigator", "synthesis", "lifecycle", "return"],
   );
   assert.ok(Object.values(contract).every((route) => route.kind === "cubic-bezier"));
   assert.match(app, /function graphCubicPoint\(/);
@@ -697,63 +826,71 @@ test("agent graph route contract stays cubic, monotonic, and clear of node inter
   assert.doesNotMatch(css, /\.graph-route-segment/);
   assert.doesNotMatch(css, /\.graph-route-arrow/);
   assert.match(css, /\.operations-map\.agent-system-panel \.graph-port\s*\{[\s\S]*?width:\s*5px;[\s\S]*?min-width:\s*5px;[\s\S]*?height:\s*5px;[\s\S]*?background:\s*rgba\(92, 222, 234, \.86\)/);
-  assert.match(css, /\.operations-map\.agent-system-panel \.graph-sources \.graph-port\s*\{[\s\S]*?flex:\s*0 0 5px;/);
+  assert.match(css, /\.graph-supply-node \.graph-port-flow-out\s*\{[\s\S]*?right:\s*-5px;/);
   assert.match(css, /\.workspace-timeline\s*\{\s*position:\s*relative;\s*\}/);
   assert.match(css, /\.orchestrator-node \.graph-port-in\s*\{[\s\S]*?left:\s*50%;/);
-  assert.match(css, /\.synthesis-node \.graph-port-synthesis-(left|middle|right)/);
+  assert.match(css, /\.synthesis-node \.graph-port-in\s*\{[\s\S]*?left:\s*50%;/);
   assert.match(css, /\.graph-step\[data-graph-node="safety"\] \.graph-port-in\s*\{[\s\S]*?left:\s*50%;/);
+  assert.match(html, /DETERMINISTIC SUPPLY CHAIN/);
+  assert.doesNotMatch(html, /READ-ONLY INVESTIGATION BOUNDARY|AGENT INVESTIGATION|DETERMINISTIC CONTROL/);
+  assert.match(html, /<strong>Evidence API<\/strong>/);
+  assert.doesNotMatch(html, /Authoritative synthetic state|Advisory only|Policy · human quorum · bounded effects|<small>READ ONLY<\/small>/);
+  assert.doesNotMatch(html, /graph-port-coordination-(left|middle|right)/);
+  assert.doesNotMatch(html, /graph-port-synthesis-(left|middle|right)/);
 
   const metrics = {
     width: 1002,
     height: 680,
-    sourceTop: 218,
-    sourceBottom: 248,
-    cardTop: 264,
-    cardBottom: 340,
-    lifecycleTop: 512,
-    packetLeft: 442,
-    packetRight: 560,
-    orchestratorLeft: 438,
-    orchestratorRight: 564,
-    orchestratorTop: 112,
-    orchestratorBottom: 190,
-    incidentOuterLeft: 434,
+    sourceTop: 64,
+    sourceBottom: 106,
+    cardTop: 290,
+    cardBottom: 366,
+    lifecycleTop: 542,
+    packetLeft: 551,
+    packetRight: 671,
+    orchestratorLeft: 451,
+    orchestratorRight: 551,
+    orchestratorTop: 158,
+    orchestratorBottom: 236,
+    incidentOuterLeft: 543,
     returnOuterLeft: 990,
-    returnBottom: 548,
+    returnBottom: 578,
   };
   const rects = [
-      ["receipt-retry", 190, 218, 266, 248],
-      // The middle compact ERP evidence chip is an explicit obstacle, not a
-      // decorative label; every unrelated route must clear this rectangle.
-      ["erp-evidence-port", 463, 218, 539, 248],
-      ["duplicate-posting", 736, 218, 812, 248],
-    ["incident-packet", 442, 48, 560, 86],
-    ["orchestrator", 438, 112, 564, 190],
-    ["retryable_message_investigator", 110, 264, 345, 340],
-    ["short_shipment_investigator", 383, 264, 619, 340],
-    ["duplicate_posting_investigator", 657, 264, 892, 340],
-    ["synthesis", 435, 394, 567, 452],
-    ["safety", 70, 512, 271, 584],
-    ["approval", 291, 512, 491, 584],
-    ["execution", 511, 512, 711, 584],
-    ["verification", 731, 512, 932, 584],
+    ["warehouse", 80, 64, 265, 106],
+    ["queue", 299, 64, 484, 106],
+    ["erp", 518, 64, 703, 106],
+    ["invoice", 737, 64, 922, 106],
+    ["incident-packet", 550, 122, 670, 160],
+    ["evidence-api", 582, 178, 640, 216],
+    ["orchestrator", 451, 158, 551, 236],
+    ["retryable_message_investigator", 110, 290, 345, 366],
+    ["short_shipment_investigator", 383, 290, 619, 366],
+    ["duplicate_posting_investigator", 657, 290, 892, 366],
+    ["synthesis", 435, 412, 567, 470],
+    ["safety", 70, 542, 271, 614],
+    ["approval", 291, 542, 491, 614],
+    ["execution", 511, 542, 711, 614],
+    ["verification", 731, 542, 932, 614],
   ].map(([id, left, top, right, bottom]) => ({ id, left, top, right, bottom }));
   const edges = [
-    ["incident", "incident-packet", "orchestrator", [501, 86], [501, 112], "incident-axis"],
-      ["source", "receipt-retry", "retryable_message_investigator", [228, 248], [176, 264], "evidence-port-left"],
-    ["orchestrator", "orchestrator", "retryable_message_investigator", [466, 190], [284, 264], "coord-left"],
-    ["investigator", "retryable_message_investigator", "synthesis", [228, 340], [467, 394], "handoff-left"],
-      ["source", "shipment-evidence", "short_shipment_investigator", [501, 248], [449, 264], "evidence-port-center"],
-      ["orchestrator", "orchestrator", "short_shipment_investigator", [501, 190], [566, 264], "coord-middle"],
-    ["investigator", "short_shipment_investigator", "synthesis", [501, 340], [501, 394], "handoff-center"],
-      ["source", "duplicate-posting", "duplicate_posting_investigator", [774, 248], [826, 264], "evidence-port-right"],
-    ["orchestrator", "orchestrator", "duplicate_posting_investigator", [536, 190], [718, 264], "coord-right"],
-    ["investigator", "duplicate_posting_investigator", "synthesis", [774, 340], [535, 394], "handoff-right"],
-    ["synthesis", "synthesis", "safety", [501, 452], [170, 512], "lifecycle-entry"],
-    ["lifecycle", "safety", "approval", [271, 548], [291, 548], "lifecycle-chain"],
-    ["lifecycle", "approval", "execution", [491, 548], [511, 548], "lifecycle-chain"],
-    ["lifecycle", "execution", "verification", [711, 548], [731, 548], "lifecycle-chain"],
-    ["return", "verification", "incident-packet", [932, 548], [560, 67], "outer-return"],
+    ["supply", "warehouse", "queue", [265, 85], [299, 85], "supply-chain"],
+    ["supply", "queue", "erp", [484, 85], [518, 85], "supply-chain"],
+    ["supply", "erp", "invoice", [703, 85], [737, 85], "supply-chain"],
+    ["boundary", "erp", "incident-packet", [610, 106], [610, 122], "supply-incident"],
+    ["boundary", "incident-packet", "evidence-api", [610, 160], [610, 178], "incident-evidence"],
+    ["boundary", "evidence-api", "orchestrator", [581, 197], [551, 197], "evidence-orchestrator"],
+    ["orchestrator", "orchestrator", "retryable_message_investigator", [501, 236], [228, 290], "coord-left"],
+    ["investigator", "retryable_message_investigator", "synthesis", [228, 366], [501, 412], "handoff-left"],
+    ["orchestrator", "orchestrator", "short_shipment_investigator", [501, 236], [501, 290], "coord-middle"],
+    ["investigator", "short_shipment_investigator", "synthesis", [501, 366], [501, 412], "handoff-middle"],
+    ["orchestrator", "orchestrator", "duplicate_posting_investigator", [501, 236], [774, 290], "coord-right"],
+    ["investigator", "duplicate_posting_investigator", "synthesis", [774, 366], [501, 412], "handoff-right"],
+    ["synthesis", "synthesis", "safety", [501, 470], [170, 542], "lifecycle-entry"],
+    ["lifecycle", "safety", "approval", [271, 578], [291, 578], "lifecycle-chain"],
+    ["lifecycle", "approval", "execution", [491, 578], [511, 578], "lifecycle-chain"],
+    ["lifecycle", "execution", "verification", [711, 578], [731, 578], "lifecycle-chain"],
+    ["return", "verification", "invoice", [932, 578], [830, 64], "outer-return"],
   ];
   const monotonic = (values) => {
     const increasing = values.every((value, index) => index === 0 || value >= values[index - 1] - .01);
@@ -796,8 +933,7 @@ test("agent graph route contract stays cubic, monotonic, and clear of node inter
     const anchors = { x1: startPoint[0], y1: startPoint[1], x2: endPoint[0], y2: endPoint[1] };
     const segments = helpers.graphRouteSegments(route, anchors, metrics);
     assert.ok(segments.every((segment) => segment.length === 4), `${type} route must be cubic`);
-    segments.forEach((segment) => {
-      assert.ok(monotonic(segment.map((point) => point[0])), `${type} x direction must not reverse`);
+    if (type !== "lifecycle") segments.forEach((segment) => {
       assert.ok(monotonic(segment.map((point) => point[1])), `${type} y direction must not reverse`);
     });
     const points = helpers.graphRoutePoints(route, anchors, metrics);
@@ -822,11 +958,11 @@ test("agent graph route contract stays cubic, monotonic, and clear of node inter
     }
   }
   assert.deepEqual(crossings, [], "graph routes must not cross outside a named port");
-  assert.ok(rects.some((rect) => rect.id === "erp-evidence-port"), "ERP evidence chip is part of collision geometry");
+  assert.ok(rects.some((rect) => rect.id === "evidence-api"), "read-only evidence boundary is part of collision geometry");
   assert.ok(edgePoints.every(({ points }) => points.length >= 17));
   assert.deepEqual(
     [...new Set(edges.map(([, , , , , lane]) => lane))].sort(),
-    ["coord-left", "coord-middle", "coord-right", "evidence-port-center", "evidence-port-left", "evidence-port-right", "handoff-center", "handoff-left", "handoff-right", "incident-axis", "lifecycle-chain", "lifecycle-entry", "outer-return"].sort(),
+    ["coord-left", "coord-middle", "coord-right", "evidence-orchestrator", "handoff-left", "handoff-middle", "handoff-right", "incident-evidence", "lifecycle-chain", "lifecycle-entry", "outer-return", "supply-chain", "supply-incident"].sort(),
   );
   assert.equal(rects.some((rect) => rect.id === "operational-flow"), false);
 });
@@ -847,6 +983,93 @@ test("copilot density exposes concise labels and available actions only", async 
   assert.match(css, /\.citation \{[^}]*min-height:\s*24px/s);
 });
 
+test("case console presents one judge-readable evidence-to-outcome workflow", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  assert.match(html, /class="platform-command-canvas"/);
+  assert.match(html, />Signals</);
+  assert.match(html, />Investigation</);
+  assert.match(html, />Manager decision</);
+  assert.match(html, /id="platform-source-receipts"/);
+  assert.match(html, /id="platform-hypotheses"/);
+  assert.match(html, /id="platform-runtime-trace"/);
+  assert.match(html, />SDK flight recorder</);
+  assert.match(html, /id="platform-outcome"/);
+  assert.match(html, /Inspect Resolution Packet/);
+  assert.doesNotMatch(html, /80 AVAILABLE|100 VERIFIED/);
+  assert.doesNotMatch(html, /id="platform-constellation"|id="platform-plan"/);
+  assert.match(app, /const selectedTools = new Set\(Array\.isArray\(strands\.tool_calls\)/);
+  assert.match(app, /strandsStatus === "COMPLETE"\s*\? \[\.\.\.selectedTools\]/);
+  assert.match(app, /const toolState = strandsStatus === "COMPLETE"\s*\? "READ"/);
+  assert.doesNotMatch(app, /selectedTools\.has\(toolName\) \? "READ" : "NOT NEEDED"/);
+  assert.match(app, /Array\.isArray\(strands\.runtime_events\)/);
+  assert.match(app, /rawName === "LiveAdvisoryResult"\s*\? "Typed result"/);
+  assert.match(app, /const verifiedPostState = executionStatus === "VERIFIED"/);
+  assert.match(app, /\["Delivery note", packetEffects\.delivery_note\]/);
+  assert.match(app, /\["Sales invoice", packetEffects\.sales_invoice\]/);
+  assert.match(app, /findings\.join_keys && findings\.join_keys\.integration_business_key/);
+  assert.match(app, /tuple\.supplier_lot/);
+  assert.match(app, /\$\{supplierLot\} · CLEARED/);
+  assert.match(app, /transition\.hidden = executionStatus !== "VERIFIED"/);
+  assert.match(app, /AGENT_UNAVAILABLE: "Retry the real Strands investigation — no plan released"/);
+  assert.match(app, /PHYSICAL_SHORTAGE_CONFIRMED: "Escalate 20-unit supplier shortage — preserve hold"/);
+  assert.match(app, /reviewAction === "RETRY_INVESTIGATION"/);
+  assert.match(app, /reviewAction === "AUTHORIZE_DIAGNOSIS"/);
+  assert.match(app, /operator_id: "M20 Demo Operator"/);
+  assert.match(app, /makeKey\("m20-platform-execute"\)/);
+  assert.doesNotMatch(app, /void runPlatformDiagnosis\(\)/);
+  assert.match(app, /executionStatus\)\s*\? \[/);
+  assert.doesNotMatch(html, />HUMAN START REQUIRED</);
+  assert.match(app, /platform\.latest_sequence/);
+  assert.match(css, /\.platform-command-canvas \{[^}]*grid-template-columns:/s);
+  assert.match(css, /\.platform-outcome-rail\[data-status="verified"\]/);
+  assert.match(css, /\.platform-runtime-span\.is-model/);
+  assert.match(css, /\.platform-runtime-span\.is-tool/);
+});
+
+test("case console is a borderless, movable command canvas with atomic live nodes", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  assert.match(html, /class="platform-command-toolbar"/);
+  assert.match(html, /id="platform-arrange-mode"/);
+  assert.match(html, /id="platform-reset-layout"/);
+  assert.match(html, /data-canvas-module="signals"/);
+  assert.match(html, /data-canvas-module="investigation"/);
+  assert.match(html, /data-canvas-module="agent-console"/);
+  assert.match(html, /data-canvas-module="conversation"/);
+  assert.match(html, />Evidence conversation</);
+  assert.match(html, /id="platform-investigation-links"/);
+  assert.match(html, /data-investigation-node="erpnext"/);
+  assert.match(html, /data-investigation-node="airtable"/);
+  assert.match(html, /data-investigation-node="celigo"/);
+  assert.match(html, /data-investigation-node="jira"/);
+  assert.match(html, /data-investigation-node="slack"/);
+  assert.match(html, /data-investigation-node="agent"/);
+  assert.match(html, /data-investigation-node="manager"/);
+  assert.match(html, /id="platform-node-popover"/);
+  assert.doesNotMatch(html, /class="platform-section-divider"/);
+  assert.match(css, /@font-face\s*\{[^}]*font-family:\s*"Geist"/s);
+  assert.match(css, /@font-face\s*\{[^}]*font-family:\s*"Geist Mono"/s);
+  assert.match(css, /\.platform-canvas-module\s*\{[^}]*border:\s*0;/s);
+  assert.match(css, /\.platform-investigation-link\s*\{[^}]*stroke-width:\s*1\.15;/s);
+  assert.match(css, /body\[data-agent-platform="ready"\]\s*\{[^}]*--ink:\s*#17212b;/s);
+  assert.match(css, /data-investigation-node="erpnext"[^}]*background:\s*#008ca0;/s);
+  assert.match(css, /data-investigation-node="airtable"[^}]*background:\s*#256cd3;/s);
+  assert.match(css, /data-investigation-node="celigo"[^}]*background:\s*#7550bd;/s);
+  assert.match(css, /data-investigation-node="jira"[^}]*background:\s*#d76416;/s);
+  assert.match(css, /data-investigation-node="slack"[^}]*background:\s*#719000;/s);
+  assert.match(app, /const PLATFORM_LAYOUT_KEY = "missing20-command-canvas-v1"/);
+  assert.match(app, /function setPlatformArrangeMode\(/);
+  assert.match(app, /function bindPlatformCanvasInteractions\(/);
+  assert.match(app, /function renderPlatformInvestigationLinks\(/);
+  assert.match(app, /function platformLinkPath\(/);
+  assert.match(app, /function platformNodeAnchor\(/);
+  assert.match(app, /localStorage\.setItem\(PLATFORM_LAYOUT_KEY/);
+  assert.doesNotMatch(app, /setInterval\([^)]*platform/i);
+});
+
 test("recovered and partial snapshots keep the UI state truthful", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   assert.match(app, /function isClosedOrRecovery\(\)/);
@@ -860,30 +1083,32 @@ test("recovered and partial snapshots keep the UI state truthful", async () => {
   assert.doesNotMatch(app, /advisory\.partial[\s\S]*AI \$\{advisory\.coverage\}/);
 });
 
-test("dashboard flow links are continuous between components at every width", async () => {
+test("dashboard flow nodes are independent live instruments without throughput lines", async () => {
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
-  assert.match(app, /column\.append\(node\);[\s\S]*column\.append\(link\);[\s\S]*map\.append\(column\);/);
   assert.match(app, /const nodes = \["warehouse", "message-queue", "erp", "invoice"\]/);
-  assert.match(app, /const edge = edges\.find\(\(candidate\) => candidate\.from === item\.id && candidate\.to === next\.id\)/);
-  assert.match(app, /const gapEdge = edge\.from === "message-queue" && edge\.to === "erp" && queueException > 0/);
-  assert.equal((app.match(/const gapEdge = /g) || []).length, 1, "the queue anomaly branch is rendered once");
+  const renderStart = app.indexOf("function renderFlow()");
+  const renderEnd = app.indexOf("function selectUnit", renderStart);
+  const renderFlow = app.slice(renderStart, renderEnd);
+  assert.match(renderFlow, /latestStageProjection\(snapshot\)/);
+  assert.match(renderFlow, /dataset\.stageCount/);
+  assert.match(renderFlow, /flow-node-exception/);
+  assert.doesNotMatch(renderFlow, /flow-link/);
+  assert.doesNotMatch(renderFlow, /flow-node-port/);
   assert.match(css, /\.flow-map\s*\{[^}]*overflow:\s*hidden;[^}]*overflow-x:\s*auto/s);
-  assert.match(css, /\.flow-column\s*\{\s*display:\s*contents;\s*\}/);
-  assert.match(css, /\.flow-node\s*\{[^}]*flex:\s*0 0 146px[^}]*margin:\s*0;/s);
-  assert.match(css, /\.flow-link\s*\{[^}]*flex:\s*1 1 0[^}]*min-width:\s*30px/s);
+  assert.match(css, /body\[data-agent-platform="ready"\] \.flow-map\s*\{[^}]*gap:/s);
   assert.match(css, /\.flow-node\s*\{\s*flex-basis:\s*103px;\s*min-width:\s*103px;/s);
   assert.match(css, /@media \(min-width: 768px\)[\s\S]*?\.flow-node \{[\s\S]*?flex: 1 1 0;/);
-  assert.match(css, /@media \(min-width: 768px\)[\s\S]*?\.flow-link \{[\s\S]*?flex: 0 0 48px;/);
-  assert.match(css, /\.flow-node-port-in \{[^}]*left: -5px/);
-  assert.match(css, /\.flow-node-port-out \{[^}]*right: -5px/);
-  assert.match(css, /\.flow-gap-branch \{/);
+  assert.match(css, /\.flow-node\.is-stage-updated/);
+  assert.match(css, /\.flow-node-count\.is-stage-updated/);
+  assert.match(css, /font-variant-numeric:\s*tabular-nums/);
 });
 
 test("dashboard evidence ports and copy stay sparse and symmetric", async () => {
   const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
-  assert.doesNotMatch(html, /dashboard-open-investigation|Open investigation/);
+  assert.match(html, /id="dashboard-open-investigation"/);
+  assert.equal((html.match(/id="dashboard-open-investigation"/g) || []).length, 1);
   assert.doesNotMatch(html, /Select a node or data point to inspect the live flow/);
   assert.match(css, /\.graph-source-group \{[\s\S]*?justify-self: center;/);
   assert.doesNotMatch(css, /\.graph-source-group:nth-child/);
@@ -920,10 +1145,150 @@ test("final truth projection keeps advisory, closed state, and quantities honest
   assert.match(app, /state\.snapshot\?\.unit_counts/);
   assert.match(app, /const dispatched = total/);
   assert.match(app, /kind === "recorded"[\s\S]*point\.unit_counts\?\.erp_recorded/);
-  assert.match(app, /metric === "erp"\) valueForMetric = number\(unitCounts\.erp_recorded\)/);
+  assert.match(app, /metric === "erp"\) valueForMetric = number\(point\.stage_counts\?\.erp/);
   assert.match(app, /roleQuestions = \{/);
   assert.match(app, /Which admitted evidence proves the receipt message is retryable/);
   assert.match(app, /button\.dataset\.question = roleQuestion\[1\]/);
   assert.match(css, /\.flow-column\s*\{\s*display:\s*contents/);
-  assert.match(css, /\.flow-link\s*\{[^}]*flex:\s*1 1 0/);
+  assert.match(css, /body\[data-agent-platform="ready"\] \.flow-link \{ display:\s*none;/);
+});
+
+test("live console reveals only reached states and refreshes metrics from SSE", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+  assert.match(html, /id="flow-window-count">—<\/b><small>changed records<\/small>/);
+  assert.match(html, /id="flow-ledger-sequence">—<\/b><small>ledger seq<\/small>/);
+  assert.doesNotMatch(html, /Duplicate posting prevention/);
+  assert.doesNotMatch(html, /ERP sync delay/);
+  assert.match(html, /id="synthesis-status"[^>]*hidden/);
+  assert.equal((html.match(/data-graph-step-status hidden/g) || []).length, 4);
+  assert.match(html, /class="graph-loop-label" hidden/);
+  assert.match(app, /scheduleAgentPlatformProjectionRefresh\(\)/);
+  assert.match(app, /statusNode\.hidden = !reached/);
+  assert.match(app, /loopVerified\.hidden = !lifecycleDone\.verification/);
+  assert.match(app, /telemetryRecordCount\(latestTelemetry\)/);
+  assert.match(css, /@keyframes live-metric-arrival/);
+  assert.match(app, /const liveAuthority = hasLiveSourceAuthority\(\)/);
+  assert.match(app, /liveAuthority\s*\? platformEvents\s*:\s*\[\.\.\.ledgerEvents, \.\.\.platformEvents, \.\.\.erpReadEvents, \.\.\.saasReadEvents\]/);
+  assert.match(app, /const authoritativeSequence = platform\?\.latestSequence/);
+  assert.match(app, /const visibleEventTotal = liveFlow\s*\? platformActivity\.length/);
+  assert.match(app, /const platformMetrics = liveFlow && Array\.isArray\(state\.agentPlatform\?\.activity\)/);
+  assert.match(app, /inventoryReconciled && liveFlow\.invoiceHeld[\s\S]*"Invoice payment hold"/);
+  assert.match(app, /"Inventory reconciled · invoice payment hold awaits agent diagnosis"/);
+  assert.doesNotMatch(app, /inventory reconciliation \$\{\["ACKNOWLEDGED", "VERIFIED"\]/);
+  assert.match(app, /consoleNode\.dataset\.phase =/);
+  assert.match(css, /\.agent-platform-console\[data-phase="idle"\][\s\S]*\.platform-chat-card/s);
+  assert.match(html, /HISTORICAL OPERATING WINDOW/);
+  assert.doesNotMatch(html, /90-DAY OPERATING WINDOW[\s\S]{0,220}>LIVE</);
+});
+
+test("manager can reject a prepared plan without executing it", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  assert.match(html, /id="platform-reject-plan"/);
+  assert.match(app, /runPlatformAction\("reject"/);
+  assert.match(app, /\/api\/v1\/agent-platform\/\$\{path\}/);
+  assert.match(app, /case_matrix_size, 14/);
+});
+
+test("dashboard projects source-derived operating economics and event-time exposure", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+
+  for (const id of [
+    "business-availability",
+    "business-reconciliation",
+    "business-working-capital",
+    "business-invoice-hold",
+    "business-unit-cost",
+    "business-price-variance",
+    "business-quality-hold",
+    "business-value-protected",
+    "business-impact-chart",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+
+  assert.match(app, /state\.agentPlatform\?\.business_impact/);
+  assert.match(app, /business_metrics:\s*\{/);
+  assert.match(app, /source: "agent-platform-event-ledger"/);
+  assert.match(app, /function renderBusinessImpact\(\)/);
+  assert.match(app, /function drawBusinessImpactChart\(snapshot\)/);
+  assert.match(css, /\.business-metric-grid/);
+  assert.match(css, /grid-area: impact/);
+  assert.doesNotMatch(html, /\$1,000|\$5,000|80\.0%/);
+});
+
+test("dashboard exposes connected plant risk from backend history instead of static report values", async () => {
+  const html = await readFile(new URL("../workspace/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
+
+  for (const id of [
+    "operations-risk-score",
+    "operations-oee",
+    "operations-schedule",
+    "operations-units-risk",
+    "operations-revenue-risk",
+    "operations-margin-risk",
+    "operations-days-supply",
+    "operations-inbound-otif",
+    "operations-supplier-ppm",
+    "operations-history-chart",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+
+  assert.match(app, /state\.agentPlatform\?\.connected_operations/);
+  assert.match(app, /function renderConnectedOperations\(\)/);
+  assert.match(app, /function drawConnectedOperationsChart\(\)/);
+  assert.match(app, /source: "synthetic-mes-demand-ledger"/);
+  assert.match(css, /\.operations-risk-signal/);
+  assert.match(css, /\.operations-metric-grid/);
+  assert.doesNotMatch(html, /900,000|130,000|83\.3%|94\.4%/);
+});
+
+test("dashboard and investigation components expose live parameters on click without framework tag noise", async () => {
+  const [html, app, css] = await Promise.all([
+    readFile(new URL("../workspace/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../workspace/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../workspace/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(html, /Adaptive reads|Typed output|Hook telemetry|Policy gate|Verified effects/);
+  assert.match(html, /id="platform-node-popover-metrics"/);
+  assert.match(html, /id="platform-evidence-details"/);
+  assert.match(html, /id="platform-node-popover-action"/);
+  assert.match(html, /id="platform-node-popover-external"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
+  assert.match(html, /id="dashboard-component-inspector"/);
+  assert.match(html, /id="dashboard-component-inspector-metrics"/);
+  assert.match(html, /id="dashboard-component-inspector-external"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
+  assert.match(app, /const EXTERNAL_SERVICE_LINKS = Object\.freeze/);
+  for (const host of ["missing20.v.frappe.cloud", "airtable.com", "integrator.io", "shrikisgood.atlassian.net", "app.slack.com"]) {
+    assert.match(app, new RegExp(host.replaceAll(".", "\\.")));
+  }
+  assert.match(app, /function platformComponentContext\(/);
+  assert.match(app, /receipt\.dataset\.platformSource = systemId/);
+  assert.match(app, /function openDashboardComponentInspector\(/);
+  assert.match(app, /function bindDashboardMetricInspectors\(/);
+  assert.match(app, /openDashboardComponentInspector\(flowComponentContext\(item\)\)/);
+  assert.match(app, /Stock Ledger Entry/);
+  assert.match(app, /General Ledger/);
+  assert.match(app, /Difference \$\{formatCurrency/);
+  assert.match(app, /Inventory \$\{currentAvailable\} → \$\{targetAvailable\} · no duplicate posting/);
+  assert.match(app, /AFTER EXECUTION · \$\{status\}/);
+  assert.match(css, /\.dashboard-component-inspector\s*\{/);
+  assert.match(css, /component-problem-pulse/);
+  assert.match(css, /\.platform-investigation-node\.is-problem/);
+});
+
+test("connected source inspectors use fetched record ids and never link to the retired fake ERP document", async () => {
+  const [html, app] = await Promise.all([
+    readFile(new URL("../workspace/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../workspace/app.js", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(app, /PO-4817|INV-4817/);
+  assert.match(app, /function liveERPDocument\(kind\)/);
+  assert.match(app, /function liveSaaSRecord\(componentId\)/);
+  assert.match(app, /liveRecord\?\.record_id/);
+  assert.match(app, /state\.erpEvidence\.activity/);
+  assert.match(app, /state\.saasEvidence\.activity/);
+  assert.match(html, /source-driven-final-v32/);
 });

@@ -806,8 +806,7 @@ class AgentCoreRuntimeModel(Model):
             "\n\nAPPLICATION-OWNED STRUCTURED OUTPUT CONTRACT:\n"
             "Return exactly one JSON object that validates against this JSON Schema. "
             "Do not return Markdown, prose outside the object, or fields not in the schema. "
-            "This contract controls formatting only; remain advisory and read-only.\n"
-            + schema_text
+            "This contract controls formatting only; remain advisory and read-only.\n" + schema_text
         )
 
     @classmethod
@@ -831,8 +830,7 @@ class AgentCoreRuntimeModel(Model):
             f"Return exactly one JSON object for the {tool_spec.get('name', 'structured output')} "
             "tool. The object must validate against this canonical inputSchema. "
             "Do not return Markdown, prose outside the object, provider metadata, or "
-            "wrapper fields.\n"
-            + schema_text
+            "wrapper fields.\n" + schema_text
         )
 
     @staticmethod
@@ -1141,17 +1139,20 @@ class AgentCoreRuntimeModel(Model):
         yield {"contentBlockDelta": {"delta": {"text": rendered}}}
         yield {"contentBlockStop": {}}
         yield {"messageStop": {"stopReason": "end_turn"}}
-        yield cast(Any, {
-            "metadata": {
-                "usage": {
-                    "inputTokens": input_tokens,
-                    "outputTokens": output_tokens,
-                    "totalTokens": input_tokens + output_tokens,
-                },
-                "metrics": {"latencyMs": 0},
-                "provider_metadata": self.actual_provider_metadata(),
-            }
-        })
+        yield cast(
+            Any,
+            {
+                "metadata": {
+                    "usage": {
+                        "inputTokens": input_tokens,
+                        "outputTokens": output_tokens,
+                        "totalTokens": input_tokens + output_tokens,
+                    },
+                    "metrics": {"latencyMs": 0},
+                    "provider_metadata": self.actual_provider_metadata(),
+                }
+            },
+        )
 
 
 class BedrockNovaProFactory(AgentModelFactory):

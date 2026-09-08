@@ -25,6 +25,8 @@ class _Reader:
 
 def _erp(*, status: str = "CONNECTED", quality_hold: bool = True) -> dict[str, object]:
     return {
+        "sequence": 1,
+        "case_id": "M20-ECU-2026-00011-LOT-A",
         "status": status,
         "activity": [
             {
@@ -37,14 +39,30 @@ def _erp(*, status: str = "CONNECTED", quality_hold: bool = True) -> dict[str, o
             }
         ],
         "documents": [
-            {"kind": "purchase_order", "name": "PUR-ORD-2026-00011"},
+            {
+                "kind": "purchase_order",
+                "name": "PUR-ORD-2026-00011",
+                "quantity": 20,
+                "unit_rate": 1200,
+                "line_value": 24000,
+                "currency": "USD",
+            },
             {
                 "kind": "purchase_receipt",
                 "name": "MAT-PRE-2026-00001",
                 "status": "PARTIAL_QUALITY_HOLD" if quality_hold else "RECEIVED",
+                "received": 20,
+                "accepted": 12 if quality_hold else 20,
                 "rejected": 8 if quality_hold else 0,
             },
-            {"kind": "purchase_invoice", "name": "ACC-PINV-2026-00007"},
+            {
+                "kind": "purchase_invoice",
+                "name": "ACC-PINV-2026-00007",
+                "status": "PAYMENT_HOLD" if quality_hold else "OPEN",
+                "on_hold": quality_hold,
+                "grand_total": 24000,
+                "currency": "USD",
+            },
         ],
     }
 
@@ -59,6 +77,7 @@ def _saas(*, status: str = "CONNECTED") -> dict[str, object]:
         "detail": "Lot A · 20 approved · correlation matched",
     }
     return {
+        "sequence": 1,
         "status": status,
         "correlation_id": "M20-ECU-2026-00011-LOT-A",
         "sources": [
@@ -74,6 +93,29 @@ def _saas(*, status: str = "CONNECTED") -> dict[str, object]:
         ],
         "activity": [row],
     }
+
+
+def test_live_projection_and_chart_metrics_come_from_the_same_erp_read() -> None:
+    platform = AgentPlatform(_Reader(_erp()), _Reader(_saas()))
+
+    projection = platform.current()
+
+    case = projection["case_projection"]["case"]
+    assert case["quantities"] == {
+        "ordered": 20.0,
+        "physically_arrived": 20.0,
+        "available": 12.0,
+        "quality_hold": 8.0,
+        "receipt_unresolved": 0.0,
+    }
+    assert case["invoice_held"] is True
+    assert projection["business_impact"]["working_capital_at_risk"] == 9600.0
+    metric_events = [event for event in projection["activity"] if "metrics" in event]
+    assert metric_events
+    assert metric_events[0]["metrics"]["expected"] == 20.0
+    assert metric_events[0]["metrics"]["recorded"] == 12.0
+    assert metric_events[0]["metrics"]["gap"] == 8.0
+    assert metric_events[0]["provenance"] == "live"
 
 
 def test_platform_admits_provider_rows_once_with_global_monotonic_sequence() -> None:
@@ -93,7 +135,8 @@ def test_platform_admits_provider_rows_once_with_global_monotonic_sequence() -> 
         "erpnext",
         "airtable",
         "celigo",
-        "jira_slack",
+        "jira",
+        "slack",
     }
     assert (
         next(node for node in constellation["nodes"] if node["id"] == "erpnext")["latest_sequence"]
@@ -153,6 +196,26 @@ def test_question_answer_is_read_only_and_does_not_claim_release() -> None:
     assert projection["activity"][-1]["status"] == "READ_ONLY"
 
 
+def test_server_live_case_console_mode_selects_authorized_read_adapter(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("MISSING20_CASE_CONSOLE_SOURCE", "live")
+    monkeypatch.delenv("MISSING20_ENVIRONMENT", raising=False)
+    try:
+        server = DecisionWorkspaceServer(
+            ("127.0.0.1", 0), ROOT, runtime_directory=tmp_path / "runtime"
+        )
+    except PermissionError:
+        pytest.skip("the managed test sandbox disallows loopback sockets")
+    try:
+        assert isinstance(server.agent_platform, AgentPlatform)
+        projection = server.agent_platform.current()
+        assert projection["mode"]["provenance"] == "live-read"
+        assert projection["mode"]["provider_writes"] == "DISABLED"
+    finally:
+        server.server_close()
+
+
 def test_server_exposes_only_read_only_agent_platform_commands(tmp_path: Path) -> None:
     platform = AgentPlatform(_Reader(_erp()), _Reader(_saas()))
     try:
@@ -184,9 +247,22 @@ def test_server_exposes_only_read_only_agent_platform_commands(tmp_path: Path) -
         assert answer["agent_advisory"]["status"] == "AGENT_UNAVAILABLE"
         assert answer["execution"]["available"] is False
 
-        diagnosis_request = Request(
+        missing_authorization = Request(
             f"{base}/api/v1/agent-platform/diagnose",
             data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(HTTPError) as authorization_error:
+            urlopen(missing_authorization, timeout=5)
+        assert authorization_error.value.code == 400
+        assert json.loads(authorization_error.value.read())["error"]["code"] == (
+            "diagnosis_authorization_required"
+        )
+
+        diagnosis_request = Request(
+            f"{base}/api/v1/agent-platform/diagnose",
+            data=b'{"operator_id":"manager-4817"}',
             headers={"Content-Type": "application/json"},
             method="POST",
         )

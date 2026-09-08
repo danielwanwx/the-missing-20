@@ -24,6 +24,9 @@ cdk.out/
 *.tfstate
 *.tfstate.*
 research-runs/
+.missing20-runtime/
+.superpowers/
+artifacts/runtime/
 
 # Browser profiles captured during local visual QA may contain session metadata.
 artifacts/audits/**/chrome-*/

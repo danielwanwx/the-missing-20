@@ -1,8 +1,8 @@
 # The Missing 20 Design
 
-**Status:** Ready for user review  
-**Date:** 2026-08-25  
-**Implementation strategy:** Hybrid vertical slice  
+**Status:** Ready for user review
+**Date:** 2026-08-25
+**Implementation strategy:** Hybrid vertical slice
 **Competition:** AWS Agents for Humans Hackathon 2026
 
 ## 1. Decision and source of truth

@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from urllib.request import urlopen
 from uuid import uuid4
@@ -15,6 +16,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.aws_preflight import PreflightError, load_identity, validate_identity
+from the_missing_20.adapters.erpnext_source import _read_env_file
 from the_missing_20.adapters.strands_models import BedrockNovaProConfig, BedrockNovaProFactory
 from the_missing_20.agents.live_advisory import live_recovery_packet
 from the_missing_20.config import ConfigurationError, Settings
@@ -37,6 +39,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--live-url", default=DEFAULT_LIVE_URL)
     parser.add_argument("--skip-live", action="store_true")
+    parser.add_argument("--live-only", action="store_true")
+    parser.add_argument(
+        "--case",
+        action="append",
+        default=[],
+        help="Fixture case filename stem to run; repeat for a representative subset.",
+    )
     return parser.parse_args()
 
 
@@ -70,7 +79,9 @@ def main() -> int:
         os.environ["BEDROCK_CONFIRM"] = args.confirm
     try:
         _confirm()
-        settings = Settings.from_env()
+        # Parse dotenv as data. Shell-sourcing this file is unsafe and also
+        # breaks legitimate SaaS labels containing spaces.
+        settings = Settings.from_env({**_read_env_file(ROOT / ".env"), **os.environ})
         identity = load_identity(settings)
         validate_identity(identity, settings)
         budget = AgentBudget(
@@ -78,9 +89,9 @@ def main() -> int:
             max_input_tokens=200_000,
             max_output_tokens=24_000,
             max_output_tokens_per_request=800,
-            prior_cost_usd=0,
-            incremental_cost_cap_usd="0.20",
-            cumulative_cost_cap_usd="0.20",
+            prior_cost_usd=Decimal("0"),
+            incremental_cost_cap_usd=Decimal("0.20"),
+            cumulative_cost_cap_usd=Decimal("0.20"),
             per_call_timeout_seconds=45,
             whole_run_timeout_seconds=300,
         )
@@ -95,10 +106,14 @@ def main() -> int:
             ),
             ledger=ledger,
         )
-        packets = [
-            load_fixture_packet(path)
-            for path in sorted((ROOT / "artifacts/golden/cases").glob("*.json"))
-        ]
+        fixture_paths = sorted((ROOT / "artifacts/golden/cases").glob("*.json"))
+        if args.case:
+            selected = set(args.case)
+            fixture_paths = [path for path in fixture_paths if path.stem in selected]
+            missing = selected.difference(path.stem for path in fixture_paths)
+            if missing:
+                raise ValueError("unknown fixture cases: " + ", ".join(sorted(missing)))
+        packets = [] if args.live_only else [load_fixture_packet(path) for path in fixture_paths]
         if not args.skip_live:
             packets.insert(0, _fetch_live_packet(args.live_url))
 
@@ -123,11 +138,11 @@ def main() -> int:
                     }
                 )
 
-        passed = sum(
-            record.get("rubric", {}).get("passed") is True
-            for record in records
-            if isinstance(record.get("rubric"), dict)
-        )
+        passed = 0
+        for record in records:
+            rubric = record.get("rubric")
+            if isinstance(rubric, dict) and rubric.get("passed") is True:
+                passed += 1
         completed = sum("rubric" in record for record in records)
         errors = sum(record.get("status") == "ERROR" for record in records)
         report: dict[str, object] = {
@@ -135,7 +150,10 @@ def main() -> int:
             "batch_id": f"real-strands-{uuid4().hex}",
             "created_at": datetime.now(UTC).isoformat(),
             "provider": factory.provenance(),
-            "input_sources": {"fixture_cases": 16, "live_case": not args.skip_live},
+            "input_sources": {
+                "fixture_cases": 0 if args.live_only else len(fixture_paths),
+                "live_case": not args.skip_live,
+            },
             "records": records,
             "summary": {
                 "planned_cases": len(packets),

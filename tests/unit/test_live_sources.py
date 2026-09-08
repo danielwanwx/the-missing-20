@@ -53,9 +53,9 @@ def test_nws_normalizes_alerts_and_uses_a_non_sensitive_user_agent() -> None:
             }
         ]
     }
-    snapshot = NWSAlertsAdapter(
-        transport=_transport(payload, requests), max_age_seconds=1
-    ).fetch(NOW)
+    snapshot = NWSAlertsAdapter(transport=_transport(payload, requests), max_age_seconds=1).fetch(
+        NOW
+    )
 
     assert snapshot.status is LiveSourceStatus.CONNECTED
     assert snapshot.metrics == {

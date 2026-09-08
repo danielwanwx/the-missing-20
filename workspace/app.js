@@ -5,11 +5,13 @@
   const $ = (id) => document.getElementById(id);
   const query = new URLSearchParams(window.location.search);
   const smokeCapture = query.get("smoke") === "1";
+  const providerPollingDisabled = query.get("polling") === "0";
   const demoMode = ["complete", "degraded", "invalid"].includes(query.get("mode") || "complete")
     ? (query.get("mode") || "complete")
     : "complete";
   const EVENT_TYPES = [
     "telemetry.observed",
+    "external.source.changed",
     "source.condition.injected",
     "incident.detected",
     "investigation.started",
@@ -27,6 +29,11 @@
     "approval.requested",
     "approval.recorded",
     "execution.started",
+    "source.read.started",
+    "source.read.completed",
+    "effect.started",
+    "effect.completed",
+    "verification.started",
     "execution.completed",
     "verification.completed",
     "copilot.message",
@@ -35,6 +42,7 @@
   ];
   const MAX_EVENT_HISTORY = 2000;
   const OPERATION_TYPES = new Set([
+    "external.source.changed",
     "agent.started",
     "agent.completed",
     "tool.started",
@@ -45,6 +53,14 @@
     "synthesis.completed",
     "evaluation.started",
     "evaluation.completed",
+    "source.read.started",
+    "source.read.completed",
+    "effect.started",
+    "effect.completed",
+    "verification.started",
+    "execution.started",
+    "execution.completed",
+    "verification.completed",
   ]);
   const WORKSPACE_STATUSES = new Set([
     "MONITORING",
@@ -79,9 +95,55 @@
     },
   ];
   const ROLE_DEFS = [
-    { role: "INTEGRATION_OPERATOR", principal: "integration-operator", name: "Integration operator" },
-    { role: "AP_APPROVER", principal: "ap-approver", name: "AP approver" },
+    { role: "MANAGER", principal: "manager", name: "Manager" },
   ];
+  const PLATFORM_LAYOUT_KEY = "missing20-command-canvas-v1";
+  const PLATFORM_NODE_IDS = ["erpnext", "airtable", "celigo", "jira", "slack", "agent", "manager"];
+  const EXTERNAL_SERVICE_LINKS = Object.freeze({
+    erpnext: {
+      label: "Open ERPNext",
+      url: "https://missing20.v.frappe.cloud/app/purchase-order/PUR-ORD-2026-00011",
+    },
+    airtable: {
+      label: "Open Airtable",
+      url: "https://airtable.com/appcV7IwCbuWs8X39",
+    },
+    celigo: {
+      label: "Open Celigo",
+      url: "https://integrator.io/flows",
+    },
+    jira: {
+      label: "Open Jira",
+      url: "https://shrikisgood.atlassian.net/jira/software/projects/QRC/boards",
+    },
+    slack: {
+      label: "Open Slack",
+      url: "https://app.slack.com/client/T0BUCRETR2R/C0BUNV20J6Q",
+    },
+  });
+
+  function liveERPDocument(kind) {
+    const documents = Array.isArray(state.erpEvidence?.documents) ? state.erpEvidence.documents : [];
+    return documents.find((item) => value(item?.kind) === kind) || null;
+  }
+
+  function liveSaaSRecord(componentId) {
+    const sources = Array.isArray(state.saasEvidence?.sources) ? state.saasEvidence.sources : [];
+    return sources.find((item) => {
+      const haystack = `${value(item?.provider)} ${value(item?.source_id)}`.toLowerCase();
+      return haystack.includes(componentId);
+    }) || null;
+  }
+
+  function erpDocumentLink(kind, route, fallbackName) {
+    const document = liveERPDocument(kind);
+    const name = value(document?.name || fallbackName);
+    return {
+      label: `Open ERPNext ${route.replaceAll("-", " ")}`,
+      url: `https://missing20.v.frappe.cloud/app/${route}/${encodeURIComponent(name)}`,
+    };
+  }
+  const MANAGER_ATTESTATIONS = ["integration-operator", "ap-approver"];
   // Stable Case Console identifiers are the only values used to dispatch a
   // command. Labels and assistant prose are display-only.
   const CASE_ACTION_DEFS = {
@@ -111,11 +173,10 @@
   };
 
   const state = {
-    view: new URLSearchParams(window.location.search).get("view") === "agent"
-      ? "agent"
-      : new URLSearchParams(window.location.search).get("view") === "scenario"
-        ? "scenario"
-        : "dashboard",
+    view: new URLSearchParams(window.location.search).get("view") === "agent" ? "agent" : "dashboard",
+    demoControlsOpen: false,
+    dashboardLatestRenderedSequence: 0,
+    dashboardEventFollow: true,
     incidentId: "",
     snapshot: null,
     units: new Map(),
@@ -135,6 +196,9 @@
     movingIds: new Set(),
     activeEdges: new Set(),
     telemetry: [],
+    transitionBaseline: null,
+    flowStageCounts: new Map(),
+    flowStageRunId: "",
     telemetryPulse: false,
     telemetryPulseTimer: null,
     activeToolActors: new Set(),
@@ -156,7 +220,27 @@
     liveSourceBusy: false,
     liveSourceRenderKey: "",
     liveSourceAnimatedSequences: new Map(),
+    erpEvidence: null,
+    erpEvidenceError: "",
+    erpEvidenceTimer: null,
+    erpEvidenceBusy: false,
+    saasEvidence: null,
+    saasEvidenceError: "",
+    saasEvidenceTimer: null,
+    saasEvidenceBusy: false,
+    agentPlatform: null,
+    ambiguousReceiptCase: null,
+    agentPlatformError: "",
+    agentPlatformTimer: null,
+    agentPlatformBusy: false,
+    agentPlatformDiagnosing: false,
+    agentPlatformActionBusy: false,
+    agentPlatformAnswer: "",
+    agentPlatformAdvisory: null,
+    agentPlatformQuestionBusy: false,
+    agentPlatformPulseAfter: 0,
     graphEventSequence: 0,
+    latestActivitySequence: 0,
     activitySource: "Current stream",
     selectedPoint: null,
     selectedPointSequence: 0,
@@ -166,10 +250,16 @@
     chartFocusTimer: null,
     chartKeyListenerInstalled: false,
     chartPulseSequence: 0,
+    liveMetricSequence: 0,
+    businessMetricSequence: 0,
     recoveryAvailable: false,
     goldenRunning: false,
     rightRailTab: "context",
     focusedEvidenceId: "",
+    platformArrangeMode: false,
+    platformFocusedModule: "",
+    platformSelectedNode: "",
+    platformLayout: {},
     renderQueued: false,
     refreshPromise: Promise.resolve(),
   };
@@ -214,16 +304,25 @@
 
   function stateClass(raw) {
     const status = value(raw).toUpperCase();
-    if (["HEALTHY", "MONITORING", "COMPLETE", "COMPLETED", "PASS", "GRANTED", "APPROVED", "ERP_RECORDED", "VERIFIED"].includes(status)) {
+    if (["HEALTHY", "MONITORING", "COMPLETE", "COMPLETED", "OPEN", "PASS", "GRANTED", "APPROVED", "ERP_RECORDED", "VERIFIED", "RECOVERY_COMPLETE", "SAFE_NOOP"].includes(status)) {
       return "state-lime";
     }
     if (["RUNNING", "TRIGGERED", "INVESTIGATING", "WAITING FOR EVIDENCE", "STARTED", "ADMITTED", "HANDED_OFF", "HANDOFF", "SCRIPTED_SYNTHETIC_PROOF"].includes(status)) {
       return "state-cyan";
     }
-    if (["ANOMALY", "QUEUE_FAILED", "PARTIAL", "HELD", "FAILED", "BLOCKED", "DEGRADED", "NOT_PROVEN", "NOT PROVEN", "PENDING_APPROVAL"].includes(status)) {
+    if (["ANOMALY", "QUEUE_FAILED", "PARTIAL", "HELD", "FAILED", "BLOCKED", "DEGRADED", "NOT_PROVEN", "NOT PROVEN", "PENDING_APPROVAL", "DENY", "HARD_STOP", "AGENT_UNAVAILABLE", "VALIDATION_FAILED"].includes(status)) {
       return "state-coral";
     }
     return "state-neutral";
+  }
+
+  function isProblemStatus(raw) {
+    return [
+      "ANOMALY", "CRITICAL", "QUEUE FAILED", "QUEUE_FAILED", "PARTIAL", "HELD",
+      "FAILED", "BLOCKED", "DEGRADED", "MISSING", "UNKNOWN", "TIMEOUT",
+      "NOT PROVEN", "NOT_PROVEN", "HARD STOP", "HARD_STOP", "AGENT UNAVAILABLE",
+      "AGENT_UNAVAILABLE", "VALIDATION FAILED", "VALIDATION_FAILED",
+    ].includes(value(raw).toUpperCase());
   }
 
   function makeKey(prefix) {
@@ -240,6 +339,383 @@
     return node;
   }
 
+  function readPlatformLayout() {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(PLATFORM_LAYOUT_KEY) || "{}");
+      if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+      return Object.fromEntries(Object.entries(stored).filter(([key, item]) => (
+        /^[a-z-]+$/.test(key)
+        && item && typeof item === "object"
+        && ["x", "y", "width", "height"].every((field) => item[field] == null || Number.isFinite(Number(item[field])))
+      )));
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function storePlatformLayout() {
+    try {
+      window.localStorage.setItem(PLATFORM_LAYOUT_KEY, JSON.stringify(state.platformLayout));
+    } catch (_error) {
+      // Layout persistence is optional. Operational state never depends on it.
+    }
+  }
+
+  function applyPlatformLayout() {
+    document.querySelectorAll("[data-canvas-module]").forEach((module) => {
+      const layout = state.platformLayout[module.dataset.canvasModule] || {};
+      const x = Math.max(-240, Math.min(240, number(layout.x)));
+      const y = Math.max(-180, Math.min(220, number(layout.y)));
+      const width = Math.max(0, Math.min(1400, number(layout.width)));
+      const height = Math.max(0, Math.min(1100, number(layout.height)));
+      module.style.setProperty("--module-x", `${x}px`);
+      module.style.setProperty("--module-y", `${y}px`);
+      module.style.width = width ? `${width}px` : "";
+      module.style.height = height ? `${height}px` : "";
+    });
+  }
+
+  function setPlatformArrangeMode(enabled) {
+    state.platformArrangeMode = Boolean(enabled);
+    const canvas = $("platform-command-canvas");
+    const button = $("platform-arrange-mode");
+    if (canvas) canvas.dataset.arrange = String(state.platformArrangeMode);
+    if (button) {
+      button.setAttribute("aria-pressed", String(state.platformArrangeMode));
+      button.setAttribute("aria-label", state.platformArrangeMode ? "Finish arranging canvas" : "Arrange canvas");
+      button.classList.toggle("is-active", state.platformArrangeMode);
+      const label = button.querySelector("span");
+      if (label) label.textContent = state.platformArrangeMode ? "Done" : "Arrange";
+    }
+  }
+
+  function resetPlatformLayout() {
+    state.platformLayout = {};
+    storePlatformLayout();
+    applyPlatformLayout();
+    renderPlatformInvestigationLinks();
+  }
+
+  function platformNodeAnchor(point, toward) {
+    const dx = toward.x - point.x;
+    const dy = toward.y - point.y;
+    if (Math.abs(dx) < .001 && Math.abs(dy) < .001) return { x: point.x, y: point.y };
+    const rx = Math.max(1, point.rx - .75);
+    const ry = Math.max(1, point.ry - .75);
+    const scale = point.node.classList.contains("platform-agent-node")
+      ? 1 / Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry))
+      : 1 / Math.max(Math.abs(dx) / rx, Math.abs(dy) / ry);
+    return { x: point.x + dx * scale, y: point.y + dy * scale };
+  }
+
+  function platformLinkPath(start, end, { curve = false } = {}) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    // All current node pairs have an unobstructed sightline. Keep those routes
+    // straight; callers must opt into a curve only when a real obstacle exists.
+    if (!curve || Math.abs(dx) < 2 || Math.abs(dy) < 2) return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const bend = Math.min(140, Math.max(32, Math.abs(dx) * .46));
+      const direction = dx >= 0 ? 1 : -1;
+      return `M ${start.x} ${start.y} C ${start.x + bend * direction} ${start.y}, ${end.x - bend * direction} ${end.y}, ${end.x} ${end.y}`;
+    }
+    const bend = Math.min(120, Math.max(28, Math.abs(dy) * .42));
+    const direction = dy >= 0 ? 1 : -1;
+    return `M ${start.x} ${start.y} C ${start.x} ${start.y + bend * direction}, ${end.x} ${end.y - bend * direction}, ${end.x} ${end.y}`;
+  }
+
+  function createSvgPath() {
+    return document.createElementNS("http:" + "//www.w3.org/2000/svg", "path");
+  }
+
+  function renderPlatformInvestigationLinks() {
+    const map = $("platform-investigation-map");
+    const svg = $("platform-investigation-links");
+    if (!map || !svg || map.offsetParent === null) return;
+    const bounds = map.getBoundingClientRect();
+    // A view switch and the first hydrated render can happen in the same
+    // animation frame. In Chromium that occasionally exposes the map before
+    // layout has assigned it usable dimensions. Do not freeze the topology in
+    // that transient empty state; the queued second pass below will draw it.
+    if (bounds.width < 2 || bounds.height < 2) return;
+    svg.setAttribute("viewBox", `0 0 ${Math.max(1, bounds.width)} ${Math.max(1, bounds.height)}`);
+    svg.replaceChildren();
+    const center = (id) => {
+      const node = map.querySelector(`[data-investigation-node="${id}"]`);
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      return {
+        x: rect.left - bounds.left + rect.width / 2,
+        y: rect.top - bounds.top + rect.height / 2,
+        rx: rect.width / 2,
+        ry: rect.height / 2,
+        node,
+      };
+    };
+    const links = [
+      ["erpnext", "agent"], ["airtable", "agent"], ["celigo", "agent"],
+      ["jira", "agent"], ["slack", "agent"], ["agent", "manager"],
+    ];
+    links.forEach(([fromId, toId]) => {
+      const from = center(fromId);
+      const to = center(toId);
+      if (!from || !to) return;
+      const start = platformNodeAnchor(from, to);
+      const end = platformNodeAnchor(to, from);
+      const path = createSvgPath();
+      path.setAttribute("d", platformLinkPath(start, end));
+      path.setAttribute("class", `platform-investigation-link${from.node.classList.contains("is-live") || to.node.classList.contains("is-live") ? " is-live" : ""}`);
+      path.setAttribute("data-platform-link", `${fromId}-${toId}`);
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.append(path);
+    });
+  }
+
+  function schedulePlatformInvestigationLinks() {
+    window.requestAnimationFrame(() => {
+      renderPlatformInvestigationLinks();
+      window.requestAnimationFrame(renderPlatformInvestigationLinks);
+    });
+  }
+
+  function focusPlatformModule(module) {
+    const next = module && state.platformFocusedModule !== module.dataset.canvasModule
+      ? module.dataset.canvasModule
+      : "";
+    state.platformFocusedModule = next;
+    document.querySelectorAll("[data-canvas-module]").forEach((item) => {
+      const focused = item.dataset.canvasModule === next;
+      item.classList.toggle("is-focused", focused);
+      item.querySelector("[data-module-focus]")?.setAttribute("aria-label", focused ? "Exit focus view" : `Focus ${item.dataset.canvasModule}`);
+    });
+    document.body.classList.toggle("platform-focus-open", Boolean(next));
+    schedulePlatformInvestigationLinks();
+  }
+
+  function platformComponentContext(componentId) {
+    const platform = state.agentPlatform || {};
+    const demoCase = platform.demo_case && typeof platform.demo_case === "object" ? platform.demo_case.case || {} : {};
+    const quantities = demoCase.quantities && typeof demoCase.quantities === "object" ? demoCase.quantities : {};
+    const systems = Array.isArray(platform.systems) ? platform.systems : [];
+    const constellation = platform.evidence_constellation && typeof platform.evidence_constellation === "object" ? platform.evidence_constellation : {};
+    const evidenceNodes = Array.isArray(constellation.nodes) ? constellation.nodes : [];
+    const system = systems.find((item) => value(item?.id) === componentId) || {};
+    const evidence = evidenceNodes.find((item) => value(item?.id) === componentId) || {};
+    const operations = connectedOperationsProjection() || {};
+    const risk = operations.risk_signal || {};
+    const agentRun = platform.agent_run || {};
+    const humanReview = platform.human_review || {};
+    const liveRecord = liveSaaSRecord(componentId);
+    const livePO = liveERPDocument("purchase_order");
+    const liveReceipt = liveERPDocument("purchase_receipt");
+    const liveInvoice = liveERPDocument("purchase_invoice");
+    const liveSalesOrder = liveERPDocument("sales_order");
+    const liveDelivery = liveERPDocument("delivery_note");
+    const liveSalesInvoice = liveERPDocument("sales_invoice");
+    const purposes = {
+      erpnext: "Authoritative purchase order, stock ledger, receipt and invoice state.",
+      airtable: "Exact-lot quality disposition and release eligibility.",
+      celigo: "Integration attempt, acknowledgement and receipt business-key lineage.",
+      jira: "Case ownership and the exception workflow journal.",
+      slack: "Manager notification and human-decision audit trail.",
+      agent: "Reads source evidence, tests competing causes and prepares a bounded recommendation.",
+      manager: "Reviews only the proposed write scope when the Agent has enough evidence.",
+    };
+    const titles = {
+      erpnext: "ERPNext",
+      airtable: "Airtable Quality",
+      celigo: "Celigo",
+      jira: "Jira",
+      slack: "Slack",
+      agent: "Agent",
+      manager: "Manager",
+    };
+    const common = {
+      title: titles[componentId] || value(system.name || componentId),
+      status: value(
+        componentId === "erpnext" && state.erpEvidence?.status === "CONNECTED"
+          ? "LIVE READ"
+          : liveRecord?.status || evidence.status || system.status || "WAITING",
+      ).replaceAll("_", " "),
+      purpose: purposes[componentId] || "Connected case component.",
+      metrics: [],
+      external: EXTERNAL_SERVICE_LINKS[componentId] || null,
+    };
+    if (componentId === "erpnext") common.external = erpDocumentLink(
+      "purchase_order",
+      "purchase-order",
+      "PUR-ORD-2026-00011",
+    );
+    if (componentId === "erpnext") common.metrics = [
+      ["Live purchase order", value(livePO?.name || "WAITING")],
+      ["Live receipt", `${value(liveReceipt?.name || "WAITING")} · ${number(liveReceipt?.accepted)} accepted / ${number(liveReceipt?.rejected)} held`],
+      ["Live invoice", `${value(liveInvoice?.name || "WAITING")} · ${value(liveInvoice?.status || "WAITING")}`],
+      ["Customer order", `${value(liveSalesOrder?.name || "WAITING")} · ${value(liveSalesOrder?.status || "WAITING")}`],
+      ["Delivery note", value(liveDelivery?.name || "WAITING")],
+      ["Customer invoice", value(liveSalesInvoice?.name || "WAITING")],
+      ["Read sequence", state.erpEvidence ? `seq ${number(state.erpEvidence.sequence)}` : "WAITING"],
+    ];
+    if (componentId === "airtable") common.metrics = [
+      ["Live record", value(liveRecord?.record_id || "WAITING")],
+      ["Status", value(liveRecord?.status || "WAITING")],
+      ["Correlation", value(liveRecord?.correlation?.case_id || demoCase.case_id || "—")],
+    ];
+    if (componentId === "celigo") common.metrics = [
+      ["Live run", value(liveRecord?.record_id || "WAITING")],
+      ["Outcome", value(liveRecord?.status || platform.integration_receipt?.status || "UNKNOWN")],
+      ["ERP acknowledged", liveRecord ? (liveRecord.erp_acknowledged ? "YES" : "NO") : "WAITING"],
+    ];
+    if (componentId === "jira") common.metrics = [
+      ["Live issue", value(liveRecord?.record_id || "WAITING")],
+      ["Risk", `${number(risk.score)} · ${value(risk.band || "WAITING")}`],
+      ["Read at", value(liveRecord?.occurred_at || "WAITING")],
+    ];
+    if (componentId === "slack") common.metrics = [
+      ["Live message", value(liveRecord?.record_id || "WAITING")],
+      ["Review", value(humanReview.status || "WAITING").replaceAll("_", " ")],
+      ["Channel read", value(liveRecord?.status || "WAITING")],
+    ];
+    if (componentId === "agent") {
+      common.status = value(agentRun.state || "IDLE").replaceAll("_", " ");
+      common.metrics = [
+        ["Evidence", String(number(platform.judge_proof?.evidence_records))],
+        ["Source checks", String(number(platform.judge_proof?.source_checks))],
+        ["Risk in scope", `${number(risk.score)} / 100`],
+        ["Confidence", `${Math.round(number(agentRun.confidence) * 100)}%`],
+      ];
+    }
+    if (componentId === "manager") {
+      common.status = value(humanReview.status || "STANDBY").replaceAll("_", " ");
+      common.metrics = [
+        ["Required", humanReview.required ? "YES" : "NO"],
+        ["Next action", value(humanReview.action || "NONE").replaceAll("_", " ")],
+        ["Can pause", humanReview.can_stop ? "YES" : "NO"],
+      ];
+    }
+    return common;
+  }
+
+  function showPlatformNodePopover(node) {
+    const popover = $("platform-node-popover");
+    if (!popover || !node) return;
+    const componentId = value(node.dataset.investigationNode || node.dataset.platformSource);
+    const context = platformComponentContext(componentId);
+    state.platformSelectedNode = componentId;
+    $("platform-node-popover-title").textContent = context.title;
+    $("platform-node-popover-status").textContent = context.status;
+    $("platform-node-popover-detail").textContent = context.purpose;
+    const metrics = $("platform-node-popover-metrics");
+    metrics.replaceChildren();
+    context.metrics.forEach(([label, metricValue]) => {
+      const row = create("div");
+      row.append(create("dt", null, label), create("dd", null, metricValue));
+      metrics.append(row);
+    });
+    const action = $("platform-node-popover-action");
+    action.dataset.componentId = componentId;
+    action.textContent = componentId === "manager" ? "Open decision" : componentId === "agent" ? "Open Agent" : "Ask Agent";
+    const external = $("platform-node-popover-external");
+    if (external) {
+      external.hidden = !context.external;
+      external.href = value(context.external?.url || "#");
+      const label = external.querySelector("span");
+      if (label) label.textContent = value(context.external?.label || "Open service");
+      external.setAttribute("aria-label", `${value(context.external?.label || "Open service")} in a new tab`);
+    }
+    popover.hidden = false;
+    const canvasBounds = $("platform-command-canvas").getBoundingClientRect();
+    const rect = node.getBoundingClientRect();
+    popover.style.left = `${Math.max(12, Math.min(canvasBounds.width - 280, rect.left - canvasBounds.left + rect.width + 12))}px`;
+    popover.style.top = `${Math.max(72, rect.top - canvasBounds.top - 8)}px`;
+    node.setAttribute("aria-expanded", "true");
+  }
+
+  function closePlatformNodePopover() {
+    const popover = $("platform-node-popover");
+    if (popover) popover.hidden = true;
+    document.querySelectorAll("[data-investigation-node]").forEach((node) => node.setAttribute("aria-expanded", "false"));
+    document.querySelectorAll("[data-platform-source]").forEach((node) => node.setAttribute("aria-expanded", "false"));
+    state.platformSelectedNode = "";
+  }
+
+  function bindPlatformCanvasInteractions() {
+    state.platformLayout = readPlatformLayout();
+    applyPlatformLayout();
+    $("platform-arrange-mode")?.addEventListener("click", () => setPlatformArrangeMode(!state.platformArrangeMode));
+    $("platform-reset-layout")?.addEventListener("click", resetPlatformLayout);
+    $("platform-node-popover-close")?.addEventListener("click", closePlatformNodePopover);
+    $("platform-node-popover-action")?.addEventListener("click", () => {
+      const componentId = value($("platform-node-popover-action").dataset.componentId);
+      closePlatformNodePopover();
+      if (componentId === "manager") {
+        focusPlatformModule(document.querySelector('[data-canvas-module="decision"]'));
+        return;
+      }
+      if (componentId === "agent") {
+        focusPlatformModule(document.querySelector('[data-canvas-module="agent-console"]'));
+        return;
+      }
+      const input = $("platform-question");
+      if (input) {
+        input.value = `Explain the current ${platformComponentContext(componentId).title} evidence, its parameters, and how it affects the risk signal.`;
+        focusPlatformModule(document.querySelector('[data-canvas-module="conversation"]'));
+        input.focus();
+      }
+    });
+    document.querySelectorAll("[data-module-focus]").forEach((button) => {
+      button.addEventListener("click", () => focusPlatformModule(button.closest("[data-canvas-module]")));
+    });
+    document.querySelectorAll("[data-investigation-node]").forEach((node) => {
+      node.setAttribute("aria-expanded", "false");
+      node.addEventListener("click", () => showPlatformNodePopover(node));
+    });
+    document.querySelectorAll("[data-canvas-module]").forEach((module) => {
+      const begin = (event, mode) => {
+        if (!state.platformArrangeMode || event.button !== 0) return;
+        if (event.target.closest("button") && !event.target.closest("[data-module-resize]")) return;
+        event.preventDefault();
+        const id = module.dataset.canvasModule;
+        const current = state.platformLayout[id] || {};
+        const rect = module.getBoundingClientRect();
+        const start = { x: event.clientX, y: event.clientY, tx: number(current.x), ty: number(current.y), width: rect.width, height: rect.height };
+        module.setPointerCapture(event.pointerId);
+        module.classList.add("is-manipulating");
+        const move = (moveEvent) => {
+          const dx = moveEvent.clientX - start.x;
+          const dy = moveEvent.clientY - start.y;
+          const next = state.platformLayout[id] = { ...current };
+          if (mode === "move") {
+            next.x = start.tx + dx;
+            next.y = start.ty + dy;
+          } else {
+            next.width = Math.max(220, start.width + dx);
+            next.height = Math.max(180, start.height + dy);
+          }
+          applyPlatformLayout();
+          renderPlatformInvestigationLinks();
+        };
+        const finish = () => {
+          module.classList.remove("is-manipulating");
+          module.removeEventListener("pointermove", move);
+          module.removeEventListener("pointerup", finish);
+          module.removeEventListener("pointercancel", finish);
+          storePlatformLayout();
+        };
+        module.addEventListener("pointermove", move);
+        module.addEventListener("pointerup", finish);
+        module.addEventListener("pointercancel", finish);
+      };
+      module.querySelector("[data-module-handle]")?.addEventListener("pointerdown", (event) => begin(event, "move"));
+      module.querySelector("[data-module-resize]")?.addEventListener("pointerdown", (event) => begin(event, "resize"));
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (state.platformFocusedModule) focusPlatformModule(null);
+      closePlatformNodePopover();
+      closeDashboardComponentInspector();
+    });
+  }
+
   function setBadge(node, label, rawState) {
     if (!node) return;
     node.className = `state-badge ${stateClass(rawState)}`;
@@ -248,10 +724,12 @@
 
   function setConnection(connection, detail) {
     state.connection = connection;
+    const liveSequence = platformFlowProjection()?.latestSequence;
+    const authoritativeSequence = liveSequence || state.lastSequence;
     const labels = { live: "LIVE", connecting: "CONNECTING", paused: "PAUSED" };
     $("connection-label").textContent = labels[connection] || "PAUSED";
     $("connection-dot").className = `status-dot ${connection === "live" ? "status-dot-lime" : connection === "paused" ? "status-dot-danger" : "status-dot-cyan"}`;
-    $("sequence-label").textContent = `seq ${state.lastSequence || "—"}`;
+    $("sequence-label").textContent = `seq ${authoritativeSequence || "—"}`;
     $("footer-status").textContent = detail || (connection === "live" ? "Ledger connected." : "Live movement paused.");
     $("live-heartbeat").textContent = connection === "live" ? "Connected" : connection === "connecting" ? "Connecting" : "Paused";
     document.body.dataset.connection = connection;
@@ -261,11 +739,150 @@
     return state.connection === "live";
   }
 
+  function platformFlowProjection() {
+    const platform = state.agentPlatform;
+    if (!platform) return null;
+    const caseProjection = platform.case_projection && typeof platform.case_projection === "object"
+      ? platform.case_projection
+      : platform.demo_case;
+    const liveAuthority = value(caseProjection?.provenance).toLowerCase() === "live-read";
+    // Synthetic Case Console facts belong to Scenario Lab. The Dashboard's
+    // synthetic workflow already has an authoritative incident ledger, so
+    // overlaying a second fixture projection would make recovery appear stuck.
+    if (!liveAuthority) return null;
+    const demoCase = caseProjection && typeof caseProjection === "object"
+      ? caseProjection.case
+      : null;
+    const quantities = demoCase && demoCase.quantities && typeof demoCase.quantities === "object"
+      ? demoCase.quantities
+      : null;
+    if (!quantities) return null;
+    const expected = number(quantities.physically_arrived);
+    const recorded = number(quantities.available);
+    const qualityHold = number(quantities.quality_hold);
+    const receiptUnresolved = number(quantities.receipt_unresolved);
+    const gap = qualityHold + receiptUnresolved;
+    const execution = platform.execution && typeof platform.execution === "object"
+      ? platform.execution
+      : {};
+    return {
+      caseId: value(platform.case_id),
+      runId: value(platform.run_id),
+      caseVersion: number(platform.case_version),
+      expected,
+      recorded,
+      gap,
+      qualityHold,
+      receiptUnresolved,
+      invoiceHeld: Boolean(demoCase.invoice_held),
+      verified: value(execution.status).toUpperCase() === "VERIFIED",
+      latestSequence: number(platform.latest_sequence),
+      provenance: value(caseProjection?.provenance || platform.mode?.provenance),
+    };
+  }
+
+  function businessImpactProjection() {
+    const raw = state.agentPlatform?.business_impact;
+    if (!raw || typeof raw !== "object") return null;
+    const liveAuthority = value(state.agentPlatform?.case_projection?.provenance).toLowerCase() === "live-read";
+    if (state.activeScenario !== "normal" || liveAuthority) return raw;
+    return {
+      ...raw,
+      inventory_availability_percent: 100,
+      erp_reconciliation_percent: 100,
+      working_capital_at_risk: 0,
+      invoice_hold_value: 0,
+      quality_hold_value: 0,
+      receipt_gap_value: 0,
+      receipt_gap_percent: 0,
+      quality_hold_percent: 0,
+      available_inventory_value: number(raw.po_line_value),
+      value_protected: 0,
+      supplier_status: value(raw.supplier_status || "ACTIVE"),
+      supplier_payment_hold: false,
+      invoice_status: "OPEN",
+    };
+  }
+
+  function valueProofProjection() {
+    const raw = state.agentPlatform?.value_proof;
+    return raw && typeof raw === "object" ? raw : null;
+  }
+
+  function hasLiveSourceAuthority() {
+    return value(state.agentPlatform?.case_projection?.provenance).toLowerCase() === "live-read";
+  }
+
+  function connectedOperationsProjection() {
+    const raw = state.agentPlatform?.connected_operations;
+    if (!raw || typeof raw !== "object") return null;
+    const liveAuthority = hasLiveSourceAuthority();
+    // The 90-day plant window is a disclosed Scenario Lab fixture.  It must
+    // never appear beside authoritative ERP records: mixing those two clocks
+    // makes a live read look like a fabricated production history.
+    if (liveAuthority && value(raw.provenance).toLowerCase().includes("synthetic")) return null;
+    if (state.activeScenario !== "normal" || liveAuthority) return raw;
+    const currentShift = raw.current_shift && typeof raw.current_shift === "object" ? raw.current_shift : {};
+    const customer = raw.customer_commitments && typeof raw.customer_commitments === "object" ? raw.customer_commitments : {};
+    const inventory = raw.inventory && typeof raw.inventory === "object" ? raw.inventory : {};
+    const history = Array.isArray(raw.history) ? raw.history.map((point) => ({ ...point })) : [];
+    if (history.length) {
+      const latest = history[history.length - 1];
+      latest.actual_units = number(latest.planned_units);
+      latest.schedule_attainment_percent = 100;
+      latest.risk_score = 0;
+      latest.units_at_risk = 0;
+      latest.revenue_at_risk = 0;
+    }
+    return {
+      ...raw,
+      risk_signal: { ...(raw.risk_signal || {}), score: 0, band: "NORMAL", units_at_risk: 0, reasons: [] },
+      current_shift: {
+        ...currentShift,
+        actual_units: number(currentShift.planned_units),
+        component_starved_units: 0,
+        schedule_attainment_percent: 100,
+        availability_percent: 96.2,
+        oee_percent: 92.3,
+      },
+      customer_commitments: {
+        ...customer,
+        units_at_risk: 0,
+        revenue_at_risk: 0,
+        contribution_margin_at_risk: 0,
+      },
+      inventory: {
+        ...inventory,
+        available_component_units: 100,
+        days_of_supply: 4.2,
+      },
+      history,
+    };
+  }
+
+  function formatCurrency(amount, currency = "USD") {
+    const numeric = Number(amount);
+    if (!Number.isFinite(numeric)) return "—";
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: value(currency || "USD"),
+        maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
+      }).format(numeric);
+    } catch (_error) {
+      return `$${numeric.toFixed(Number.isInteger(numeric) ? 0 : 2)}`;
+    }
+  }
+
   function incidentStatus() {
+    const platform = platformFlowProjection();
+    if (platform?.verified) return "CLOSED";
     return value(state.snapshot && state.snapshot.incident && state.snapshot.incident.status);
   }
 
   function isVerifiedClosedRecovery() {
+    const platform = platformFlowProjection();
+    if (platform?.verified) return true;
     const snapshot = state.snapshot || {};
     const incidentState = value(snapshot.incident && snapshot.incident.status).toUpperCase();
     return (incidentState === "CLOSED" || state.activeScenario === "recovery")
@@ -273,6 +890,8 @@
   }
 
   function isClosedOrRecovery() {
+    const platform = platformFlowProjection();
+    if (platform?.verified) return true;
     return value(state.snapshot && state.snapshot.incident && state.snapshot.incident.status).toUpperCase() === "CLOSED"
       || state.activeScenario === "recovery";
   }
@@ -752,10 +1371,885 @@
     }
   }
 
+  async function refreshEnterpriseEvidence() {
+    if (state.erpEvidenceBusy) return;
+    state.erpEvidenceBusy = true;
+    try {
+      state.erpEvidence = await requestJSON("/api/v1/erpnext-evidence");
+      state.erpEvidenceError = "";
+    } catch (error) {
+      state.erpEvidenceError = error.message;
+    } finally {
+      state.erpEvidenceBusy = false;
+      scheduleRender();
+    }
+  }
+
+  function scheduleEnterpriseEvidenceRefresh() {
+    if (smokeCapture || providerPollingDisabled || state.erpEvidenceTimer != null) return;
+    state.erpEvidenceTimer = window.setTimeout(() => {
+      state.erpEvidenceTimer = null;
+      if (document.hidden) {
+        scheduleEnterpriseEvidenceRefresh();
+        return;
+      }
+      refreshEnterpriseEvidence().finally(scheduleEnterpriseEvidenceRefresh);
+    }, 5000);
+  }
+
+  function startEnterpriseEvidenceRefresh() {
+    if (smokeCapture || providerPollingDisabled || state.erpEvidenceTimer != null) return;
+    refreshEnterpriseEvidence();
+    scheduleEnterpriseEvidenceRefresh();
+  }
+
+  async function refreshSaasEvidence() {
+    if (state.saasEvidenceBusy) return;
+    state.saasEvidenceBusy = true;
+    try {
+      state.saasEvidence = await requestJSON("/api/v1/saas-evidence");
+      state.saasEvidenceError = "";
+    } catch (error) {
+      state.saasEvidenceError = error.message;
+    } finally {
+      state.saasEvidenceBusy = false;
+      scheduleRender();
+    }
+  }
+
+  function scheduleSaasEvidenceRefresh() {
+    if (smokeCapture || providerPollingDisabled || state.saasEvidenceTimer != null) return;
+    state.saasEvidenceTimer = window.setTimeout(() => {
+      state.saasEvidenceTimer = null;
+      if (document.hidden) {
+        scheduleSaasEvidenceRefresh();
+        return;
+      }
+      refreshSaasEvidence().finally(scheduleSaasEvidenceRefresh);
+    }, 15000);
+  }
+
+  function startSaasEvidenceRefresh() {
+    if (smokeCapture || providerPollingDisabled || state.saasEvidenceTimer != null) return;
+    refreshSaasEvidence();
+    scheduleSaasEvidenceRefresh();
+  }
+
+  async function refreshAgentPlatform(force = false) {
+    if (state.agentPlatformBusy || (smokeCapture && !force)) return;
+    state.agentPlatformBusy = true;
+    try {
+      setAgentPlatformProjection(await requestJSON("/api/v1/agent-platform"));
+      try {
+        state.ambiguousReceiptCase = await requestJSON("/api/v1/ambiguous-receipt-case");
+      } catch (_error) {
+        state.ambiguousReceiptCase = null;
+      }
+      state.agentPlatformError = "";
+    } catch (error) {
+      state.agentPlatformError = error.message;
+    } finally {
+      state.agentPlatformBusy = false;
+      scheduleRender();
+    }
+  }
+
+  function setAgentPlatformProjection(projection) {
+    state.agentPlatformPulseAfter = number(state.agentPlatform && state.agentPlatform.latest_sequence);
+    state.agentPlatform = projection;
+  }
+
+  function startAgentPlatformRefresh() {
+    if (smokeCapture || providerPollingDisabled || state.agentPlatformTimer != null) return;
+    // Use short projection reads instead of a second permanent EventSource.
+    // One authoritative incident stream remains live; bounded polling prevents
+    // several open demo tabs from exhausting the browser's per-host connection pool.
+    state.agentPlatformTimer = window.setTimeout(async () => {
+      state.agentPlatformTimer = null;
+      if (document.hidden) {
+        startAgentPlatformRefresh();
+        return;
+      }
+      await refreshAgentPlatform();
+      startAgentPlatformRefresh();
+    }, 1500);
+  }
+
+  function scheduleAgentPlatformProjectionRefresh() {
+    if (smokeCapture || providerPollingDisabled) return;
+    if (state.agentPlatformTimer != null) window.clearTimeout(state.agentPlatformTimer);
+    state.agentPlatformTimer = window.setTimeout(() => {
+      state.agentPlatformTimer = null;
+      void refreshAgentPlatform().finally(startAgentPlatformRefresh);
+    }, 650);
+  }
+
+  async function syncPlatformInvestigation() {
+    await refreshAgentPlatform();
+    startAgentPlatformRefresh();
+  }
+
+  function syncDashboardSourceControl() {
+    const control = $("dashboard-inject-incident");
+    if (!control) return;
+    const liveSourceMode = hasLiveSourceAuthority();
+    const leadingLabel = control.querySelector("span:not([aria-hidden])");
+    const actionLabel = control.querySelector("strong");
+    if (leadingLabel) leadingLabel.textContent = liveSourceMode ? "Source" : "Live";
+    if (actionLabel) actionLabel.textContent = liveSourceMode ? "Open ERPNext" : "Inject incident";
+    control.title = liveSourceMode
+      ? "Open ERPNext; this dashboard advances only after the external records change"
+      : "Create the server-backed Scenario Lab incident";
+    control.dataset.sourceAuthority = liveSourceMode ? "external" : "scenario";
+    const demoControls = $("demo-controls-toggle");
+    if (demoControls) {
+      demoControls.hidden = liveSourceMode;
+      demoControls.setAttribute("aria-hidden", String(liveSourceMode));
+    }
+  }
+
+  function renderAgentPlatform() {
+    const consoleNode = $("agent-platform-console");
+    if (!consoleNode) return;
+    const platform = state.agentPlatform;
+    // A healthy dashboard stays a sparse operational baseline. The case console
+    // is an incident workspace: it appears only after the server-backed anomaly
+    // transition, then remains available through recovery and verification.
+    const liveFlow = platformFlowProjection();
+    const sourceAttention = Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
+    const normalScenario = isNormalScenario() && !sourceAttention;
+    syncDashboardSourceControl();
+    const verifiedHistory = Boolean(
+      platform?.resolution_packet?.status === "VERIFIED"
+      || platform?.execution?.status === "VERIFIED"
+      || platform?.judge_proof?.verified === true
+    );
+    const enabled = Boolean(platform) && (!normalScenario || verifiedHistory);
+    const agentView = $("agent-view");
+    if (agentView && consoleNode.parentElement !== agentView) agentView.prepend(consoleNode);
+    consoleNode.hidden = !enabled;
+    const normalState = $("agent-normal-state");
+    if (normalState) normalState.hidden = !Boolean(platform) || !normalScenario || verifiedHistory;
+    const normalSequence = $("agent-normal-sequence");
+    if (normalSequence) normalSequence.textContent = String(number(platform?.latest_sequence, state.lastSequence));
+    const legacyDashboard = document.querySelector("#dashboard-view .dashboard-grid");
+    const legacyWorkspace = document.querySelector("#agent-view .workspace-layout");
+    if (legacyDashboard) legacyDashboard.hidden = false;
+    // The old Operations Map remains only as a compatibility fixture. Every
+    // user-visible Agent state now uses the same light command-system shell.
+    if (legacyWorkspace) legacyWorkspace.hidden = Boolean(platform) && !smokeCapture;
+    document.body.dataset.agentPlatform = platform ? "ready" : "pending";
+    if (!enabled) return;
+
+    const correlation = platform.correlation && typeof platform.correlation === "object"
+      ? platform.correlation
+      : {};
+    setBadge($("platform-correlation"), value(correlation.status || "CORRELATION —").replaceAll("_", " "), correlation.status);
+    const providerWrites = value(platform.mode && platform.mode.provider_writes || "DISABLED");
+    const sourceProvenance = value(platform.mode && platform.mode.provenance);
+    const writeLabel = providerWrites === "DISABLED"
+      ? "WRITES DISABLED"
+      : providerWrites === "LOCAL_SYNTHETIC_ONLY"
+        ? "DEMO TENANT"
+        : providerWrites.replaceAll("_", " ");
+    setBadge(
+      $("platform-mode"),
+      `${sourceProvenance === "live-read" ? "LIVE READ · " : ""}${writeLabel}`,
+      providerWrites,
+    );
+    const tuple = correlation.tuple && typeof correlation.tuple === "object" ? correlation.tuple : {};
+    const platformCase = platform.demo_case && typeof platform.demo_case === "object"
+      ? platform.demo_case.case
+      : null;
+    const caseProjection = platformCase && typeof platformCase === "object"
+      ? platformCase
+      : (state.ambiguousReceiptCase && typeof state.ambiguousReceiptCase === "object"
+        ? state.ambiguousReceiptCase.case
+        : null);
+    const caseFacts = caseProjection && typeof caseProjection === "object" ? caseProjection : null;
+    const caseQuantities = caseFacts && caseFacts.quantities && typeof caseFacts.quantities === "object"
+      ? caseFacts.quantities
+      : null;
+    $("platform-incident-code").textContent = value(caseFacts && caseFacts.case_id || tuple.case_id || "M20");
+    const tupleNode = $("platform-case-tuple");
+    tupleNode.replaceChildren();
+    const caseDisplay = caseFacts && caseQuantities
+      ? [
+        ["arrived", caseQuantities.physically_arrived],
+        ["on hand", caseQuantities.available],
+        ["quality", caseQuantities.quality_hold],
+        ["receipt", caseQuantities.receipt_unresolved],
+        ["invoice", caseFacts.invoice_held ? "held" : `${number(caseQuantities.available)} matched · open`],
+      ]
+      : ["case_id", "purchase_order", "purchase_receipt", "purchase_invoice", "quantity"].map((key) => [key.replaceAll("_", " "), tuple[key]]);
+    caseDisplay.forEach(([key, itemValue]) => {
+      const item = create("span", "platform-tuple");
+      item.append(create("strong", null, key), create("span", null, value(itemValue) || "—"));
+      tupleNode.append(item);
+    });
+    const missing = Array.isArray(correlation.missing_fields) ? correlation.missing_fields : [];
+    const mismatched = Array.isArray(correlation.mismatched_fields) ? correlation.mismatched_fields : [];
+    const integrationOutcome = value(caseFacts && caseFacts.integration_outcome).toUpperCase();
+    const ribbonExecutionStatus = value(platform.execution && platform.execution.status).toUpperCase();
+    const inventoryReconciled = Boolean(liveFlow && liveFlow.gap === 0);
+    $("platform-title").textContent = ribbonExecutionStatus === "VERIFIED"
+      ? "Verified recovery"
+      : inventoryReconciled && liveFlow.invoiceHeld
+        ? "Invoice payment hold"
+        : liveFlow?.gap > 0
+          ? "Receipt reconciliation"
+          : "Connected investigation";
+    $("platform-correlation-detail").textContent = caseFacts && caseQuantities
+      ? (ribbonExecutionStatus === "VERIFIED"
+        ? "Receipt reconciled · recovery independently verified"
+        : inventoryReconciled && liveFlow.invoiceHeld
+          ? "Inventory reconciled · invoice payment hold awaits agent diagnosis"
+          : liveFlow?.gap > 0
+            ? `${liveFlow.gap} units require cross-source reconciliation`
+            : `Receipt confirmed · integration ${["ACKNOWLEDGED", "VERIFIED"].includes(integrationOutcome) ? "acknowledged" : "requires review"}`)
+      : missing.length
+      ? `Partial correlation · ${missing.join(", ")}`
+      : (mismatched.length
+        ? `Correlation mismatch · ${mismatched.join(", ")}`
+        : `Full correlation · ${providerWrites === "DEMO_GUARDED" ? "manager-gated execution" : "read only"}`);
+
+    const agentRun = platform.agent_run && typeof platform.agent_run === "object"
+      ? platform.agent_run
+      : {};
+    const diagnosis = platform.diagnosis && typeof platform.diagnosis === "object" ? platform.diagnosis : {};
+    const proof = platform.judge_proof && typeof platform.judge_proof === "object" ? platform.judge_proof : {};
+    const strands = diagnosis.strands_investigation && typeof diagnosis.strands_investigation === "object"
+      ? diagnosis.strands_investigation
+      : {};
+    const execution = platform.execution && typeof platform.execution === "object" ? platform.execution : {};
+    const executionStatus = value(execution.status || "AWAITING_MANAGER_APPROVAL");
+    const runState = value(agentRun.state).toUpperCase();
+    consoleNode.dataset.phase = executionStatus === "VERIFIED"
+      ? "verified"
+      : ["PLAN_READY", "COMPLETE", "RECOVERY_READY"].includes(runState)
+        ? "decision"
+        : runState === "IDLE" ? "idle" : "running";
+    setBadge($("platform-run-state"), value(agentRun.state || "IDLE").replaceAll("_", " "), agentRun.state);
+    const usage = strands.usage && typeof strands.usage === "object" ? strands.usage : {};
+    const provider = proof.provider && typeof proof.provider === "object"
+      ? proof.provider
+      : (strands.provider && typeof strands.provider === "object" ? strands.provider : {});
+    const modelId = value(provider.model);
+    const runtimeStatus = value(strands.status).toUpperCase();
+    const runtimeLabel = ["AGENT_UNAVAILABLE", "VALIDATION_FAILED"].includes(runtimeStatus)
+      ? "Unavailable"
+      : modelId.includes("nova-pro")
+      ? "Nova Pro"
+      : modelId.includes("nova-lite")
+        ? "Nova Lite"
+        : (modelId.split(/[.:/]/).filter(Boolean).at(-1) || value(proof.runtime) || "—");
+    const metricText = (id, text) => {
+      const node = $(id);
+      if (node) node.textContent = text;
+    };
+    metricText("platform-metric-runtime", runState === "IDLE" && runtimeLabel === "—" ? "On start" : runtimeLabel);
+    metricText("platform-metric-latency", number(strands.latency_ms) ? `${(number(strands.latency_ms) / 1000).toFixed(1)}s` : runState === "IDLE" ? "After run" : "—");
+    metricText("platform-metric-tools", String(number(proof.source_checks, Array.isArray(strands.tool_calls) ? strands.tool_calls.length : 0)));
+    metricText("platform-metric-evidence", String(number(proof.evidence_records)));
+    metricText("platform-metric-cases", String(number(proof.case_matrix_size, 14)));
+    metricText("platform-metric-tokens", number(usage.input_tokens) || number(usage.output_tokens)
+      ? `${Math.round((number(usage.input_tokens) + number(usage.output_tokens)) / 100) / 10}k`
+      : runState === "IDLE" ? "After run" : "—");
+    metricText("platform-metric-cost", number(usage.incremental_cost_usd)
+      ? `$${number(usage.incremental_cost_usd).toFixed(3)}`
+      : runState === "IDLE" ? "After run" : "—");
+
+    const diagnosisState = value(diagnosis.status).toUpperCase();
+    const strandsState = value(strands.status).toUpperCase();
+    const evaluated = ["PLAN_READY", "COMPLETE", "RECOVERY_READY"].includes(diagnosisState)
+      || strandsState === "COMPLETE";
+    const approvedOrExecuting = ["AUTHORIZED", "EXECUTING", "VERIFYING", "VERIFIED"].includes(executionStatus);
+    const stageState = {
+      observe: runState === "IDLE" ? "waiting" : "complete",
+      retrieve: strandsState === "COMPLETE" || evaluated ? "complete" : runState === "GATHERING" ? "current" : "waiting",
+      reconcile: evaluated ? "complete" : runState === "RECONCILING" ? "current" : "waiting",
+      evaluate: evaluated ? "complete" : ["EVALUATING", "SYNTHESIZING"].includes(runState) ? "current" : "waiting",
+      decide: executionStatus === "VERIFIED" || approvedOrExecuting ? "complete" : evaluated ? "current" : "waiting",
+      verify: executionStatus === "VERIFIED" ? "complete" : ["VERIFYING", "EXECUTING"].includes(executionStatus) ? "current" : "waiting",
+    };
+    document.querySelectorAll("#platform-loop-stages [data-loop-stage]").forEach((node) => {
+      const status = stageState[node.dataset.loopStage] || "waiting";
+      node.classList.toggle("is-complete", status === "complete");
+      node.classList.toggle("is-current", status === "current");
+      node.classList.toggle("is-waiting", status === "waiting");
+      node.setAttribute("aria-current", status === "current" ? "step" : "false");
+    });
+    const constellation = platform.evidence_constellation && typeof platform.evidence_constellation === "object"
+      ? platform.evidence_constellation
+      : {};
+    const conclusion = constellation.conclusion && typeof constellation.conclusion === "object"
+      ? constellation.conclusion
+      : {};
+    const pulseAfter = number(state.agentPlatformPulseAfter);
+    const latestSequence = number(platform.latest_sequence);
+    const constellationNodes = Array.isArray(constellation.nodes) ? constellation.nodes : [];
+    const integration = platform.integration_receipt && typeof platform.integration_receipt === "object"
+      ? platform.integration_receipt
+      : {};
+    const sourceReceipts = $("platform-source-receipts");
+    sourceReceipts.replaceChildren();
+    const observedDate = new Date(value(platform.received_at));
+    const observedTime = Number.isNaN(observedDate.getTime())
+      ? "OBSERVED —"
+      : `OBSERVED ${observedDate.toLocaleTimeString([], { hour12: false })}`;
+    const sourceRecord = {
+      erpnext: caseFacts ? `${value(caseFacts.purchase_order_id)} · ${value(caseFacts.invoice_id)}` : "—",
+      airtable: caseFacts ? `${value(caseFacts.supplier_lot)} · ${value(caseFacts.quality_release_key)}` : "—",
+      celigo: caseFacts ? value(caseFacts.receipt_business_key) : value(integration.record_id),
+      slack: caseFacts ? value(caseFacts.case_id) : value(tuple.case_id),
+    };
+    const platformSystems = Array.isArray(platform.systems) ? platform.systems : [];
+    $("platform-signal-count").textContent = `${platformSystems.length} LIVE`;
+    platformSystems.forEach((system) => {
+      if (!system || typeof system !== "object") return;
+      const systemId = value(system.id);
+      const evidenceNode = constellationNodes.find((node) => node && value(node.id) === systemId) || {};
+      const status = value(evidenceNode.status || system.status || "UNKNOWN");
+      const receipt = create("button", `platform-source-receipt is-${status.toLowerCase()}`);
+      receipt.type = "button";
+      receipt.dataset.platformSource = systemId;
+      receipt.setAttribute("aria-expanded", "false");
+      receipt.classList.toggle("is-problem", isProblemStatus(status));
+      if (number(evidenceNode.latest_sequence) > pulseAfter) receipt.classList.add("is-live");
+      const heading = create("div", "platform-source-receipt-head");
+      const systemLabel = {
+        erpnext: "ERPNext",
+        airtable: "Airtable Quality",
+        celigo: "Celigo",
+        jira: "Jira",
+        slack: "Slack",
+      }[systemId] || value(system.name);
+      receipt.setAttribute("aria-label", `${systemLabel}, ${human(status)}. Inspect live parameters.`);
+      receipt.addEventListener("click", () => showPlatformNodePopover(receipt));
+      heading.append(
+        create("strong", null, systemLabel),
+        create("span", null, status.replaceAll("_", " ")),
+      );
+      receipt.append(
+        heading,
+        create("code", null, value(system.record_id) || sourceRecord[systemId] || "—"),
+        create("span", "platform-source-authority", value(system.authority)),
+        create("time", "platform-source-time", observedTime),
+      );
+      sourceReceipts.append(receipt);
+    });
+    const systemById = new Map(platformSystems.map((system) => [value(system && system.id), system]));
+    PLATFORM_NODE_IDS.forEach((nodeId) => {
+      const node = document.querySelector(`[data-investigation-node="${nodeId}"]`);
+      if (!node) return;
+      const evidenceNode = constellationNodes.find((item) => item && value(item.id) === nodeId) || {};
+      const system = systemById.get(nodeId) || {};
+      let status = value(evidenceNode.status || system.status || "WAITING");
+      let detail = value(system.record_id || system.authority || "Waiting for evidence");
+      if (nodeId === "agent") {
+        status = value(agentRun.state || strands.status || "IDLE");
+        detail = value(diagnosis.summary || "Ready to investigate");
+      } else if (nodeId === "manager") {
+        status = value(platform.human_review && platform.human_review.status || "STANDBY");
+        detail = value(platform.human_review && platform.human_review.reason || "No decision required yet");
+      }
+      node.className = `platform-investigation-node${nodeId === "agent" ? " platform-agent-node" : ""}${nodeId === "manager" ? " platform-manager-node" : ""} ${stateClass(status)}`;
+      node.classList.toggle("is-problem", isProblemStatus(status));
+      if (latestSequence > pulseAfter && (nodeId === "agent" || value(evidenceNode.status))) node.classList.add("is-live");
+      node.dataset.nodeLabel = node.querySelector("strong")?.textContent || nodeId;
+      node.dataset.nodeStatus = status.replaceAll("_", " ");
+      node.dataset.nodeDetail = detail;
+    });
+    const conclusionNode = $("platform-conclusion");
+    conclusionNode.textContent = value(conclusion.label || "NO RELEASE");
+    const conclusionCard = $("platform-agent-conclusion");
+    conclusionCard.className = `platform-agent-conclusion is-${value(conclusion.status).toLowerCase()}`;
+    if (latestSequence > pulseAfter) conclusionCard.classList.add("is-live");
+    $("platform-confidence").textContent = executionStatus === "VERIFIED"
+      ? "Residual gap · 0 units"
+      : number(conclusion.confidence)
+        ? `Confidence · ${number(conclusion.confidence).toFixed(2)}`
+        : "Not scored";
+    const guardCopy = executionStatus === "VERIFIED"
+      ? "RECOVERY VERIFIED"
+      : executionStatus === "VERIFYING"
+        ? "ERP RECOVERY COMPLETE · VERIFYING RECEIPT"
+        : providerWrites === "DEMO_GUARDED"
+          ? (executionStatus === "AUTHORIZED" ? "MANAGER APPROVED · READY TO EXECUTE" : "MANAGER-GATED DEMO WRITE")
+          : "READ-ONLY OBSERVER";
+    $("platform-guard").lastChild.textContent = ` ${guardCopy}`;
+
+    setBadge($("platform-diagnosis-status"), value(diagnosis.status || "IDLE").replaceAll("_", " "), diagnosis.status);
+    const strandsStatus = value(strands.status || "IDLE");
+    setBadge(
+      $("platform-strands-status"),
+      strandsStatus === "COMPLETE" ? "REAL STRANDS" : strandsStatus.replaceAll("_", " "),
+      strandsStatus,
+    );
+    $("platform-diagnosis-summary").textContent = value(diagnosis.summary || "No diagnosis has run.");
+    const findingsHost = $("platform-reconciled-findings");
+    findingsHost.replaceChildren();
+    const findings = strands.evidence_findings && typeof strands.evidence_findings === "object"
+      ? strands.evidence_findings
+      : {};
+    const observations = findings.observations && typeof findings.observations === "object"
+      ? findings.observations
+      : null;
+    if (observations) {
+      const verifiedPostState = executionStatus === "VERIFIED";
+      const physical = verifiedPostState
+        ? number(caseQuantities && caseQuantities.physically_arrived)
+        : number(observations.physical_received_quantity);
+      const qualityHeld = verifiedPostState
+        ? number(caseQuantities && caseQuantities.quality_hold)
+        : number(observations.erp_quality_inspection_quantity);
+      const receiptGap = verifiedPostState
+        ? number(caseQuantities && caseQuantities.receipt_unresolved)
+        : Math.max(0, physical - number(observations.erp_accounted_quantity));
+      const accounted = verifiedPostState
+        ? Math.max(0, physical - receiptGap)
+        : number(observations.erp_accounted_quantity);
+      const keyState = observations.integration_business_key_present_in_erp;
+      const businessKey = value(
+        findings.join_keys && findings.join_keys.integration_business_key
+        || tuple.receipt_business_key
+        || `${value(tuple.purchase_receipt)}:receipt-post`,
+      );
+      const supplierLot = value(tuple.supplier_lot);
+      const lotState = verifiedPostState
+        ? `${supplierLot} · CLEARED`
+        : Array.isArray(observations.exact_held_lot_quality_dispositions)
+          && observations.exact_held_lot_quality_dispositions.length
+          ? `${supplierLot} · ${observations.exact_held_lot_quality_dispositions.join(" · ")}`
+          : supplierLot || "NOT RETURNED";
+      [
+        ["Physical", physical, "cyan"],
+        ["ERP accounted", accounted, "violet"],
+        ["Receipt gap", receiptGap, "coral"],
+        ["Quality hold", qualityHeld, "amber"],
+        ["Business key", keyState === false ? "ABSENT" : businessKey || "NOT RETURNED", keyState === false ? "coral" : "lime"],
+        ["Exact lot", lotState, verifiedPostState ? "lime" : "amber"],
+      ].forEach(([label, findingValue, tone]) => {
+        const item = create("span", `platform-reconciled-finding is-${tone}`);
+        item.append(create("small", null, label), create("strong", null, value(findingValue)));
+        findingsHost.append(item);
+      });
+    }
+    const hypotheses = $("platform-hypotheses");
+    hypotheses.replaceChildren();
+    (Array.isArray(diagnosis.hypotheses) ? diagnosis.hypotheses : []).forEach((hypothesis) => {
+      if (!hypothesis || typeof hypothesis !== "object") return;
+      const diagnosedStatus = value(hypothesis.status || "OPEN");
+      const invoiceHypothesis = value(hypothesis.id).includes("invoice")
+        || value(hypothesis.label).toLowerCase().includes("invoice");
+      const status = executionStatus === "VERIFIED" && invoiceHypothesis
+        ? "CLEARED"
+        : diagnosedStatus;
+      const row = create("div", `platform-hypothesis is-${status.toLowerCase()}`);
+      row.append(
+        create("span", null, executionStatus === "VERIFIED" && invoiceHypothesis
+          ? `At diagnosis · ${value(hypothesis.label)}`
+          : value(hypothesis.label)),
+        create("strong", null, executionStatus === "VERIFIED" && invoiceHypothesis
+          ? `AFTER EXECUTION · ${status}`
+          : status),
+      );
+      hypotheses.append(row);
+    });
+    const tools = $("platform-tool-calls");
+    tools.replaceChildren();
+    const selectedTools = new Set(Array.isArray(strands.tool_calls) ? strands.tool_calls.map(value) : []);
+    const plannedTools = Array.isArray(diagnosis.tool_calls) ? diagnosis.tool_calls : [];
+    const plannedNames = plannedTools
+      .filter((tool) => tool && typeof tool === "object")
+      .map((tool) => value(tool.tool))
+      .filter(Boolean);
+    // Once the investigation has completed, show only tools the agent actually
+    // called.  Planned-but-skipped tools are useful in a trace export, but add
+    // noise to the judge-facing runtime ledger and can be mistaken for work
+    // that happened.
+    const visibleToolNames = strandsStatus === "COMPLETE"
+      ? [...selectedTools]
+      : [...new Set([...selectedTools, ...plannedNames])];
+    visibleToolNames.forEach((toolName) => {
+      const toolState = strandsStatus === "COMPLETE"
+        ? "READ"
+        : (strandsStatus === "IDLE" ? "WAITING" : strandsStatus.replaceAll("_", " "));
+      const item = create("span", `platform-tool-call is-${toolState.toLowerCase().replaceAll(" ", "-")}`);
+      item.append(create("strong", null, toolName), create("small", null, toolState));
+      tools.append(item);
+    });
+    const runtimeEvents = Array.isArray(strands.runtime_events) ? strands.runtime_events : [];
+    const runtimeTrace = $("platform-runtime-trace");
+    const runtimeSpans = [];
+    const openToolSpans = new Map();
+    let openModelSpan = null;
+    let modelTurn = 0;
+    runtimeEvents.forEach((event) => {
+      if (!event || typeof event !== "object") return;
+      const eventType = value(event.type);
+      if (eventType === "model.started") {
+        modelTurn += 1;
+        openModelSpan = {
+          lane: "MODEL",
+          name: `Reasoning ${modelTurn}`,
+          detail: event.projected_input_tokens ? `${number(event.projected_input_tokens)} tokens in` : "started",
+          status: "running",
+        };
+        runtimeSpans.push(openModelSpan);
+      } else if (["model.succeeded", "model.failed"].includes(eventType) && openModelSpan) {
+        openModelSpan.status = eventType.endsWith("failed") ? "failed" : "complete";
+        openModelSpan.detail = `${number(event.duration_ms)} ms`;
+        openModelSpan = null;
+      } else if (eventType === "tool.started") {
+        const rawName = value(event.tool || "tool");
+        const span = {
+          lane: rawName === "LiveAdvisoryResult" ? "OUTPUT" : "TOOL",
+          name: rawName === "LiveAdvisoryResult"
+            ? "Typed result"
+            : rawName.replace(/^read_/, "").replaceAll("_", " "),
+          detail: "running",
+          status: "running",
+        };
+        runtimeSpans.push(span);
+        openToolSpans.set(value(event.tool_use_id), span);
+      } else if (["tool.succeeded", "tool.failed"].includes(eventType)) {
+        const span = openToolSpans.get(value(event.tool_use_id));
+        if (!span) return;
+        span.status = eventType.endsWith("failed") ? "failed" : "complete";
+        span.detail = `${number(event.duration_ms)} ms`;
+        openToolSpans.delete(value(event.tool_use_id));
+      }
+    });
+    runtimeTrace.replaceChildren();
+    runtimeSpans.slice(-16).forEach((span) => {
+      const item = create("li", `platform-runtime-span is-${span.lane.toLowerCase()} is-${span.status}`);
+      item.append(
+        create("small", null, span.lane),
+        create("strong", null, span.name),
+        create("span", null, span.detail),
+      );
+      runtimeTrace.append(item);
+    });
+    $("platform-runtime-count").textContent = `${runtimeEvents.length} hooks`;
+    const review = platform.human_review && typeof platform.human_review === "object"
+      ? platform.human_review
+      : {};
+    setBadge($("platform-review-status"), value(review.status || "HUMAN_START_REQUIRED").replaceAll("_", " "), review.status);
+    $("platform-review-detail").textContent = value(review.reason || "Start the investigation when you are ready.");
+    const decisionScope = $("platform-decision-scope");
+    decisionScope.replaceChildren();
+    const packet = platform.resolution_packet && typeof platform.resolution_packet === "object"
+      ? platform.resolution_packet
+      : null;
+    const packetTuple = packet && packet.case_tuple && typeof packet.case_tuple === "object"
+      ? packet.case_tuple
+      : {};
+    const receiptUnits = number(packetTuple.receipt_post_quantity, number(caseQuantities && caseQuantities.receipt_unresolved));
+    const qualityUnits = number(packetTuple.quality_transfer_quantity, number(caseQuantities && caseQuantities.quality_hold));
+    const finding = value(diagnosis.finding).toUpperCase();
+    const decisionRows = value(agentRun.state) === "PLAN_READY" || ["AUTHORIZED", "VERIFYING", "VERIFIED"].includes(executionStatus)
+      ? [
+          ["Receipt", receiptUnits ? `Post ${receiptUnits} unresolved units` : "No receipt post"],
+          ["Quality", qualityUnits ? `Transfer ${qualityUnits} approved units` : "No quality transfer"],
+          ["Invoice", caseFacts && caseFacts.invoice_held ? "Revalidate held invoice" : "Invoice verified open"],
+        ]
+      : value(agentRun.state) === "BLOCKED"
+        ? [["Control", ({
+            AGENT_UNAVAILABLE: "Retry the real Strands investigation — no plan released",
+            AGENT_VALIDATION_FAILED: "Review validation failure — no plan released",
+            EFFECT_ALREADY_PRESENT: "Reconcile acknowledgement — no write",
+            PHYSICAL_SHORTAGE_CONFIRMED: "Escalate 20-unit supplier shortage — preserve hold",
+            CROSS_SOURCE_QUANTITY_CONFLICT: "Request fresh scoped reads — no write",
+            QUALITY_EVIDENCE_INELIGIBLE: "Preserve quality and invoice holds — no transfer",
+            NEEDS_ERP_KEY_REREAD: "Restore authoritative ERP lookup — no write",
+            DUPLICATE_SUPPLIER_INVOICE: "Route duplicate invoice to AP review — no write",
+            COMMERCIAL_TERMS_MISMATCH: "Route price variance to Procurement — no write",
+            UOM_CONVERSION_EVIDENCE_REQUIRED: "Obtain approved UOM conversion — no write",
+            PO_REVISION_EVIDENCE_REQUIRED: "Refresh the current PO revision — no write",
+            SUPPLIER_COMPLIANCE_HOLD: "Route vendor hold to Supplier Management — no write",
+            LOT_TRACE_MISMATCH: "Reconcile physical lot identity — no write",
+            HUMAN_REJECTED_PLAN: "Manager rejected the plan — no write",
+          })[finding] || "Safe stop — no write"]]
+        : [];
+    decisionRows.forEach(([label, detail]) => {
+      const row = create("div", "platform-scope-row");
+      row.append(create("span", null, label), create("strong", null, detail));
+      decisionScope.append(row);
+    });
+    const diagnosisButton = $("platform-diagnose");
+    const reviewAction = value(review.action);
+    const canStartOrResume = ["AUTHORIZE_DIAGNOSIS", "START_INVESTIGATION", "RESUME_INVESTIGATION", "RESUME_AFTER_EVIDENCE", "RETRY_INVESTIGATION"].includes(reviewAction);
+    diagnosisButton.disabled = state.agentPlatformDiagnosing || !canStartOrResume;
+    diagnosisButton.setAttribute("aria-disabled", String(diagnosisButton.disabled));
+    diagnosisButton.textContent = state.agentPlatformDiagnosing
+      ? "Running authorized diagnosis…"
+      : reviewAction === "AUTHORIZE_DIAGNOSIS"
+        ? "Authorize diagnosis"
+      : reviewAction === "RESUME_AFTER_EVIDENCE"
+        ? "Resume after evidence"
+        : reviewAction === "RETRY_INVESTIGATION"
+          ? "Retry real Agent"
+        : reviewAction === "RESUME_INVESTIGATION"
+          ? "Resume investigation"
+          : "Start investigation";
+    const stopButton = $("platform-stop");
+    const canStop = Boolean(review.can_stop) && !["IDLE", "STOPPED", "VERIFIED"].includes(value(agentRun.state));
+    stopButton.hidden = !canStop;
+    stopButton.disabled = state.agentPlatformActionBusy;
+    const questionInput = $("platform-question");
+    const questionSubmit = $("platform-question-submit");
+    questionInput.disabled = state.agentPlatformQuestionBusy;
+    questionSubmit.disabled = state.agentPlatformQuestionBusy;
+    questionSubmit.textContent = state.agentPlatformQuestionBusy ? "Reading…" : "Ask";
+    const answerNode = $("platform-answer");
+    const advisory = state.agentPlatformAdvisory && typeof state.agentPlatformAdvisory === "object"
+      ? state.agentPlatformAdvisory
+      : {};
+    const conversation = Array.isArray(platform.conversation) ? platform.conversation : [];
+    answerNode.hidden = !state.agentPlatformAnswer && conversation.length === 0;
+    const conversationStatus = state.agentPlatformQuestionBusy
+      ? "READING"
+      : value(advisory.status || (conversation.length ? "COMPLETE" : "READY"));
+    setBadge($("platform-answer-status"), conversationStatus.replaceAll("_", " "), conversationStatus);
+    $("platform-answer-trace").textContent = value(advisory.mode === "real_strands" ? "REAL STRANDS" : "");
+    const conversationHost = $("platform-answer-text");
+    conversationHost.replaceChildren();
+    conversation.forEach((turn) => {
+      if (!turn || typeof turn !== "object") return;
+      const item = create("article", "platform-conversation-turn");
+      const humanBubble = create("div", "platform-chat-bubble is-human");
+      humanBubble.append(create("small", null, "YOU"), create("p", null, value(turn.question)));
+      const agentBubble = create("div", "platform-chat-bubble is-agent");
+      agentBubble.append(create("small", null, "EVIDENCE AGENT"), create("p", null, value(turn.answer)));
+      if (value(turn.validation_status)) {
+        agentBubble.classList.add("is-rejected-claim");
+        agentBubble.append(create("strong", "platform-claim-verdict", human(turn.validation_status)));
+      }
+      const meta = create("div", "platform-chat-meta");
+      meta.append(
+        create("span", null, `${number(turn.tool_calls && turn.tool_calls.length)} tools`),
+        create("span", null, `${number(turn.evidence_ids && turn.evidence_ids.length)} evidence`),
+        create("span", null, number(turn.context_turns) ? `${number(turn.context_turns)} prior turns` : "new thread"),
+      );
+      agentBubble.append(meta);
+      item.append(humanBubble, agentBubble);
+      const citations = create("div", "platform-tool-calls");
+      (Array.isArray(turn.evidence_ids) ? turn.evidence_ids : []).forEach((evidenceId) => {
+        const citation = create("button", "platform-tool-call", value(evidenceId));
+        citation.type = "button";
+        citation.title = `Evidence record ${value(evidenceId)}`;
+        citation.dataset.evidenceId = value(evidenceId);
+        citations.append(citation);
+      });
+      agentBubble.append(citations);
+      conversationHost.append(item);
+    });
+    if (conversation.length === 0 && state.agentPlatformAnswer) {
+      conversationHost.append(create("p", null, state.agentPlatformAnswer));
+    }
+    const answerEvidence = $("platform-answer-evidence");
+    answerEvidence.replaceChildren();
+    const advisoryResult = advisory.result && typeof advisory.result === "object" ? advisory.result : {};
+    (conversation.length === 0 && Array.isArray(advisoryResult.evidence_ids) ? advisoryResult.evidence_ids : []).forEach((evidenceId) => {
+      answerEvidence.append(create("span", "platform-tool-call", value(evidenceId)));
+    });
+    $("platform-write-disabled").lastChild.textContent = ` ${value(platform.execution && platform.execution.detail)}`;
+    const actions = $("platform-execution-actions");
+    const actionState = value(execution.status);
+    const actionBusy = state.agentPlatformActionBusy;
+    actions.hidden = !Boolean(platform.mode && platform.mode.execution_available);
+    $("platform-approve-execute").disabled = actionBusy || value(agentRun.state) !== "PLAN_READY" || actionState !== "AWAITING_MANAGER_APPROVAL";
+    $("platform-reject-plan").disabled = actionBusy || value(agentRun.state) !== "PLAN_READY" || actionState !== "AWAITING_MANAGER_APPROVAL";
+    const packetNode = $("platform-resolution-packet");
+    packetNode.hidden = !packet;
+    if (packet) {
+      $("platform-packet-id").textContent = value(packet.packet_id);
+      const postState = packet.post_state && typeof packet.post_state === "object" ? packet.post_state : {};
+      $("platform-packet-summary").textContent = `Verified · ${value(packet.guard).replaceAll("_", " ")} · ${Object.entries(postState).map(([key, itemValue]) => `${key.replaceAll("_", " ")}: ${value(itemValue)}`).join(" · ")}`;
+      const packetScope = $("platform-packet-scope");
+      packetScope.replaceChildren();
+      [["Receipt post", packetTuple.receipt_post_quantity], ["Quality transfer", packetTuple.quality_transfer_quantity]].forEach(([label, amount]) => {
+        packetScope.append(create("span", "platform-packet-fact", `${label} · ${value(amount)} units`));
+      });
+      const packetEffects = packet.effects && typeof packet.effects === "object" ? packet.effects : {};
+      [
+        ["Quality transfer", packetEffects.quality_release_transfer],
+        ["Sales order", packetEffects.sales_order],
+        ["Delivery note", packetEffects.delivery_note],
+        ["Sales invoice", packetEffects.sales_invoice],
+        ["Celigo receipt", packetEffects.celigo_receipt],
+      ].forEach(([label, recordId]) => {
+        if (recordId) packetScope.append(create("span", "platform-packet-fact", `${label} · ${value(recordId)}`));
+      });
+      const packetTrace = $("platform-packet-trace");
+      packetTrace.replaceChildren();
+      const packetAgentTrace = packet.agent_trace && typeof packet.agent_trace === "object" ? packet.agent_trace : {};
+      const packetAgentProvider = packetAgentTrace.provider && typeof packetAgentTrace.provider === "object" ? packetAgentTrace.provider : {};
+      const packetApproval = packet.approval && typeof packet.approval === "object" ? packet.approval : {};
+      const packetExecution = packet.execution && typeof packet.execution === "object" ? packet.execution : {};
+      const traceToolCount = Array.isArray(packetAgentTrace.tool_calls) ? packetAgentTrace.tool_calls.length : 0;
+      const traceModel = value(packetAgentTrace.model || packetAgentProvider.model);
+      [
+        ["Agent", traceModel ? `${traceModel} · ${traceToolCount} reads` : value(packetAgentTrace.status || "trace unavailable")],
+        ["Manager", value(packetApproval.manager_id || "—")],
+        ["Idempotency", value(packetExecution.idempotency_key || "—")],
+      ].forEach(([label, detail]) => packetTrace.append(create("span", "platform-packet-fact", `${label} · ${detail}`)));
+      const packetTimestamps = $("platform-packet-timestamps");
+      packetTimestamps.replaceChildren();
+      const timestamps = packet.timestamps && typeof packet.timestamps === "object" ? packet.timestamps : {};
+      [["Approved", timestamps.approved_at], ["Executed", timestamps.executed_at], ["Verified", timestamps.verified_at]].forEach(([label, timestamp]) => {
+        if (timestamp) packetTimestamps.append(create("span", "platform-packet-fact", `${label} · ${value(timestamp)}`));
+      });
+      const packetEvidence = $("platform-packet-evidence");
+      packetEvidence.replaceChildren();
+      (Array.isArray(packet.evidence) ? packet.evidence : []).forEach((evidence) => {
+        if (!evidence || typeof evidence !== "object") return;
+        packetEvidence.append(create("span", "platform-tool-call", `${value(evidence.source_id)} · ${value(evidence.record_id)}`));
+      });
+    }
+
+    const activity = $("platform-activity");
+    const events = Array.isArray(platform.activity) ? platform.activity.slice(-18) : [];
+    activity.replaceChildren();
+    events.forEach((event) => {
+      if (!event || typeof event !== "object") return;
+      const item = create("li", "platform-activity-item");
+      if (number(event.sequence) > pulseAfter) item.classList.add("is-live");
+      const main = create("div", "platform-activity-main");
+      main.append(create("strong", null, value(event.label)), create("span", null, value(event.detail)));
+      const occurredAt = new Date(value(event.occurred_at || event.timestamp || event.created_at));
+      const timeLabel = Number.isNaN(occurredAt.getTime())
+        ? `#${value(event.sequence)}`
+        : occurredAt.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      item.append(
+        create("time", "platform-activity-sequence", timeLabel),
+        main,
+        create("span", "platform-activity-provenance", value(event.provenance) === "synthetic-demo-fixture" ? "DEMO" : value(event.provenance || "live")),
+      );
+      activity.append(item);
+    });
+    window.requestAnimationFrame(() => { activity.scrollTop = activity.scrollHeight; });
+    $("platform-event-count").textContent = `${value(platform.latest_sequence || 0)} events`;
+    const outcomeState = executionStatus === "VERIFIED"
+      ? "VERIFIED"
+      : executionStatus === "VERIFYING"
+        ? "VERIFYING"
+        : executionStatus === "AUTHORIZED"
+          ? "APPROVED"
+          : value(agentRun.state) === "BLOCKED"
+            ? "SAFE STOP"
+            : value(agentRun.state) === "PLAN_READY"
+              ? "MANAGER REVIEW"
+              : "WAITING";
+    $("platform-outcome-status").textContent = outcomeState;
+    $("platform-outcome").dataset.status = outcomeState.toLowerCase().replaceAll(" ", "-");
+    $("platform-outcome-summary").textContent = value(execution.detail || diagnosis.summary || "No recovery effect has been issued.");
+    const transition = $("platform-state-transition");
+    const packetPreState = packet && packet.pre_state && typeof packet.pre_state === "object"
+      ? packet.pre_state
+      : {};
+    const packetPostState = packet && packet.post_state && typeof packet.post_state === "object"
+      ? packet.post_state
+      : {};
+    const currentAvailable = number(packetPreState.available, number(caseQuantities && caseQuantities.available));
+    const targetAvailable = number(packetPostState.available, number(caseQuantities && caseQuantities.available));
+    const priorInvoice = value(packetPreState.invoice_status || "PAYMENT_HOLD").replaceAll("_", " ");
+    const currentInvoice = value(packetPostState.invoice_status || (caseFacts && caseFacts.invoice_held ? "PAYMENT HOLD" : "OPEN")).replaceAll("_", " ");
+    transition.hidden = executionStatus !== "VERIFIED";
+    if (!transition.hidden) {
+      transition.replaceChildren(
+        create("span", null, priorInvoice),
+        create("i", "ph ph-arrow-right", ""),
+        create("span", null, currentInvoice),
+        create("small", null, `Inventory ${currentAvailable} → ${targetAvailable} · no duplicate posting`),
+      );
+      transition.querySelector("i")?.setAttribute("aria-hidden", "true");
+    } else {
+      transition.replaceChildren();
+    }
+    state.agentPlatformPulseAfter = latestSequence;
+    // Draw synchronously when the map already has layout. Headless Chromium
+    // can throttle requestAnimationFrame even while the document is visible;
+    // the queued passes remain as protection for ordinary view transitions.
+    renderPlatformInvestigationLinks();
+    schedulePlatformInvestigationLinks();
+  }
+
+  async function runPlatformDiagnosis() {
+    if (state.agentPlatformDiagnosing) return;
+    state.agentPlatformDiagnosing = true;
+    scheduleRender();
+    try {
+      setAgentPlatformProjection(await requestJSON("/api/v1/agent-platform/diagnose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: { operator_id: "M20 Demo Operator" },
+      }));
+      state.agentPlatformError = "";
+    } catch (error) {
+      state.agentPlatformError = error.message;
+    } finally {
+      state.agentPlatformDiagnosing = false;
+      scheduleRender();
+    }
+  }
+
+  async function askPlatformQuestion(question) {
+    const cleanQuestion = value(question).trim();
+    if (!cleanQuestion || state.agentPlatformQuestionBusy) return;
+    state.agentPlatformQuestionBusy = true;
+    scheduleRender();
+    try {
+      const response = await requestJSON("/api/v1/agent-platform/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: { question: cleanQuestion },
+      });
+      setAgentPlatformProjection(response);
+      state.agentPlatformAnswer = value(response.answer);
+      state.agentPlatformAdvisory = response.agent_advisory && typeof response.agent_advisory === "object"
+        ? response.agent_advisory
+        : null;
+      state.agentPlatformError = "";
+    } catch (error) {
+      state.agentPlatformError = error.message;
+      state.agentPlatformAnswer = `Evidence question unavailable: ${error.message}`;
+      state.agentPlatformAdvisory = { status: "AGENT_UNAVAILABLE", mode: "real_strands", result: null };
+    } finally {
+      state.agentPlatformQuestionBusy = false;
+      scheduleRender();
+    }
+  }
+
+  async function runPlatformAction(path, body = {}) {
+    if (state.agentPlatformActionBusy) return;
+    state.agentPlatformActionBusy = true;
+    scheduleRender();
+    try {
+      setAgentPlatformProjection(await requestJSON(`/api/v1/agent-platform/${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      }));
+      state.agentPlatformError = "";
+    } catch (error) {
+      state.agentPlatformError = error.message;
+      state.agentPlatformAnswer = `Agent action stopped safely: ${error.message}`;
+    } finally {
+      state.agentPlatformActionBusy = false;
+      scheduleRender();
+    }
+  }
+
   function scheduleLiveSourceRefresh() {
-    if (smokeCapture || state.liveSourceTimer != null) return;
+    if (smokeCapture || providerPollingDisabled || state.liveSourceTimer != null) return;
     state.liveSourceTimer = window.setTimeout(() => {
       state.liveSourceTimer = null;
+      if (document.hidden) {
+        scheduleLiveSourceRefresh();
+        return;
+      }
       refreshLiveSources().finally(scheduleLiveSourceRefresh);
     }, 15000);
   }
@@ -763,7 +2257,7 @@
   function startLiveSourceRefresh() {
     if (smokeCapture || state.liveSourceTimer != null) return;
     refreshLiveSources();
-    scheduleLiveSourceRefresh();
+    if (!providerPollingDisabled) scheduleLiveSourceRefresh();
   }
 
   async function refreshScenarioCatalog() {
@@ -851,6 +2345,11 @@
     return payload;
   }
 
+  function incidentSnapshotPath(incidentId) {
+    const projection = smokeCapture ? "compact=1" : "projection=browser";
+    return `/api/v1/incidents/${encodeURIComponent(incidentId)}?${projection}`;
+  }
+
   function mergeInitialEvents(rows) {
     const ordered = (Array.isArray(rows) ? rows : [])
       .filter((item) => item && Number.isInteger(Number(item.sequence)))
@@ -871,6 +2370,7 @@
     state.activeEdges.clear();
     const latestVisualEvent = [...ordered].reverse().find((item) => [
       "telemetry.observed",
+      "external.source.changed",
       "source.condition.injected",
       "incident.detected",
       "execution.started",
@@ -930,7 +2430,7 @@
   function queueRefresh() {
     if (!state.incidentId) return state.refreshPromise;
     state.refreshPromise = state.refreshPromise.then(async () => {
-      const snapshot = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}`);
+      const snapshot = await requestJSON(incidentSnapshotPath(state.incidentId));
       // The snapshot is one authoritative read and already carries its unit
       // projection. Fetching /units concurrently can cross an execution commit
       // and pair a new VERIFIED snapshot with an old 80/20 unit list.
@@ -951,6 +2451,7 @@
       "message-queue->erp",
       "erp->invoice",
     ];
+    if (type === "external.source.changed") return;
     if (type === "telemetry.observed") {
       const counts = payload.unit_counts && typeof payload.unit_counts === "object"
         ? payload.unit_counts
@@ -993,13 +2494,10 @@
       // A server restart or ledger rotation can make the browser cursor newer
       // than the current stream.  Re-read the authoritative projection and use
       // its contiguous event history as the safe cursor before resubscribing.
-      const [snapshot, units] = await Promise.all([
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}`),
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}/units`),
-      ]);
+      const snapshot = await requestJSON(incidentSnapshotPath(state.incidentId));
       // Use the unit rows embedded in the same snapshot so reconnect cannot
       // combine a reset projection with a response from another case version.
-      applySnapshot(snapshot, snapshot.units || units.units, true);
+      applySnapshot(snapshot, snapshot.units, true);
       await refreshScenarioCatalog();
       if (state.replaying) {
         state.replayTargetSequence = number(snapshot.projection_sequence);
@@ -1027,6 +2525,7 @@
     state.graphEventSequence = sequence;
     if (state.activitySource !== "Persisted ledger") state.activitySource = "Current stream";
     state.events.push({ ...event, sequence, event_type: type });
+    state.latestActivitySequence = sequence;
     if (state.events.length > MAX_EVENT_HISTORY) state.events.shift();
     state.activeEdges.clear();
     markFlowEdgesForEvent(type, event.payload || {});
@@ -1039,12 +2538,21 @@
       if (state.telemetry.length > 24) state.telemetry.shift();
       pulseTelemetry();
     }
+    if (type === "external.source.changed") {
+      pulseTelemetry();
+      scheduleAgentPlatformProjectionRefresh();
+    }
     if (type === "tool.started" && event.actor) state.activeToolActors.add(value(event.actor));
     if (type === "tool.completed" && event.actor) state.activeToolActors.delete(value(event.actor));
     if (["agent.completed", "workflow.blocked", "verification.completed"].includes(type) && event.actor) {
       state.activeToolActors.delete(value(event.actor));
     }
     if (type === "execution.started") state.activeEdges.add("message-queue->erp");
+    if (["execution.started", "source.read.started", "source.read.completed", "effect.started", "effect.completed", "verification.started", "verification.completed"].includes(type)) {
+      const activityDrawer = $("activity-drawer");
+      if (activityDrawer) activityDrawer.open = true;
+      state.rightRailTab = "decision";
+    }
     if (state.goldenRunning && type === "evaluation.completed") {
       // Evaluation is the terminal event for a fresh Golden Incident.  The
       // event itself, rather than a UI timer, owns the button's idle state.
@@ -1052,7 +2560,7 @@
     }
     $("sequence-label").textContent = `seq ${state.lastSequence}`;
     scheduleRender();
-    if (["execution.completed", "verification.completed"].includes(type)) {
+    if (["evaluation.completed", "execution.completed", "verification.completed"].includes(type)) {
       queueRefresh();
       refreshScenarioCatalog();
     }
@@ -1104,6 +2612,10 @@
       state.streamError = "";
       setConnection("live");
       renderAll();
+      // A server-backed incident is the trigger for the autonomous harness.
+      // `startInvestigation` rejects healthy, replay, and closed states, and
+      // `startIssued` makes reconnects idempotent.
+      void startInvestigation();
     };
     source.onerror = () => {
       if (state.source !== source) return;
@@ -1123,7 +2635,7 @@
   }
 
   function setView(view) {
-    const allowedViews = new Set(["dashboard", "agent", "scenario"]);
+    const allowedViews = new Set(["dashboard", "agent"]);
     state.view = demoMode === "degraded"
       ? "dashboard"
       : allowedViews.has(view)
@@ -1135,7 +2647,7 @@
     window.history.replaceState(null, "", `/?${query.toString()}`);
     $("dashboard-view").hidden = state.view !== "dashboard";
     $("agent-view").hidden = state.view !== "agent";
-    $("scenario-view").hidden = state.view !== "scenario";
+    $("scenario-view").hidden = !state.demoControlsOpen;
     document.querySelectorAll("[data-view]").forEach((tab) => {
       const selected = tab.dataset.view === state.view;
       tab.classList.toggle("is-selected", selected);
@@ -1143,6 +2655,8 @@
       tab.tabIndex = selected ? 0 : -1;
     });
     window.scrollTo(0, 0);
+    document.body.classList.remove("platform-focus-open");
+    state.platformFocusedModule = "";
     renderAll();
     renderLiveSources();
   }
@@ -1166,6 +2680,9 @@
     state.activeEdges.clear();
     state.activeToolActors.clear();
     state.telemetry = [];
+    if (scenario === "normal") state.transitionBaseline = null;
+    state.flowStageCounts = new Map();
+    state.flowStageRunId = "";
     state.selectedPoint = null;
     state.selectedPointSequence = 0;
     state.focusedChartId = "";
@@ -1176,6 +2693,7 @@
       state.chartFocusTimer = null;
     }
     state.chartPulseSequence = 0;
+    state.liveMetricSequence = 0;
     state.rightRailTab = "context";
     state.focusedEvidenceId = "";
     state.telemetryPulse = false;
@@ -1222,11 +2740,8 @@
     renderAll();
     try {
       const incidentId = value(catalogIncident.incident_id);
-      const [snapshot, units] = await Promise.all([
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(incidentId)}`),
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(incidentId)}/units`),
-      ]);
-      replaceSession({ ...snapshot, units: units.units }, "incident");
+      const snapshot = await requestJSON(incidentSnapshotPath(incidentId));
+      replaceSession(snapshot, "incident");
       state.selectedAgentId = "orchestrator";
       setView(targetView);
       await refreshScenarioCatalog();
@@ -1288,6 +2803,24 @@
     state.scenarioError = "";
     renderScenarioControls();
     try {
+      if ((scenario === "incident" || scenario === "golden") && state.activeScenario === "normal") {
+        const counts = state.snapshot?.unit_counts || {};
+        const latest = state.telemetry[state.telemetry.length - 1] || {};
+        state.transitionBaseline = {
+          sequence: number(latest.sequence, state.lastSequence),
+          observed_at: value(latest.observed_at || latest.captured_at) || new Date().toISOString(),
+          received_at: value(latest.received_at || latest.observed_at || latest.captured_at) || new Date().toISOString(),
+          unit_counts: {
+            total: number(counts.total),
+            erp_recorded: number(counts.erp_recorded),
+            queue_failed: number(counts.queue_failed),
+          },
+          queue_depth: number(counts.queue_failed),
+          invoice_count: number(state.snapshot?.flow?.summary?.invoice, number(counts.erp_recorded)),
+          source: "preceding-authoritative-session",
+          authoritative: true,
+        };
+      }
       const catalogScenarios = state.scenarioCatalog && Array.isArray(state.scenarioCatalog.scenarios)
         ? state.scenarioCatalog.scenarios
         : [];
@@ -1302,10 +2835,37 @@
         body: scenarioRequest,
       });
       replaceSession(response, scenario);
+      if (scenario === "incident" || scenario === "golden") {
+        // Admission exposes the evidence chat immediately. A human explicitly
+        // authorizes the bounded diagnosis after questioning the Agent.
+        await syncPlatformInvestigation();
+      }
       state.scenarioError = "";
     } catch (error) {
       state.scenarioError = `Scenario transition rejected: ${error.message}. Current state: ${scenarioTruthSummary()}. Select Normal to recover when available.`;
       setConnection(state.connection, `Scenario unavailable: ${error.message}`);
+    } finally {
+      state.commandBusy = false;
+      renderAll();
+    }
+  }
+
+  async function runCounterfactual(variant) {
+    if (state.commandBusy || !["incident", "golden"].includes(state.activeScenario)) return;
+    state.commandBusy = true;
+    state.scenarioError = "";
+    renderScenarioControls();
+    try {
+      setAgentPlatformProjection(await requestJSON("/api/v1/agent-platform/counterfactual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: { variant },
+      }));
+      await syncPlatformInvestigation();
+      state.demoControlsOpen = false;
+      setView("agent");
+    } catch (error) {
+      state.scenarioError = `Counterfactual unavailable: ${error.message}`;
     } finally {
       state.commandBusy = false;
       renderAll();
@@ -1636,7 +3196,13 @@
         ? "Supply flow healthy"
         : "Reconciliation gap detected";
     }
-    if (type === "telemetry.observed") return "Telemetry flowing";
+    if (type === "telemetry.observed") {
+      const trigger = payload.trigger && typeof payload.trigger === "object" ? payload.trigger : {};
+      if (trigger.kind === "external_source_baseline") return "Authoritative source baseline";
+      if (trigger.kind === "external_scenario_change") return "Scenario source changed";
+      return "Source observation recorded";
+    }
+    if (type === "external.source.changed") return `${human(payload.source_id || event.actor)} changed`;
     if (type === "source.condition.injected") return "Source condition injected";
     if (type === "investigation.started") return "Investigation started";
     if (type === "agent.started") return `${actor} started`;
@@ -1651,9 +3217,14 @@
     if (type === "evaluation.completed") return `Evaluation ${human(event.status || payload.decision || "completed")}`;
     if (type === "copilot.message") return "Copilot answered from the investigation";
     if (type === "recovery.prepared") return "Recovery proposal prepared";
-    if (type === "approval.requested") return "Two-role approval requested";
-    if (type === "approval.recorded") return `${human(payload.role || "Role")} recorded approval`;
+    if (type === "approval.requested") return "Manager approval requested";
+    if (type === "approval.recorded") return "Manager approval recorded";
     if (type === "execution.started") return "Controlled recovery started";
+    if (type === "source.read.started") return `${human(payload.source || "Authoritative source")} read started`;
+    if (type === "source.read.completed") return `${human(payload.source || "Authoritative source")} read completed`;
+    if (type === "effect.started") return "Recovery effect started";
+    if (type === "effect.completed") return "Recovery effect committed";
+    if (type === "verification.started") return "Authoritative verification started";
     if (type === "execution.completed") return "Controlled recovery committed";
     if (type === "verification.completed") return "Fresh read verified the effect";
     if (type === "provider.degraded") return "Provider became degraded";
@@ -1670,11 +3241,21 @@
         : `${number(payload.missing_quantity)} units stopped at queue`;
     }
     if (type === "telemetry.observed") {
+      const stages = payload.stage_counts && typeof payload.stage_counts === "object"
+        ? payload.stage_counts
+        : null;
+      if (stages) {
+        return `${telemetryRecordCount(payload)} new records · Warehouse ${number(stages.warehouse)} · Queue ${number(stages.message_queue)} · ERP ${number(stages.erp)} · Invoice ${number(stages.invoice)}`;
+      }
       const counts = payload.unit_counts && typeof payload.unit_counts === "object"
         ? payload.unit_counts
         : {};
       const observedRecords = telemetryRecordCount(payload);
       return `${observedRecords} records · queue ${number(payload.queue_depth, number(counts.queue_failed))}`;
+    }
+    if (type === "external.source.changed") {
+      const records = Array.isArray(payload.record_ids) ? payload.record_ids : [];
+      return `${number(payload.change_count, records.length)} source records · provider seq ${number(payload.source_sequence)}`;
     }
     if (type === "source.condition.injected") {
       return `${number(payload.queue_depth)} units entered the retryable lock condition`;
@@ -1684,7 +3265,9 @@
     if (type === "evidence.returned") return `${countLabel((payload.evidence_ids || []).length, "evidence", "evidence")} returned`;
     if (type === "agent.handoff") return `${countLabel((payload.evidence_ids || []).length, "evidence", "evidence")} handed off`;
     if (type === "evaluation.completed") return value(payload.decision || event.status);
-    if (type === "approval.recorded") return value(payload.principal_id || payload.role);
+    if (type === "approval.recorded") return "Manager · immutable intent";
+    if (["source.read.started", "source.read.completed"].includes(type)) return `${number(payload.record_count)} records · ${number(payload.duration_ms)} ms`;
+    if (["effect.started", "effect.completed", "verification.started"].includes(type)) return value(payload.execution_id || event.status);
     if (type === "execution.completed") return "Effect recorded";
     if (type === "verification.completed") {
       const delta = Number.isInteger(payload.replay_effect_delta) ? payload.replay_effect_delta : "not proven";
@@ -1829,9 +3412,16 @@
     if (!snapshot) return;
     const incident = snapshot.incident || {};
     const counts = snapshot.unit_counts || {};
-    const expected = number(incident.expected_quantity, number(counts.total));
-    const recorded = number(incident.recorded_quantity, number(counts.erp_recorded));
-    const missing = number(incident.missing_quantity, number(counts.queue_failed));
+    const platform = platformFlowProjection();
+    const expected = platform
+      ? platform.expected
+      : number(incident.expected_quantity, number(counts.total));
+    const recorded = platform
+      ? platform.recorded
+      : number(incident.recorded_quantity, number(counts.erp_recorded));
+    const missing = platform
+      ? platform.gap
+      : number(incident.missing_quantity, number(counts.queue_failed));
     const unit = incident.unit === "EA" ? "units" : value(incident.unit || "records");
     const heroKicker = document.querySelector(".hero-copy .kicker");
     const normalScenario = isNormalScenario();
@@ -1858,7 +3448,11 @@
         ? "LIVE SUPPLY FLOW"
         : "LIVE SYNTHETIC INCIDENT";
     }
-    $("incident-title").textContent = missing ? `${missing} ${unit} stopped before ERP` : `All ${expected} ${unit} are accounted for`;
+    $("incident-title").textContent = missing
+      ? `${missing}-${unit.replace(/s$/, "")} gap. Five systems disagree.`
+      : platform?.invoiceHeld
+        ? `Invoice hold blocks the ${expected}-${unit.replace(/s$/, "")} receipt.`
+        : `All ${expected} ${unit} are accounted for`;
     $("incident-subtitle").textContent = closedRecovery
       ? "Investigation complete"
       : state.replaying
@@ -1867,10 +3461,12 @@
         ? "Queue exception"
         : "Flow verified";
     const incidentIdNode = $("incident-id");
-    incidentIdNode.textContent = `Incident ${value(snapshot.incident_id)}`;
+    incidentIdNode.textContent = `Incident ${value(platform?.caseId || snapshot.incident_id)}`;
     incidentIdNode.hidden = normalScenario;
     incidentIdNode.setAttribute("aria-hidden", String(normalScenario));
-    $("trace-id").textContent = `Trace ${value(snapshot.trace_id)}`;
+    $("trace-id").textContent = platform?.runId
+      ? `Run ${platform.runId}`
+      : `Trace ${value(snapshot.trace_id)}`;
     $("missing-count").textContent = String(missing);
     $("expected-count").textContent = String(expected);
     $("recorded-count").textContent = String(recorded);
@@ -1878,28 +3474,38 @@
     $("hero-expected").textContent = String(expected);
     $("hero-recorded").textContent = String(recorded);
     $("hero-queue").textContent = String(missing);
-    $("hero-sequence").textContent = String(state.lastSequence || number(snapshot.projection_sequence) || "—");
+    const authoritativeSequence = platform?.latestSequence
+      || state.lastSequence
+      || number(snapshot.projection_sequence);
+    $("hero-sequence").textContent = String(authoritativeSequence || "—");
     const heroLabel = document.querySelector(".hero-count span");
     if (heroLabel) heroLabel.textContent = missing ? "stopped at queue" : "verified in ERP";
     const mode = value(snapshot.mode);
     const execution = snapshot.execution || {};
-    document.body.dataset.recovered = String(missing === 0 && execution.verified === true);
+    document.body.dataset.recovered = String(
+      missing === 0 && (platform?.verified || execution.verified === true),
+    );
     const isScripted = mode === "SCRIPTED_SYNTHETIC";
     const connectionState = state.connection === "live"
       ? "Connected"
       : state.connection === "paused"
         ? "Paused"
         : "Connecting";
-    $("mode-label").textContent = isScripted
-      ? `Synthetic facility simulator · ${connectionState}`
-      : `${human(mode || "Experiment")} · ${connectionState}`;
+    const liveSourceAuthority = hasLiveSourceAuthority();
+    $("mode-label").textContent = liveSourceAuthority
+      ? `External source ledger · ${connectionState}`
+      : isScripted
+        ? `Scenario Lab · ${connectionState}`
+        : `${human(mode || "Experiment")} · ${connectionState}`;
     $("mode-detail").textContent = demoMode === "degraded"
       ? "advisory degraded"
-      : isScripted
-        ? "synthetic data"
-        : "provider state";
-    $("mode-dot").className = `status-dot ${isScripted ? "status-dot-lime" : "status-dot-cyan"}`;
-    $("sequence-label").textContent = `seq ${state.lastSequence || number(snapshot.projection_sequence) || "—"}`;
+      : liveSourceAuthority
+        ? "provider state"
+        : isScripted
+          ? "scenario data"
+          : "provider state";
+    $("mode-dot").className = `status-dot ${liveSourceAuthority || !isScripted ? "status-dot-cyan" : "status-dot-lime"}`;
+    $("sequence-label").textContent = `seq ${authoritativeSequence || "—"}`;
     renderScenarioControls();
   }
 
@@ -1946,6 +3552,14 @@
       golden.setAttribute("aria-disabled", String(golden.disabled));
       golden.textContent = state.goldenRunning ? "Golden Incident · live" : "Run Golden Incident";
     }
+    if (typeof document !== "undefined") {
+      document.querySelectorAll("[data-counterfactual]").forEach((button) => {
+        button.disabled = state.commandBusy
+          || state.connection !== "live"
+          || !["incident", "golden"].includes(state.activeScenario);
+        button.setAttribute("aria-disabled", String(button.disabled));
+      });
+    }
     const error = $("scenario-error");
     if (error) {
       error.hidden = !state.scenarioError;
@@ -1959,7 +3573,64 @@
   }
 
   function chartTelemetryPoints(snapshot) {
+    // The helper is also executed in isolation by the chart contract tests.
+    // In the browser it selects the unified Case Console authority; isolated
+    // consumers correctly fall back to the legacy immutable telemetry ledger.
+    const platform = typeof platformFlowProjection === "function"
+      ? platformFlowProjection()
+      : null;
+    const platformActivity = Array.isArray(state.agentPlatform?.activity)
+      ? state.agentPlatform.activity
+      : [];
+    if (platform && platformActivity.some((event) => event && event.metrics)) {
+      return platformActivity
+        .filter((event) => event && event.metrics && typeof event.metrics === "object")
+        .map((event) => {
+          const metrics = event.metrics;
+          return {
+            sequence: number(event.sequence),
+            observed_at: value(event.occurred_at),
+            received_at: value(event.occurred_at),
+            unit_counts: {
+              total: number(metrics.expected),
+              erp_recorded: number(metrics.recorded),
+              queue_failed: number(metrics.gap),
+            },
+            queue_depth: number(metrics.gap),
+            recorded_quantity: number(metrics.recorded),
+            invoice_count: number(metrics.invoice_count),
+            flow_run_id: value(event.run_id || platform.runId || platform.caseId),
+            stage_counts: {
+              warehouse: number(metrics.expected),
+              message_queue: number(metrics.expected),
+              erp: number(metrics.recorded),
+              invoice: number(metrics.invoice_count),
+            },
+            business_metrics: {
+              working_capital_at_risk: number(metrics.working_capital_at_risk),
+              invoice_hold_value: number(metrics.invoice_hold_value),
+              purchase_price_variance: number(metrics.purchase_price_variance),
+              billed_revenue: number(metrics.billed_revenue, metrics.value_protected),
+              booked_revenue: number(metrics.booked_revenue),
+              revenue_at_risk: number(metrics.revenue_at_risk),
+              po_unit_cost: number(metrics.po_unit_cost),
+            },
+            source: platform.provenance === "live-read"
+              ? "ERPNext semantic source ledger"
+              : "synthetic case ledger",
+            authoritative: platform.provenance === "live-read",
+          };
+        });
+    }
     const points = state.telemetry.slice();
+    const baseline = state.transitionBaseline;
+    if (baseline && points.length) {
+      const baselineCounts = baseline.unit_counts || {};
+      const firstCounts = points[0]?.unit_counts || {};
+      const differs = number(baselineCounts.erp_recorded, -1) !== number(firstCounts.erp_recorded, -1)
+        || number(baselineCounts.queue_failed, -1) !== number(firstCounts.queue_failed, -1);
+      if (differs) points.unshift(baseline);
+    }
     // Replay intentionally preserves the historical 80/20 observations while
     // the immutable stream is being drained.  Once the authoritative execution
     // and verification are closed, append a terminal 100/0 point to the chart
@@ -1995,10 +3666,43 @@
         snapshot && snapshot.flow && snapshot.flow.summary && snapshot.flow.summary.invoice,
         current.erp_recorded,
       ),
+      flow_run_id: value(last.flow_run_id),
+      stage_counts: {
+        warehouse: current.total,
+        message_queue: current.total,
+        erp: current.erp_recorded,
+        invoice: current.erp_recorded,
+      },
       source: "authoritative-verified-state",
       authoritative: true,
     });
     return points;
+  }
+
+  function latestStageProjection(snapshot) {
+    const latest = [...chartTelemetryPoints(snapshot)].reverse().find((point) => (
+      point
+      && point.stage_counts
+      && typeof point.stage_counts === "object"
+    ));
+    if (!latest) return { runId: "", counts: {} };
+    const raw = latest.stage_counts;
+    return {
+      runId: value(latest.flow_run_id),
+      counts: {
+        warehouse: number(raw.warehouse),
+        "message-queue": number(raw.message_queue),
+        erp: number(raw.erp),
+        invoice: number(raw.invoice),
+      },
+    };
+  }
+
+  function currentFlowTelemetry(snapshot) {
+    const points = chartTelemetryPoints(snapshot);
+    const currentRunId = value([...points].reverse().find((point) => value(point.flow_run_id))?.flow_run_id);
+    if (!currentRunId) return points;
+    return points.filter((point) => value(point.flow_run_id) === currentRunId);
   }
 
   function sparklineValues(kind, snapshot) {
@@ -2006,7 +3710,7 @@
       recorded: "observed_record_count",
       missing: "queue_depth",
     }[kind];
-    const telemetry = chartTelemetryPoints(snapshot);
+    const telemetry = currentFlowTelemetry(snapshot);
     if (telemetryKind && telemetry.length) {
       return telemetry.map((point) => kind === "recorded"
         ? number(point.unit_counts?.erp_recorded, number(state.snapshot?.unit_counts?.erp_recorded, 0))
@@ -2032,7 +3736,11 @@
   }
 
   function chartColor(tone) {
-    return tone === "coral" ? "#ff796a" : tone === "lime" ? "#d9f85e" : "#5cdeea";
+    if (tone === "coral") return "#ff796a";
+    if (tone === "lime") return "#d9f85e";
+    if (tone === "violet") return "#845adf";
+    if (tone === "amber") return "#e09a2d";
+    return "#5cdeea";
   }
 
   function focusedChartId() {
@@ -2187,7 +3895,7 @@
     const label = point && pointTime(point)
       ? shortTime(pointTime(point))
       : state.connection === "live" ? "LIVE" : "PAUSED";
-    ["trend-time", "flow-health-cursor", "source-status-summary"].forEach((id) => {
+    ["trend-time", "flow-health-cursor", "source-status-summary", "business-trend-time"].forEach((id) => {
       const node = $(id);
       if (node) node.textContent = label;
     });
@@ -2350,7 +4058,9 @@
 
   function drawLineChart(canvas, series, tones, options = {}) {
     const surface = chartContext(canvas);
-    if (!surface) return;
+    if (!surface) return renderSvgLineChart(canvas, series, tones, options);
+    canvas.classList.remove("has-svg-fallback");
+    canvas.parentElement?.querySelector(`[data-chart-fallback="${canvas.id}"]`)?.remove();
     const { context, width, height } = surface;
     const pad = { top: options.top || 14, right: options.right || 12, bottom: options.bottom || 22, left: options.left || 31 };
     const plotWidth = Math.max(1, width - pad.left - pad.right);
@@ -2444,18 +4154,89 @@
     installChartInteractions(canvas, points, options.metric, options.unit, options.source);
   }
 
+  function renderSvgLineChart(canvas, series, tones, options = {}) {
+    if (!canvas) return;
+    const width = Math.max(240, Math.round(canvas.getBoundingClientRect().width || canvas.width || 600));
+    const height = Math.max(96, Math.round(canvas.getBoundingClientRect().height || canvas.height || 180));
+    const pad = { top: options.top || 14, right: options.right || 12, bottom: options.bottom || 22, left: options.left || 31 };
+    const plotWidth = Math.max(1, width - pad.left - pad.right);
+    const plotHeight = Math.max(1, height - pad.top - pad.bottom);
+    const values = series.flatMap((line) => line.map((item) => number(item)));
+    const points = (options.points || []).map((point, pointIndex, allPoints) => ({
+      ...point,
+      x: allPoints.length === 1
+        ? pad.left + plotWidth / 2
+        : pad.left + (pointIndex / (allPoints.length - 1)) * plotWidth,
+      value: point.value == null ? number(series[0] && series[0][pointIndex]) : point.value,
+    }));
+    canvas.__chartMeta = {
+      points,
+      metric: options.metric || "Flow",
+      unit: options.unit || "units",
+      source: options.source || "synthetic-enterprise-snapshot",
+      left: pad.left,
+      right: width - pad.right,
+    };
+    canvas.classList.add("has-svg-fallback");
+    let svg = canvas.parentElement?.querySelector(`[data-chart-fallback="${canvas.id}"]`);
+    if (!svg) {
+      svg = document.createElementNS("http:" + "//www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", `chart-svg-fallback ${canvas.classList.contains("mini-chart-canvas") ? "mini-chart-svg-fallback" : "diagram-svg-fallback"}`);
+      svg.setAttribute("data-chart-fallback", canvas.id);
+      svg.setAttribute("aria-hidden", "true");
+      canvas.insertAdjacentElement("afterend", svg);
+    }
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.replaceChildren();
+    const make = (tag, attributes = {}) => {
+      const node = document.createElementNS("http:" + "//www.w3.org/2000/svg", tag);
+      Object.entries(attributes).forEach(([key, item]) => node.setAttribute(key, String(item)));
+      return node;
+    };
+    if (!values.length || (options.points && options.points.length < 2)) {
+      const label = make("text", { x: width / 2, y: height / 2, class: "chart-svg-empty", "text-anchor": "middle" });
+      label.textContent = options.emptyLabel || "Insufficient live history";
+      svg.append(label);
+      return;
+    }
+    const max = Math.max(...values, 1);
+    const min = Math.min(...values, 0);
+    const span = Math.max(1, max - min);
+    for (let row = 0; row <= 4; row += 1) {
+      const y = pad.top + (plotHeight * row) / 4;
+      svg.append(make("line", { x1: pad.left, y1: y, x2: width - pad.right, y2: y, class: "chart-svg-grid" }));
+    }
+    series.forEach((line, lineIndex) => {
+      if (!line.length) return;
+      const coordinates = line.map((item, pointIndex) => {
+        const x = line.length === 1
+          ? pad.left + plotWidth / 2
+          : pad.left + (pointIndex / (line.length - 1)) * plotWidth;
+        const y = pad.top + plotHeight - ((number(item) - min) / span) * plotHeight;
+        return { x, y };
+      });
+      const path = make("path", {
+        d: coordinates.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" "),
+        class: "chart-svg-series",
+        stroke: chartColor(tones[lineIndex] || "cyan"),
+      });
+      svg.append(path);
+      const last = coordinates.at(-1);
+      svg.append(make("circle", { cx: last.x, cy: last.y, r: 3, fill: chartColor(tones[lineIndex] || "cyan"), class: "chart-svg-latest" }));
+    });
+  }
+
   function reconciliationSeries(snapshot) {
-    const telemetry = chartTelemetryPoints(snapshot);
+    const telemetry = currentFlowTelemetry(snapshot);
     const snapshotCounts = snapshot && snapshot.unit_counts && typeof snapshot.unit_counts === "object"
       ? snapshot.unit_counts
       : {};
     if (telemetry.length) {
       return {
-        // Telemetry's unit_counts is the authoritative stock projection at the
-        // observation boundary.  Throughput-window fields describe sampled
-        // activity and must never be plotted as ERP stock.
-        expected: telemetry.map((point) => number(point.unit_counts?.total, number(snapshotCounts.total, 0))),
-        recorded: telemetry.map((point) => number(point.unit_counts?.erp_recorded, number(snapshotCounts.erp_recorded, 0))),
+        // Stage counts are committed with each telemetry observation. They
+        // reveal the current flow window without rewriting inventory truth.
+        expected: telemetry.map((point) => number(point.stage_counts?.warehouse, number(point.unit_counts?.total, number(snapshotCounts.total, 0)))),
+        recorded: telemetry.map((point) => number(point.stage_counts?.erp, number(point.unit_counts?.erp_recorded, number(snapshotCounts.erp_recorded, 0)))),
         gap: telemetry.map((point) => number(point.unit_counts?.queue_failed, number(snapshotCounts.queue_failed, 0))),
       };
     }
@@ -2474,15 +4255,15 @@
   }
 
   function reconciliationPoints(snapshot) {
-    const telemetry = chartTelemetryPoints(snapshot);
+    const telemetry = currentFlowTelemetry(snapshot);
     if (telemetry.length) {
       return telemetry.map((point) => ({
         sequence: point.sequence,
         timestamp: point.observed_at || point.captured_at,
         observed_at: point.observed_at || point.captured_at,
         received_at: point.received_at || point.observed_at || point.captured_at,
-        expected: number(point.unit_counts?.total, 0),
-        recorded: number(point.unit_counts?.erp_recorded, 0),
+        expected: number(point.stage_counts?.warehouse, number(point.unit_counts?.total, 0)),
+        recorded: number(point.stage_counts?.erp, number(point.unit_counts?.erp_recorded, 0)),
         gap: number(point.unit_counts?.queue_failed, number(point.queue_depth)),
         value: number(point.unit_counts?.queue_failed, number(point.queue_depth)),
         freshness_seconds: point.freshness_seconds,
@@ -2510,8 +4291,8 @@
       let valueForMetric;
       let unit = "units";
       if (metric === "queue") valueForMetric = number(unitCounts.queue_failed, number(point.queue_depth));
-      else if (metric === "erp") valueForMetric = number(unitCounts.erp_recorded);
-      else valueForMetric = number(unitCounts.invoice, number(point.invoice_count, number(unitCounts.erp_recorded)));
+      else if (metric === "erp") valueForMetric = number(point.stage_counts?.erp, number(unitCounts.erp_recorded));
+      else valueForMetric = number(point.stage_counts?.invoice, number(point.invoice_count, number(unitCounts.erp_recorded)));
       return {
         sequence: point.sequence,
         timestamp: point.observed_at || point.captured_at,
@@ -2544,7 +4325,9 @@
       points,
       metric,
       unit: "units",
-      source: "synthetic-enterprise-snapshot",
+      source: platformFlowProjection()?.provenance === "live-read"
+        ? "ERPNext semantic source ledger"
+        : "synthetic enterprise snapshot",
       emptyLabel: "Insufficient live history",
       ...labels,
       left: 28,
@@ -2727,6 +4510,242 @@
     drawExternalRiskChart();
   }
 
+  function renderBusinessImpact() {
+    const impact = businessImpactProjection();
+    const proof = valueProofProjection();
+    const observed = proof?.observed && typeof proof.observed === "object" ? proof.observed : {};
+    const counterfactual = proof?.counterfactual && typeof proof.counterfactual === "object" ? proof.counterfactual : {};
+    const currency = value(proof?.currency || impact?.currency || "USD");
+    const latestSequence = number(state.agentPlatform?.latest_sequence);
+    const advanced = latestSequence > state.businessMetricSequence;
+    const entries = [
+      ["business-availability", impact ? `${number(impact.inventory_availability_percent).toFixed(1)}%` : "—", false],
+      ["business-reconciliation", impact ? `${number(impact.erp_reconciliation_percent).toFixed(1)}%` : "—", false],
+      ["business-working-capital", impact ? formatCurrency(impact.working_capital_at_risk, currency) : "—", number(impact?.working_capital_at_risk) > 0],
+      ["business-invoice-hold", impact ? formatCurrency(impact.invoice_hold_value, currency) : "—", number(impact?.invoice_hold_value) > 0],
+      ["business-unit-cost", impact ? formatCurrency(impact.po_unit_cost, currency) : "—", false],
+      ["business-price-variance", impact ? `${number(impact.purchase_price_variance) > 0 ? "+" : ""}${formatCurrency(impact.purchase_price_variance, currency)}` : "—", number(impact?.purchase_price_variance) !== 0],
+      ["business-quality-hold", impact ? formatCurrency(impact.quality_hold_value, currency) : "—", number(impact?.quality_hold_value) > 0],
+      ["business-value-protected", impact ? formatCurrency(impact.value_protected, currency) : "—", false],
+      ["business-booked-revenue", proof ? formatCurrency(observed.booked_revenue, currency) : "—", false],
+      ["business-revenue-at-risk", proof ? formatCurrency(counterfactual.revenue_at_risk_if_hold_persists, currency) : "—", number(counterfactual.revenue_at_risk_if_hold_persists) > 0],
+      ["business-delivered-quantity", proof ? `${number(observed.delivered_quantity)} / ${number(observed.order_quantity)}` : "—", false],
+      ["business-gross-spread", proof && value(proof.status) === "BILLED_VERIFIED" ? formatCurrency(observed.gross_spread, currency) : "—", false],
+    ];
+    entries.forEach(([id, text, alert]) => {
+      const node = $(id);
+      if (!node) return;
+      node.textContent = text;
+      const metric = node.closest(".business-metric");
+      if (metric) {
+        metric.dataset.tone = alert ? "alert" : id === "business-value-protected" && number(impact?.value_protected) > 0 ? "success" : "neutral";
+      }
+      if (advanced) {
+        node.classList.remove("is-live-update");
+        void node.offsetWidth;
+        node.classList.add("is-live-update");
+      }
+    });
+    const detailValues = [
+      ["business-receipt-gap", impact ? formatCurrency(impact.receipt_gap_value, currency) : "—"],
+      ["business-quality-hold-detail", impact ? formatCurrency(impact.quality_hold_value, currency) : "—"],
+      ["business-working-capital-detail", impact ? formatCurrency(impact.working_capital_at_risk, currency) : "—"],
+      ["business-po-line-value", impact ? formatCurrency(impact.po_line_value, currency) : "—"],
+      ["business-invoice-value", impact ? formatCurrency(impact.invoice_value, currency) : "—"],
+      ["business-invoice-unit-price", impact ? formatCurrency(impact.invoice_unit_price, currency) : "—"],
+      ["business-price-delta", impact ? `${number(impact.invoice_price_delta_percent) > 0 ? "+" : ""}${number(impact.invoice_price_delta_percent).toFixed(1)}%` : "—"],
+      ["business-available-value", impact ? formatCurrency(impact.available_inventory_value, currency) : "—"],
+      ["business-delivery-completion", impact ? `${number(impact.supplier_delivery_completion_percent).toFixed(1)}%` : "—"],
+    ];
+    detailValues.forEach(([id, text]) => { if ($(id)) $(id).textContent = text; });
+    const exposureTotal = Math.max(1, number(impact?.working_capital_at_risk));
+    [
+      ["receipt-gap-bar", number(impact?.receipt_gap_value)],
+      ["quality-hold-bar", number(impact?.quality_hold_value)],
+      ["working-capital-bar", number(impact?.working_capital_at_risk)],
+    ].forEach(([id, amount]) => {
+      const bar = $(id);
+      if (bar) bar.style.setProperty("--exposure-width", `${Math.max(0, Math.min(100, amount * 100 / exposureTotal))}%`);
+    });
+    const supplier = $("business-supplier-status");
+    if (supplier) {
+      const status = value(impact?.supplier_status || "—").toUpperCase();
+      supplier.textContent = `SUPPLIER ${status}`;
+      supplier.dataset.tone = impact?.supplier_payment_hold ? "alert" : "healthy";
+    }
+    const invoice = $("business-invoice-status");
+    if (invoice) {
+      const status = value(impact?.invoice_status || "—").toUpperCase();
+      invoice.textContent = `INVOICE ${status}`;
+      invoice.dataset.tone = status === "HELD" || status === "BLOCKED" ? "alert" : "healthy";
+    }
+    const order = $("business-order-status");
+    if (order) {
+      const status = value(proof?.status || "—").replaceAll("_", " ").toUpperCase();
+      order.textContent = `ORDER ${status}`;
+      order.dataset.tone = ["ORDER HELD", "ORDER OPEN", "DELIVERED"].includes(status) ? "alert" : status === "BILLED VERIFIED" ? "healthy" : "neutral";
+    }
+    const sequence = $("business-impact-sequence");
+    if (sequence) sequence.textContent = `LEDGER ${latestSequence || "—"}`;
+    if (advanced) state.businessMetricSequence = latestSequence;
+  }
+
+  function renderConnectedOperations() {
+    const operations = connectedOperationsProjection();
+    const section = document.querySelector(".connected-operations");
+    const historyPanel = document.querySelector(".diagram-operations");
+    if (section) section.hidden = !operations || isNormalScenario();
+    if (historyPanel) historyPanel.hidden = !operations;
+    const latestSequence = number(state.agentPlatform?.latest_sequence);
+    const advanced = latestSequence > number(state.operationsMetricSequence);
+    const risk = operations?.risk_signal || {};
+    const shift = operations?.current_shift || {};
+    const customer = operations?.customer_commitments || {};
+    const supplier = operations?.supplier_performance || {};
+    const inventory = operations?.inventory || {};
+    const currency = value(businessImpactProjection()?.currency || "USD");
+    const entries = [
+      ["operations-risk-score", operations ? number(risk.score).toFixed(0) : "—"],
+      ["operations-risk-band", operations ? value(risk.band || "NORMAL") : "WAITING"],
+      ["operations-oee", operations ? `${number(shift.oee_percent).toFixed(1)}%` : "—"],
+      ["operations-schedule", operations ? `${number(shift.schedule_attainment_percent).toFixed(1)}%` : "—"],
+      ["operations-units-risk", operations ? String(number(customer.units_at_risk)) : "—"],
+      ["operations-revenue-risk", operations ? formatCurrency(customer.revenue_at_risk, currency) : "—"],
+      ["operations-margin-risk", operations ? formatCurrency(customer.contribution_margin_at_risk, currency) : "—"],
+      ["operations-days-supply", operations ? `${number(inventory.days_of_supply).toFixed(1)}d` : "—"],
+      ["operations-inbound-otif", operations ? `${number(supplier.inbound_otif_percent_90d).toFixed(1)}%` : "—"],
+      ["operations-supplier-ppm", operations ? new Intl.NumberFormat("en-US").format(number(supplier.supplier_ppm_90d)) : "—"],
+    ];
+    entries.forEach(([id, content]) => { if ($(id)) $(id).textContent = content; });
+    const signal = $("operations-risk-signal");
+    if (signal) {
+      signal.dataset.tone = value(risk.band || "normal").toLowerCase();
+      if (advanced) {
+        signal.classList.remove("is-live-update");
+        void signal.offsetWidth;
+        signal.classList.add("is-live-update");
+      }
+    }
+    const reasons = Array.isArray(risk.reasons) ? risk.reasons : [];
+    const reasonHost = $("operations-risk-reasons");
+    if (reasonHost) {
+      reasonHost.replaceChildren(...(
+        reasons.length
+          ? reasons.map((reason) => create("span", "", value(reason)))
+          : [create("span", "is-clear", operations ? "No cross-system exposure detected" : "Waiting for connected records")]
+      ));
+    }
+    if (advanced) state.operationsMetricSequence = latestSequence;
+  }
+
+  function bindDashboardMetricInspectors() {
+    document.querySelectorAll(".business-metric, .operations-metric-grid article, .operations-risk-signal").forEach((card) => {
+      card.setAttribute("role", "button");
+      card.tabIndex = 0;
+      const inspect = () => {
+        const label = value(card.querySelector("span")?.textContent || card.querySelector("small")?.textContent || "Operational metric");
+        const metricValue = value(card.querySelector("strong")?.textContent || "—");
+        const supporting = value(card.querySelector("small")?.textContent);
+        const isBusiness = card.classList.contains("business-metric");
+        const businessMetric = value(card.dataset.businessMetric);
+        const tone = value(card.dataset.tone);
+        const exactERPLink = (kind, route) => liveERPDocument(kind)
+          ? erpDocumentLink(kind, route, "")
+          : EXTERNAL_SERVICE_LINKS.erpnext;
+        const externalByMetric = {
+          "booked-revenue": exactERPLink("sales_order", "sales-order"),
+          "revenue-risk": exactERPLink("sales_order", "sales-order"),
+          delivered: exactERPLink("delivery_note", "delivery-note"),
+          "value-protected": exactERPLink("sales_invoice", "sales-invoice"),
+          "gross-spread": exactERPLink("sales_invoice", "sales-invoice"),
+          "invoice-hold": exactERPLink("purchase_invoice", "purchase-invoice"),
+          "price-variance": exactERPLink("purchase_invoice", "purchase-invoice"),
+        };
+        openDashboardComponentInspector({
+          kind: isBusiness ? "Financial control" : "Connected operations",
+          title: label,
+          status: tone === "alert" || ["critical", "elevated"].includes(tone) ? "ANOMALY" : state.connection === "live" ? "LIVE" : "PAUSED",
+          tone,
+          purpose: supporting || (isBusiness
+            ? "Observed or explicitly counterfactual value derived from ERPNext order, delivery, invoice, stock and GL evidence."
+            : "Operating signal derived from the connected 90-day plant, supplier and demand window."),
+          metrics: [
+            ["Current value", metricValue],
+            ["Ledger sequence", number(state.agentPlatform?.latest_sequence, state.lastSequence) || "—"],
+            ["Source", isBusiness ? "ERPNext authoritative reread" : "MES + demand + supplier evidence"],
+          ],
+          external: isBusiness
+            ? externalByMetric[businessMetric] || erpDocumentLink("purchase_order", "purchase-order", "")
+            : null,
+        });
+      };
+      card.addEventListener("click", inspect);
+      card.addEventListener("keydown", (event) => {
+        if (!["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+        inspect();
+      });
+    });
+  }
+
+  function drawConnectedOperationsChart() {
+    const operations = connectedOperationsProjection();
+    const history = Array.isArray(operations?.history) ? operations.history : [];
+    const points = history.map((point, index) => ({
+      ...point,
+      timestamp: `${value(point.date)}T12:00:00Z`,
+      sequence: index + 1,
+      value: number(point.risk_score),
+      metric: "Operational risk score",
+      unit: "/100",
+      source: "synthetic-mes-demand-ledger",
+    }));
+    drawLineChart(
+      $("operations-history-chart"),
+      [
+        points.map((point) => number(point.risk_score)),
+        points.map((point) => number(point.schedule_attainment_percent)),
+        points.map((point) => number(point.oee_percent)),
+      ],
+      ["coral", "cyan", "violet"],
+      {
+        points,
+        metric: "Operational risk score",
+        unit: "/100",
+        source: "synthetic-mes-demand-ledger",
+        emptyLabel: "Waiting for connected operating history",
+        startLabel: history.length ? value(history[0].date) : "",
+        endLabel: history.length ? value(history[history.length - 1].date) : "",
+      },
+    );
+  }
+
+  function drawBusinessImpactChart(snapshot) {
+    const impactPoints = chartTelemetryPoints(snapshot)
+      .filter((point) => point && point.business_metrics)
+      .map((point) => ({
+        ...point,
+        value: number(point.business_metrics.working_capital_at_risk),
+        metric: "Working capital at risk",
+        unit: value(businessImpactProjection()?.currency || "USD"),
+        source: "agent-platform-event-ledger",
+      }));
+    const series = [
+      impactPoints.map((point) => number(point.business_metrics.working_capital_at_risk)),
+      impactPoints.map((point) => number(point.business_metrics.invoice_hold_value)),
+      impactPoints.map((point) => number(point.business_metrics.billed_revenue)),
+    ];
+    const labels = lineLabels(impactPoints);
+    drawLineChart($("business-impact-chart"), series, ["violet", "coral", "lime"], {
+      points: impactPoints,
+      metric: "Event-time financial evidence",
+      unit: value(businessImpactProjection()?.currency || "USD"),
+      source: "agent-platform-event-ledger",
+      emptyLabel: "Waiting for event-time financial history",
+      ...labels,
+    });
+  }
+
   function renderOperationalCharts(snapshot) {
     const active = document.activeElement;
     const activeCanvasId = active && active.tagName === "CANVAS" ? active.id : "";
@@ -2739,7 +4758,9 @@
       points,
       metric: "Gap",
       unit: "units",
-      source: "synthetic-enterprise-snapshot",
+      source: platformFlowProjection()?.provenance === "live-read"
+        ? "ERPNext semantic source ledger"
+        : "synthetic enterprise snapshot",
       emptyLabel: "Insufficient live history",
       ...labels,
     });
@@ -2749,12 +4770,18 @@
       points,
       metric: "Gap",
       unit: "units",
-      source: "synthetic-enterprise-snapshot",
+      source: platformFlowProjection()?.provenance === "live-read"
+        ? "ERPNext semantic source ledger"
+        : "synthetic enterprise snapshot",
       gridColor: "rgba(143, 185, 153, .16)",
     });
     renderMiniChart("queue-health-chart", "queue-health-value", telemetryPoints(snapshot, "queue"), "Queue backlog", "coral");
     renderMiniChart("erp-health-chart", "erp-health-value", telemetryPoints(snapshot, "erp"), "ERP posting", "cyan");
     renderMiniChart("invoice-health-chart", "invoice-health-value", telemetryPoints(snapshot, "invoice"), "Invoice completion", "lime");
+    renderBusinessImpact();
+    drawBusinessImpactChart(snapshot);
+    renderConnectedOperations();
+    drawConnectedOperationsChart();
     drawExternalRiskChart();
     // The cursor is a single atomic record owned by the physically focused
     // canvas. Reconcile its point and metric metadata only after every chart
@@ -2779,22 +4806,59 @@
   function renderLiveMetrics() {
     const snapshot = state.snapshot;
     if (!snapshot) return;
-    const counts = snapshot.unit_counts || {};
+    const platform = platformFlowProjection();
+    const counts = platform ? {
+      total: platform.expected,
+      erp_recorded: platform.recorded,
+      queue_failed: platform.gap,
+    } : snapshot.unit_counts || {};
     const agentCount = allAgentStates().filter((item) => ["TRIGGERED", "INVESTIGATING", "WAITING FOR EVIDENCE", "HANDOFF"].includes(item.status)).length;
-    const latestTelemetry = state.telemetry.length
-      ? state.telemetry[state.telemetry.length - 1]
-      : null;
+    const platformMetricEvents = Array.isArray(state.agentPlatform?.activity)
+      ? state.agentPlatform.activity.filter((event) => event?.metrics)
+      : [];
+    const latestPlatformMetric = platformMetricEvents.at(-1);
+    const latestTelemetry = latestPlatformMetric
+      ? {
+        ...latestPlatformMetric.metrics,
+        sequence: latestPlatformMetric.sequence,
+        received_at: latestPlatformMetric.occurred_at,
+        trigger: {
+          kind: "external_source_change",
+          source_system: "erpnext",
+          change_count: number(latestPlatformMetric.change_count),
+        },
+      }
+      : state.telemetry.length ? state.telemetry[state.telemetry.length - 1] : null;
     const values = {
       observedRecords: latestTelemetry
-        ? telemetryRecordCount(latestTelemetry)
+        ? number(latestTelemetry.trigger?.change_count, telemetryRecordCount(latestTelemetry))
         : 0,
       queue: number(counts.queue_failed),
       agents: agentCount,
-      sequence: state.lastSequence || number(snapshot.projection_sequence),
+      sequence: platform?.latestSequence || state.lastSequence || number(snapshot.projection_sequence),
     };
     const telemetrySequence = latestTelemetry
       ? number(latestTelemetry.sequence, values.sequence)
       : values.sequence;
+    const metricAdvanced = telemetrySequence > state.liveMetricSequence;
+    const flowWindowCount = $("flow-window-count");
+    if (flowWindowCount) {
+      flowWindowCount.textContent = latestTelemetry
+        ? String(number(latestTelemetry.trigger?.change_count, telemetryRecordCount(latestTelemetry)))
+        : "—";
+    }
+    const flowLedgerSequence = $("flow-ledger-sequence");
+    if (flowLedgerSequence) {
+      flowLedgerSequence.textContent = values.sequence ? String(values.sequence) : "—";
+    }
+    if (metricAdvanced) {
+      [flowWindowCount, flowLedgerSequence].filter(Boolean).forEach((node) => {
+        node.classList.remove("is-live-update");
+        void node.offsetWidth;
+        node.classList.add("is-live-update");
+      });
+      state.liveMetricSequence = telemetrySequence;
+    }
     [
       ["metric-throughput", values.observedRecords],
       ["metric-queue-depth", values.queue],
@@ -2810,7 +4874,7 @@
     const flowDetail = $("flow-stat-detail");
     if (flowDetail) {
       flowDetail.textContent = latestTelemetry
-        ? `${telemetryRecordCount(latestTelemetry)} records observed · event ${value(latestTelemetry.sequence)} · source ledger`
+        ? `${number(latestTelemetry.trigger?.change_count, telemetryRecordCount(latestTelemetry))} changed records · event ${value(latestTelemetry.sequence)} · source ledger`
         : "Waiting for the first source observation.";
     }
     const provenanceSequence = $("provenance-sequence");
@@ -2818,8 +4882,8 @@
     const provenanceDetail = $("provenance-detail");
     if (provenanceDetail) {
       provenanceDetail.textContent = latestTelemetry
-        ? `Synthetic enterprise flow · received ${shortTime(latestTelemetry.received_at || latestTelemetry.observed_at)} · SSE cursor ${value(state.lastSequence || values.sequence)}`
-        : "Synthetic enterprise flow · awaiting first observation.";
+        ? `Source-triggered observation · received ${shortTime(latestTelemetry.received_at || latestTelemetry.observed_at)} · source cursor ${value(values.sequence)}`
+        : "Awaiting the first external source observation.";
     }
     renderOperationalCharts(snapshot);
     const timeline = $("reconciliation-timeline");
@@ -2844,11 +4908,10 @@
   function renderFlow() {
     const snapshot = state.snapshot;
     if (!snapshot) return;
-    const flow = snapshot.flow || { nodes: [], edges: [] };
+    const flow = snapshot.flow || { nodes: [] };
     const map = $("flow-map");
     map.replaceChildren();
     const rawNodes = Array.isArray(flow.nodes) ? flow.nodes : [];
-    const edges = Array.isArray(flow.edges) ? flow.edges : [];
     const nodeMap = new Map(rawNodes.map((item) => [value(item.id), item]));
     // The control-room route is a fixed four-component supply chain.  Keep
     // the visual order and one card per component even if a future payload
@@ -2858,13 +4921,37 @@
       .filter(Boolean);
     const flowSummary = flow.summary || {};
     const snapshotCounts = snapshot.unit_counts && typeof snapshot.unit_counts === "object" ? snapshot.unit_counts : {};
-    const expected = number(snapshotCounts.total, number(flowSummary.expected, number(nodeMap.get("warehouse")?.count)));
-    const recorded = number(snapshotCounts.erp_recorded, number(flowSummary.recorded, number(nodeMap.get("erp")?.count)));
-    const queueException = number(snapshotCounts.queue_failed, number(flowSummary.queue_exception, number(nodeMap.get("message-queue")?.count)));
+    const platform = platformFlowProjection();
+    const expected = platform
+      ? platform.expected
+      : number(snapshotCounts.total, number(flowSummary.expected, number(nodeMap.get("warehouse")?.count)));
+    const recorded = platform
+      ? platform.recorded
+      : number(snapshotCounts.erp_recorded, number(flowSummary.recorded, number(nodeMap.get("erp")?.count)));
+    const queueException = platform
+      ? platform.gap
+      : number(snapshotCounts.queue_failed, number(flowSummary.queue_exception, number(nodeMap.get("message-queue")?.count)));
+    const stageProjection = latestStageProjection(snapshot);
+    const stageCounts = stageProjection.counts;
+    const projectedCount = (nodeId, fallback) => platform
+      ? fallback
+      : Object.hasOwn(stageCounts, nodeId)
+        ? number(stageCounts[nodeId], fallback)
+        : fallback;
     $("expected-count").textContent = String(expected);
     $("recorded-count").textContent = String(recorded);
     $("queue-count").textContent = String(queueException);
-    const allNodesHealthy = nodes.length > 0 && nodes.every((item) => ["HEALTHY", "RELEASED"].includes(value(item.status).toUpperCase()));
+    const allNodesHealthy = platform
+      ? platform.verified && platform.gap === 0 && !platform.invoiceHeld
+      : nodes.length > 0 && nodes.every((item) => ["HEALTHY", "RELEASED"].includes(value(item.status).toUpperCase()));
+    const projectedStatus = (item) => {
+      if (!platform) return value(item.status).toUpperCase();
+      if (allNodesHealthy) return value(item.id) === "invoice" ? "OPEN" : "HEALTHY";
+      if (value(item.id) === "warehouse") return "HEALTHY";
+      if (value(item.id) === "message-queue") return platform.receiptUnresolved > 0 ? "ANOMALY" : "HEALTHY";
+      if (value(item.id) === "erp") return platform.gap > 0 ? "PARTIAL" : "HEALTHY";
+      return platform.invoiceHeld ? "HELD" : "OPEN";
+    };
     setBadge($("path-status"), allNodesHealthy ? "Healthy" : "Attention needed", allNodesHealthy ? "HEALTHY" : "ANOMALY");
     const projectedNodes = {
       warehouse: { healthId: "health-warehouse", sourceId: "source-warehouse" },
@@ -2876,18 +4963,18 @@
       const projection = projectedNodes[value(item.id)];
       if (!projection) return;
       const count = value(item.id) === "warehouse"
-        ? expected
+        ? projectedCount("warehouse", expected)
         : value(item.id) === "message-queue"
-          ? queueException
+          ? projectedCount("message-queue", queueException)
           : value(item.id) === "erp"
-            ? recorded
-            : number(item.count);
+            ? projectedCount("erp", recorded)
+            : projectedCount("invoice", platform ? (platform.invoiceHeld ? 0 : recorded) : number(item.count));
       [projection.healthId, projection.sourceId].forEach((id) => {
         const target = $(id);
         if (target) target.textContent = String(count);
       });
-      const status = value(item.status).toUpperCase();
-      const alert = !["HEALTHY", "RELEASED"].includes(status);
+      const status = projectedStatus(item);
+      const alert = !["HEALTHY", "OPEN", "RELEASED"].includes(status);
       const sourceNodeId = projection.sourceNodeId || value(item.id);
       document.querySelectorAll(`[data-health-node="${value(item.id)}"], [data-source-node="${sourceNodeId}"]`).forEach((target) => {
         target.classList.toggle("is-alert", alert);
@@ -2900,27 +4987,39 @@
     });
     const healthCore = document.querySelector(".health-core");
     if (healthCore) {
-      const queueHealthy = value(nodeMap.get("message-queue")?.status).toUpperCase() === "HEALTHY";
+      const queueHealthy = platform
+        ? platform.gap === 0
+        : value(nodeMap.get("message-queue")?.status).toUpperCase() === "HEALTHY";
       healthCore.classList.toggle("is-alert", !queueHealthy);
       healthCore.classList.toggle("is-healthy", queueHealthy);
     }
     const rightErp = $("health-erp-right");
     if (rightErp) rightErp.textContent = String(recorded);
-    nodes.forEach((item, index) => {
+    const nextStageCounts = new Map();
+    nodes.forEach((item) => {
       const column = create("div", "flow-column");
-      const node = create("article", `flow-node ${stateClass(item.status)}`, null);
       const nodeId = value(item.id);
       const count = nodeId === "warehouse"
-        ? expected
+        ? projectedCount("warehouse", expected)
         : nodeId === "message-queue"
-          ? queueException
+          ? projectedCount("message-queue", queueException)
           : nodeId === "erp"
-            ? recorded
-            : number(item.count);
+            ? projectedCount("erp", recorded)
+          : projectedCount("invoice", platform ? (platform.invoiceHeld ? 0 : recorded) : number(item.count));
+      const previousCount = state.flowStageCounts.get(nodeId);
+      const stageUpdated = previousCount != null && previousCount !== count;
+      const node = create(
+        "article",
+        `flow-node ${stateClass(projectedStatus(item))}${stageUpdated ? " is-stage-updated" : ""}`,
+        null,
+      );
+      nextStageCounts.set(nodeId, count);
       node.dataset.nodeId = value(item.id);
+      node.dataset.stageCount = String(count);
+      node.dataset.flowRunId = stageProjection.runId;
       node.setAttribute("role", "button");
       node.tabIndex = 0;
-      node.setAttribute("aria-label", `${value(item.label)}, ${count} records, ${human(item.status)}`);
+      node.setAttribute("aria-label", `${value(item.label)}, ${count} records, ${human(projectedStatus(item))}`);
       node.addEventListener("click", () => selectFlowEntity(item));
       node.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
@@ -2940,75 +5039,44 @@
       icon.setAttribute("aria-hidden", "true");
       header.append(dot, icon, create("span", "flow-node-label", value(item.label)));
       const badge = create("span", "state-badge", null);
-      badge.classList.add(stateClass(item.status));
-      const badgeIcon = ["HEALTHY", "RELEASED"].includes(value(item.status).toUpperCase())
+      const nodeStatus = projectedStatus(item);
+      badge.classList.add(stateClass(nodeStatus));
+      const badgeIcon = ["HEALTHY", "OPEN", "RELEASED"].includes(nodeStatus)
         ? "ph-bold ph-check"
         : "ph-bold ph-warning";
       badge.append(create("i", badgeIcon));
-      badge.setAttribute("aria-label", value(item.status));
+      badge.setAttribute("aria-label", nodeStatus);
       header.append(badge);
-      const countNode = create("strong", "flow-node-count", String(count));
-      const erpCount = recorded;
+      const countNode = create(
+        "strong",
+        `flow-node-count${stageUpdated ? " is-stage-updated" : ""}`,
+        String(count),
+      );
       const semantics = nodeId === "warehouse"
-        ? "dispatched"
+        ? "received"
         : nodeId === "message-queue"
-          ? "backlog"
+          ? state.agentPlatform ? "unresolved" : "published"
           : nodeId === "erp"
             ? "posted"
             : nodeId === "invoice"
-              ? count > erpCount ? "expected" : "completed"
+              ? "matched"
               : "records";
       const countLabel = create("span", "flow-node-count-label", semantics);
       node.setAttribute(
         "aria-label",
-        `${value(item.label)}, ${count} ${semantics}, ${human(item.status)}`,
+        `${value(item.label)}, ${count} ${semantics}, ${human(nodeStatus)}`,
       );
-      const inputPort = create("span", "flow-node-port flow-node-port-in");
-      inputPort.dataset.port = "in";
-      inputPort.setAttribute("aria-hidden", "true");
-      const outputPort = create("span", "flow-node-port flow-node-port-out");
-      outputPort.dataset.port = "out";
-      outputPort.setAttribute("aria-hidden", "true");
-      node.append(header, countNode, countLabel, inputPort, outputPort);
-      column.append(node);
-      if (index < nodes.length - 1) {
-        const next = nodes[index + 1];
-        const edge = edges.find((candidate) => candidate.from === item.id && candidate.to === next.id);
-        if (edge) {
-          const telemetryActive = streamIsLive() && state.telemetryPulse;
-          const gapEdge = edge.from === "message-queue" && edge.to === "erp" && queueException > 0;
-          const link = create("div", `flow-link${state.activeEdges.has(`${edge.from}->${edge.to}`) ? " is-active" : ""}${telemetryActive ? " is-telemetry" : ""}${gapEdge ? " is-gap" : ""}`);
-          link.dataset.edge = `${edge.from}->${edge.to}`;
-          const throughput = number(edge.throughput, item.id === "warehouse" ? expected : item.id === "message-queue" ? recorded : recorded);
-          const width = Math.max(2, Math.min(8, 2 + (throughput / Math.max(expected, 1)) * 6));
-          const duration = Math.max(0.65, Math.min(2.4, 1.65 - (throughput / Math.max(expected, 1))));
-          const line = create("span", "flow-link-line");
-          line.style.setProperty("--flow-width", `${width.toFixed(2)}px`);
-          line.style.setProperty("--flow-duration", `${duration.toFixed(2)}s`);
-          link.title = `${value(edge.from)} to ${value(edge.to)} · ${throughput} records`;
-          const particleLayer = create("span", "flow-particle-layer");
-          for (let particleIndex = 0; particleIndex < 5; particleIndex += 1) {
-            const particle = create("span", "flow-particle");
-            particle.style.setProperty("--particle-delay", `${(particleIndex * duration / 5).toFixed(2)}s`);
-            particle.setAttribute("aria-hidden", "true");
-            particleLayer.append(particle);
-          }
-          line.append(particleLayer);
-          link.append(line);
-          if (gapEdge) {
-            const branch = create("span", "flow-gap-branch");
-            branch.dataset.missingQuantity = String(queueException);
-            branch.append(
-              create("span", "flow-gap-branch-line"),
-              create("strong", null, `${queueException} missing`),
-            );
-            link.append(branch);
-          }
-          column.append(link);
-        }
+      node.append(header, countNode, countLabel);
+      if (nodeId === "message-queue" && queueException > 0) {
+        const exception = create("span", "flow-node-exception", `${queueException} held`);
+        exception.setAttribute("aria-label", `${queueException} units held before ERP`);
+        node.append(exception);
       }
+      column.append(node);
       map.append(column);
     });
+    state.flowStageCounts = nextStageCounts;
+    state.flowStageRunId = stageProjection.runId;
     renderUnitDensity();
     renderUnitAnomalies();
     renderUnitDetail();
@@ -3028,18 +5096,133 @@
     renderUnitDetail();
   }
 
+  function openDashboardComponentInspector(context) {
+    const inspector = $("dashboard-component-inspector");
+    if (!inspector || !context) return;
+    $("dashboard-component-inspector-kind").textContent = value(context.kind || "LIVE COMPONENT").toUpperCase();
+    $("dashboard-component-inspector-title").textContent = value(context.title || "Component");
+    const status = value(context.status || "WAITING").replaceAll("_", " ");
+    setBadge($("dashboard-component-inspector-status"), status, status);
+    $("dashboard-component-inspector-purpose").textContent = value(context.purpose || "Live operational component.");
+    const metrics = $("dashboard-component-inspector-metrics");
+    metrics.replaceChildren();
+    (Array.isArray(context.metrics) ? context.metrics : []).forEach(([label, metricValue]) => {
+      const row = create("div");
+      row.append(create("dt", null, value(label)), create("dd", null, value(metricValue) || "—"));
+      metrics.append(row);
+    });
+    inspector.dataset.tone = isProblemStatus(context.status) || context.tone === "alert" ? "alert" : "normal";
+    const external = $("dashboard-component-inspector-external");
+    if (external) {
+      external.hidden = !context.external;
+      external.href = value(context.external?.url || "#");
+      const label = external.querySelector("span");
+      if (label) label.textContent = value(context.external?.label || "Open service");
+      external.setAttribute("aria-label", `${value(context.external?.label || "Open service")} in a new tab`);
+    }
+    inspector.hidden = false;
+  }
+
+  function closeDashboardComponentInspector() {
+    const inspector = $("dashboard-component-inspector");
+    if (inspector) inspector.hidden = true;
+  }
+
+  function flowComponentContext(item) {
+    const id = value(item?.id);
+    const flow = platformFlowProjection();
+    const caseFacts = state.agentPlatform?.demo_case?.case || {};
+    const impact = businessImpactProjection();
+    const operations = connectedOperationsProjection();
+    const risk = operations?.risk_signal || {};
+    const ledger = state.erpEvidence?.ledger_evidence || {};
+    const stockLedger = Array.isArray(ledger.stock_entries) ? ledger.stock_entries : [];
+    const generalLedger = Array.isArray(ledger.general_ledger_entries)
+      ? ledger.general_ledger_entries
+      : [];
+    const ledgerTotals = ledger.totals && typeof ledger.totals === "object" ? ledger.totals : {};
+    const currency = value(impact?.currency || "USD");
+    const renderedStatus = document.querySelector(`[data-node-id="${id}"] .state-badge`)?.getAttribute("aria-label");
+    const status = value(renderedStatus || item?.status || "WAITING");
+    const contexts = {
+      warehouse: {
+        purpose: "Physical receipt and available inventory entering the control loop.",
+        external: { label: "Open ERPNext stock", url: "https://missing20.v.frappe.cloud/app/stock-entry" },
+        metrics: [
+          ["Physically arrived", `${number(flow?.expected, item?.count)} units`],
+          ["Available", `${number(flow?.recorded)} units`],
+          ["Days of supply", operations ? `${number(operations.inventory?.days_of_supply).toFixed(1)} days` : "—"],
+          ["Stock ledger rows", String(stockLedger.length)],
+        ],
+      },
+      "message-queue": {
+        purpose: "Carries the receipt event and exposes acknowledgements, retries and unresolved records.",
+        external: EXTERNAL_SERVICE_LINKS.celigo,
+        metrics: [
+          ["Published", `${number(flow?.expected, item?.count)} units`],
+          ["Unresolved", `${number(flow?.receiptUnresolved)} units`],
+          ["Business key", value(caseFacts.receipt_business_key || "—")],
+        ],
+      },
+      erp: {
+        purpose: "Authoritative inventory ledger used to reconcile physical receipt, quality and financial state.",
+        external: erpDocumentLink("purchase_order", "purchase-order", "PUR-ORD-2026-00011"),
+        metrics: [
+          ["ERP accounted", `${number(flow?.recorded, item?.count)} units`],
+          ["Reconciled", impact ? `${number(impact.erp_reconciliation_percent).toFixed(1)}%` : "—"],
+          ["Live source", value(liveERPDocument("purchase_order")?.name || "WAITING")],
+          ["GL rows", String(generalLedger.length)],
+          ["Debits / credits", ledger.status === "CONNECTED"
+            ? `${formatCurrency(ledgerTotals.debit, currency)} / ${formatCurrency(ledgerTotals.credit, currency)}`
+            : "Ledger read unavailable"],
+        ],
+      },
+      invoice: {
+        purpose: "Payment control that remains held until receipt and exact-lot evidence reconcile.",
+        external: erpDocumentLink("purchase_invoice", "purchase-invoice", "ACC-PINV-2026-00007"),
+        metrics: [
+          ["Invoice", value(impact?.invoice_status || (flow?.invoiceHeld ? "HELD" : "OPEN"))],
+          ["Invoice value", impact ? formatCurrency(impact.invoice_value, currency) : "—"],
+          ["Live source", value(liveERPDocument("purchase_invoice")?.name || "WAITING")],
+          ["Balanced posting", ledger.assertions?.debits_equal_credits ? "Verified" : "Not verified"],
+        ],
+      },
+    };
+    const context = contexts[id] || { purpose: "Live supply-chain stage.", metrics: [] };
+    return { kind: "Supply chain", title: value(item?.label || human(id)), status, ...context };
+  }
+
   function selectFlowEntity(item) {
     if (!item) return;
-    const latest = state.telemetry.length ? state.telemetry[state.telemetry.length - 1] : null;
+    const liveFlow = platformFlowProjection();
+    const platformMetrics = liveFlow && Array.isArray(state.agentPlatform?.activity)
+      ? state.agentPlatform.activity.filter((event) => event?.metrics && typeof event.metrics === "object")
+      : [];
+    const latestSourceEvent = platformMetrics.at(-1) || null;
+    const latest = latestSourceEvent || (state.telemetry.length ? state.telemetry[state.telemetry.length - 1] : null);
+    const liveValues = {
+      warehouse: liveFlow?.expected,
+      "message-queue": liveFlow?.expected,
+      erp: liveFlow?.recorded,
+      invoice: liveFlow ? (liveFlow.invoiceHeld ? 0 : liveFlow.recorded) : latestSourceEvent?.metrics?.invoice_count,
+    };
+    const selectedValue = liveFlow
+      ? number(liveValues[value(item.id)])
+      : number(item.count);
+    const occurredAt = liveFlow
+      ? value(latestSourceEvent?.occurred_at)
+      : value(latest?.observed_at || latest?.captured_at);
     const point = {
-      sequence: latest ? latest.sequence : number(state.snapshot && state.snapshot.projection_sequence),
-      timestamp: latest && (latest.observed_at || latest.captured_at),
-      observed_at: latest && (latest.observed_at || latest.captured_at),
-      received_at: latest && (latest.received_at || latest.observed_at || latest.captured_at),
-      value: number(item.count),
+      sequence: liveFlow?.latestSequence || (latest ? latest.sequence : number(state.snapshot && state.snapshot.projection_sequence)),
+      timestamp: occurredAt,
+      observed_at: occurredAt,
+      received_at: liveFlow ? occurredAt : latest && (latest.received_at || latest.observed_at || latest.captured_at),
+      value: selectedValue,
       unit: "records",
       metric: `${value(item.label || item.id)} records`,
-      source: "synthetic-enterprise-snapshot",
+      source: liveFlow?.provenance === "live-read"
+        ? "ERPNext semantic source ledger"
+        : "synthetic enterprise snapshot",
       entity: value(item.id),
     };
     state.selectedPoint = point;
@@ -3047,6 +5230,7 @@
     renderFlowSelectionDetail(point);
     renderDiagramCursorLabels(point);
     renderOperationalCharts(state.snapshot);
+    openDashboardComponentInspector(flowComponentContext(item));
   }
 
   function renderAgentCard(item, compact) {
@@ -3076,11 +5260,9 @@
     if (!compact) {
       card.append(
         create("span", "graph-port graph-port-in", null),
-        create("span", "graph-port graph-port-control-in", null),
         create("span", "graph-port graph-port-out", null),
       );
       card.querySelector(".graph-port-in").dataset.port = `${item.id}-in`;
-      card.querySelector(".graph-port-control-in").dataset.port = `${item.id}-control-in`;
       card.querySelector(".graph-port-out").dataset.port = `${item.id}-out`;
       card.querySelectorAll(".graph-port").forEach((port) => port.setAttribute("aria-hidden", "true"));
       card.addEventListener("click", () => {
@@ -3211,6 +5393,8 @@
 
   function graphRouteContract() {
     return {
+      supply: { kind: "cubic-bezier", lane: "orthogonal-data-plane" },
+      boundary: { kind: "cubic-bezier", lane: "read-only-boundary" },
       incident: { kind: "cubic-bezier", lane: "outer-upper" },
       source: { kind: "cubic-bezier", lane: "source-column" },
       orchestrator: { kind: "cubic-bezier", lane: "coordination-bus" },
@@ -3225,38 +5409,44 @@
     const { x1, y1, x2, y2 } = anchors;
     const width = number(metrics.width, 0);
     const graphHeight = number(metrics.height, 0);
-    // Every semantic lane except the return corridor is a single smooth
-    // cubic. Control points stay between the ports, so both axes are
-    // monotonic and a fan-out can never fold back across a sibling route.
-    if (route.type === "orchestrator" && route.lane === "coord-left") {
-      // The left coordination lane leaves the orchestrator early enough to
-      // pass outside the compact evidence-port row before it fans into the
-      // left investigator.  Keeping both controls to the left of the middle
-      // port makes the fan-out monotonic without cutting through a sibling
-      // source chip.
-      const spanY = (y2 - y1) * .38;
-      const sideControl = x1 + (x2 - x1) * .82;
-      return [[[x1, y1], [sideControl, y1 + spanY * .52], [sideControl, y2 - spanY], [x2, y2]]];
+    // Route shape follows the relationship instead of forcing decoration:
+    // aligned source/incident edges stay straight; only fan-out, fan-in,
+    // obstacle avoidance, and the outer return use visible curvature.
+    if (["supply", "incident", "source"].includes(route.type)) {
+      const thirdY = (y2 - y1) / 3;
+      return [[[x1, y1], [x1, y1 + thirdY], [x2, y2 - thirdY], [x2, y2]]];
     }
-    if (route.type === "orchestrator" && route.lane === "coord-right") {
-      // Mirror the left lane so the right fan-out also clears the center
-      // evidence port while preserving a smooth, non-crossing layout.
-      const spanY = (y2 - y1) * .38;
-      const sideControl = x1 + (x2 - x1) * .82;
-      return [[[x1, y1], [sideControl, y1 + spanY * .52], [sideControl, y2 - spanY], [x2, y2]]];
+    if (route.type === "boundary") {
+      if (Math.abs(x2 - x1) < 8 || Math.abs(y2 - y1) < 8) {
+        const thirdX = (x2 - x1) / 3;
+        const thirdY = (y2 - y1) / 3;
+        return [[[x1, y1], [x1 + thirdX, y1 + thirdY], [x2 - thirdX, y2 - thirdY], [x2, y2]]];
+      }
+      const spanY = y2 - y1;
+      return [[[x1, y1], [x1, y1 + spanY * .42], [x2, y2 - spanY * .42], [x2, y2]]];
     }
-    if (route.type === "orchestrator" && route.lane === "coord-middle") {
-      // The centered evidence port owns the center axis.  Move the
-      // coordination lane to its distinct right-hand top port before it
-      // reaches the investigator row, so the two routes never sit on top of
-      // one another inside the compact source-port band.
-      const spanY = (y2 - y1) * .38;
-      return [[[x1, y1], [x2, y1 + spanY * .52], [x2, y2 - spanY], [x2, y2]]];
+    if (route.type === "orchestrator") {
+      if (route.lane === "coord-middle") {
+        const thirdY = (y2 - y1) / 3;
+        return [[[x1, y1], [x1, y1 + thirdY], [x2, y2 - thirdY], [x2, y2]]];
+      }
+      const spanX = x2 - x1;
+      const spanY = y2 - y1;
+      return [[[x1, y1], [x1 + spanX * .34, y1 + spanY * .12], [x2 - spanX * .2, y2 - spanY * .14], [x2, y2]]];
     }
-    if (["incident", "source", "orchestrator", "investigator", "synthesis"].includes(route.type)) {
-      const spanX = (x2 - x1) * .38;
-      const spanY = (y2 - y1) * .38;
-      return [[[x1, y1], [x1 + spanX, y1 + spanY], [x2 - spanX, y2 - spanY], [x2, y2]]];
+    if (route.type === "investigator") {
+      if (Math.abs(x2 - x1) < 8) {
+        const thirdY = (y2 - y1) / 3;
+        return [[[x1, y1], [x1, y1 + thirdY], [x2, y2 - thirdY], [x2, y2]]];
+      }
+      const spanX = x2 - x1;
+      const spanY = y2 - y1;
+      return [[[x1, y1], [x1 + spanX * .28, y1 + spanY * .08], [x2 - spanX * .28, y2 - spanY * .08], [x2, y2]]];
+    }
+    if (route.type === "synthesis") {
+      const spanX = x2 - x1;
+      const spanY = y2 - y1;
+      return [[[x1, y1], [x1 + spanX * .28, y1 + spanY * .08], [x2 - spanX * .24, y2 - spanY * .12], [x2, y2]]];
     }
     if (route.type === "lifecycle") {
       const span = (x2 - x1) * .38;
@@ -3268,9 +5458,10 @@
       // cubic corner turns keep the return visually rounded without creating
       // the old bottom/left drag tail or crossing the control row.
       const rightOuter = Math.max(x1 + 36, Math.min(width - 12, width - 12));
-      const topLane = Math.max(10, Math.min(y2, y1 - 72));
+      const topLane = Math.max(16, Math.min(y2 - 30, y1 - 72));
       const corner = Math.max(14, Math.min(24, (y1 - topLane) / 8));
       const horizontal = Math.max(18, Math.min(32, (rightOuter - x1) * .16));
+      const entryLead = 30;
       const railSpan = Math.max(1, rightOuter - corner - x1);
       const turnControl = railSpan * .35;
       return [
@@ -3278,7 +5469,8 @@
         [[rightOuter - corner, y1], [rightOuter - corner + corner * .55, y1], [rightOuter, y1 - corner * .55], [rightOuter, y1 - corner]],
         [[rightOuter, y1 - corner], [rightOuter, y1 - corner - (y1 - topLane - corner * 2) * .34], [rightOuter, topLane + corner + (y1 - topLane - corner * 2) * .34], [rightOuter, topLane + corner]],
         [[rightOuter, topLane + corner], [rightOuter, topLane + corner * .45], [rightOuter - corner * .55, topLane], [rightOuter - corner, topLane]],
-        [[rightOuter - corner, topLane], [rightOuter - corner - horizontal, topLane], [x2 + horizontal, topLane], [x2, topLane]],
+        [[rightOuter - corner, topLane], [rightOuter - corner - horizontal, topLane], [x2 + entryLead + horizontal, topLane], [x2 + entryLead, topLane]],
+        [[x2 + entryLead, topLane], [x2 + entryLead * .45, topLane], [x2, y2 - entryLead * .45], [x2, y2]],
       ];
     }
     return [[[x1, y1], [x1, y1 + 32], [x2, y2 - 32], [x2, y2]]];
@@ -3321,7 +5513,7 @@
     const path = new Set();
     const actorEdge = actor && actor !== "orchestrator" ? actor : "";
     if (["telemetry.observed", "source.condition.injected"].includes(type)) {
-      path.add("verification->incident-packet");
+      path.add("verification->supply-chain");
       return path;
     }
     if (["incident.detected", "investigation.started"].includes(type)) {
@@ -3334,7 +5526,7 @@
     }
     if (["tool.completed", "evidence.returned"].includes(type) && actorEdge) {
       path.add(`${actorEdge}->synthesis`);
-      path.add(`source-${actorEdge}->${actorEdge}`);
+      path.add("incident-packet->orchestrator");
       return path;
     }
     if (type === "agent.handoff" && actorEdge) {
@@ -3364,7 +5556,7 @@
     }
     if (type === "verification.completed") {
       path.add("execution->verification");
-      path.add("verification->incident-packet");
+      path.add("verification->supply-chain");
       return path;
     }
     if (["provider.degraded", "workflow.blocked"].includes(type)) {
@@ -3376,14 +5568,13 @@
   function graphPathForAgent(agentId) {
     return new Set([
       "incident-packet->orchestrator",
-      `source-${agentId}->${agentId}`,
       `orchestrator->${agentId}`,
       `${agentId}->synthesis`,
       "synthesis->safety",
       "safety->approval",
       "approval->execution",
       "execution->verification",
-      "verification->incident-packet",
+      "verification->supply-chain",
     ]);
   }
 
@@ -3398,7 +5589,8 @@
     const orchestrator = $("orchestrator-node");
     const synthesis = $("synthesis-node");
     const incidentPacket = $("incident-packet-node");
-    if (!graph || !links || !orchestrator || !synthesis || !incidentPacket) return;
+    const evidenceApi = $("evidence-api-node");
+    if (!graph || !links || !orchestrator || !synthesis || !incidentPacket || !evidenceApi) return;
     const hostRect = graph.getBoundingClientRect();
     if (!hostRect.width || !hostRect.height) return;
     const latestEvent = state.events[state.events.length - 1];
@@ -3411,40 +5603,26 @@
     const routes = [];
     const contract = graphRouteContract();
     const add = (id, from, fromPort, to, toPort, type, lane) => routes.push({ id, from, fromPort, to, toPort, type, lane });
-    add("incident-packet->orchestrator", incidentPacket, ".graph-port-out", orchestrator, ".graph-port-in", "incident", "incident-bus");
+    const warehouse = graph.querySelector('[data-supply-node="warehouse"]');
+    const queue = graph.querySelector('[data-supply-node="queue"]');
+    const erp = graph.querySelector('[data-supply-node="erp"]');
+    const invoice = graph.querySelector('[data-supply-node="invoice"]');
+    add("warehouse->queue", warehouse, ".graph-port-flow-out", queue, ".graph-port-flow-in", "supply", "supply-chain");
+    add("queue->erp", queue, ".graph-port-flow-out", erp, ".graph-port-flow-in", "supply", "supply-chain");
+    add("erp->invoice", erp, ".graph-port-flow-out", invoice, ".graph-port-flow-in", "supply", "supply-chain");
+    add("erp->incident-packet", erp, ".graph-port-boundary-out", incidentPacket, ".graph-port-in", "boundary", "supply-incident");
+    add("incident-packet->evidence-api", incidentPacket, ".graph-port-out", evidenceApi, ".graph-port-in", "boundary", "incident-evidence");
+    add("incident-packet->orchestrator", evidenceApi, ".graph-port-out", orchestrator, ".graph-port-in", "boundary", "evidence-orchestrator");
     agents.forEach((agent) => {
       const card = graph.querySelector(`.agent-nodes [data-agent-id="${CSS.escape(agent.id)}"]`);
-      const sourceGroup = agent.id === "retryable_message_investigator"
-        ? "receipt-retry"
-        : agent.id === "short_shipment_investigator"
-          ? "shipment-evidence"
-          : "duplicate-posting";
-      const sourceKey = agent.id === "retryable_message_investigator" ? "queue" : agent.id === "short_shipment_investigator" ? "shipment" : "duplicate";
-      const source = graph.querySelector(`[data-source-group="${CSS.escape(sourceGroup)}"], [data-graph-source="${CSS.escape(sourceKey)}"]`);
-      if (!card || !source) return;
-      const sourceLane = agent.id === "retryable_message_investigator"
-        ? "evidence-port-left"
-        : agent.id === "short_shipment_investigator"
-          ? "evidence-port-center"
-          : "evidence-port-right";
+      if (!card) return;
       const coordinationLane = agent.id === "retryable_message_investigator"
         ? "coord-left"
         : agent.id === "short_shipment_investigator"
           ? "coord-middle"
           : "coord-right";
-      add(`source-${agent.id}->${agent.id}`, source, ".graph-port-out", card, ".graph-port-in", "source", sourceLane);
-      const orchestrationPort = coordinationLane === "coord-left"
-        ? ".graph-port-coordination-left"
-        : coordinationLane === "coord-middle"
-          ? ".graph-port-coordination-middle"
-          : ".graph-port-coordination-right";
-      const synthesisPort = agent.id === "retryable_message_investigator"
-        ? ".graph-port-synthesis-left"
-        : agent.id === "short_shipment_investigator"
-          ? ".graph-port-synthesis-middle"
-          : ".graph-port-synthesis-right";
-      add(`orchestrator->${agent.id}`, orchestrator, orchestrationPort, card, ".graph-port-control-in", "orchestrator", coordinationLane);
-      add(`${agent.id}->synthesis`, card, ".graph-port-out", synthesis, synthesisPort, "investigator", "handoff");
+      add(`orchestrator->${agent.id}`, orchestrator, ".graph-port-out", card, ".graph-port-in", "orchestrator", coordinationLane);
+      add(`${agent.id}->synthesis`, card, ".graph-port-out", synthesis, ".graph-port-in", "investigator", `handoff-${coordinationLane.slice(6)}`);
     });
     const safety = graph.querySelector('[data-graph-node="safety"]');
     const approval = graph.querySelector('[data-graph-node="approval"]');
@@ -3454,7 +5632,7 @@
     add("safety->approval", safety, ".graph-port-out", approval, ".graph-port-in", "lifecycle", "lifecycle-chain");
     add("approval->execution", approval, ".graph-port-out", execution, ".graph-port-in", "lifecycle", "lifecycle-chain");
     add("execution->verification", execution, ".graph-port-out", verification, ".graph-port-in", "lifecycle", "lifecycle-chain");
-    add("verification->incident-packet", verification, ".graph-port-out", incidentPacket, ".graph-port-in", "return", "outer-return");
+    add("verification->supply-chain", verification, ".graph-port-out", invoice, ".graph-port-return-in", "return", "outer-return");
     const relativeRect = (element) => {
       const rect = element && element.getBoundingClientRect();
       if (!rect) return null;
@@ -3557,12 +5735,24 @@
   }
 
   function renderOperationItem(item) {
-    const row = create("li", `operation-item operation-${slug(eventType(item))}`);
+    const isLatest = number(item.sequence) === state.latestActivitySequence;
+    const row = create("li", `operation-item operation-${slug(eventType(item))}${isLatest ? " is-new" : ""}`);
     const dot = create("span", `operation-dot ${stateClass(item.status)}`, null);
     dot.setAttribute("aria-hidden", "true");
     const copy = create("div", "operation-copy");
     copy.append(create("strong", null, eventLabel(item)), create("span", null, eventDetail(item)));
     const meta = create("span", "operation-meta", `#${value(item.sequence).padStart(2, "0")} · ${shortTime(item.occurred_at)}`);
+    row.append(dot, copy, meta);
+    return row;
+  }
+
+  function renderEnterpriseOperationItem(item, sequence, provider = "ERP") {
+    const row = create("li", `operation-item operation-enterprise-evidence is-new`);
+    const dot = create("span", `operation-dot ${stateClass(item.status)}`, null);
+    dot.setAttribute("aria-hidden", "true");
+    const copy = create("div", "operation-copy");
+    copy.append(create("strong", null, value(item.label)), create("span", null, value(item.detail)));
+    const meta = create("span", "operation-meta", `${provider} · #${String(sequence).padStart(2, "0")} · ${shortTime(item.occurred_at)}`);
     row.append(dot, copy, meta);
     return row;
   }
@@ -3598,7 +5788,17 @@
     if (pulse) pulse.classList.toggle("is-active", eventPaths.has("incident-packet->orchestrator") || eventPaths.has("synthesis->safety"));
     setBadge($("orchestrator-status"), orchestration.label, orchestration.raw);
     const synthesis = synthesisStatus();
-    setBadge($("synthesis-status"), synthesis.label, synthesis.raw);
+    const synthesisBadge = $("synthesis-status");
+    const synthesisReached = state.events.some((event) => [
+      "synthesis.started",
+      "synthesis.completed",
+      "evaluation.started",
+      "evaluation.completed",
+    ].includes(eventType(event))) || persistedLifecycleProjection().stagesComplete;
+    if (synthesisBadge) {
+      synthesisBadge.hidden = !synthesisReached;
+      if (synthesisReached) setBadge(synthesisBadge, synthesis.label, synthesis.raw);
+    }
     const packet = $("incident-packet-node");
     if (packet) {
       packet.classList.toggle("is-alert", hasIncidentDetected() && !isClosedOrRecovery());
@@ -3607,8 +5807,20 @@
     setBadge($("workspace-state"), supplyChain.label, supplyChain.raw);
     const operations = state.events.filter((item) => OPERATION_TYPES.has(eventType(item)) || ["copilot.message", "provider.degraded", "workflow.blocked"].includes(eventType(item)));
     const activityRows = operations.length ? operations : state.events;
-    $("operation-count").textContent = operations.length
-      ? `${operations.length} events`
+    const enterpriseRows = state.erpEvidence && Array.isArray(state.erpEvidence.activity)
+      && value(state.erpEvidence.status) === "CONNECTED"
+      ? state.erpEvidence.activity
+      : [];
+    const saasRows = state.saasEvidence && Array.isArray(state.saasEvidence.activity)
+      && value(state.saasEvidence.status) !== "NOT_CONFIGURED"
+      ? state.saasEvidence.activity.filter((item) => value(item.status) !== "NOT_CONFIGURED")
+      : [];
+    const sourceRows = [
+      ...enterpriseRows.map((item) => ({ item, sequence: number(state.erpEvidence.sequence), provider: "ERP" })),
+      ...saasRows.map((item) => ({ item, sequence: number(state.saasEvidence.sequence), provider: value(item.provider).split(" · ")[0] || "SaaS" })),
+    ];
+    $("operation-count").textContent = operations.length || sourceRows.length
+      ? `${operations.length + sourceRows.length} events`
       : activityRows.length
         ? `${activityRows.length} persisted events`
         : "Current stream";
@@ -3620,6 +5832,11 @@
       : activityRows;
     // The legacy "No activity yet" copy is intentionally not rendered for an
     // incident: an empty role window is distinct from an empty incident ledger.
+    if (!state.selectedAgentId || state.selectedAgentId === "orchestrator") {
+      sourceRows.slice().reverse().forEach((row) => {
+        feed.append(renderEnterpriseOperationItem(row.item, row.sequence, row.provider));
+      });
+    }
     filtered.slice(-8).reverse().forEach((item) => feed.append(renderOperationItem(item)));
     if (!filtered.length) {
       feed.append(create(
@@ -3635,6 +5852,11 @@
     const fullFeed = $("full-operation-feed");
     if (fullFeed) {
       fullFeed.replaceChildren();
+      if (!state.selectedAgentId || state.selectedAgentId === "orchestrator") {
+        sourceRows.slice().reverse().forEach((row) => {
+          fullFeed.append(renderEnterpriseOperationItem(row.item, row.sequence, row.provider));
+        });
+      }
       filtered.slice().reverse().forEach((item) => fullFeed.append(renderOperationItem(item)));
       if (!filtered.length) {
         fullFeed.append(create(
@@ -3672,14 +5894,19 @@
       const name = step.dataset.graphStep;
       const done = Boolean(lifecycleDone[name]);
       const active = latestStep && latestStep[0] === name && !done;
+      const stopped = name === "safety" && latestType === "workflow.blocked";
       step.classList.toggle("is-done", done);
-      step.classList.toggle("is-active", Boolean(active));
+      step.classList.toggle("is-active", Boolean(active || stopped));
       const statusNode = step.querySelector("[data-graph-step-status]");
       if (statusNode) {
-        const status = done ? "COMPLETE" : active ? "ACTIVE" : "MONITORING";
+        const reached = done || active || stopped;
+        statusNode.hidden = !reached;
+        const status = done ? "COMPLETE" : stopped ? "SAFE STOP" : "ACTIVE";
         statusNode.textContent = status;
       }
     });
+    const loopVerified = document.querySelector(".graph-loop-label");
+    if (loopVerified) loopVerified.hidden = !lifecycleDone.verification;
     renderRoleContext();
     renderEvidencePackets();
   }
@@ -3874,13 +6101,282 @@
     $("latest-event-sequence").textContent = `#${value(latest.sequence).padStart(2, "0")}`;
   }
 
+  function dashboardEventSource(event) {
+    const payload = event && event.payload && typeof event.payload === "object" ? event.payload : {};
+    const haystack = `${value(event.source_id || payload.source_id)} ${value(event.actor)} ${value(event.provider)} ${value(event.type)} ${value(event.label)} ${value(event.detail)}`.toLowerCase();
+    if (haystack.includes("airtable")) return "Airtable";
+    if (haystack.includes("celigo")) return "Celigo";
+    if (haystack.includes("jira")) return "Jira";
+    if (haystack.includes("slack")) return "Slack";
+    if (haystack.includes("erp") || haystack.includes("receipt")) return "ERPNext";
+    if (haystack.includes("invoice")) return "Invoice";
+    if (haystack.includes("manager") || haystack.includes("approval")) return "Manager";
+    if (haystack.includes("agent") || haystack.includes("strand") || haystack.includes("investigation")) return "Agent";
+    return "Control plane";
+  }
+
+  function renderDashboardEventRail() {
+    const feed = $("dashboard-event-feed");
+    if (!feed) return;
+    const platformEvents = Array.isArray(state.agentPlatform?.activity) ? state.agentPlatform.activity : [];
+    const ledgerEvents = Array.isArray(state.events) ? state.events : [];
+    const erpReadEvents = Array.isArray(state.erpEvidence?.activity)
+      ? state.erpEvidence.activity.map((event) => ({ ...event, sequence: number(state.erpEvidence.sequence) }))
+      : [];
+    const saasReadEvents = Array.isArray(state.saasEvidence?.activity)
+      ? state.saasEvidence.activity
+        .filter((event) => value(event?.status) !== "NOT_CONFIGURED")
+        .map((event) => ({ ...event, sequence: number(state.saasEvidence.sequence) }))
+      : [];
+    // In live-read mode the Agent Platform activity ledger is the one visible
+    // authority. Mixing the synthetic incident SSE cursor and provider polling
+    // receipts made a single source state appear to have three event counts.
+    const liveAuthority = hasLiveSourceAuthority();
+    const combinedEvents = (liveAuthority
+      ? platformEvents
+      : [...ledgerEvents, ...platformEvents, ...erpReadEvents, ...saasReadEvents])
+      .filter((event) => event && typeof event === "object");
+    const deduplicated = new Map();
+    combinedEvents.forEach((event) => {
+      const key = [
+        number(event.sequence),
+        value(event.type),
+        value(event.label),
+        value(event.occurred_at || event.timestamp || event.created_at),
+      ].join("|");
+      deduplicated.set(key, event);
+    });
+    const allEvents = [...deduplicated.values()].sort((left, right) => {
+      const leftTime = Date.parse(value(left.occurred_at || left.timestamp || left.created_at));
+      const rightTime = Date.parse(value(right.occurred_at || right.timestamp || right.created_at));
+      if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+        return leftTime - rightTime;
+      }
+      return number(left.sequence) - number(right.sequence);
+    });
+    // Keep one newest receipt per source so fast control-plane pulses cannot
+    // drown out the slower external reads that prove the Agent touched real
+    // demo records. During an investigation the Agent replaces the generic
+    // control-plane row; otherwise the operator sees five sources plus flow.
+    const newestBySource = new Map();
+    allEvents.forEach((event) => newestBySource.set(dashboardEventSource(event), event));
+    const agentState = value(state.agentPlatform?.agent_run?.state).toUpperCase();
+    const agentIsActive = ["RUNNING", "INVESTIGATING", "PLAN_READY"].includes(agentState);
+    const preferredSources = agentIsActive && newestBySource.has("Agent")
+      ? ["ERPNext", "Airtable", "Celigo", "Jira", "Slack", "Agent"]
+      : ["ERPNext", "Airtable", "Celigo", "Jira", "Slack", "Control plane"];
+    const events = preferredSources
+      .map((source) => newestBySource.get(source))
+      .filter(Boolean)
+      .sort((left, right) => Date.parse(value(left.occurred_at || left.timestamp || left.created_at))
+        - Date.parse(value(right.occurred_at || right.timestamp || right.created_at)));
+    const previousLatest = state.dashboardLatestRenderedSequence;
+    const latest = events.reduce((maximum, event) => Math.max(maximum, number(event.sequence)), 0);
+    feed.replaceChildren();
+    // newest-at-bottom: rows stay chronological so real SSE arrivals push older evidence upward.
+    events.forEach((event) => {
+      const sequence = number(event.sequence);
+      const row = create("li", "dashboard-event-row");
+      row.dataset.source = slug(dashboardEventSource(event));
+      if (previousLatest > 0 && sequence > previousLatest) row.classList.add("is-new");
+      const occurredAt = new Date(value(event.occurred_at || event.timestamp || event.created_at));
+      const timeLabel = Number.isNaN(occurredAt.getTime())
+        ? `#${value(event.sequence)}`
+        : occurredAt.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const body = create("div", "dashboard-event-copy");
+      body.append(
+        create("span", "dashboard-event-source", dashboardEventSource(event)),
+        create("strong", null, value(event.label || eventLabel(event))),
+        create("p", null, value(event.detail || eventDetail(event))),
+      );
+      row.append(create("time", null, timeLabel), body);
+      feed.append(row);
+    });
+    $("dashboard-event-count").textContent = `${allEvents.length} events`;
+    if (latest > state.dashboardLatestRenderedSequence) state.dashboardLatestRenderedSequence = latest;
+    if (state.dashboardEventFollow) window.requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; });
+  }
+
+  function renderDashboardAgentStatus() {
+    const platform = state.agentPlatform || {};
+    const liveFlow = platformFlowProjection();
+    const sourceAttention = Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
+    const agentRun = platform.agent_run && typeof platform.agent_run === "object" ? platform.agent_run : {};
+    const diagnosis = platform.diagnosis && typeof platform.diagnosis === "object" ? platform.diagnosis : {};
+    const proof = platform.judge_proof && typeof platform.judge_proof === "object" ? platform.judge_proof : {};
+    const execution = platform.execution && typeof platform.execution === "object" ? platform.execution : {};
+    const executionStatus = value(execution.status).toUpperCase();
+    const runState = value(agentRun.state).toUpperCase();
+    const finding = value(diagnosis.finding).toUpperCase();
+    const stage = executionStatus === "VERIFIED"
+      ? "Recovery verified"
+      : executionStatus === "VERIFYING"
+        ? "Verifying recovery"
+        : executionStatus === "AUTHORIZED"
+          ? "Manager approved"
+          : runState === "PLAN_READY"
+            ? "Awaiting manager review"
+            : runState === "BLOCKED" && ["AGENT_UNAVAILABLE", "AGENT_VALIDATION_FAILED"].includes(finding)
+              ? "Agent unavailable · retry required"
+              : runState === "BLOCKED"
+                ? "Safe stop"
+            : ["RUNNING", "INVESTIGATING"].includes(runState)
+              ? "Investigating"
+              : isNormalScenario() && !sourceAttention
+                ? "Monitoring"
+                : "Incident detected";
+    $("dashboard-agent-stage").textContent = stage;
+    const sources = Array.isArray(state.saasEvidence?.sources) ? state.saasEvidence.sources : [];
+    $("dashboard-agent-evidence").textContent = String(number(proof.evidence_records, sources.length + (state.erpEvidence ? 1 : 0)));
+    const strands = diagnosis.strands_investigation && typeof diagnosis.strands_investigation === "object"
+      ? diagnosis.strands_investigation
+      : {};
+    const toolCalls = Array.isArray(strands.tool_calls)
+      ? strands.tool_calls
+      : Array.isArray(diagnosis.tool_calls) ? diagnosis.tool_calls : [];
+    $("dashboard-agent-tool-count").textContent = String(number(proof.source_checks, toolCalls.length));
+    const platformActivity = Array.isArray(platform.activity) ? platform.activity : [];
+    const visibleEventTotal = liveFlow
+      ? platformActivity.length
+      : new Set(
+        [...state.events, ...platformActivity].map((event) => [
+          number(event && event.sequence),
+          value(event && event.type),
+          value(event && event.label),
+          value(event && (event.occurred_at || event.timestamp || event.created_at)),
+        ].join("|")),
+      ).size;
+    $("dashboard-agent-event-count").textContent = String(
+      liveFlow
+        ? visibleEventTotal
+        : Math.max(visibleEventTotal, number(proof.ledger_events, platform.latest_sequence)),
+    );
+    const provider = strands.provider && typeof strands.provider === "object" ? strands.provider : {};
+    const proofProvider = proof.provider && typeof proof.provider === "object" ? proof.provider : {};
+    const providerLabel = value(provider.model_id || provider.model || proofProvider.model_id || proofProvider.model || strands.mode || proof.runtime);
+    const strandsStatus = value(strands.status).toUpperCase();
+    $("dashboard-agent-provider").textContent = strandsStatus === "COMPLETE" && providerLabel
+      ? providerLabel.includes("nova-pro")
+        ? "Amazon Nova Pro"
+        : providerLabel.replace("us.amazon.", "").replace("-v1:0", "")
+      : strandsStatus.includes("UNAVAILABLE")
+        ? "Unavailable"
+        : "Strands";
+    const confidence = number(diagnosis.confidence, -1);
+    $("dashboard-agent-confidence").textContent = confidence >= 0
+      ? `${Math.round(confidence <= 1 ? confidence * 100 : confidence)}%`
+      : "—";
+    const status = $("dashboard-agent-status");
+    status.dataset.stage = slug(stage);
+    const facts = status.querySelector(".dashboard-agent-facts");
+    if (facts) facts.hidden = isNormalScenario() && !sourceAttention;
+    const openInvestigation = $("dashboard-open-investigation");
+    if (openInvestigation) {
+      openInvestigation.hidden = isNormalScenario()
+        && !(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
+    }
+  }
+
+  function renderDashboardEvidenceLinks() {
+    const stage = document.querySelector("#dashboard-view .flow-stage");
+    const map = $("dashboard-evidence-map");
+    const svg = $("dashboard-evidence-links");
+    if (!stage || !map || !svg || stage.offsetParent === null) return;
+    const stageBounds = stage.getBoundingClientRect();
+    const mapBounds = map.getBoundingClientRect();
+    svg.setAttribute("viewBox", `0 0 ${Math.max(1, stageBounds.width)} ${Math.max(1, stageBounds.height)}`);
+    svg.replaceChildren();
+    const links = [
+      ["jira", "warehouse"],
+      ["celigo", "message-queue"],
+      ["airtable", "erp"],
+      ["slack", "invoice"],
+    ];
+    links.forEach(([sourceId, targetId]) => {
+      const source = map.querySelector(`[data-dashboard-evidence="${sourceId}"]`);
+      const target = $("flow-map")?.querySelector(`[data-node-id="${targetId}"]`);
+      if (!source || !target) return;
+      const targetBounds = target.getBoundingClientRect();
+      const sourceWidth = source.getBoundingClientRect().width;
+      const targetCenterX = targetBounds.left - mapBounds.left + targetBounds.width / 2;
+      source.style.left = `${Math.max(0, Math.min(mapBounds.width - sourceWidth, targetCenterX - sourceWidth / 2))}px`;
+    });
+    links.forEach(([sourceId, targetId]) => {
+      const source = map.querySelector(`[data-dashboard-evidence="${sourceId}"]`);
+      const target = $("flow-map")?.querySelector(`[data-node-id="${targetId}"]`);
+      if (!source || !target) return;
+      const sourceBounds = source.getBoundingClientRect();
+      const targetBounds = target.getBoundingClientRect();
+      const start = {
+        x: targetBounds.left - stageBounds.left + targetBounds.width / 2,
+        y: targetBounds.bottom - stageBounds.top,
+      };
+      const end = {
+        x: sourceBounds.left - stageBounds.left + sourceBounds.width / 2,
+        y: sourceBounds.top - stageBounds.top,
+      };
+      const path = createSvgPath();
+      path.setAttribute("d", platformLinkPath(start, end));
+      path.setAttribute("class", "dashboard-evidence-link");
+      path.setAttribute("data-dashboard-link", `${sourceId}-${targetId}`);
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.append(path);
+    });
+  }
+
+  function renderDashboardEvidence() {
+    const sources = Array.isArray(state.saasEvidence?.sources) ? state.saasEvidence.sources : [];
+    const platformNodes = Array.isArray(state.agentPlatform?.evidence_constellation?.nodes)
+      ? state.agentPlatform.evidence_constellation.nodes
+      : [];
+    const platformSourceIds = { jira: "jira", celigo: "celigo", airtable: "airtable", slack: "slack" };
+    const usePlatformTruth = Boolean(platformFlowProjection());
+    const evidenceMap = $("dashboard-evidence-map");
+    const hasProviderRecords = sources.some((item) => Boolean(item?.record_id));
+    const hideEvidenceMap = isNormalScenario() && !hasProviderRecords;
+    if (evidenceMap) evidenceMap.hidden = hideEvidenceMap;
+    const evidenceLinks = $("dashboard-evidence-links");
+    if (evidenceLinks) evidenceLinks.hidden = hideEvidenceMap;
+    document.querySelectorAll("[data-dashboard-evidence]").forEach((node) => {
+      const id = value(node.dataset.dashboardEvidence);
+      const evidence = sources.find((item) => `${value(item.provider)} ${value(item.source_id)}`.toLowerCase().includes(id));
+      const platformEvidence = platformNodes.find((item) => value(item?.id) === platformSourceIds[id]);
+      const hasLiveRead = Boolean(evidence?.record_id);
+      const status = value(
+        hasLiveRead
+          ? evidence.status || "CONNECTED"
+          : usePlatformTruth
+            ? platformEvidence?.status || "WAITING"
+            : state.saasEvidence ? "CONNECTED" : "WAITING",
+      ).replaceAll("_", " ");
+      const statusNode = node.querySelector("span");
+      if (statusNode) statusNode.textContent = status;
+      node.dataset.sourceStatus = status;
+      node.dataset.sourceDetail = value(
+        hasLiveRead
+          ? `${value(evidence.provider)} · ${value(evidence.record_id)} · ${value(evidence.detail)}`
+          : usePlatformTruth
+            ? platformEvidence?.detail || `${value(platformEvidence?.role || id)} evidence · sequence ${value(platformEvidence?.latest_sequence || "—")}`
+            : evidence?.detail || evidence?.label || "No source event received yet",
+      );
+      node.dataset.sourceSequence = value(evidence?.record_id || platformEvidence?.latest_sequence || state.lastSequence || "—");
+      node.classList.toggle("is-live", hasLiveRead || (usePlatformTruth ? Boolean(platformEvidence) : Boolean(evidence)));
+      node.classList.toggle("is-attention", ["UNKNOWN", "TIMEOUT", "HELD", "BLOCKED"].includes(status.toUpperCase()));
+    });
+    window.requestAnimationFrame(renderDashboardEvidenceLinks);
+  }
+
   function renderDashboard() {
     renderFlow();
+    renderDashboardEventRail();
+    renderDashboardAgentStatus();
+    renderDashboardEvidence();
     const normalScenario = isNormalScenario();
     const closedRecovery = isVerifiedClosedRecovery();
     const incidentVisible = !normalScenario && !closedRecovery;
     const inject = $("dashboard-inject-incident");
     if (inject) {
+      const liveSourceMode = hasLiveSourceAuthority();
       const selectedScenario = state.snapshot ? scenarioForSnapshot(state.snapshot) : state.activeScenario;
       const catalog = authoritativeScenarioState();
       const hasActiveIncident = Boolean(catalog.activeIncident);
@@ -3902,14 +6398,17 @@
       inject.hidden = hasActiveIncident && incidentVisible;
       inject.dataset.incidentAction = incidentAction;
       const injectLabel = inject.querySelector("strong");
-      if (injectLabel) injectLabel.textContent = hasActiveIncident
-        ? "Resume active incident"
-        : hasHistoricalIncident
-          ? "View completed investigation"
-          : "Inject incident";
-      inject.disabled = !injectAllowed;
-      inject.setAttribute("aria-disabled", String(!injectAllowed));
-      inject.title = injectAllowed
+      if (!liveSourceMode && injectLabel) injectLabel.textContent = hasActiveIncident
+          ? "Resume active incident"
+          : hasHistoricalIncident
+            ? "View completed investigation"
+            : "Inject incident";
+      const sourceActionAllowed = liveSourceMode && Boolean(EXTERNAL_SERVICE_LINKS.erpnext?.url);
+      inject.disabled = liveSourceMode ? !sourceActionAllowed : !injectAllowed;
+      inject.setAttribute("aria-disabled", String(liveSourceMode ? !sourceActionAllowed : !injectAllowed));
+      inject.title = liveSourceMode
+        ? "Open ERPNext; this dashboard advances only after the external records change"
+        : injectAllowed
         ? hasActiveIncident
           ? "Open the active server-backed incident"
           : hasHistoricalIncident
@@ -3919,9 +6418,10 @@
           ? hasActiveIncident
             ? "Reconnect to resume the active incident"
             : "Reconnect to open the completed investigation"
-        : selectedScenario === "normal"
+          : selectedScenario === "normal"
           ? "The control plane has not admitted a new incident yet"
           : "Return to Normal before injecting another incident";
+      syncDashboardSourceControl();
     }
     const livePanel = $("live-panel");
     if (livePanel) {
@@ -4077,7 +6577,7 @@
       || value(approval.decision_eligibility) === "NO_ACTION";
     const requiredRoles = Array.isArray(approval.required_roles) && approval.required_roles.length
       ? approval.required_roles.map((role) => value(role))
-      : ROLE_DEFS.map((definition) => definition.role);
+      : ["INTEGRATION_OPERATOR", "AP_APPROVER"];
     const approvedRoles = new Set(
       approvals
         .filter((item) => value(item.intent_id) === intent && value(item.status) === "APPROVED")
@@ -4087,6 +6587,9 @@
     const approvalCount = approvedRoles.size;
     const quorumApproved = prepared && value(approval.status) === "GRANTED" && approvalCount === requiredRoles.length;
     const hasExecution = prepared && state.events.some((event) => eventType(event) === "execution.completed" && value(event.payload && event.payload.tool) === activeTool);
+    const executionStarted = prepared && state.events.some((event) => eventType(event) === "execution.started" && value(event.payload && event.payload.tool) === activeTool);
+    const effectStarted = prepared && state.events.some((event) => eventType(event) === "effect.started" && value(event.payload && event.payload.tool) === activeTool);
+    const verificationStarted = prepared && state.events.some((event) => eventType(event) === "verification.started");
     // ``execution.verified`` is an incident-level summary.  Once a new intent is
     // prepared (for example invoice release after receipt recovery), it must not
     // make that new action look verified by the completed receipt intent.
@@ -4107,10 +6610,13 @@
     else if (verified && !prepared && completedIntent && noAction) { status = "VERIFIED · CLOSED"; rawStatus = "VERIFIED"; }
     else if (verified && !prepared && completedIntent) { status = "VERIFIED · NEXT ACTION PENDING"; rawStatus = "PENDING_APPROVAL"; }
     else if (verified && prepared) { status = "VERIFIED"; rawStatus = "VERIFIED"; }
+    else if (verificationStarted) { status = "VERIFYING"; rawStatus = "RUNNING"; }
     else if (hasExecution) { status = "RECOVERED"; rawStatus = "COMPLETE"; }
+    else if (effectStarted) { status = "APPLYING RECOVERY"; rawStatus = "RUNNING"; }
+    else if (executionStarted) { status = "EXECUTING"; rawStatus = "RUNNING"; }
     else if (quorumApproved) { status = "APPROVED"; rawStatus = "GRANTED"; }
     else if (approvalCount) { status = `${approvalCount} of ${requiredRoles.length} approved`; rawStatus = "PENDING_APPROVAL"; }
-    else if (prepared) { status = "Awaiting two roles"; rawStatus = "PENDING_APPROVAL"; }
+    else if (prepared) { status = "Awaiting Manager"; rawStatus = "PENDING_APPROVAL"; }
     setBadge($("decision-status"), status, rawStatus);
     const intentNode = $("decision-intent");
     intentNode.replaceChildren();
@@ -4147,7 +6653,7 @@
     roles.replaceChildren();
     if (prepared) {
       ROLE_DEFS.forEach((definition) => {
-        const approved = approvals.some((item) => value(item.intent_id) === intent && value(item.principal_id) === definition.principal && value(item.status) === "APPROVED");
+        const approved = quorumApproved;
         const card = create("div", `approval-role${approved ? " is-approved" : ""}`);
         const copy = create("div", "approval-role-copy");
         copy.append(create("strong", null, definition.name), create("span", null, definition.role));
@@ -4158,7 +6664,7 @@
           button.type = "button";
           button.disabled = state.commandBusy || !canOperate() || quorumApproved || (verified && hasExecution);
           button.dataset.approvalPrincipal = definition.principal;
-          button.addEventListener("click", () => recordApproval(definition.principal));
+          button.addEventListener("click", recordManagerApproval);
           card.append(button);
         }
         roles.append(card);
@@ -4170,7 +6676,7 @@
       : noAction ? "No further action" : currentAction ? `Prepare ${actionLabel(currentAction)}` : "Prepare recovery";
     prepareButton.disabled = state.commandBusy || !canOperate() || prepared || !currentDecision || currentDecision.eligibility !== "PENDING_APPROVAL";
     const executeButton = $("execute-button");
-    executeButton.disabled = state.commandBusy || !canOperate() || !quorumApproved || (verified && hasExecution);
+    executeButton.disabled = state.commandBusy || !canOperate() || !quorumApproved || executionStarted || (verified && hasExecution);
     executeButton.hidden = Boolean(noAction && !prepared && completedIntent);
     if (state.commandError) {
       roles.append(create("p", "command-error", state.commandError));
@@ -4185,6 +6691,7 @@
     try {
       const response = await requestJSON(`/api/v1/incidents/${encodeURIComponent(state.incidentId)}/decisions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
       applySnapshot(response, response.units, false);
+      if (response.accepted === true && !state.source) connectEvents();
       await queueRefresh();
       await refreshScenarioCatalog();
       return response;
@@ -4210,6 +6717,18 @@
     const intent = state.snapshot && state.snapshot.approval && state.snapshot.approval.intent_id;
     if (!intent) return;
     sendDecision({ command: "approve", intent_id: intent, principal_id: principal, idempotency_key: makeKey("approve") });
+  }
+
+  async function recordManagerApproval() {
+    const intent = state.snapshot && state.snapshot.approval && state.snapshot.approval.intent_id;
+    if (!intent) return;
+    for (const principal of MANAGER_ATTESTATIONS) {
+      const approved = (state.snapshot?.approvals || []).some((item) => value(item.intent_id) === intent && value(item.principal_id) === principal && value(item.status) === "APPROVED");
+      if (!approved) {
+        const response = await sendDecision({ command: "approve", intent_id: intent, principal_id: principal, idempotency_key: makeKey(`manager-${principal}`) });
+        if (!response) return;
+      }
+    }
   }
 
   function executeRecovery() {
@@ -4626,16 +7145,23 @@
     renderInvestigationControls();
     renderHeader();
     renderLiveMetrics();
-    if (state.view === "agent") renderAgentView();
-    else if (state.view === "dashboard") renderDashboard();
+    // Keep the autonomous trace current even while the dashboard remains in
+    // focus. Switching to the Agent Workspace then reveals the same ordered
+    // trace instead of a stale, post-hoc reconstruction.
+    renderAgentView();
+    renderAgentPlatform();
+    if (state.view === "dashboard") renderDashboard();
     $("dashboard-view").hidden = state.view !== "dashboard";
     $("agent-view").hidden = state.view !== "agent";
-    $("scenario-view").hidden = state.view !== "scenario";
+    $("scenario-view").hidden = !state.demoControlsOpen;
+    $("demo-controls-toggle")?.setAttribute("aria-expanded", String(state.demoControlsOpen));
     bodyReady();
   }
 
   function bodyReady() {
-    document.body.dataset.workspaceReady = state.loaded && state.units.size > 0 ? "true" : "false";
+    const ready = state.loaded && state.units.size > 0;
+    document.body.dataset.workspaceReady = ready ? "true" : "false";
+    if (ready) document.body.dataset.bootState = "ready";
     const disconnected = state.connection === "paused" && Boolean(state.streamError);
     if (disconnected) {
       showUnavailable(`${state.streamError} Live movement is paused.`, true);
@@ -4650,6 +7176,7 @@
       // are explicit transitions, so the first frame never implies an anomaly
       // before the user has selected one.
       const scenarioListing = await requestJSON("/api/v1/scenarios");
+      const agentPlatformReady = refreshAgentPlatform(true);
       setScenarioCatalog(scenarioListing);
       const normal = Array.isArray(scenarioListing.scenarios)
         ? scenarioListing.scenarios.find((item) => value(item.id) === "normal")
@@ -4663,20 +7190,34 @@
       // the ID and returns authoritative state; this query only selects which
       // already-persisted session the read-only browser should open.
       const requestedIncidentId = value(query.get("incident_id"));
-      const initialScenario = requestedIncidentId && requestedScenario === "incident"
-        ? { ...(requested || {}), id: "incident", incident_id: requestedIncidentId }
-        : requested && requestedScenario !== "golden" ? requested : normal;
+      const requestedStatus = value(requested && requested.status).toUpperCase();
+      const requestedIsRegistered = Boolean(requested) && (
+        requestedScenario === "normal"
+        || (requestedScenario === "incident" && requestedStatus === "ACTIVE")
+        || (requestedScenario === "recovery" && requestedStatus === "READY")
+      );
+      const requestedIncidentIsExplicit = Boolean(
+        requestedIncidentId
+        && ["incident", "recovery"].includes(requestedScenario)
+      );
+      const initialScenario = requestedIncidentIsExplicit
+        ? { ...(requested || {}), id: requestedScenario, incident_id: requestedIncidentId }
+        : requestedIsRegistered ? requested : normal;
       if (!initialScenario || !initialScenario.incident_id) throw new Error("No healthy synthetic scenario is available");
       const id = value(initialScenario.incident_id);
       state.activeScenario = value(initialScenario.id) || "normal";
-      const snapshotQuery = smokeCapture ? "?compact=1" : "";
-      const [snapshot, units] = await Promise.all([
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}${snapshotQuery}`),
-        requestJSON(`/api/v1/incidents/${encodeURIComponent(id)}/units`),
+      const snapshot = await requestJSON(incidentSnapshotPath(id));
+      // Prefer one coherent first paint over briefly showing the legacy
+      // compatibility totals. External reads may be slower, so cap the wait
+      // and let the independent projection refresh continue in the background.
+      await Promise.race([
+        agentPlatformReady,
+        new Promise((resolve) => window.setTimeout(resolve, 15000)),
       ]);
       if (demoMode === "invalid") {
         document.body.dataset.demoMode = "invalid";
         document.body.dataset.workspaceReady = "false";
+        document.body.dataset.bootState = "error";
         $("dashboard-view").hidden = true;
         $("agent-view").hidden = true;
         $("scenario-view").hidden = true;
@@ -4684,13 +7225,19 @@
         setConnection("paused", "Invalid evidence; the workspace is unavailable.");
         return;
       }
-      applySnapshot(snapshot, units.units, true);
+      applySnapshot(snapshot, snapshot.units, true);
+      startEnterpriseEvidenceRefresh();
+      startSaasEvidenceRefresh();
       startLiveSourceRefresh();
       showUnavailable("", false);
       setView(state.view);
-      if (!smokeCapture) connectEvents();
+      if (!smokeCapture) {
+        connectEvents();
+        startAgentPlatformRefresh();
+      }
     } catch (error) {
       state.loaded = false;
+      document.body.dataset.bootState = "error";
       showUnavailable(error.message, true);
       setConnection("paused", `Incident unavailable: ${error.message}`);
       document.body.dataset.workspaceReady = "false";
@@ -4725,6 +7272,28 @@
       setView(next.dataset.view);
     });
   });
+  $("demo-controls-toggle")?.addEventListener("click", () => {
+    state.demoControlsOpen = !state.demoControlsOpen;
+    $("scenario-view").hidden = !state.demoControlsOpen;
+    $("demo-controls-toggle").setAttribute("aria-expanded", String(state.demoControlsOpen));
+    if (state.demoControlsOpen) $("demo-controls-close")?.focus();
+  });
+  $("demo-controls-close")?.addEventListener("click", () => {
+    state.demoControlsOpen = false;
+    $("scenario-view").hidden = true;
+    $("demo-controls-toggle")?.setAttribute("aria-expanded", "false");
+    $("demo-controls-toggle")?.focus();
+  });
+  $("dashboard-open-investigation")?.addEventListener("click", () => setView("agent"));
+  $("dashboard-component-inspector-close")?.addEventListener("click", closeDashboardComponentInspector);
+  $("dashboard-component-inspector-action")?.addEventListener("click", () => {
+    closeDashboardComponentInspector();
+    setView("agent");
+  });
+  $("dashboard-event-feed")?.addEventListener("scroll", (event) => {
+    const feed = event.currentTarget;
+    state.dashboardEventFollow = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 28;
+  });
   const railTabList = document.querySelector(".workspace-rail-tabs[role=tablist]");
   const railTabs = railTabList ? [...railTabList.querySelectorAll(":scope > [data-rail-target]")] : [];
   railTabs.forEach((button, index) => {
@@ -4749,8 +7318,149 @@
   // Incident detection owns the handoff to the agent harness.  The legacy start
   // endpoint and hidden compatibility nodes remain available to older smoke
   // fixtures, but there is no user-facing Start control or click listener.
-  $("dashboard-inject-incident").addEventListener("click", () => selectScenario("incident"));
+  $("dashboard-inject-incident").addEventListener("click", () => {
+    const liveFlow = platformFlowProjection();
+    if (liveFlow?.provenance === "live-read") {
+      window.open(EXTERNAL_SERVICE_LINKS.erpnext.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    selectScenario("incident");
+  });
+  $("platform-diagnose")?.addEventListener("click", runPlatformDiagnosis);
+  $("platform-stop")?.addEventListener("click", () => runPlatformAction("stop"));
+  $("platform-approve-execute")?.addEventListener("click", () => runPlatformAction("approve-and-execute", { manager_id: "M20 Demo Manager", idempotency_key: makeKey("m20-platform-execute") }));
+  $("platform-reject-plan")?.addEventListener("click", () => runPlatformAction("reject", {
+    manager_id: "M20 Demo Manager",
+    reason: "Evidence is understood, but the proposed recovery is not authorized for execution.",
+  }));
+  $("platform-question-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = $("platform-question");
+    const question = input.value;
+    input.value = "";
+    askPlatformQuestion(question);
+  });
+  $("platform-answer-text")?.addEventListener("click", (event) => {
+    const citation = event.target.closest("[data-evidence-id]");
+    if (!citation) return;
+    const evidenceId = value(citation.dataset.evidenceId);
+    const catalog = state.agentPlatform?.evidence_catalog || {};
+    const record = catalog[evidenceId] || {
+      evidence_id: evidenceId,
+      provider: "Scoped evidence",
+      summary: "This citation belongs to the active case/run.",
+      revision: "—",
+      observed_at: "—",
+      provenance: "synthetic-demo-fixture",
+    };
+    $("platform-evidence-provider").textContent = value(record.provider);
+    $("platform-evidence-id").textContent = value(record.evidence_id || evidenceId);
+    $("platform-evidence-summary").textContent = value(record.summary);
+    $("platform-evidence-revision").textContent = value(record.revision || "—");
+    $("platform-evidence-observed").textContent = value(record.observed_at || "—");
+    $("platform-evidence-provenance").textContent = value(record.provenance || "—");
+    const details = $("platform-evidence-details");
+    details.replaceChildren();
+    const fields = Array.isArray(record.fields) ? record.fields : [];
+    if (fields.length) {
+      const fieldList = create("dl", "platform-evidence-field-list");
+      fields.forEach((field) => {
+        if (!field || typeof field !== "object") return;
+        const row = create("div");
+        row.append(
+          create("dt", null, human(value(field.label))),
+          create("dd", null, Array.isArray(field.value) ? field.value.join(" · ") : value(field.value)),
+        );
+        fieldList.append(row);
+      });
+      details.append(fieldList);
+    }
+    const assertions = record.assertions && typeof record.assertions === "object"
+      ? record.assertions
+      : null;
+    const totals = record.totals && typeof record.totals === "object" ? record.totals : null;
+    if (assertions || totals) {
+      const proof = create("section", "platform-ledger-proof");
+      proof.append(create("h3", null, "Ledger assertions"));
+      if (totals) {
+        proof.append(create("p", "platform-ledger-balance", `Debit ${formatCurrency(totals.debit, "USD")} · Credit ${formatCurrency(totals.credit, "USD")} · Difference ${formatCurrency(Math.abs(number(totals.debit) - number(totals.credit)), "USD")}`));
+      }
+      if (assertions) {
+        const chips = create("div", "platform-ledger-assertions");
+        Object.entries(assertions).forEach(([key, passed]) => {
+          chips.append(create("span", passed ? "is-pass" : "is-fail", `${passed ? "✓" : "×"} ${human(key)}`));
+        });
+        proof.append(chips);
+      }
+      details.append(proof);
+    }
+    const ledgerTable = (title, rows, columns) => {
+      if (!Array.isArray(rows) || !rows.length) return;
+      const section = create("section", "platform-ledger-table");
+      section.append(create("h3", null, title));
+      rows.forEach((row) => {
+        const item = create("article");
+        columns.forEach(([key, label, format]) => {
+          const raw = row && row[key];
+          if (raw === undefined || raw === null || raw === "") return;
+          const rendered = format === "currency" ? formatCurrency(raw, "USD") : value(raw);
+          const field = create("div");
+          field.append(create("small", null, label), create("strong", null, rendered));
+          item.append(field);
+        });
+        section.append(item);
+      });
+      details.append(section);
+    };
+    ledgerTable("Stock Ledger Entry", record.stock_entries, [
+      ["name", "Entry"], ["voucher_no", "Voucher"], ["posting_date", "Posted"],
+      ["posting_time", "Time"], ["company", "Company"], ["item_code", "Item"],
+      ["warehouse", "Warehouse"], ["actual_qty", "Quantity"],
+      ["qty_after_transaction", "Balance"], ["stock_value_difference", "Value", "currency"],
+    ]);
+    ledgerTable("General Ledger", record.general_ledger_entries, [
+      ["name", "Entry"], ["voucher_no", "Voucher"], ["posting_date", "Posted"],
+      ["company", "Company"], ["account", "Account"], ["debit", "Debit", "currency"],
+      ["credit", "Credit", "currency"], ["party", "Party"],
+    ]);
+    $("platform-evidence-drawer").hidden = false;
+  });
+  $("platform-evidence-drawer-close")?.addEventListener("click", () => {
+    $("platform-evidence-drawer").hidden = true;
+  });
+  document.querySelectorAll("[data-dashboard-evidence]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const latest = state.telemetry.length ? state.telemetry[state.telemetry.length - 1] : null;
+      const point = {
+        sequence: number(node.dataset.sourceSequence, number(latest && latest.sequence)),
+        timestamp: value(latest && (latest.observed_at || latest.captured_at)),
+        observed_at: value(latest && (latest.observed_at || latest.captured_at)),
+        received_at: value(latest && (latest.received_at || latest.observed_at || latest.captured_at)),
+        value: value(node.dataset.sourceStatus || "WAITING"),
+        unit: "status",
+        metric: `${value(node.querySelector("strong")?.textContent)} source`,
+        source: value(node.dataset.sourceDetail),
+      };
+      state.selectedPoint = point;
+      state.selectedPointSequence = pointSequence(point);
+      renderFlowSelectionDetail(point);
+      renderDiagramCursorLabels(point);
+      openDashboardComponentInspector({
+        kind: "Evidence source",
+        title: value(node.querySelector("strong")?.textContent || node.dataset.dashboardEvidence),
+        status: value(node.dataset.sourceStatus || "WAITING"),
+        purpose: value(node.dataset.sourceDetail || "Connected source evidence for the active case."),
+        external: EXTERNAL_SERVICE_LINKS[value(node.dataset.dashboardEvidence)] || null,
+        metrics: [
+          ["Status", value(node.dataset.sourceStatus || "WAITING")],
+          ["Ledger sequence", value(node.dataset.sourceSequence || "—")],
+          ["Case", value(state.agentPlatform?.case_id || state.snapshot?.incident_id || "—")],
+        ],
+      });
+    });
+  });
   $("workspace-run-incident-demo")?.addEventListener("click", () => selectScenario("incident"));
+  $("agent-normal-run-incident")?.addEventListener("click", () => selectScenario("incident"));
   $("dashboard-replay-investigation").addEventListener("click", replayInvestigation);
   $("agent-replay-investigation").addEventListener("click", replayInvestigation);
   $("prepare-button").addEventListener("click", prepareRecovery);
@@ -4758,6 +7468,9 @@
   ["normal", "incident", "recovery"].forEach((scenario) => {
     const button = $(`scenario-${scenario}`);
     if (button) button.addEventListener("click", () => selectScenario(scenario));
+  });
+  document.querySelectorAll("[data-counterfactual]").forEach((button) => {
+    button.addEventListener("click", () => runCounterfactual(button.dataset.counterfactual));
   });
   $("golden-incident").addEventListener("click", () => selectScenario("golden"));
   $("chat-form").addEventListener("submit", (event) => {
@@ -4771,17 +7484,28 @@
 
   document.addEventListener("visibilitychange", () => {
     document.body.dataset.hidden = String(document.hidden);
+    if (!document.hidden && !smokeCapture && !providerPollingDisabled) {
+      void refreshAgentPlatform();
+      void refreshEnterpriseEvidence();
+      void refreshSaasEvidence();
+      void refreshLiveSources();
+    }
   });
   document.body.dataset.hidden = String(document.hidden);
 
   window.addEventListener("resize", () => {
     if (state.view === "agent") scheduleRender();
+    window.requestAnimationFrame(renderPlatformInvestigationLinks);
+    window.requestAnimationFrame(renderDashboardEvidenceLinks);
   });
 
   window.addEventListener("beforeunload", () => {
     if (state.source) state.source.close();
     if (state.reconnectTimer != null) window.clearTimeout(state.reconnectTimer);
+    if (state.agentPlatformTimer != null) window.clearTimeout(state.agentPlatformTimer);
   });
 
+  bindPlatformCanvasInteractions();
+  bindDashboardMetricInspectors();
   bootstrap();
 })();

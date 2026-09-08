@@ -2,7 +2,7 @@
 
 **Status:** Terminal `BLOCK_M4`; v4 through final v9 each failed their sole authorized real-provider gate
 **Date:** 2026-08-27
-**Parent design:** [`2026-08-25-the-missing-20-design.md`](2026-08-25-the-missing-20-design.md)  
+**Parent design:** [`2026-08-25-the-missing-20-design.md`](2026-08-25-the-missing-20-design.md)
 **Accepted safety foundation:** [`2026-08-25-milestone-3-golden-v1-design.md`](2026-08-25-milestone-3-golden-v1-design.md)
 
 ## 1. Decision

@@ -128,9 +128,9 @@ def test_retryable_role_chat_uses_outer_strands_loop_before_one_remote_call(
             }
         }
     )
-    assert {
-        call["tool"] for call in result.investigator.audit.calls
-    }.issubset({"read_admitted_evidence", "search_synthetic_knowledge"})
+    assert {call["tool"] for call in result.investigator.audit.calls}.issubset(
+        {"read_admitted_evidence", "search_synthetic_knowledge"}
+    )
     assert len(remote_calls) == 1
     assert remote_loop_states == [False]
     assert result.knowledge_citations
