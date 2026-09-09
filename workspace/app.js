@@ -6448,6 +6448,8 @@
                 ? "Safe stop"
             : ["RUNNING", "REASONING", "INVESTIGATING"].includes(runState)
               ? "Investigating"
+              : platform.receiving_work?.status === "CONFIGURED"
+                ? (sourceAttention ? "Receiving needs review" : "Monitoring receiving")
               : isNormalScenario() && !sourceAttention
                 ? "Monitoring"
                 : "Incident detected";
@@ -6495,7 +6497,8 @@
     const status = $("dashboard-agent-status");
     status.dataset.stage = slug(stage);
     const facts = status.querySelector(".dashboard-agent-facts");
-    if (facts) facts.hidden = isNormalScenario() && !sourceAttention;
+    if (facts) facts.hidden = (isNormalScenario() && !sourceAttention)
+      || (platform.receiving_work?.status === "CONFIGURED" && ["", "NOT_EVALUATED"].includes(finding));
     const openInvestigation = $("dashboard-open-investigation");
     if (openInvestigation) {
       openInvestigation.hidden = isNormalScenario()

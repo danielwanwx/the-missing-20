@@ -2,390 +2,7 @@
   "scope": "Actual external GET readbacks; demo public photo is not real shipment proof.",
   "business_writes_in_verifier": 0,
   "before_restart": {
-    "checked_at": "2026-09-09T15:17:39.318383+00:00",
-    "case_id": "M20-GOODS-20260909-40-R2",
-    "capture_id": "73afc302ec46996e4e95bf5c074b49f7",
-    "purchase_order": "PUR-ORD-2026-00014",
-    "receipt": "MAT-PRE-2026-00004",
-    "quantity": 1,
-    "uom": "Box",
-    "matching_receipts": [
-      {
-        "name": "MAT-PRE-2026-00004",
-        "docstatus": 1
-      }
-    ],
-    "stock_ledger": [
-      {
-        "name": "95c80e0ebe",
-        "actual_qty": 1.0,
-        "item_code": "M20-DEMO-CARTON",
-        "warehouse": "Stores - M20",
-        "voucher_detail_no": "cu1jg5mk13",
-        "voucher_type": "Purchase Receipt",
-        "voucher_no": "MAT-PRE-2026-00004",
-        "company": "Missing 20 Automotive Demo",
-        "is_cancelled": 0
-      }
-    ],
-    "ledger_ids_at_posting": [
-      "95c80e0ebe"
-    ],
-    "ledger_ids_current": [
-      "95c80e0ebe"
-    ],
-    "same_stock_effects": true,
-    "destinations": [
-      {
-        "key": "m20-receipt-03a792aeb4a678f89404334517b6c5d8",
-        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
-        "provider": "Slack via Celigo",
-        "record_id": "1788965506.082209",
-        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788965506082209",
-        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
-      },
-      {
-        "key": "m20-receipt-25b3bf4372a71881eb15784975dd6da1",
-        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
-        "provider": "Airtable",
-        "record_id": "recgbi4HC41a3r3hQ",
-        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/recgbi4HC41a3r3hQ"
-      }
-    ],
-    "quantities": {
-      "accepted_cumulative": 1.0,
-      "available": 1.0,
-      "available_to_promise": null,
-      "case_balance": 1.0,
-      "delivered_quantity": 0,
-      "invoice_count": 0.0,
-      "ordered": 40.0,
-      "outstanding_order_quantity": 39.0,
-      "physically_arrived": 1.0,
-      "quality_hold": 0.0,
-      "receipt_posted_quantity": 1.0,
-      "receipt_unresolved": 0.0,
-      "received": 1.0,
-      "received_cumulative": 1.0,
-      "released_quantity": 0
-    },
-    "history_points": 1,
-    "history_retained_records": 1,
-    "history_projection_revisions": [],
-    "history_metric_corrections": [],
-    "conversation_turns": 8,
-    "conversation": [
-      {
-        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
-        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 is in NEEDS_REVIEW due to a PO change. ARRIVAL-02 has been successfully received and the stock ledger updated. The PO has an outstanding quantity of 39 units, with 1 unit received and accepted. There is no supplier invoice yet. Next: Verify the current status of the purchase order after the change.",
-        "evidence_ids": [
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger",
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209"
-        ],
-        "tool_calls": [
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_control_context",
-          "read_erp_evidence"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 16782,
-        "usage": {
-          "incremental_cost_usd": 0.045948,
-          "input_tokens": 51331,
-          "output_tokens": 1526,
-          "request_count": 5,
-          "source_cache_hits": 0,
-          "validation_retries": 0
-        },
-        "context_turns": 1
-      },
-      {
-        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
-        "answer": "Disposition: NEEDS_EVIDENCE. Inspect purchase order change, receipt preparation, and ERP draft reread for ARRIVAL-01. ERP receipt and stock ledger prove posted stock; notification systems are copies, not independent verification. Next: Inspect purchase order change, receipt preparation, and ERP draft reread for ARRIVAL-01.",
-        "evidence_ids": [
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger",
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209"
-        ],
-        "tool_calls": [
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_control_context",
-          "read_erp_evidence"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 25175,
-        "usage": {
-          "incremental_cost_usd": 0.0631544,
-          "input_tokens": 68775,
-          "output_tokens": 2542,
-          "request_count": 6,
-          "source_cache_hits": 0,
-          "validation_retries": 2
-        },
-        "context_turns": 1
-      },
-      {
-        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
-        "answer": "Disposition: NEEDS_EVIDENCE. The first arrival is waiting for review due to a change in the purchase order, while the second arrival has been successfully submitted and verified. The current ERP order has an ordered quantity of 40, with 1 received and 39 outstanding. The current ERP receipt has a received quantity of 1, which matches the posted quantity in the stock ledger. Next: Review the reason for the change in the purchase order and refresh the receiving evidence for the first arrival.",
-        "evidence_ids": [
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209",
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger"
-        ],
-        "tool_calls": [
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_control_context",
-          "read_erp_evidence"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 16618,
-        "usage": {
-          "incremental_cost_usd": 0.0371216,
-          "input_tokens": 39234,
-          "output_tokens": 1792,
-          "request_count": 4,
-          "source_cache_hits": 0,
-          "validation_retries": 0
-        },
-        "context_turns": 3
-      },
-      {
-        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
-        "answer": "Disposition: NEEDS_EVIDENCE. The blocked arrival (ARRIVAL-01) is waiting for review because the purchase order (PUR-ORD-2026-00014) has changed. The arrival cannot proceed until the receiving evidence is refreshed before a draft is created. Jira tasks and Slack messages cannot authorize stock movement as they are only notification copies and do not have stock, QA, billing, or delivery authority. Next: Inspect the current status of ARRIVAL-01 after refreshing the receiving evidence.",
-        "evidence_ids": [
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger",
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209"
-        ],
-        "tool_calls": [
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_control_context",
-          "read_erp_evidence"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 24655,
-        "usage": {
-          "incremental_cost_usd": 0.0748616,
-          "input_tokens": 82713,
-          "output_tokens": 2716,
-          "request_count": 7,
-          "source_cache_hits": 0,
-          "validation_retries": 1
-        },
-        "context_turns": 3
-      },
-      {
-        "question": "Keep the read-only constraint: do not approve or post inventory. Show the receiving trend and historical baseline. Explain what actually changed and whether the still-unreceived order balance proves a loss or a revenue improvement.",
-        "answer": "Disposition: NEEDS_EVIDENCE. One arrival needs review; the other is submitted. The unreceived order balance is not a loss or revenue improvement. Next: Inspect ARRIVAL-01 to resolve the review.",
-        "evidence_ids": [
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger",
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209"
-        ],
-        "tool_calls": [
-          "read_control_context",
-          "read_erp_evidence",
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_operational_history"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 17788,
-        "usage": {
-          "incremental_cost_usd": 0.051892,
-          "input_tokens": 58165,
-          "output_tokens": 1675,
-          "request_count": 5,
-          "source_cache_hits": 0,
-          "validation_retries": 0
-        },
-        "context_turns": 3
-      },
-      {
-        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
-        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 needs review due to a PO change. ARRIVAL-02 is submitted with 1.0 quantity posted. Outstanding order balance is 39.0. Next: Inspect ARRIVAL-01 receipt evidence to verify the PO change impact.",
-        "evidence_ids": [
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger",
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209"
-        ],
-        "tool_calls": [
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_control_context",
-          "read_erp_evidence"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 18085,
-        "usage": {
-          "incremental_cost_usd": 0.04954,
-          "input_tokens": 53917,
-          "output_tokens": 2002,
-          "request_count": 5,
-          "source_cache_hits": 0,
-          "validation_retries": 0
-        },
-        "context_turns": 3
-      },
-      {
-        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
-        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 is blocked due to a PO change. Refresh receiving evidence. External task records do not authorize stock movement. Next: Inspect and verify the updated purchase order and refresh the receiving evidence for ARRIVAL-01 to align with the new order details.",
-        "evidence_ids": [
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger",
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209"
-        ],
-        "tool_calls": [
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_control_context",
-          "read_erp_evidence"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 22130,
-        "usage": {
-          "incremental_cost_usd": 0.0630056,
-          "input_tokens": 69453,
-          "output_tokens": 2326,
-          "request_count": 6,
-          "source_cache_hits": 1,
-          "validation_retries": 1
-        },
-        "context_turns": 3
-      },
-      {
-        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain what actually changed and whether the still-unreceived order balance proves a loss or a revenue improvement.",
-        "answer": "Disposition: NEEDS_EVIDENCE. The receiving trend shows 1 box received, with an outstanding order quantity of 39 boxes. The historical baseline is insufficient. The still-unreceived order balance does not prove a loss or revenue improvement. ARRIVAL-01 requires further review, while ARRIVAL-02 has been successfully submitted. Next: Inspect and verify the records related to ARRIVAL-01 without executing or suggesting an inventory write.",
-        "evidence_ids": [
-          "PUR-ORD-2026-00014",
-          "MAT-PRE-2026-00004",
-          "MAT-PRE-2026-00004:ledger",
-          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
-          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
-          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
-          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
-          "1788965506.082209"
-        ],
-        "tool_calls": [
-          "read_control_context",
-          "read_erp_evidence",
-          "read_airtable_evidence",
-          "read_celigo_evidence",
-          "read_collaboration_evidence",
-          "read_operational_history"
-        ],
-        "provider": {
-          "mode": "bedrock",
-          "model": "us.amazon.nova-pro-v1:0",
-          "provider": "bedrock",
-          "region": "us-west-2",
-          "transport": "strands_bedrock_model"
-        },
-        "latency_ms": 16882,
-        "usage": {
-          "incremental_cost_usd": 0.0518784,
-          "input_tokens": 58196,
-          "output_tokens": 1663,
-          "request_count": 5,
-          "source_cache_hits": 0,
-          "validation_retries": 0
-        },
-        "context_turns": 3
-      }
-    ],
-    "passed": true
-  },
-  "after_restart": {
-    "checked_at": "2026-09-09T18:42:43.925309+00:00",
+    "checked_at": "2026-09-09T18:44:44.023538+00:00",
     "case_id": "M20-GOODS-20260909-40-R2",
     "capture_id": "73afc302ec46996e4e95bf5c074b49f7",
     "purchase_order": "PUR-ORD-2026-00014",
@@ -765,6 +382,813 @@
         "context_turns": 3
       }
     ],
-    "passed": false
-  }
+    "passed": true
+  },
+  "after_restart": {
+    "checked_at": "2026-09-09T18:47:12.476050+00:00",
+    "case_id": "M20-GOODS-20260909-40-R2",
+    "capture_id": "73afc302ec46996e4e95bf5c074b49f7",
+    "purchase_order": "PUR-ORD-2026-00014",
+    "receipt": "MAT-PRE-2026-00004",
+    "quantity": 1,
+    "uom": "Box",
+    "matching_receipts": [
+      {
+        "name": "MAT-PRE-2026-00004",
+        "docstatus": 1
+      }
+    ],
+    "stock_ledger": [
+      {
+        "name": "MAT-SLE-2026-00024",
+        "actual_qty": 1.0,
+        "item_code": "M20-DEMO-CARTON",
+        "warehouse": "Stores - M20",
+        "voucher_detail_no": "cu1jg5mk13",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "MAT-PRE-2026-00004",
+        "company": "Missing 20 Automotive Demo",
+        "is_cancelled": 0
+      }
+    ],
+    "ledger_ids_at_posting": [
+      "95c80e0ebe"
+    ],
+    "ledger_ids_current": [
+      "MAT-SLE-2026-00024"
+    ],
+    "same_stock_effects": true,
+    "destinations": [
+      {
+        "key": "m20-receipt-03a792aeb4a678f89404334517b6c5d8",
+        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
+        "provider": "Slack via Celigo",
+        "record_id": "1788965506.082209",
+        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788965506082209",
+        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
+      },
+      {
+        "key": "m20-receipt-25b3bf4372a71881eb15784975dd6da1",
+        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
+        "provider": "Airtable",
+        "record_id": "recgbi4HC41a3r3hQ",
+        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/recgbi4HC41a3r3hQ"
+      }
+    ],
+    "quantities": {
+      "accepted_cumulative": 1.0,
+      "available": 1.0,
+      "available_to_promise": null,
+      "case_balance": 1.0,
+      "delivered_quantity": 0,
+      "invoice_count": 0.0,
+      "ordered": 40.0,
+      "outstanding_order_quantity": 39.0,
+      "physically_arrived": 1.0,
+      "quality_hold": 0.0,
+      "receipt_posted_quantity": 1.0,
+      "receipt_unresolved": 0.0,
+      "received": 1.0,
+      "received_cumulative": 1.0,
+      "released_quantity": 0
+    },
+    "history_points": 5,
+    "history_retained_records": 5,
+    "history_projection_revisions": [],
+    "history_metric_corrections": [],
+    "conversation_turns": 8,
+    "conversation": [
+      {
+        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 is in NEEDS_REVIEW due to a PO change. ARRIVAL-02 has been successfully received and the stock ledger updated. The PO has an outstanding quantity of 39 units, with 1 unit received and accepted. There is no supplier invoice yet. Next: Verify the current status of the purchase order after the change.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 16782,
+        "usage": {
+          "incremental_cost_usd": 0.045948,
+          "input_tokens": 51331,
+          "output_tokens": 1526,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 1
+      },
+      {
+        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
+        "answer": "Disposition: NEEDS_EVIDENCE. Inspect purchase order change, receipt preparation, and ERP draft reread for ARRIVAL-01. ERP receipt and stock ledger prove posted stock; notification systems are copies, not independent verification. Next: Inspect purchase order change, receipt preparation, and ERP draft reread for ARRIVAL-01.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 25175,
+        "usage": {
+          "incremental_cost_usd": 0.0631544,
+          "input_tokens": 68775,
+          "output_tokens": 2542,
+          "request_count": 6,
+          "source_cache_hits": 0,
+          "validation_retries": 2
+        },
+        "context_turns": 1
+      },
+      {
+        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+        "answer": "Disposition: NEEDS_EVIDENCE. The first arrival is waiting for review due to a change in the purchase order, while the second arrival has been successfully submitted and verified. The current ERP order has an ordered quantity of 40, with 1 received and 39 outstanding. The current ERP receipt has a received quantity of 1, which matches the posted quantity in the stock ledger. Next: Review the reason for the change in the purchase order and refresh the receiving evidence for the first arrival.",
+        "evidence_ids": [
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209",
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 16618,
+        "usage": {
+          "incremental_cost_usd": 0.0371216,
+          "input_tokens": 39234,
+          "output_tokens": 1792,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
+        "answer": "Disposition: NEEDS_EVIDENCE. The blocked arrival (ARRIVAL-01) is waiting for review because the purchase order (PUR-ORD-2026-00014) has changed. The arrival cannot proceed until the receiving evidence is refreshed before a draft is created. Jira tasks and Slack messages cannot authorize stock movement as they are only notification copies and do not have stock, QA, billing, or delivery authority. Next: Inspect the current status of ARRIVAL-01 after refreshing the receiving evidence.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 24655,
+        "usage": {
+          "incremental_cost_usd": 0.0748616,
+          "input_tokens": 82713,
+          "output_tokens": 2716,
+          "request_count": 7,
+          "source_cache_hits": 0,
+          "validation_retries": 1
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep the read-only constraint: do not approve or post inventory. Show the receiving trend and historical baseline. Explain what actually changed and whether the still-unreceived order balance proves a loss or a revenue improvement.",
+        "answer": "Disposition: NEEDS_EVIDENCE. One arrival needs review; the other is submitted. The unreceived order balance is not a loss or revenue improvement. Next: Inspect ARRIVAL-01 to resolve the review.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_control_context",
+          "read_erp_evidence",
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 17788,
+        "usage": {
+          "incremental_cost_usd": 0.051892,
+          "input_tokens": 58165,
+          "output_tokens": 1675,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 needs review due to a PO change. ARRIVAL-02 is submitted with 1.0 quantity posted. Outstanding order balance is 39.0. Next: Inspect ARRIVAL-01 receipt evidence to verify the PO change impact.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 18085,
+        "usage": {
+          "incremental_cost_usd": 0.04954,
+          "input_tokens": 53917,
+          "output_tokens": 2002,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
+        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 is blocked due to a PO change. Refresh receiving evidence. External task records do not authorize stock movement. Next: Inspect and verify the updated purchase order and refresh the receiving evidence for ARRIVAL-01 to align with the new order details.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 22130,
+        "usage": {
+          "incremental_cost_usd": 0.0630056,
+          "input_tokens": 69453,
+          "output_tokens": 2326,
+          "request_count": 6,
+          "source_cache_hits": 1,
+          "validation_retries": 1
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain what actually changed and whether the still-unreceived order balance proves a loss or a revenue improvement.",
+        "answer": "Disposition: NEEDS_EVIDENCE. The receiving trend shows 1 box received, with an outstanding order quantity of 39 boxes. The historical baseline is insufficient. The still-unreceived order balance does not prove a loss or revenue improvement. ARRIVAL-01 requires further review, while ARRIVAL-02 has been successfully submitted. Next: Inspect and verify the records related to ARRIVAL-01 without executing or suggesting an inventory write.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_control_context",
+          "read_erp_evidence",
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 16882,
+        "usage": {
+          "incremental_cost_usd": 0.0518784,
+          "input_tokens": 58196,
+          "output_tokens": 1663,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      }
+    ],
+    "passed": true
+  },
+  "restart_no_duplicate_effects": true,
+  "after_replay": {
+    "checked_at": "2026-09-09T18:48:15.819413+00:00",
+    "case_id": "M20-GOODS-20260909-40-R2",
+    "capture_id": "73afc302ec46996e4e95bf5c074b49f7",
+    "purchase_order": "PUR-ORD-2026-00014",
+    "receipt": "MAT-PRE-2026-00004",
+    "quantity": 1,
+    "uom": "Box",
+    "matching_receipts": [
+      {
+        "name": "MAT-PRE-2026-00004",
+        "docstatus": 1
+      }
+    ],
+    "stock_ledger": [
+      {
+        "name": "MAT-SLE-2026-00024",
+        "actual_qty": 1.0,
+        "item_code": "M20-DEMO-CARTON",
+        "warehouse": "Stores - M20",
+        "voucher_detail_no": "cu1jg5mk13",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "MAT-PRE-2026-00004",
+        "company": "Missing 20 Automotive Demo",
+        "is_cancelled": 0
+      }
+    ],
+    "ledger_ids_at_posting": [
+      "95c80e0ebe"
+    ],
+    "ledger_ids_current": [
+      "MAT-SLE-2026-00024"
+    ],
+    "same_stock_effects": true,
+    "destinations": [
+      {
+        "key": "m20-receipt-03a792aeb4a678f89404334517b6c5d8",
+        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
+        "provider": "Slack via Celigo",
+        "record_id": "1788965506.082209",
+        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788965506082209",
+        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
+      },
+      {
+        "key": "m20-receipt-25b3bf4372a71881eb15784975dd6da1",
+        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
+        "provider": "Airtable",
+        "record_id": "recgbi4HC41a3r3hQ",
+        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/recgbi4HC41a3r3hQ"
+      }
+    ],
+    "quantities": {
+      "accepted_cumulative": 1.0,
+      "available": 1.0,
+      "available_to_promise": null,
+      "case_balance": 1.0,
+      "delivered_quantity": 0,
+      "invoice_count": 0.0,
+      "ordered": 40.0,
+      "outstanding_order_quantity": 39.0,
+      "physically_arrived": 1.0,
+      "quality_hold": 0.0,
+      "receipt_posted_quantity": 1.0,
+      "receipt_unresolved": 0.0,
+      "received": 1.0,
+      "received_cumulative": 1.0,
+      "released_quantity": 0
+    },
+    "history_points": 5,
+    "history_retained_records": 5,
+    "history_projection_revisions": [],
+    "history_metric_corrections": [],
+    "conversation_turns": 9,
+    "conversation": [
+      {
+        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 is in NEEDS_REVIEW due to a PO change. ARRIVAL-02 has been successfully received and the stock ledger updated. The PO has an outstanding quantity of 39 units, with 1 unit received and accepted. There is no supplier invoice yet. Next: Verify the current status of the purchase order after the change.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 16782,
+        "usage": {
+          "incremental_cost_usd": 0.045948,
+          "input_tokens": 51331,
+          "output_tokens": 1526,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 1
+      },
+      {
+        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
+        "answer": "Disposition: NEEDS_EVIDENCE. Inspect purchase order change, receipt preparation, and ERP draft reread for ARRIVAL-01. ERP receipt and stock ledger prove posted stock; notification systems are copies, not independent verification. Next: Inspect purchase order change, receipt preparation, and ERP draft reread for ARRIVAL-01.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 25175,
+        "usage": {
+          "incremental_cost_usd": 0.0631544,
+          "input_tokens": 68775,
+          "output_tokens": 2542,
+          "request_count": 6,
+          "source_cache_hits": 0,
+          "validation_retries": 2
+        },
+        "context_turns": 1
+      },
+      {
+        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+        "answer": "Disposition: NEEDS_EVIDENCE. The first arrival is waiting for review due to a change in the purchase order, while the second arrival has been successfully submitted and verified. The current ERP order has an ordered quantity of 40, with 1 received and 39 outstanding. The current ERP receipt has a received quantity of 1, which matches the posted quantity in the stock ledger. Next: Review the reason for the change in the purchase order and refresh the receiving evidence for the first arrival.",
+        "evidence_ids": [
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209",
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 16618,
+        "usage": {
+          "incremental_cost_usd": 0.0371216,
+          "input_tokens": 39234,
+          "output_tokens": 1792,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
+        "answer": "Disposition: NEEDS_EVIDENCE. The blocked arrival (ARRIVAL-01) is waiting for review because the purchase order (PUR-ORD-2026-00014) has changed. The arrival cannot proceed until the receiving evidence is refreshed before a draft is created. Jira tasks and Slack messages cannot authorize stock movement as they are only notification copies and do not have stock, QA, billing, or delivery authority. Next: Inspect the current status of ARRIVAL-01 after refreshing the receiving evidence.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 24655,
+        "usage": {
+          "incremental_cost_usd": 0.0748616,
+          "input_tokens": 82713,
+          "output_tokens": 2716,
+          "request_count": 7,
+          "source_cache_hits": 0,
+          "validation_retries": 1
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep the read-only constraint: do not approve or post inventory. Show the receiving trend and historical baseline. Explain what actually changed and whether the still-unreceived order balance proves a loss or a revenue improvement.",
+        "answer": "Disposition: NEEDS_EVIDENCE. One arrival needs review; the other is submitted. The unreceived order balance is not a loss or revenue improvement. Next: Inspect ARRIVAL-01 to resolve the review.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_control_context",
+          "read_erp_evidence",
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 17788,
+        "usage": {
+          "incremental_cost_usd": 0.051892,
+          "input_tokens": 58165,
+          "output_tokens": 1675,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 needs review due to a PO change. ARRIVAL-02 is submitted with 1.0 quantity posted. Outstanding order balance is 39.0. Next: Inspect ARRIVAL-01 receipt evidence to verify the PO change impact.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 18085,
+        "usage": {
+          "incremental_cost_usd": 0.04954,
+          "input_tokens": 53917,
+          "output_tokens": 2002,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
+        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 is blocked due to a PO change. Refresh receiving evidence. External task records do not authorize stock movement. Next: Inspect and verify the updated purchase order and refresh the receiving evidence for ARRIVAL-01 to align with the new order details.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 22130,
+        "usage": {
+          "incremental_cost_usd": 0.0630056,
+          "input_tokens": 69453,
+          "output_tokens": 2326,
+          "request_count": 6,
+          "source_cache_hits": 1,
+          "validation_retries": 1
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain what actually changed and whether the still-unreceived order balance proves a loss or a revenue improvement.",
+        "answer": "Disposition: NEEDS_EVIDENCE. The receiving trend shows 1 box received, with an outstanding order quantity of 39 boxes. The historical baseline is insufficient. The still-unreceived order balance does not prove a loss or revenue improvement. ARRIVAL-01 requires further review, while ARRIVAL-02 has been successfully submitted. Next: Inspect and verify the records related to ARRIVAL-01 without executing or suggesting an inventory write.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_control_context",
+          "read_erp_evidence",
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 16882,
+        "usage": {
+          "incremental_cost_usd": 0.0518784,
+          "input_tokens": 58196,
+          "output_tokens": 1663,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: NEEDS_EVIDENCE. Ordered: 40.0 units. Physically received: 1.0 unit. Posted: 1.0 unit. Outstanding balance: 39.0 units. Arrival-01 needs review. Next: Inspect Arrival-01 to verify the physical receipt.",
+        "evidence_ids": [
+          "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+          "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+          "PUR-ORD-2026-00014",
+          "MAT-PRE-2026-00004",
+          "MAT-PRE-2026-00004:ledger",
+          "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+          "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+          "1788965506.082209"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 23024,
+        "usage": {
+          "incremental_cost_usd": 0.0604656,
+          "input_tokens": 67190,
+          "output_tokens": 2098,
+          "request_count": 6,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      }
+    ],
+    "passed": true,
+    "history_changed_since_initial_restart": false
+  },
+  "replay_no_duplicate_external_effects": true
 }

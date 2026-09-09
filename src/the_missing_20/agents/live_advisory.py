@@ -1539,6 +1539,12 @@ async def _invoke(
             "Keep safe_next_step read-only: inspect/read/verify records without executing "
             "or suggesting an inventory write. Answer the history question as a separate "
             "explanation; a stable chart does not close an unresolved receiving review."
+            " Answer each part of the newest question explicitly, including whether a "
+            "verified receipt should be retried and whether an outstanding order proves loss, "
+            "when asked. Use the exact source unit. Repeated cumulative history observations "
+            "are snapshots of the same balance, not new receipts. Explain insufficient "
+            "baseline using the actual comparable prior count and minimum required; missing "
+            "billed revenue or causal evidence is not proof of a financial improvement."
         )
     if receiving and not requests_history(current_question):
         payloads.pop(HISTORY_TOOL_NAME, None)

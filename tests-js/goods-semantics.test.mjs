@@ -6,6 +6,31 @@ import vm from "node:vm";
 const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
 const section = (name, next) => app.slice(app.indexOf(`  function ${name}(`), app.indexOf(`  function ${next}(`));
 const number = (v, fallback = 0) => v == null || !Number.isFinite(Number(v)) ? fallback : Number(v);
+test("receiving lifecycle does not imply an incident diagnosis or display empty diagnosis metrics", () => {
+  const elements = new Map();
+  const element = id => {
+    if (!elements.has(id)) elements.set(id, {dataset: {}, querySelector: () => element("facts")});
+    return elements.get(id);
+  };
+  const platform = {diagnosis: {status: "IDLE", finding: "NOT_EVALUATED"},
+    receiving_work: {status: "CONFIGURED", arrivals: [{status: "NEEDS_REVIEW"}]}};
+  const context = {state: {agentPlatform: platform}, $: element, number,
+    value: v => String(v ?? ""), slug: v => v,
+    platformFlowProjection: () => ({gap: 0, invoiceHeld: false}), isNormalScenario: () => true};
+  vm.runInNewContext(section("receivingNeedsAttention", "platformFlowProjection"), context);
+  const start = app.indexOf("  function renderDashboardAgentStatus(");
+  vm.runInNewContext(app.slice(start, app.indexOf("\n  function ", start + 12)), context);
+  context.renderDashboardAgentStatus();
+  assert.equal(element("dashboard-agent-stage").textContent, "Receiving needs review");
+  assert.equal(element("facts").hidden, true);
+  assert.equal(element("dashboard-open-investigation").hidden, false);
+  platform.receiving_work.arrivals[0].status = "RECEIPT_SUBMITTED";
+  context.renderDashboardAgentStatus();
+  assert.equal(element("dashboard-agent-stage").textContent, "Monitoring receiving");
+  platform.agent_run = {state: "INVESTIGATING"};
+  context.renderDashboardAgentStatus();
+  assert.equal(element("dashboard-agent-stage").textContent, "Investigating");
+});
 test("an unposted receiving exception stays visible without fabricating a stock gap", () => {
   const context = {};
   vm.runInNewContext(section("receivingNeedsAttention", "platformFlowProjection"), context);

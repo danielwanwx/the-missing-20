@@ -1,0 +1,917 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R2",
+  "started_at": "2026-09-09T18:47:45.394751+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "acceptance_scope": "runtime_contract_only",
+  "independent_answer_quality_review_required": true,
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "Disposition: NEEDS_EVIDENCE. Ordered: 40.0 units. Physically received: 1.0 unit. Posted: 1.0 unit. Outstanding balance: 39.0 units. Arrival-01 needs review. Next: Inspect Arrival-01 to verify the physical receipt.",
+      "advisory": {
+        "attachments": [],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [],
+        "latency_ms": 23024,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "NEEDS_EVIDENCE",
+          "evidence_ids": [
+            "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+            "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+            "PUR-ORD-2026-00014",
+            "MAT-PRE-2026-00004",
+            "MAT-PRE-2026-00004:ledger",
+            "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+            "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+            "1788965506.082209"
+          ],
+          "follow_up_questions": [],
+          "reason": "Ordered: 40.0 units. Physically received: 1.0 unit. Posted: 1.0 unit. Outstanding balance: 39.0 units. Arrival-01 needs review.",
+          "safe_next_step": "Inspect Arrival-01 to verify the physical receipt.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2006,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 1669,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_N63mqpJCC4yaTiQUdNWPWO",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_xRAJ26kOIM4WahA5tEkDre",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_fLtMbrVLWEOmZwMTi89LjA",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_AqXJtXyI1VaZAiFW2FFMQi",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_RICxg2y9gH5lG3Yo6Lmctk",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 8,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_N63mqpJCC4yaTiQUdNWPWO",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 5,
+            "sequence": 9,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_xRAJ26kOIM4WahA5tEkDre",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 5,
+            "sequence": 10,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_fLtMbrVLWEOmZwMTi89LjA",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 5,
+            "sequence": 11,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_AqXJtXyI1VaZAiFW2FFMQi",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 5,
+            "sequence": 12,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_RICxg2y9gH5lG3Yo6Lmctk",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 7263,
+            "sequence": 13,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2875,
+            "sequence": 14,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 11756,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 6301,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 13558,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 5388,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 19,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_kqYKmKyz6L8P2vf4Zb0xsk",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 1,
+            "sequence": 20,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_kqYKmKyz6L8P2vf4Zb0xsk",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 13862,
+            "sequence": 21,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3469,
+            "sequence": 22,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 23,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_ekGwmXicBo36v2foTw6WkZ",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 24,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_ekGwmXicBo36v2foTw6WkZ",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 14302,
+            "sequence": 25,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3293,
+            "sequence": 26,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 27,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_ZiteJUERwrWtgURpfvDu9G",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 28,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_ZiteJUERwrWtgURpfvDu9G",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.0604656,
+          "input_tokens": 67190,
+          "output_tokens": 2098,
+          "request_count": 6,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    },
+    {
+      "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+      "answer": "Disposition: NEEDS_EVIDENCE. The receipt MAT-PRE-2026-00004 is verified by ERP receipt and stock-ledger records. ARRIVAL-02 is RECEIPT_SUBMITTED with a posted quantity of 1. ARRIVAL-01 is NEEDS_REVIEW with no posted quantity. Next: Inspect the current status of ARRIVAL-01 after the review.",
+      "advisory": {
+        "attachments": [],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [],
+        "latency_ms": 20772,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "NEEDS_EVIDENCE",
+          "evidence_ids": [
+            "PUR-ORD-2026-00014",
+            "MAT-PRE-2026-00004",
+            "MAT-PRE-2026-00004:ledger",
+            "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+            "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+            "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+            "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+            "1788965506.082209"
+          ],
+          "follow_up_questions": [],
+          "reason": "The receipt MAT-PRE-2026-00004 is verified by ERP receipt and stock-ledger records. ARRIVAL-02 is RECEIPT_SUBMITTED with a posted quantity of 1. ARRIVAL-01 is NEEDS_REVIEW with no posted quantity.",
+          "safe_next_step": "Inspect the current status of ARRIVAL-01 after the review.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2000,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 1680,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_XKIrZudITRFqjtKKdYhyko",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_K2dp0iGZefMYkL24OUPv1D",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_XUGVBQCA8bl4CrJ9lt6Vjs",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_urtIBiSD6GdxtvB2TZs448",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_oKp0NqPQvgcPHmioN1gs2X",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 8,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_XKIrZudITRFqjtKKdYhyko",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 9,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_K2dp0iGZefMYkL24OUPv1D",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 10,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_XUGVBQCA8bl4CrJ9lt6Vjs",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 11,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_urtIBiSD6GdxtvB2TZs448",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 5,
+            "sequence": 12,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_oKp0NqPQvgcPHmioN1gs2X",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 7266,
+            "sequence": 13,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2808,
+            "sequence": 14,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 11782,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 7192,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 13690,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 4196,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 19,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_UhARP8VxLdis4nfSJIpONH",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 20,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_UhARP8VxLdis4nfSJIpONH",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 14007,
+            "sequence": 21,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 4873,
+            "sequence": 22,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 23,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_ZVduKixLMdh1rElZxFbnOI",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 24,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_ZVduKixLMdh1rElZxFbnOI",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.048568,
+          "input_tokens": 53182,
+          "output_tokens": 1882,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    },
+    {
+      "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain net change versus the prior-observation average; is this proof of revenue gain?",
+      "answer": "Disposition: NEEDS_EVIDENCE. The receiving trend shows a consistent pattern of 1 Box received per observation, with no net change from the first to the latest observation. The historical baseline is insufficient due to the limited number of observations. The current receiving activity does not indicate a revenue gain as it is consistent with prior observations. The case classification is NEEDS_EVIDENCE due to the unresolved arrival (ARRIVAL-01) with a status of NEEDS_REVIEW and no posted quantity. Next: Inspect and verify the records for ARRIVAL-01 to resolve the review status.",
+      "advisory": {
+        "attachments": [
+          {
+            "history": {
+              "baseline": {
+                "calculation": "arithmetic_mean_of_prior_comparable_observations",
+                "cohort": {
+                  "case_id": "M20-GOODS-20260909-40-R2",
+                  "currency": "USD",
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "observation_kind": "live_observation",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "uom": "Box"
+                },
+                "industry_benchmark": false,
+                "kind": "internal_observation_baseline",
+                "metrics": {
+                  "invoice_hold_value": {
+                    "change": null,
+                    "change_percent": null,
+                    "current": 0.0,
+                    "previous_mean": null,
+                    "sample_count": 2,
+                    "status": "INSUFFICIENT_DATA"
+                  },
+                  "net_billed_sales": {
+                    "change": null,
+                    "change_percent": null,
+                    "current": null,
+                    "previous_mean": null,
+                    "sample_count": 0,
+                    "status": "UNAVAILABLE"
+                  },
+                  "outstanding_order_quantity": {
+                    "change": null,
+                    "change_percent": null,
+                    "current": 39.0,
+                    "previous_mean": null,
+                    "sample_count": 2,
+                    "status": "INSUFFICIENT_DATA"
+                  },
+                  "quality_hold": {
+                    "change": null,
+                    "change_percent": null,
+                    "current": 0.0,
+                    "previous_mean": null,
+                    "sample_count": 2,
+                    "status": "INSUFFICIENT_DATA"
+                  },
+                  "received": {
+                    "change": null,
+                    "change_percent": null,
+                    "current": 1.0,
+                    "previous_mean": null,
+                    "sample_count": 2,
+                    "status": "INSUFFICIENT_DATA"
+                  },
+                  "recorded": {
+                    "change": null,
+                    "change_percent": null,
+                    "current": 1.0,
+                    "previous_mean": null,
+                    "sample_count": 2,
+                    "status": "INSUFFICIENT_DATA"
+                  }
+                },
+                "minimum_samples": 3,
+                "sample_count": 2,
+                "status": "INSUFFICIENT_DATA",
+                "time_weighted": false
+              },
+              "case_id": "M20-GOODS-20260909-40-R2",
+              "coverage": {
+                "business_history_complete": false,
+                "first_observed_at": "2026-09-09T14:58:26.950003+00:00",
+                "first_retained_at": "2026-09-09T14:58:26.950003+00:00",
+                "last_observed_at": "2026-09-09T17:01:51.649226+00:00",
+                "last_retained_at": "2026-09-09T17:01:51.649226+00:00",
+                "returned_points": 5,
+                "since": null,
+                "status": "OBSERVED",
+                "time_basis": "observed_at",
+                "total_points": 5,
+                "total_points_basis": "RETAINED_RECORDS_INCLUDING_PROJECTION_REVISIONS",
+                "truncated": false
+              },
+              "evidence_ids": [
+                "operational-history:M20-GOODS-20260909-40-R2:1",
+                "operational-history:M20-GOODS-20260909-40-R2:2",
+                "operational-history:M20-GOODS-20260909-40-R2:3",
+                "operational-history:M20-GOODS-20260909-40-R2:4",
+                "operational-history:M20-GOODS-20260909-40-R2:5"
+              ],
+              "freshness": "HISTORICAL_OBSERVATIONS",
+              "limitations": "Observation-time history, not a complete business ledger, industry benchmark, cash receipt, or causal revenue uplift. Baseline uses the parent query window.",
+              "points": [
+                {
+                  "case_id": "M20-GOODS-20260909-40-R2",
+                  "currency": "USD",
+                  "documents": [
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_order",
+                      "name": "PUR-ORD-2026-00014",
+                      "status": "SUBMITTED",
+                      "version": "2026-09-09 07:51:25.302755"
+                    },
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_receipt",
+                      "name": "MAT-PRE-2026-00004",
+                      "status": "RECEIVED",
+                      "version": "2026-09-09 07:51:25.226673"
+                    }
+                  ],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R2:1",
+                  "id": 1,
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "metrics": {
+                    "invoice_hold_value": 0.0,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": 39.0,
+                    "quality_hold": 0.0,
+                    "received": 1.0,
+                    "recorded": 1.0
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T14:58:26.950003+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "CONNECTED",
+                  "time_basis": "observed_at",
+                  "uom": "Box"
+                },
+                {
+                  "case_id": "M20-GOODS-20260909-40-R2",
+                  "currency": null,
+                  "documents": [],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R2:2",
+                  "id": 2,
+                  "item_code": null,
+                  "metric_version": "v1",
+                  "metrics": {
+                    "invoice_hold_value": null,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": null,
+                    "quality_hold": null,
+                    "received": null,
+                    "recorded": null
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T16:45:50.775426+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "DEGRADED",
+                  "time_basis": "observed_at",
+                  "uom": null
+                },
+                {
+                  "case_id": "M20-GOODS-20260909-40-R2",
+                  "currency": "USD",
+                  "documents": [
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_order",
+                      "name": "PUR-ORD-2026-00014",
+                      "status": "SUBMITTED",
+                      "version": "2026-09-09 07:51:25.302755"
+                    },
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_receipt",
+                      "name": "MAT-PRE-2026-00004",
+                      "status": "RECEIVED",
+                      "version": "2026-09-09 07:51:25.226673"
+                    }
+                  ],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R2:3",
+                  "id": 3,
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "metrics": {
+                    "invoice_hold_value": 0.0,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": 39.0,
+                    "quality_hold": 0.0,
+                    "received": 1.0,
+                    "recorded": 1.0
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T16:46:28.995158+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "CONNECTED",
+                  "time_basis": "observed_at",
+                  "uom": "Box"
+                },
+                {
+                  "case_id": "M20-GOODS-20260909-40-R2",
+                  "currency": null,
+                  "documents": [],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R2:4",
+                  "id": 4,
+                  "item_code": null,
+                  "metric_version": "v1",
+                  "metrics": {
+                    "invoice_hold_value": null,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": null,
+                    "quality_hold": null,
+                    "received": null,
+                    "recorded": null
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T17:01:12.040904+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "DEGRADED",
+                  "time_basis": "observed_at",
+                  "uom": null
+                },
+                {
+                  "case_id": "M20-GOODS-20260909-40-R2",
+                  "currency": "USD",
+                  "documents": [
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_order",
+                      "name": "PUR-ORD-2026-00014",
+                      "status": "SUBMITTED",
+                      "version": "2026-09-09 07:51:25.302755"
+                    },
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_receipt",
+                      "name": "MAT-PRE-2026-00004",
+                      "status": "RECEIVED",
+                      "version": "2026-09-09 07:51:25.226673"
+                    }
+                  ],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R2:5",
+                  "id": 5,
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "metrics": {
+                    "invoice_hold_value": 0.0,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": 39.0,
+                    "quality_hold": 0.0,
+                    "received": 1.0,
+                    "recorded": 1.0
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T17:01:51.649226+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "CONNECTED",
+                  "time_basis": "observed_at",
+                  "uom": "Box"
+                }
+              ],
+              "selection": {
+                "returned": 5,
+                "truncated": false
+              }
+            },
+            "kind": "history",
+            "metric": "received",
+            "selection_basis": "explicit_human_request"
+          }
+        ],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [],
+        "latency_ms": 21064,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "NEEDS_EVIDENCE",
+          "evidence_ids": [
+            "PUR-ORD-2026-00014",
+            "MAT-PRE-2026-00004",
+            "MAT-PRE-2026-00004:ledger",
+            "39762f9ab842c13bc800de41f7ab2eca:photo:1:2dc3d1ef5b4d",
+            "73afc302ec46996e4e95bf5c074b49f7:photo:1:b34d390f0b03",
+            "barcode:4e23fdf03127384c105e462f9f3f50a82ea9a7b3e0ec79f449ad30091bb140df",
+            "barcode:6fd98c0452301f8c539d5a149101e82c78ecf78930a74194b060a4112aa200a7",
+            "1788965506.082209"
+          ],
+          "follow_up_questions": [],
+          "reason": "The receiving trend shows a consistent pattern of 1 Box received per observation, with no net change from the first to the latest observation. The historical baseline is insufficient due to the limited number of observations. The current receiving activity does not indicate a revenue gain as it is consistent with prior observations. The case classification is NEEDS_EVIDENCE due to the unresolved arrival (ARRIVAL-01) with a status of NEEDS_REVIEW and no posted quantity.",
+          "safe_next_step": "Inspect and verify the records for ARRIVAL-01 to resolve the review status.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2119,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3408,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_yfjNBZ8pXTy6uoxvNgxKvM",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_pjru7p3lpo8H3SXybHRLwn",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_gTsR6r65RMzKGz9nuoqaSy",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_E1LXy9s53kE4cpC7zSHnyQ",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_j8dcXGLmcx3F5stLICHUVG",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 8,
+            "tool": "read_operational_history",
+            "tool_use_id": "tooluse_0c0BUtCjq8OuEM7hZiXBlP",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 9,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_yfjNBZ8pXTy6uoxvNgxKvM",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 10,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_pjru7p3lpo8H3SXybHRLwn",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 11,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_gTsR6r65RMzKGz9nuoqaSy",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 12,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_E1LXy9s53kE4cpC7zSHnyQ",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 13,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_j8dcXGLmcx3F5stLICHUVG",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 14,
+            "tool": "read_operational_history",
+            "tool_use_id": "tooluse_0c0BUtCjq8OuEM7hZiXBlP",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 9639,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2261,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 15349,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2711,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 16913,
+            "sequence": 19,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 5502,
+            "sequence": 20,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 21,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_QwSqZXPeal8XDvyVnEUOtz",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 22,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_QwSqZXPeal8XDvyVnEUOtz",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 17434,
+            "sequence": 23,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3641,
+            "sequence": 24,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 25,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_MXcMepIr6ogMptBvTcIHw8",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 26,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_MXcMepIr6ogMptBvTcIHw8",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.0589,
+          "input_tokens": 67129,
+          "output_tokens": 1624,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    }
+  ],
+  "passed": true,
+  "quantities_unchanged": true,
+  "completed_at": "2026-09-09T18:48:50.470094+00:00"
+}

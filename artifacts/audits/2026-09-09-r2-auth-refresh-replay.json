@@ -1,0 +1,24 @@
+{
+  "capture_id": "73afc302ec46996e4e95bf5c074b49f7",
+  "checked_at": "2026-09-09T18:47:40.911329+00:00",
+  "receipt": "MAT-PRE-2026-00004",
+  "version_before": 7,
+  "scope": "Local replay assertions; pair with fresh external readback verifier.",
+  "submits": [
+    {
+      "attempt": 1,
+      "same_receipt_and_version": true
+    },
+    {
+      "attempt": 2,
+      "same_receipt_and_version": true
+    },
+    {
+      "attempt": 3,
+      "same_receipt_and_version": true
+    }
+  ],
+  "duplicate_photo_http_status": 400,
+  "passed": true,
+  "version_after": 7
+}
