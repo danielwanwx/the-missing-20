@@ -1170,7 +1170,7 @@ test("live console reveals only reached states and refreshes metrics from SSE", 
   assert.match(app, /telemetryRecordCount\(latestTelemetry\)/);
   assert.match(css, /@keyframes live-metric-arrival/);
   assert.match(app, /const liveAuthority = hasLiveSourceAuthority\(\)/);
-  assert.match(app, /liveAuthority\s*\? platformEvents\s*:\s*\[\.\.\.ledgerEvents, \.\.\.platformEvents, \.\.\.erpReadEvents, \.\.\.saasReadEvents\]/);
+  assert.match(app, /platformFlowProjection\(\) \? platformEvents : ledgerEvents/);
   assert.match(app, /const authoritativeSequence = platform\?\.latestSequence/);
   assert.match(app, /const visibleEventTotal = liveFlow\s*\? platformActivity\.length/);
   assert.match(app, /const platformMetrics = liveFlow && Array\.isArray\(state\.agentPlatform\?\.activity\)/);

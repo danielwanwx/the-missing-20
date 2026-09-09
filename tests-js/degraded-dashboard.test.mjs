@@ -90,10 +90,12 @@ test("retained events show their actual last timestamp rather than a static NOW"
   const context = {
     state: { agentPlatform: { activity: [
       { sequence: 1, source_id: "erp", label: "Receipt read", occurred_at: "2026-09-07T12:00:00Z" },
-    ] }, dashboardLatestRenderedSequence: 0 },
+    ] }, events: [
+      { sequence: 9, source_id: "erp", label: "Other scenario", occurred_at: "2026-09-09T12:00:00Z" },
+    ], dashboardLatestRenderedSequence: 0 },
     $: (id) => nodes[id] ||= { ...node(), firstElementChild: { textContent: "NOW" } },
     create: node, number: (v) => Number(v || 0), value: (v) => String(v ?? ""), slug: (v) => v,
-    hasLiveSourceAuthority: () => true, dashboardEventSource: () => "ERPNext",
+    platformFlowProjection: () => ({}), dashboardEventSource: () => "ERPNext",
     operatorEventTime: (date) => date.toISOString(), eventDetail: () => "",
   };
   vm.runInNewContext(source("renderDashboardEventRail"), context);
@@ -103,6 +105,10 @@ test("retained events show their actual last timestamp rather than a static NOW"
   context.state.agentPlatform.activity = [];
   context.renderDashboardEventRail();
   assert.equal(nodes["dashboard-event-now"].firstElementChild.textContent, "Waiting for events");
+  context.platformFlowProjection = () => null;
+  context.renderDashboardEventRail();
+  assert.equal(nodes["dashboard-event-now"].firstElementChild.textContent,
+    "Latest · 2026-09-09T12:00:00.000Z");
 });
 
 test("Investigation counts retained events, not the lifetime ledger sequence", () => {
@@ -112,6 +118,25 @@ test("Investigation counts retained events, not the lifetime ledger sequence", (
   const assignment = app.match(/\$\("platform-event-count"\)\.textContent =[^;]+;/)[0];
   vm.runInNewContext(assignment, context);
   assert.equal(node.textContent, "80 events");
+});
+
+test("normal monitoring does not inherit a selected case's failed investigation", () => {
+  const nodes = {};
+  const node = () => ({ dataset: {}, querySelector: () => nodes.facts ||= {} });
+  const context = {
+    state: { events: [], agentPlatform: { latest_sequence: 47,
+      agent_run: {state: "BLOCKED"}, diagnosis: {finding: "AGENT_VALIDATION_FAILED"},
+      activity: [{sequence: 47, label: "Other case failure"}] } },
+    $: id => nodes[id] ||= node(), platformFlowProjection: () => null,
+    receivingNeedsAttention: () => false, isNormalScenario: () => true,
+    number: (v, fallback = 0) => v == null ? fallback : Number(v),
+    value: v => String(v ?? ""), slug: v => v,
+  };
+  vm.runInNewContext(source("renderDashboardAgentStatus"), context);
+  context.renderDashboardAgentStatus();
+  assert.equal(nodes["dashboard-agent-stage"].textContent, "Monitoring");
+  assert.equal(nodes["dashboard-agent-event-count"].textContent, "0");
+  assert.equal(nodes["dashboard-open-investigation"].hidden, true);
 });
 
 test("receiving conflicts remain visible beside an existing agent answer", () => {
@@ -125,7 +150,7 @@ test("receiving conflicts remain visible beside an existing agent answer", () =>
     ] }, dashboardLatestRenderedSequence: 0 },
     $: (id) => nodes[id] ||= node(),
     create: node, number: (v) => Number(v || 0), value: (v) => String(v ?? ""), slug: (v) => v,
-    hasLiveSourceAuthority: () => true, operatorEventTime: () => "10:01:00", eventDetail: () => "",
+    platformFlowProjection: () => ({}), operatorEventTime: () => "10:01:00", eventDetail: () => "",
   };
   vm.runInNewContext(source("dashboardEventSource") + source("renderDashboardEventRail"), context);
   context.renderDashboardEventRail();

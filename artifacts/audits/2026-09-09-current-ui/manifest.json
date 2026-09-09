@@ -1,0 +1,23 @@
+{
+  "scope": "Manual current UI investigation; intermediate screenshots, not final acceptance",
+  "base_commit": "0deeb8a9f8af4b5c2638b0d606529dd586bd3ea2",
+  "case_id": "M20-PO-4817",
+  "runtime": ".missing20-finalization-current-20260909",
+  "port": 8898,
+  "business_effects": "isolated local synthetic case",
+  "model": "real configured Bedrock via Strands",
+  "actions": [
+    "mouse Inject incident",
+    "mouse Investigation",
+    "mouse Authorize diagnosis",
+    "read API diagnosis after completion"
+  ],
+  "result": "VALIDATION_FAILED: three internal NEEDS_EVIDENCE dispositions conflict with source control; no plan or effect authorized",
+  "cost_usd": 0.0408032,
+  "final_freeze_screenshots_required": true,
+  "files": {
+    "01-selected-case.png": "b13d16b36895fba921859ba2f710345c685938b192e841ee31132eb2dc32ea66",
+    "02-validation-failed.png": "73dc374eaa46486dbc3d0ee2927db59bd39dd961e6a3735b0eed1b21b3555a80",
+    "02-diagnosis-failure.json": "3f7c5a5ca6df360bd654926e549ba0fc50e17cb5d95fc3b8f5a14d7321cc7258"
+  }
+}

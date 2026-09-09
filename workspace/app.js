@@ -3481,8 +3481,9 @@
   function renderUnitDetail() {
     const detailNode = $("unit-detail");
     if (!detailNode) return;
-    const detail = state.units.get(state.selectedUnitId);
     detailNode.replaceChildren();
+    if (platformFlowProjection()) return;
+    const detail = state.units.get(state.selectedUnitId);
     if (!detail) {
       detailNode.append(create("span", "detail-placeholder", "Select an exception to inspect its authoritative record."));
       return;
@@ -3513,6 +3514,16 @@
   function renderUnitDensity() {
     const strip = $("unit-density-strip");
     if (!strip) return;
+    strip.hidden = Boolean(platformFlowProjection());
+    if (strip.hidden) {
+      state.selectedUnitId = "";
+      strip.replaceChildren();
+      strip.removeAttribute("aria-label");
+      delete strip.dataset.totalRecords;
+      delete strip.dataset.postedRecords;
+      delete strip.dataset.backlogRecords;
+      return;
+    }
     const units = [...state.units.values()];
     const snapshotCounts = state.snapshot && state.snapshot.unit_counts && typeof state.snapshot.unit_counts === "object"
       ? state.snapshot.unit_counts
@@ -3553,6 +3564,13 @@
   function renderUnitAnomalies() {
     const list = $("unit-anomaly-list");
     if (!list) return;
+    const inspector = list.closest("details");
+    if (inspector) inspector.hidden = Boolean(platformFlowProjection());
+    if (platformFlowProjection()) {
+      list.replaceChildren();
+      if (inspector) inspector.open = false;
+      return;
+    }
     const anomalies = [...state.units.values()].filter((unit) => !isPostedUnit(unit));
     list.replaceChildren();
     if (!anomalies.length) {
@@ -3615,7 +3633,7 @@
     const incident = snapshot.incident || {};
     const counts = snapshot.unit_counts || {};
     const platform = platformFlowProjection();
-    const receivingSummary = platform?.provenance === "live-read" ? liveReceivingSummary(platform) : null;
+    const receivingSummary = platform ? liveReceivingSummary(platform) : null;
     const expected = platform
       ? platform.expected
       : number(incident.expected_quantity, number(counts.total));
@@ -4721,7 +4739,8 @@
     const observed = proof?.observed && typeof proof.observed === "object" ? proof.observed : {};
     const counterfactual = proof?.counterfactual && typeof proof.counterfactual === "object" ? proof.counterfactual : {};
     const currency = value(proof?.currency || impact?.currency || "USD");
-    const latestSequence = number(state.agentPlatform?.latest_sequence);
+    const latestSequence = number(platformFlowProjection()?.latestSequence
+      ?? state.snapshot?.projection_sequence ?? state.lastSequence);
     const advanced = latestSequence > state.businessMetricSequence;
     const entries = [
       ["business-availability", impact?.inventory_availability_percent != null ? `${number(impact.inventory_availability_percent).toFixed(1)}%` : "—", false],
@@ -5149,6 +5168,8 @@
     $("queue-count").textContent = String(queueException);
     const recordedLabel = $("recorded-count").parentElement?.querySelector("small");
     if (recordedLabel) recordedLabel.textContent = platform ? "RECEIPT POSTED" : "RECORDED";
+    const queueLabel = $("queue-count").parentElement?.querySelector("small");
+    if (queueLabel) queueLabel.textContent = platform ? "receipt unresolved" : "gap";
     const allNodesHealthy = platform
       ? platform.sourceCurrent && platform.gap === 0 && !platform.invoiceHeld && platform.posted <= platform.expected
       : nodes.length > 0 && nodes.every((item) => ["HEALTHY", "RELEASED"].includes(value(item.status).toUpperCase()));
@@ -5268,7 +5289,7 @@
       const semantics = nodeId === "warehouse"
         ? "received"
         : nodeId === "message-queue"
-          ? state.agentPlatform ? "unresolved" : "published"
+          ? platform ? "unresolved" : "published"
           : nodeId === "erp"
             ? "posted"
             : nodeId === "invoice"
@@ -5296,6 +5317,7 @@
   }
 
   function selectUnit(unitId) {
+    if (platformFlowProjection()) return;
     const id = value(unitId);
     if (!state.units.has(id)) return;
     state.selectedUnitId = id;
@@ -6342,21 +6364,9 @@
     if (!feed) return;
     const platformEvents = Array.isArray(state.agentPlatform?.activity) ? state.agentPlatform.activity : [];
     const ledgerEvents = Array.isArray(state.events) ? state.events : [];
-    const erpReadEvents = Array.isArray(state.erpEvidence?.activity)
-      ? state.erpEvidence.activity.map((event) => ({ ...event, sequence: number(state.erpEvidence.sequence) }))
-      : [];
-    const saasReadEvents = Array.isArray(state.saasEvidence?.activity)
-      ? state.saasEvidence.activity
-        .filter((event) => value(event?.status) !== "NOT_CONFIGURED")
-        .map((event) => ({ ...event, sequence: number(state.saasEvidence.sequence) }))
-      : [];
-    // In live-read mode the Agent Platform activity ledger is the one visible
-    // authority. Mixing the synthetic incident SSE cursor and provider polling
-    // receipts made a single source state appear to have three event counts.
-    const liveAuthority = hasLiveSourceAuthority();
-    const combinedEvents = (liveAuthority
-      ? platformEvents
-      : [...ledgerEvents, ...platformEvents, ...erpReadEvents, ...saasReadEvents])
+    // Normal uses its session ledger; a selected case uses its platform ledger.
+    // Provider polling and unrelated scenario events are not new case effects.
+    const combinedEvents = (platformFlowProjection() ? platformEvents : ledgerEvents)
       .filter((event) => event && typeof event === "object");
     const deduplicated = new Map();
     combinedEvents.forEach((event) => {
@@ -6423,8 +6433,8 @@
   }
 
   function renderDashboardAgentStatus() {
-    const platform = state.agentPlatform || {};
     const liveFlow = platformFlowProjection();
+    const platform = liveFlow ? state.agentPlatform || {} : {};
     const sourceAttention = receivingNeedsAttention(platform)
       || Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
     const agentRun = platform.agent_run && typeof platform.agent_run === "object" ? platform.agent_run : {};

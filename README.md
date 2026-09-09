@@ -136,12 +136,16 @@ make bootstrap
 make case-console
 ```
 
-Open `http://127.0.0.1:8765`, choose **Live / Inject incident**, then follow
-Dashboard → Investigation → conversation → Manager decision → verification.
+Open `http://127.0.0.1:8765`, choose **Live / Inject incident**, then inspect
+Dashboard → Investigation and the synthetic source records.
 
-The default path uses deterministic synthetic source fixtures and makes no AWS or
-third-party provider call. It is the reproducible judge path. Keep the generated
-`.missing20-runtime` directory to verify recovery across a server restart.
+Startup and source inspection require no cloud credentials. The current conversation
+and **Authorize diagnosis** actions require a real, authorized Bedrock connection;
+without one they stop safely and do not expose an approved execution plan. The default
+browser path is therefore not a complete offline Agent demonstration. `make judge-demo`
+checks the separately retained historical 20-unit proof without cloud calls; it does
+not execute the current receiving workflow. Keep the generated `.missing20-runtime`
+directory for persistence checks.
 
 ### Real Strands / Nova mode
 
@@ -177,6 +181,13 @@ make golden-v2
 make workspace-smoke
 make judge-demo
 ```
+
+Current finalization status: `make check` passed in an independent credential-free
+checkout. `make workspace-smoke` remains failed: its legacy browser contract no longer
+matches the current Case Console; replacement coverage is not yet accepted. Real
+multi-turn and current diagnosis failures are retained in the
+[finalization ledger](docs/submission/finalization-tracker.md). Passing the offline
+historical proof does not clear these gates.
 
 Targeted proof:
 

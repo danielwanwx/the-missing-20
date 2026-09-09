@@ -6,6 +6,30 @@ import vm from "node:vm";
 const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
 const section = (name, next) => app.slice(app.indexOf(`  function ${name}(`), app.indexOf(`  function ${next}(`));
 const number = (v, fallback = 0) => v == null || !Number.isFinite(Number(v)) ? fallback : Number(v);
+test("selected case clears foreign unit details and normal restores its own surface", () => {
+  const inspector = { hidden: false, open: true };
+  const node = () => ({ children: ["old unit"], dataset: {totalRecords: "100"},
+    attrs: {"aria-label": "old units"}, replaceChildren(...items) { this.children = items; },
+    append(item) { this.children.push(item); }, closest: () => inspector,
+    removeAttribute(key) { delete this.attrs[key]; }, setAttribute(key, value) { this.attrs[key] = value; } });
+  const nodes = Object.fromEntries(["unit-density-strip", "unit-anomaly-list", "unit-detail"].map(id => [id, node()]));
+  const context = { $: id => nodes[id], state: {selectedUnitId: "FOREIGN", units: new Map(), snapshot: {unit_counts: {total: 0}}},
+    platformFlowProjection: () => ({}), number, value: v => String(v ?? ""), create: () => node() };
+  vm.runInNewContext(section("renderUnitDetail", "liveReceivingSummary"), context);
+  context.renderUnitDensity(); context.renderUnitAnomalies(); context.renderUnitDetail();
+  assert.equal(context.state.selectedUnitId, "");
+  for (const element of Object.values(nodes)) assert.equal(element.children.length, 0);
+  assert.equal(nodes["unit-density-strip"].hidden, true);
+  assert.equal(nodes["unit-density-strip"].attrs["aria-label"], undefined);
+  assert.equal(nodes["unit-density-strip"].dataset.totalRecords, undefined);
+  assert.equal(inspector.hidden, true); assert.equal(inspector.open, false);
+  context.platformFlowProjection = () => null;
+  context.renderUnitDensity(); context.renderUnitAnomalies(); context.renderUnitDetail();
+  assert.equal(nodes["unit-density-strip"].hidden, false);
+  assert.equal(nodes["unit-density-strip"].dataset.totalRecords, "0");
+  assert.equal(inspector.hidden, false);
+  assert.equal(nodes["unit-detail"].children.length, 1);
+});
 test("receiving lifecycle does not imply an incident diagnosis or display empty diagnosis metrics", () => {
   const elements = new Map();
   const element = id => {
