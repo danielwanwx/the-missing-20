@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -10,6 +11,7 @@ import pytest
 from scripts.decision_workspace_server import DecisionWorkspaceServer
 from the_missing_20.adapters.ambiguous_case_platform import AmbiguousCasePlatform
 from the_missing_20.adapters.case_console_store import CaseConsoleStore
+from the_missing_20.adapters.live_advisory_gateway import DashboardAdvisoryGateway
 from the_missing_20.domain.ambiguous_receipt import (
     AmbiguousReceiptCase,
     QualityDisposition,
@@ -17,6 +19,48 @@ from the_missing_20.domain.ambiguous_receipt import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_specialist_event_and_stop_are_fenced_and_traceable(tmp_path: Path) -> None:
+    platform = AmbiguousCasePlatform(store_path=tmp_path / "case.sqlite3")
+    platform.authorize_diagnosis("manager")
+    projection, claimed = platform.claim_diagnosis()
+    assert claimed
+    run_id = str(projection["agent_run"]["run_id"])
+    assert platform.agent_run_is_active(run_id)
+    event = {"type": "task.completed", "role": "inventory", "task_id": "TASK-1"}
+    barrier = threading.Barrier(2)
+
+    def complete() -> None:
+        barrier.wait(timeout=2)
+        platform.record_agent_runtime_progress(event, run_id)
+
+    worker = threading.Thread(target=complete)
+    worker.start()
+    barrier.wait(timeout=2)
+    platform.stop()
+    worker.join(timeout=2)
+    assert not worker.is_alive()
+    platform.record_agent_runtime_progress(event, run_id)
+    events = platform.events_since()
+    paused = next(e["sequence"] for e in events if e["event_type"] == "human.investigation.paused")
+    task_events = [e for e in events if e["event_type"] == "agent.task.completed"]
+    assert all(e["sequence"] < paused and e["task"]["task_id"] == "TASK-1" for e in task_events)
+    assert not platform.agent_run_is_active(run_id)
+
+
+def test_failed_specialist_tool_is_not_projected_as_another_start() -> None:
+    platform = AmbiguousCasePlatform()
+    platform.authorize_diagnosis("manager")
+    projection, claimed = platform.claim_diagnosis()
+    assert claimed
+    platform.record_agent_tool_progress(
+        "consult_quality", "failed", str(projection["agent_run"]["run_id"])
+    )
+    event = platform.events_since()[-1]
+    assert event["event_type"] == "agent.strands.tool.failed"
+    assert event["status"] == "FAILED"
+    assert event["label"] == "Quality specialist"
 
 
 def test_primary_case_runs_from_agent_diagnosis_to_idempotent_verified_recovery() -> None:
@@ -380,9 +424,28 @@ def test_durable_event_ledger_is_append_only_and_reset_replaces_the_run(tmp_path
 
 
 def test_local_http_flow_reaches_verified_recovery(tmp_path: Path) -> None:
+    class SuccessfulAdvisoryDouble(DashboardAdvisoryGateway):
+        def investigate(self, projection: Mapping[str, object]) -> dict[str, object]:
+            run = projection["agent_run"]
+            assert isinstance(run, Mapping)
+            return {
+                "status": "COMPLETE",
+                "run_id": run["run_id"],
+                "mode": "test_double",
+                "provider": {"provider": "test_double"},
+                "tool_calls": [],
+                "runtime_events": [],
+                "result": {"disposition": "RECOVERY_READY", "write_performed": False},
+            }
+
+    platform = AmbiguousCasePlatform(store_path=tmp_path / "case-console.sqlite3")
     try:
         server = DecisionWorkspaceServer(
-            ("127.0.0.1", 0), ROOT, runtime_directory=tmp_path / "runtime"
+            ("127.0.0.1", 0),
+            ROOT,
+            runtime_directory=tmp_path / "runtime",
+            agent_platform=platform,
+            agent_advisory=SuccessfulAdvisoryDouble(platform),
         )
     except PermissionError:
         pytest.skip("the managed test sandbox disallows loopback sockets")
@@ -403,6 +466,7 @@ def test_local_http_flow_reaches_verified_recovery(tmp_path: Path) -> None:
     try:
         diagnosis = post("diagnose", {"operator_id": "manager-4817"})
         assert diagnosis["agent_run"]["state"] == "PLAN_READY"
+        assert diagnosis["diagnosis"]["strands_investigation"]["mode"] == "test_double"
         verified = post(
             "approve-and-execute",
             {"manager_id": "manager-4817", "idempotency_key": "m20-http-recovery-v1"},

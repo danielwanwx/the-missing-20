@@ -11,8 +11,11 @@ from __future__ import annotations
 import base64
 import json
 import os
+import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,6 +62,7 @@ class SaaSEvidenceSource:
         *,
         transport: Callable[[Request, float], bytes] | None = None,
         timeout_seconds: float = 8.0,
+        cache_seconds: float = 0,
     ) -> None:
         self._config = config
         self._transport = transport or self._default_transport
@@ -66,13 +70,20 @@ class SaaSEvidenceSource:
         self._sequence = 0
         self._last_fingerprint = ""
         self._last_changed_at: datetime | None = None
+        self._cache_seconds = max(0, cache_seconds)
+        self._read_lock = threading.RLock()
+        self._cached: dict[str, object] | None = None
+        self._cache_until = 0.0
+        self.receiving_notifications: Callable[[], list[dict[str, Any]]] | None = None
 
     def _finalize(self, projection: dict[str, object], now: datetime) -> dict[str, object]:
         """Advance the cursor only when a provider record actually changes."""
 
+        raw_sources = projection.get("sources", [])
+        source_rows = raw_sources if isinstance(raw_sources, list) else []
         semantic_sources = [
             {key: value for key, value in item.items() if key != "occurred_at"}
-            for item in projection.get("sources", [])
+            for item in source_rows
             if isinstance(item, Mapping)
         ]
         fingerprint = json.dumps(
@@ -87,7 +98,7 @@ class SaaSEvidenceSource:
         changed_at = self._last_changed_at or now
         sources = [
             {**item, "occurred_at": changed_at.isoformat()}
-            for item in projection.get("sources", [])
+            for item in source_rows
             if isinstance(item, Mapping)
         ]
         return {
@@ -131,7 +142,8 @@ class SaaSEvidenceSource:
                 jira_cloud_id=values.get("JIRA_CLOUD_ID", "").strip(),
                 slack_bot_token=values.get("SLACK_BOT_TOKEN", "").strip(),
                 slack_channel_id=values.get("SLACK_INCIDENT_CHANNEL_ID", "").strip(),
-            )
+            ),
+            cache_seconds=15,
         )
 
     @staticmethod
@@ -608,6 +620,18 @@ class SaaSEvidenceSource:
             )
 
     def current(self) -> dict[str, object]:
+        with self._read_lock:
+            if self._cached is not None and time.monotonic() < self._cache_until:
+                return deepcopy(self._cached)
+            self._cached = self._read_current()
+            self._cache_until = time.monotonic() + self._cache_seconds
+            return deepcopy(self._cached)
+
+    def invalidate_cache(self) -> None:
+        with self._read_lock:
+            self._cache_until = 0
+
+    def _read_current(self) -> dict[str, object]:
         """Return only display-safe, source-attributed evidence rows."""
 
         now = datetime.now(UTC)
@@ -617,6 +641,8 @@ class SaaSEvidenceSource:
         readers = (self._airtable, self._celigo, self._jira, self._slack)
         with ThreadPoolExecutor(max_workers=4, thread_name_prefix="m20-saas-read") as pool:
             sources = list(pool.map(lambda reader: reader(now), readers))
+        if self.receiving_notifications is not None:
+            sources.extend(self.receiving_notifications())
         configured = [source for source in sources if source["status"] != "NOT_CONFIGURED"]
         connected = [source for source in configured if source["status"] not in {"DEGRADED"}]
         return self._finalize(

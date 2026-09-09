@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import time
+from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -29,6 +30,7 @@ from the_missing_20.adapters.ambiguous_case_platform import AmbiguousCasePlatfor
 from the_missing_20.adapters.ambiguous_receipt_source import (  # noqa: E402
     AmbiguousReceiptEvidenceSource,
 )
+from the_missing_20.adapters.automatic_investigation import AutomaticInvestigation  # noqa: E402
 from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
 from the_missing_20.adapters.erpnext_source import (  # noqa: E402
     ERPNextEvidenceSource,
@@ -41,7 +43,14 @@ from the_missing_20.adapters.live_advisory_gateway import (  # noqa: E402
     DashboardAdvisoryGateway,
     connected_competition_investigation_packet,
 )
+from the_missing_20.adapters.photo_receiving import (  # noqa: E402
+    PhotoReceiptERP,
+    PhotoReceiving,
+)
+from the_missing_20.adapters.receiving_draft_worker import ReceivingDraftWorker  # noqa: E402
+from the_missing_20.adapters.receiving_handoff_worker import ReceivingHandoffWorker  # noqa: E402
 from the_missing_20.adapters.saas_evidence import SaaSEvidenceSource  # noqa: E402
+from the_missing_20.agents.photo_receiving import StrandsPhotoReader  # noqa: E402
 from the_missing_20.authority_b.models import canonical_json  # noqa: E402
 from the_missing_20.authority_b.quorum import QuorumDenied  # noqa: E402
 from the_missing_20.authority_b.workspace_demo import (  # noqa: E402
@@ -49,6 +58,7 @@ from the_missing_20.authority_b.workspace_demo import (  # noqa: E402
     WorkspaceMode,
     build_decision_workspace,
 )
+from the_missing_20.config import Settings  # noqa: E402
 from the_missing_20.domain.errors import VersionConflict  # noqa: E402
 from the_missing_20.experiment.ledger import EventLedgerError  # noqa: E402
 from the_missing_20.experiment.session import (  # noqa: E402
@@ -70,6 +80,12 @@ STATIC_FILES = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/photo-receiving.js": ("photo-receiving.js", "text/javascript; charset=utf-8"),
+    "/barcode-capture.js": ("barcode-capture.js", "text/javascript; charset=utf-8"),
+    "/photo-receiving.css": ("photo-receiving.css", "text/css; charset=utf-8"),
+    "/operations-history.js": ("operations-history.js", "text/javascript; charset=utf-8"),
+    "/operations-history.css": ("operations-history.css", "text/css; charset=utf-8"),
+    "/conversation-views.js": ("conversation-views.js", "text/javascript; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
 STATIC_ASSETS = {
@@ -142,7 +158,7 @@ def _headers(content_type: str, content_length: int | None = None) -> dict[str, 
             # style attributes while keeping scripts, connections, images,
             # frames, and form submissions locked to this local origin.
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; "
+            "connect-src 'self'; img-src 'self'; media-src 'self' blob:; base-uri 'none'; form-action 'none'; "
             "frame-ancestors 'none'"
         ),
     }
@@ -287,6 +303,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def _send_json(self, status: HTTPStatus, value: object) -> None:
+        automation = getattr(self.server, "automatic_investigation", None)
+        if automation is not None and isinstance(value, dict) and "agent_run" in value:
+            value = {**value, "automation": automation.current()}
         self._send(status, _json_bytes(value), "application/json; charset=utf-8")
 
     def _send_api_error(
@@ -318,7 +337,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         except (LookupError, OSError, TypeError, ValueError) as exc:
             raise APIRequestError(HTTPStatus.NOT_FOUND, "incident_not_found", str(exc)) from exc
 
-    def _read_json(self, *, allow_empty: bool = False) -> dict[str, object]:
+    def _read_json(
+        self, *, allow_empty: bool = False, max_bytes: int = MAX_REQUEST_BYTES
+    ) -> dict[str, object]:
         raw_length = self.headers.get("Content-Length")
         try:
             length = int(raw_length or "0")
@@ -330,11 +351,11 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             ) from exc
         if length == 0 and allow_empty:
             return {}
-        if length <= 0 or length > MAX_REQUEST_BYTES:
+        if length <= 0 or length > max_bytes:
             raise APIRequestError(
                 HTTPStatus.BAD_REQUEST,
                 "invalid_request_size",
-                f"request body must be between 1 and {MAX_REQUEST_BYTES} bytes",
+                f"request body must be between 1 and {max_bytes} bytes",
             )
         try:
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
@@ -369,6 +390,24 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         return sequence
 
     def _v1_get(self, route: str, query: dict[str, list[str]]) -> None:
+        if route == "/api/v1/agent-platform/history":
+            if not self._photo_host_allowed():
+                raise APIRequestError(
+                    HTTPStatus.FORBIDDEN, "local_only", "History is loopback-only."
+                )
+            if set(query) - {"limit", "since"} or any(len(v) != 1 for v in query.values()):
+                raise ValueError("History accepts a single limit and since timestamp.")
+            limit = int(query.get("limit", ["96"])[0])
+            if not 1 <= limit <= 500:
+                raise ValueError("History limit must be between 1 and 500.")
+            history = getattr(self.agent_platform, "operational_history", None)
+            result = (
+                history(limit=limit, since=query.get("since", [None])[0])
+                if callable(history)
+                else {"status": "SYNTHETIC_CASE", "points": []}
+            )
+            self._send_json(HTTPStatus.OK, result)
+            return
         if route == "/api/v1/agent-platform":
             self._send_json(HTTPStatus.OK, self.agent_platform.current())
             return
@@ -643,6 +682,64 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         route = parsed.path
         query = parse_qs(parsed.query, keep_blank_values=True)
+        if route in {
+            "/api/v1/photo-receiving",
+            "/api/v1/photo-receiving/image",
+            "/api/v1/photo-receiving/list",
+            "/api/v1/photo-receiving/history",
+            "/api/v1/photo-receiving/identity",
+            "/api/v1/photo-receiving/arrivals",
+        }:
+            if not self._photo_host_allowed():
+                self._send_api_error(
+                    HTTPStatus.FORBIDDEN, "local_only", "Capture is loopback-only."
+                )
+                return
+            try:
+                capture_id = query.get("id", [""])[0]
+                receiving = self.server.photo_receiving  # type: ignore[attr-defined]
+                if route.endswith("/arrivals"):
+                    configured = receiving.arrivals
+                    result = (
+                        receiving.receiving_work(configured.case_id, configured.purchase_order)
+                        if configured
+                        else {"status": "NOT_CONFIGURED", "arrivals": []}
+                    )
+                    self._send_json(HTTPStatus.OK, result)
+                elif route.endswith("/identity"):
+                    self._send_json(HTTPStatus.OK, receiving.receiving_identity())
+                elif route.endswith("/list"):
+                    if set(query) - {"limit", "offset"}:
+                        raise ValueError("Unexpected capture list parameter.")
+                    result = receiving.list_captures(
+                        limit=int(query.get("limit", ["50"])[0]),
+                        offset=int(query.get("offset", ["0"])[0]),
+                    )
+                    handoff = self.server.receiving_handoff_worker  # type: ignore[attr-defined]
+                    if handoff is not None:
+                        result["captures"] = [handoff.projection(row) for row in result["captures"]]
+                    self._send_json(HTTPStatus.OK, result)
+                elif route.endswith("/history"):
+                    self._send_json(HTTPStatus.OK, receiving.history(capture_id))
+                elif route.endswith("/image"):
+                    image_version = query.get("image_version", [None])[0]
+                    payload = (
+                        receiving.historical_image(capture_id, int(image_version))
+                        if image_version is not None
+                        else receiving.image(capture_id, query.get("v", [""])[0])
+                    )
+                    self._send(
+                        HTTPStatus.OK,
+                        payload,
+                        "image/jpeg",
+                    )
+                else:
+                    state = receiving.current(capture_id)
+                    handoff = self.server.receiving_handoff_worker  # type: ignore[attr-defined]
+                    self._send_json(HTTPStatus.OK, handoff.projection(state) if handoff else state)
+            except ValueError as exc:
+                self._send_api_error(HTTPStatus.NOT_FOUND, "capture_not_found", str(exc))
+            return
         if route == "/healthz":
             compatibility_truth = self.registry.provider_truth()
             platform_truth_reader = getattr(self.agent_platform, "runtime_truth", None)
@@ -714,6 +811,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             return
         if (
             route == "/api/v1/agent-platform"
+            or route == "/api/v1/agent-platform/history"
             or route == "/api/v1/agent-platform/events"
             or route == "/api/v1/ambiguous-receipt-case"
             or route == "/api/v1/scenarios"
@@ -731,6 +829,13 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # pragma: no cover - defensive transport boundary
                 status, code = _error_status(exc)
                 self._send_api_error(status, code, str(exc))
+            return
+        if route == "/vendor/zxing-browser.min.js":
+            path = ROOT / "node_modules/@zxing/browser/umd/zxing-browser.min.js"
+            if not path.is_file():
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "decoder_unavailable"})
+                return
+            self._send(HTTPStatus.OK, path.read_bytes(), "text/javascript; charset=utf-8")
             return
         if route in STATIC_ASSETS:
             relative, content_type = STATIC_ASSETS[route]
@@ -763,6 +868,82 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def _v1_post(self, route: str, payload: dict[str, object]) -> None:
+        if route.startswith("/api/v1/photo-receiving"):
+            receiving = self.server.photo_receiving  # type: ignore[attr-defined]
+            if route == "/api/v1/photo-receiving":
+                if set(payload) - {"arrival_id"}:
+                    raise ValueError("Select a known receiving arrival only.")
+                self._send_json(
+                    HTTPStatus.OK, receiving.create(arrival_id=payload.get("arrival_id"))
+                )
+                return
+            if route == "/api/v1/photo-receiving/scan":
+                self._send_json(HTTPStatus.OK, receiving.scan(payload))
+                return
+            if route == "/api/v1/photo-receiving/barcode":
+                self._send_json(HTTPStatus.OK, receiving.barcode(payload))
+                return
+            allowed = {
+                "/api/v1/photo-receiving/upload": {"id", "image"},
+                "/api/v1/photo-receiving/draft": {"id"},
+                "/api/v1/photo-receiving/submit": {
+                    "id",
+                    "receipt_name",
+                    "expected_version",
+                    "confirm_received",
+                },
+                "/api/v1/photo-receiving/confirm-identity": {
+                    "id",
+                    "item_code",
+                    "expected_version",
+                    "confirm_match",
+                },
+            }.get(route, set())
+            optional = {"barcode_evidence_id"} if route.endswith("/confirm-identity") else set()
+            if not allowed.issubset(payload) or set(payload) - allowed - optional:
+                raise ValueError("Photo receiving request has unexpected or missing fields.")
+            if allowed and not isinstance(payload.get("id"), str):
+                raise ValueError("Receiving session ID is required.")
+            if route.endswith("/upload"):
+                result = receiving.upload(payload["id"], payload["image"])
+            elif route.endswith("/draft"):
+                result = receiving.draft(payload["id"])
+            elif route.endswith("/submit"):
+                result = receiving.submit(
+                    payload["id"],
+                    receipt_name=payload["receipt_name"],
+                    expected_version=payload["expected_version"],
+                    confirm_received=payload["confirm_received"],
+                )
+            elif route.endswith("/confirm-identity"):
+                result = receiving.confirm_identity(
+                    payload["id"],
+                    item_code=payload["item_code"],
+                    expected_version=payload["expected_version"],
+                    confirm_match=payload["confirm_match"],
+                    barcode_evidence_id=payload.get("barcode_evidence_id"),
+                )
+            else:
+                result = receiving.create()
+            self._send_json(HTTPStatus.OK, result)
+            return
+        if route == "/api/v1/agent-platform/automation":
+            if not self._photo_host_allowed():
+                raise APIRequestError(
+                    HTTPStatus.FORBIDDEN, "local_only", "Automation is loopback-only."
+                )
+            automation = self.server.automatic_investigation
+            if automation is None:
+                raise ValueError("Automatic investigation requires the live platform.")
+            if set(payload) != {"enabled", "case_id", "operator_id"} or (
+                type(payload["enabled"]) is not bool
+                or not isinstance(payload["case_id"], str)
+                or not isinstance(payload["operator_id"], str)
+            ):
+                raise ValueError("Specify enabled, case_id and operator_id only.")
+            result = automation.configure(**payload)
+            self._send_json(HTTPStatus.OK, result)
+            return
         if route == "/api/v1/agent-platform/diagnose":
             if set(payload) - {"operator_id"}:
                 raise APIRequestError(
@@ -789,9 +970,14 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             else:
                 projection = self.agent_platform.diagnose()
             advisory = self.agent_advisory.investigate(projection)
-            self._send_json(
-                HTTPStatus.OK, self.agent_platform.record_strands_investigation(advisory)
+            record_live = getattr(self.agent_platform, "record_live_strands_investigation", None)
+            run = projection.get("agent_run")
+            result = (
+                record_live(advisory, run_id=run.get("run_id", ""))
+                if callable(record_live) and isinstance(run, Mapping)
+                else self.agent_platform.record_strands_investigation(advisory)
             )
+            self._send_json(HTTPStatus.OK, result)
             return
         if route == "/api/v1/agent-platform/counterfactual":
             variant = payload.get("variant")
@@ -816,7 +1002,12 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "unexpected_payload",
                     "pause preserves evidence and accepts no provider commands",
                 )
-            self._send_json(HTTPStatus.OK, self.agent_platform.stop())
+            if self.server.automatic_investigation is not None:
+                self.server.automatic_investigation.pause()
+            projection = self.agent_platform.current()
+            if projection.get("agent_run", {}).get("state") != "STOPPED":
+                projection = self.agent_platform.stop()
+            self._send_json(HTTPStatus.OK, projection)
             return
         if route == "/api/v1/agent-platform/ask":
             question = payload.get("question")
@@ -1031,13 +1222,24 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         route = urlsplit(self.path).path
+        if route.startswith("/api/v1/photo-receiving") and not self._photo_host_allowed():
+            self._send_api_error(HTTPStatus.FORBIDDEN, "local_only", "Capture is loopback-only.")
+            return
         if route == "/api/workspace":
             self._method_not_allowed("GET")
             return
         allowed_routes = {
+            "/api/v1/photo-receiving",
+            "/api/v1/photo-receiving/upload",
+            "/api/v1/photo-receiving/draft",
+            "/api/v1/photo-receiving/submit",
+            "/api/v1/photo-receiving/confirm-identity",
+            "/api/v1/photo-receiving/scan",
+            "/api/v1/photo-receiving/barcode",
             "/api/v1/scenarios",
             "/api/v1/agent-platform/ask",
             "/api/v1/agent-platform/diagnose",
+            "/api/v1/agent-platform/automation",
             "/api/v1/agent-platform/counterfactual",
             "/api/v1/agent-platform/stop",
             "/api/v1/agent-platform/approve",
@@ -1070,7 +1272,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                 return
         try:
             payload = self._read_json(
-                allow_empty=route.endswith("/start") or route.endswith("/diagnose")
+                allow_empty=route.endswith("/start") or route.endswith("/diagnose"),
+                max_bytes=7_100_000
+                if route == "/api/v1/photo-receiving/upload"
+                else MAX_REQUEST_BYTES,
             )
             self._v1_post(route, payload)
         except APIRequestError as exc:
@@ -1081,6 +1286,14 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         except Exception as exc:  # pragma: no cover - defensive transport boundary
             status, code = _error_status(exc)
             self._send_api_error(status, code, str(exc))
+
+    def _photo_host_allowed(self) -> bool:
+        port = self.server.server_port  # type: ignore[attr-defined]
+        return self.headers.get("Host") in {
+            f"127.0.0.1:{port}",
+            f"localhost:{port}",
+            f"[::1]:{port}",
+        }
 
     def _send_prometheus(self) -> None:
         """Expose the same local authoritative metrics used by the native UI."""
@@ -1188,6 +1401,36 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             repository_root=repository_root
         )
         self.external_source_changes = ExternalSourceChangeDetector()
+        photo_values = {**_read_env_file(repository_root / ".env"), **os.environ}
+        photo_client = ERPNextDemoExecutor.from_environment(repository_root)
+        photo_po = photo_values.get("MISSING20_PHOTO_PURCHASE_ORDER", "")
+        manifest_path = photo_values.get("MISSING20_RECEIVING_MANIFEST", "")
+        receiving_manifest = json.loads(Path(manifest_path).read_text()) if manifest_path else None
+        if receiving_manifest is not None and (
+            photo_values.get("MISSING20_CASE_ID") != receiving_manifest.get("case_id")
+            or photo_values.get("MISSING20_ERPNEXT_PURCHASE_ORDER") != photo_po
+        ):
+            raise ValueError(
+                "Photo and platform case/PO configuration must match the receiving manifest."
+            )
+        self.photo_receiving = PhotoReceiving(
+            (runtime_directory or repository_root / ".missing20-runtime")
+            / "photo-receiving.sqlite3",
+            StrandsPhotoReader(Settings.from_env(photo_values)),
+            erp=PhotoReceiptERP(photo_client, photo_po) if photo_client and photo_po else None,
+            drafts_enabled=photo_values.get("MISSING20_PHOTO_DRAFTS_ENABLED", "0") == "1",
+            manifest=receiving_manifest,
+            auto_prepare=photo_values.get("MISSING20_PHOTO_AUTO_PREPARE", "0") == "1",
+        )
+        self.receiving_draft_worker = ReceivingDraftWorker(self.photo_receiving)
+        self.receiving_handoff_worker = (
+            ReceivingHandoffWorker(
+                self.photo_receiving, runtime_directory or repository_root / ".missing20-runtime",
+                self.saas_evidence._config,
+            ) if photo_values.get("MISSING20_RECEIVING_HANDOFF_ENABLED", "0") == "1" else None
+        )
+        if self.receiving_handoff_worker is not None:
+            self.saas_evidence.receiving_notifications = self.receiving_handoff_worker.sources
         self.ambiguous_receipt = ambiguous_receipt or AmbiguousReceiptEvidenceSource()
         # The default remains the deterministic synthetic tenant used by the
         # recorded judge path.  A real authorised read path is opt-in so a
@@ -1208,9 +1451,9 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 self.erpnext_evidence,
                 self.saas_evidence,
                 executor=executor,
-                state_path=(runtime_directory / "agent-platform-state.json")
-                if runtime_directory is not None
-                else None,
+                state_path=(runtime_directory or repository_root / ".missing20-runtime")
+                / "agent-platform-state.json",
+                receiving=self.photo_receiving,
             )
         elif source_mode == "synthetic":
             case_console_store = (
@@ -1221,11 +1464,24 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             self.agent_platform = AmbiguousCasePlatform(store_path=case_console_store)
         else:
             raise ValueError("MISSING20_CASE_CONSOLE_SOURCE must be synthetic or live")
+        # Opt-in until the single-agent/team comparison passes. Both modes retain
+        # the same source facts, human gate and authoritative execution boundary.
+        workflow = os.environ.get("MISSING20_AGENT_WORKFLOW", "single")
+        if workflow not in {"single", "roles"}:
+            raise ValueError("MISSING20_AGENT_WORKFLOW must be single or roles")
+        delegation_journal = None
+        if workflow == "roles" and agent_advisory is None:
+            from the_missing_20.adapters.role_task_journal import RoleTaskJournal
+
+            delegation_journal = RoleTaskJournal(
+                (runtime_directory or repository_root / ".missing20-runtime") / "role-tasks.sqlite3"
+            )
         if agent_advisory is not None:
             self.agent_advisory = agent_advisory
         elif isinstance(self.agent_platform, AmbiguousCasePlatform):
             self.agent_advisory = DashboardAdvisoryGateway(
                 self.agent_platform,
+                delegation_journal=delegation_journal,
                 packet_factory=lambda projection: connected_competition_investigation_packet(
                     projection,
                     erp_evidence=self.erpnext_evidence.current(),
@@ -1233,7 +1489,16 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 ),
             )
         else:
-            self.agent_advisory = DashboardAdvisoryGateway(self.agent_platform)
+            self.agent_advisory = DashboardAdvisoryGateway(
+                self.agent_platform, delegation_journal=delegation_journal
+            )
+        self.automatic_investigation = (
+            AutomaticInvestigation(
+                (runtime_directory or repository_root / ".missing20-runtime")
+                / "automatic-investigation.sqlite3",
+                self.agent_platform, self.agent_advisory,
+            ) if isinstance(self.agent_platform, AgentPlatform) else None
+        )
         self.live_source_poller = LiveSourcePoller(self.live_sources)
         configured_autostart = os.environ.get("MISSING20_LIVE_SOURCES_AUTOSTART", "0")
         should_autostart = (
@@ -1242,6 +1507,11 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             else configured_autostart.strip().lower() in {"1", "true", "yes", "on"}
         )
         super().__init__(address, DecisionWorkspaceHandler)
+        self.receiving_draft_worker.start()
+        if self.receiving_handoff_worker is not None:
+            self.receiving_handoff_worker.start()
+        if self.automatic_investigation is not None:
+            self.automatic_investigation.start()
         if should_autostart:
             self.live_source_poller.start()
 
@@ -1263,6 +1533,11 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         """Stop session producers as the serving loop is asked to terminate."""
 
         self.live_source_poller.stop()
+        self.receiving_draft_worker.close()
+        if self.receiving_handoff_worker is not None:
+            self.receiving_handoff_worker.close()
+        if self.automatic_investigation is not None:
+            self.automatic_investigation.close()
         self.registry.close()
         super().shutdown()
 
@@ -1270,6 +1545,11 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         """Stop session producers before closing the listening socket."""
 
         self.live_source_poller.stop()
+        self.receiving_draft_worker.close()
+        if self.receiving_handoff_worker is not None:
+            self.receiving_handoff_worker.close()
+        if self.automatic_investigation is not None:
+            self.automatic_investigation.close()
         self.registry.close()
         super().server_close()
 

@@ -102,7 +102,7 @@
   const EXTERNAL_SERVICE_LINKS = Object.freeze({
     erpnext: {
       label: "Open ERPNext",
-      url: "https://missing20.v.frappe.cloud/app/purchase-order/PUR-ORD-2026-00011",
+      url: "https://missing20.v.frappe.cloud/app/purchase-order",
     },
     airtable: {
       label: "Open Airtable",
@@ -135,12 +135,12 @@
     }) || null;
   }
 
-  function erpDocumentLink(kind, route, fallbackName) {
+  function erpDocumentLink(kind, route) {
     const document = liveERPDocument(kind);
-    const name = value(document?.name || fallbackName);
+    const name = value(document?.name);
     return {
-      label: `Open ERPNext ${route.replaceAll("-", " ")}`,
-      url: `https://missing20.v.frappe.cloud/app/${route}/${encodeURIComponent(name)}`,
+      label: "Open ERPNext",
+      url: `https://missing20.v.frappe.cloud/app/${route}${name ? `/${encodeURIComponent(name)}` : ""}`,
     };
   }
   const MANAGER_ATTESTATIONS = ["integration-operator", "ap-approver"];
@@ -307,7 +307,7 @@
     if (["HEALTHY", "MONITORING", "COMPLETE", "COMPLETED", "OPEN", "PASS", "GRANTED", "APPROVED", "ERP_RECORDED", "VERIFIED", "RECOVERY_COMPLETE", "SAFE_NOOP"].includes(status)) {
       return "state-lime";
     }
-    if (["RUNNING", "TRIGGERED", "INVESTIGATING", "WAITING FOR EVIDENCE", "STARTED", "ADMITTED", "HANDED_OFF", "HANDOFF", "SCRIPTED_SYNTHETIC_PROOF"].includes(status)) {
+    if (["RUNNING", "REASONING", "TRIGGERED", "INVESTIGATING", "WAITING FOR EVIDENCE", "STARTED", "ADMITTED", "HANDED_OFF", "HANDOFF", "SCRIPTED_SYNTHETIC_PROOF"].includes(status)) {
       return "state-cyan";
     }
     if (["ANOMALY", "QUEUE_FAILED", "PARTIAL", "HELD", "FAILED", "BLOCKED", "DEGRADED", "NOT_PROVEN", "NOT PROVEN", "PENDING_APPROVAL", "DENY", "HARD_STOP", "AGENT_UNAVAILABLE", "VALIDATION_FAILED"].includes(status)) {
@@ -478,17 +478,51 @@
     });
   }
 
+  let platformFocusDialog = null;
+  let platformFocusAnchor = null;
+  let platformFocusTrigger = null;
   function focusPlatformModule(module) {
     const next = module && state.platformFocusedModule !== module.dataset.canvasModule
       ? module.dataset.canvasModule
       : "";
+    // Use the browser top layer. A fixed card inside a transformed canvas is
+    // otherwise trapped below the body backdrop and can appear entirely dimmed.
+    if (platformFocusDialog) {
+      const previous = platformFocusDialog.querySelector("[data-canvas-module]");
+      if (previous && platformFocusAnchor) platformFocusAnchor.replaceWith(previous);
+      platformFocusDialog.close();
+      platformFocusDialog.remove();
+      platformFocusDialog = null;
+      platformFocusAnchor = null;
+      platformFocusTrigger?.focus();
+      platformFocusTrigger = null;
+    }
     state.platformFocusedModule = next;
     document.querySelectorAll("[data-canvas-module]").forEach((item) => {
       const focused = item.dataset.canvasModule === next;
       item.classList.toggle("is-focused", focused);
       item.querySelector("[data-module-focus]")?.setAttribute("aria-label", focused ? "Exit focus view" : `Focus ${item.dataset.canvasModule}`);
     });
-    document.body.classList.toggle("platform-focus-open", Boolean(next));
+    document.body.classList.remove("platform-focus-open");
+    if (next && module) {
+      platformFocusTrigger = document.activeElement;
+      platformFocusAnchor = document.createComment("focused module location");
+      module.before(platformFocusAnchor);
+      const dialog = document.createElement("dialog");
+      dialog.className = "platform-focus-dialog";
+      dialog.setAttribute("aria-label", `Expanded ${next}`);
+      const close = create("button", "platform-focus-close", "Close expanded view");
+      close.type = "button";
+      close.addEventListener("click", () => focusPlatformModule(null));
+      dialog.append(close, module);
+      document.body.append(dialog);
+      dialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        focusPlatformModule(null);
+      });
+      platformFocusDialog = dialog;
+      dialog.showModal();
+    }
     schedulePlatformInvestigationLinks();
   }
 
@@ -505,7 +539,8 @@
     const risk = operations.risk_signal || {};
     const agentRun = platform.agent_run || {};
     const humanReview = platform.human_review || {};
-    const liveRecord = liveSaaSRecord(componentId);
+    const receivingNotification = system.write_state === "EVENT_DRIVEN_NOTIFICATION";
+    const liveRecord = receivingNotification ? system : liveSaaSRecord(componentId);
     const livePO = liveERPDocument("purchase_order");
     const liveReceipt = liveERPDocument("purchase_receipt");
     const liveInvoice = liveERPDocument("purchase_invoice");
@@ -541,14 +576,18 @@
       metrics: [],
       external: EXTERNAL_SERVICE_LINKS[componentId] || null,
     };
+    if (receivingNotification) return {
+      ...common, title: value(system.name), status: value(system.status), purpose: value(system.detail),
+      metrics: [["Source record", value(system.record_id) || "Waiting"], ["Scope", "Receipt notification"], ["Authority", "ERPNext stock ledger"]],
+      external: value(system.url).startsWith("https://") ? { url: system.url, label: "Open source record" } : common.external,
+    };
     if (componentId === "erpnext") common.external = erpDocumentLink(
       "purchase_order",
       "purchase-order",
-      "PUR-ORD-2026-00011",
     );
     if (componentId === "erpnext") common.metrics = [
       ["Live purchase order", value(livePO?.name || "WAITING")],
-      ["Live receipt", `${value(liveReceipt?.name || "WAITING")} · ${number(liveReceipt?.accepted)} accepted / ${number(liveReceipt?.rejected)} held`],
+      ["Receipt at posting", `${value(liveReceipt?.name || "WAITING")} · ${number(liveReceipt?.accepted)} accepted / ${number(liveReceipt?.rejected)} sent to quality`],
       ["Live invoice", `${value(liveInvoice?.name || "WAITING")} · ${value(liveInvoice?.status || "WAITING")}`],
       ["Customer order", `${value(liveSalesOrder?.name || "WAITING")} · ${value(liveSalesOrder?.status || "WAITING")}`],
       ["Delivery note", value(liveDelivery?.name || "WAITING")],
@@ -625,7 +664,8 @@
     popover.hidden = false;
     const canvasBounds = $("platform-command-canvas").getBoundingClientRect();
     const rect = node.getBoundingClientRect();
-    popover.style.left = `${Math.max(12, Math.min(canvasBounds.width - 280, rect.left - canvasBounds.left + rect.width + 12))}px`;
+    const popoverWidth = popover.getBoundingClientRect().width;
+    popover.style.left = `${Math.max(12, Math.min(canvasBounds.width - popoverWidth - 12, rect.left - canvasBounds.left + rect.width + 12))}px`;
     popover.style.top = `${Math.max(72, rect.top - canvasBounds.top - 8)}px`;
     node.setAttribute("aria-expanded", "true");
   }
@@ -739,6 +779,18 @@
     return state.connection === "live";
   }
 
+  function platformInvoiceStatus(platform) {
+    const projection = platform?.case_projection || platform?.demo_case;
+    const facts = projection?.case;
+    if (projection?.provenance === "live-read") {
+      if (platform.source_freshness?.status !== "CURRENT") return "UNKNOWN";
+      if (platform.document_lifecycle?.purchase_invoice === "AWAITING_INVOICE"
+        && !facts?.purchase_invoice && !facts?.quantities?.invoice_count) return "NOT YET INVOICED";
+      if (!facts?.purchase_invoice && !facts?.quantities?.invoice_count) return "UNKNOWN";
+    }
+    return facts?.invoice_held ? "HELD" : facts ? "OPEN" : "UNKNOWN";
+  }
+
   function platformFlowProjection() {
     const platform = state.agentPlatform;
     if (!platform) return null;
@@ -746,10 +798,11 @@
       ? platform.case_projection
       : platform.demo_case;
     const liveAuthority = value(caseProjection?.provenance).toLowerCase() === "live-read";
-    // Synthetic Case Console facts belong to Scenario Lab. The Dashboard's
-    // synthetic workflow already has an authoritative incident ledger, so
-    // overlaying a second fixture projection would make recovery appear stuck.
-    if (!liveAuthority) return null;
+    // A selected synthetic incident has one Case Console authority in both
+    // views. Never label it live or overlay it on the separate normal baseline.
+    const syntheticAuthority = value(caseProjection?.provenance) === "synthetic-demo-fixture"
+      && state.activeScenario !== "normal";
+    if (!liveAuthority && !syntheticAuthority) return null;
     const demoCase = caseProjection && typeof caseProjection === "object"
       ? caseProjection.case
       : null;
@@ -757,8 +810,14 @@
       ? demoCase.quantities
       : null;
     if (!quantities) return null;
-    const expected = number(quantities.physically_arrived);
+    const expected = number(quantities.ordered, number(quantities.physically_arrived));
     const recorded = number(quantities.available);
+    const received = number(quantities.received_cumulative, number(quantities.received,
+      syntheticAuthority ? number(quantities.physically_arrived) : 0));
+    const posted = number(quantities.receipt_posted_quantity,
+      syntheticAuthority ? recorded + number(quantities.quality_hold) : received);
+    const invoiceCount = number(quantities.invoice_count,
+      syntheticAuthority ? (demoCase.invoice_held ? 0 : recorded) : 0);
     const qualityHold = number(quantities.quality_hold);
     const receiptUnresolved = number(quantities.receipt_unresolved);
     const gap = qualityHold + receiptUnresolved;
@@ -771,11 +830,17 @@
       caseVersion: number(platform.case_version),
       expected,
       recorded,
+      received,
+      posted,
+      invoiceCount,
+      uom: value(demoCase.uom || "units"),
       gap,
       qualityHold,
       receiptUnresolved,
       invoiceHeld: Boolean(demoCase.invoice_held),
+      invoiceStatus: platformInvoiceStatus(platform),
       verified: value(execution.status).toUpperCase() === "VERIFIED",
+      sourceCurrent: liveAuthority ? platform.source_freshness?.status === "CURRENT" : true,
       latestSequence: number(platform.latest_sequence),
       provenance: value(caseProjection?.provenance || platform.mode?.provenance),
     };
@@ -861,6 +926,7 @@
   }
 
   function formatCurrency(amount, currency = "USD") {
+    if (amount == null || amount === "" || typeof amount === "boolean") return "—";
     const numeric = Number(amount);
     if (!Number.isFinite(numeric)) return "—";
     try {
@@ -1446,8 +1512,10 @@
         state.ambiguousReceiptCase = null;
       }
       state.agentPlatformError = "";
+      state.agentPlatformReadError = "";
     } catch (error) {
       state.agentPlatformError = error.message;
+      state.agentPlatformReadError = error.message;
     } finally {
       state.agentPlatformBusy = false;
       scheduleRender();
@@ -1457,7 +1525,18 @@
   function setAgentPlatformProjection(projection) {
     state.agentPlatformPulseAfter = number(state.agentPlatform && state.agentPlatform.latest_sequence);
     state.agentPlatform = projection;
+    if (typeof window !== "undefined" && typeof CustomEvent !== "undefined") {
+      window.dispatchEvent(new CustomEvent("missing20:projection", { detail: {
+        caseId: projection?.case_id, sequence: projection?.latest_sequence,
+        sourceStatus: projection?.source_freshness?.status,
+        provenance: projection?.mode?.provenance,
+      } }));
+    }
   }
+
+  window.addEventListener("missing20:receipt-changed", () => {
+    scheduleAgentPlatformProjectionRefresh();
+  });
 
   function startAgentPlatformRefresh() {
     if (smokeCapture || providerPollingDisabled || state.agentPlatformTimer != null) return;
@@ -1517,7 +1596,9 @@
     // transition, then remains available through recovery and verification.
     const liveFlow = platformFlowProjection();
     const sourceAttention = Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
-    const normalScenario = isNormalScenario() && !sourceAttention;
+    // Live users can ask evidence questions even without an incident. The sparse
+    // normal scene is only the explicitly controlled scenario, never live truth.
+    const normalScenario = isNormalScenario() && !sourceAttention && !hasLiveSourceAuthority();
     syncDashboardSourceControl();
     const verifiedHistory = Boolean(
       platform?.resolution_packet?.status === "VERIFIED"
@@ -1576,10 +1657,10 @@
     const caseDisplay = caseFacts && caseQuantities
       ? [
         ["arrived", caseQuantities.physically_arrived],
-        ["on hand", caseQuantities.available],
+        ["case balance", caseQuantities.available],
         ["quality", caseQuantities.quality_hold],
-        ["receipt", caseQuantities.receipt_unresolved],
-        ["invoice", caseFacts.invoice_held ? "held" : `${number(caseQuantities.available)} matched · open`],
+        ["receipt gap", caseQuantities.receipt_unresolved],
+        ["invoice", platformInvoiceStatus(platform).toLowerCase()],
       ]
       : ["case_id", "purchase_order", "purchase_receipt", "purchase_invoice", "quantity"].map((key) => [key.replaceAll("_", " "), tuple[key]]);
     caseDisplay.forEach(([key, itemValue]) => {
@@ -1592,13 +1673,16 @@
     const integrationOutcome = value(caseFacts && caseFacts.integration_outcome).toUpperCase();
     const ribbonExecutionStatus = value(platform.execution && platform.execution.status).toUpperCase();
     const inventoryReconciled = Boolean(liveFlow && liveFlow.gap === 0);
+    const receivingNormal = platform.receiving_work?.status === "CONFIGURED"
+      && inventoryReconciled && liveFlow.sourceCurrent && !liveFlow.invoiceHeld;
+    if (receivingNormal) setBadge($("platform-correlation"), "RECEIVING", "HEALTHY");
     $("platform-title").textContent = ribbonExecutionStatus === "VERIFIED"
       ? "Verified recovery"
       : inventoryReconciled && liveFlow.invoiceHeld
         ? "Invoice payment hold"
         : liveFlow?.gap > 0
           ? "Receipt reconciliation"
-          : "Connected investigation";
+          : receivingNormal ? "Receiving operations" : "Connected investigation";
     $("platform-correlation-detail").textContent = caseFacts && caseQuantities
       ? (ribbonExecutionStatus === "VERIFIED"
         ? "Receipt reconciled · recovery independently verified"
@@ -1606,7 +1690,8 @@
           ? "Inventory reconciled · invoice payment hold awaits agent diagnosis"
           : liveFlow?.gap > 0
             ? `${liveFlow.gap} units require cross-source reconciliation`
-            : `Receipt confirmed · integration ${["ACKNOWLEDGED", "VERIFIED"].includes(integrationOutcome) ? "acknowledged" : "requires review"}`)
+            : receivingNormal ? liveReceivingSummary(liveFlow).detail
+              : `Receipt confirmed · integration ${["ACKNOWLEDGED", "VERIFIED"].includes(integrationOutcome) ? "acknowledged" : "requires review"}`)
       : missing.length
       ? `Partial correlation · ${missing.join(", ")}`
       : (mismatched.length
@@ -1651,7 +1736,8 @@
     metricText("platform-metric-latency", number(strands.latency_ms) ? `${(number(strands.latency_ms) / 1000).toFixed(1)}s` : runState === "IDLE" ? "After run" : "—");
     metricText("platform-metric-tools", String(number(proof.source_checks, Array.isArray(strands.tool_calls) ? strands.tool_calls.length : 0)));
     metricText("platform-metric-evidence", String(number(proof.evidence_records)));
-    metricText("platform-metric-cases", String(number(proof.case_matrix_size, 14)));
+    metricText("platform-metric-cases", Number.isInteger(proof.case_matrix_size) && proof.case_matrix_size >= 0
+      ? String(proof.case_matrix_size) : "—");
     metricText("platform-metric-tokens", number(usage.input_tokens) || number(usage.output_tokens)
       ? `${Math.round((number(usage.input_tokens) + number(usage.output_tokens)) / 100) / 10}k`
       : runState === "IDLE" ? "After run" : "—");
@@ -1704,7 +1790,7 @@
       slack: caseFacts ? value(caseFacts.case_id) : value(tuple.case_id),
     };
     const platformSystems = Array.isArray(platform.systems) ? platform.systems : [];
-    $("platform-signal-count").textContent = `${platformSystems.length} LIVE`;
+    $("platform-signal-count").textContent = `${platformSystems.length} systems`;
     platformSystems.forEach((system) => {
       if (!system || typeof system !== "object") return;
       const systemId = value(system.id);
@@ -1717,7 +1803,7 @@
       receipt.classList.toggle("is-problem", isProblemStatus(status));
       if (number(evidenceNode.latest_sequence) > pulseAfter) receipt.classList.add("is-live");
       const heading = create("div", "platform-source-receipt-head");
-      const systemLabel = {
+      const systemLabel = system.write_state === "EVENT_DRIVEN_NOTIFICATION" ? value(system.name) : {
         erpnext: "ERPNext",
         airtable: "Airtable Quality",
         celigo: "Celigo",
@@ -1837,22 +1923,15 @@
     }
     const hypotheses = $("platform-hypotheses");
     hypotheses.replaceChildren();
+    $("platform-findings-history").hidden = !(diagnosis.hypotheses || []).length;
     (Array.isArray(diagnosis.hypotheses) ? diagnosis.hypotheses : []).forEach((hypothesis) => {
       if (!hypothesis || typeof hypothesis !== "object") return;
-      const diagnosedStatus = value(hypothesis.status || "OPEN");
-      const invoiceHypothesis = value(hypothesis.id).includes("invoice")
-        || value(hypothesis.label).toLowerCase().includes("invoice");
-      const status = executionStatus === "VERIFIED" && invoiceHypothesis
-        ? "CLEARED"
-        : diagnosedStatus;
+      // These are historical claims, not assertions about the current stock state.
+      const status = value(hypothesis.status || "OPEN");
       const row = create("div", `platform-hypothesis is-${status.toLowerCase()}`);
       row.append(
-        create("span", null, executionStatus === "VERIFIED" && invoiceHypothesis
-          ? `At diagnosis · ${value(hypothesis.label)}`
-          : value(hypothesis.label)),
-        create("strong", null, executionStatus === "VERIFIED" && invoiceHypothesis
-          ? `AFTER EXECUTION · ${status}`
-          : status),
+        create("span", null, value(hypothesis.label)),
+        create("strong", null, status),
       );
       hypotheses.append(row);
     });
@@ -1950,8 +2029,12 @@
     const finding = value(diagnosis.finding).toUpperCase();
     const decisionRows = value(agentRun.state) === "PLAN_READY" || ["AUTHORIZED", "VERIFYING", "VERIFIED"].includes(executionStatus)
       ? [
-          ["Receipt", receiptUnits ? `Post ${receiptUnits} unresolved units` : "No receipt post"],
-          ["Quality", qualityUnits ? `Transfer ${qualityUnits} approved units` : "No quality transfer"],
+          ["Receipt", receiptUnits ? executionStatus === "VERIFIED"
+            ? `${receiptUnits} units posted · verified` : `Post ${receiptUnits} unresolved units`
+            : "No new receipt needed"],
+          ["Quality", qualityUnits ? executionStatus === "VERIFIED"
+            ? `${qualityUnits} units released · verified` : `Transfer ${qualityUnits} approved units`
+            : "No new quality transfer needed"],
           ["Invoice", caseFacts && caseFacts.invoice_held ? "Revalidate held invoice" : "Invoice verified open"],
         ]
       : value(agentRun.state) === "BLOCKED"
@@ -1981,6 +2064,7 @@
     const reviewAction = value(review.action);
     const canStartOrResume = ["AUTHORIZE_DIAGNOSIS", "START_INVESTIGATION", "RESUME_INVESTIGATION", "RESUME_AFTER_EVIDENCE", "RETRY_INVESTIGATION"].includes(reviewAction);
     diagnosisButton.disabled = state.agentPlatformDiagnosing || !canStartOrResume;
+    diagnosisButton.hidden = !canStartOrResume && !state.agentPlatformDiagnosing;
     diagnosisButton.setAttribute("aria-disabled", String(diagnosisButton.disabled));
     diagnosisButton.textContent = state.agentPlatformDiagnosing
       ? "Running authorized diagnosis…"
@@ -1994,6 +2078,23 @@
           ? "Resume investigation"
           : "Start investigation";
     const stopButton = $("platform-stop");
+    const automation = platform.automation;
+    const automationButton = $("platform-automation");
+    const automationStatus = $("platform-automation-status");
+    automationButton.hidden = !automation;
+    automationStatus.hidden = !automation;
+    if (automation) {
+      automationButton.disabled = state.agentPlatformActionBusy;
+      automationButton.textContent = automation.enabled ? "Pause automatic investigation" : "Auto-investigate";
+      automationButton.setAttribute("aria-pressed", String(automation.enabled));
+      automationStatus.textContent = ({
+        PAUSED: "Paused", WATCHING: "Watching for exceptions", INVESTIGATING: "Investigating",
+        WAITING_SOURCE: "Waiting for source access", BUSY: "Investigation in progress",
+        AWAITING_REVIEW: "Awaiting manager review", NEEDS_ATTENTION: "Investigation needs attention",
+        INTERRUPTED: "Previous run interrupted", CASE_CHANGED: "Case changed — paused",
+        BUDGET_EXHAUSTED: "Run limit reached — paused",
+      })[automation.status] || "Paused";
+    }
     const canStop = Boolean(review.can_stop) && !["IDLE", "STOPPED", "VERIFIED"].includes(value(agentRun.state));
     stopButton.hidden = !canStop;
     stopButton.disabled = state.agentPlatformActionBusy;
@@ -2003,10 +2104,46 @@
     questionSubmit.disabled = state.agentPlatformQuestionBusy;
     questionSubmit.textContent = state.agentPlatformQuestionBusy ? "Reading…" : "Ask";
     const answerNode = $("platform-answer");
+    const feedback = $("platform-question-feedback");
+    const attempt = state.agentPlatformQuestionAttempt;
+    feedback.hidden = !attempt || attempt.status === "COMPLETE";
+    const feedbackSignature = JSON.stringify(attempt);
+    if (attempt && !feedback.hidden && feedback.renderedAttempt !== feedbackSignature) {
+      feedback.dataset.status = attempt.status;
+      feedback.replaceChildren(
+        create("p", null, attempt.question),
+        create("strong", null, attempt.status === "READING" ? "Checking the source records…" : "The agent could not verify an answer. No action was taken."),
+      );
+      if (attempt.status !== "READING" && attempt.detail) {
+        const details = create("details", "operator-details");
+        details.append(create("summary", null, "Why this stopped"), create("p", null, attempt.detail));
+        feedback.append(details);
+      }
+      if (attempt.retainedViews?.length) {
+        feedback.append(create("p", null, "Retained observations only — not a current answer."));
+        attempt.retainedViews.forEach((attachment) => {
+          const view = window.Missing20Conversation?.renderAttachment(attachment);
+          if (view) feedback.append(view);
+        });
+      }
+      feedback.renderedAttempt = feedbackSignature;
+    }
     const advisory = state.agentPlatformAdvisory && typeof state.agentPlatformAdvisory === "object"
       ? state.agentPlatformAdvisory
       : {};
     const conversation = Array.isArray(platform.conversation) ? platform.conversation : [];
+    const suggestions = $("platform-question-suggestions");
+    const suggestedQuestions = window.Missing20Conversation?.questionsFor(conversation) || [];
+    const suggestionSignature = JSON.stringify([suggestedQuestions, state.agentPlatformQuestionBusy]);
+    if (suggestions && suggestions.renderedSuggestions !== suggestionSignature) {
+      suggestions.replaceChildren(...suggestedQuestions.map((question) => {
+        const button = create("button", "conversation-question", question);
+        button.type = "button"; button.disabled = state.agentPlatformQuestionBusy;
+        button.addEventListener("click", () => askPlatformQuestion(question));
+        return button;
+      }));
+      suggestions.renderedSuggestions = suggestionSignature;
+    }
     answerNode.hidden = !state.agentPlatformAnswer && conversation.length === 0;
     const conversationStatus = state.agentPlatformQuestionBusy
       ? "READING"
@@ -2014,14 +2151,22 @@
     setBadge($("platform-answer-status"), conversationStatus.replaceAll("_", " "), conversationStatus);
     $("platform-answer-trace").textContent = value(advisory.mode === "real_strands" ? "REAL STRANDS" : "");
     const conversationHost = $("platform-answer-text");
+    const conversationSignature = JSON.stringify([conversation, state.agentPlatformAnswer]);
+    if (conversationHost.renderedConversation !== conversationSignature) {
+    const followConversation = conversationHost.scrollHeight - conversationHost.scrollTop - conversationHost.clientHeight < 40;
+    const expandedSources = new Set([...conversationHost.querySelectorAll("details[open]")].map((item) => item.dataset.turnIndex));
     conversationHost.replaceChildren();
-    conversation.forEach((turn) => {
+    conversation.forEach((turn, turnIndex) => {
       if (!turn || typeof turn !== "object") return;
       const item = create("article", "platform-conversation-turn");
       const humanBubble = create("div", "platform-chat-bubble is-human");
       humanBubble.append(create("small", null, "YOU"), create("p", null, value(turn.question)));
       const agentBubble = create("div", "platform-chat-bubble is-agent");
       agentBubble.append(create("small", null, "EVIDENCE AGENT"), create("p", null, value(turn.answer)));
+      (Array.isArray(turn.attachments) ? turn.attachments : []).forEach((attachment) => {
+        const view = window.Missing20Conversation?.renderAttachment(attachment);
+        if (view) agentBubble.append(view);
+      });
       if (value(turn.validation_status)) {
         agentBubble.classList.add("is-rejected-claim");
         agentBubble.append(create("strong", "platform-claim-verdict", human(turn.validation_status)));
@@ -2032,7 +2177,6 @@
         create("span", null, `${number(turn.evidence_ids && turn.evidence_ids.length)} evidence`),
         create("span", null, number(turn.context_turns) ? `${number(turn.context_turns)} prior turns` : "new thread"),
       );
-      agentBubble.append(meta);
       item.append(humanBubble, agentBubble);
       const citations = create("div", "platform-tool-calls");
       (Array.isArray(turn.evidence_ids) ? turn.evidence_ids : []).forEach((evidenceId) => {
@@ -2042,11 +2186,18 @@
         citation.dataset.evidenceId = value(evidenceId);
         citations.append(citation);
       });
-      agentBubble.append(citations);
+      const sourceDetails = create("details", "operator-details");
+      sourceDetails.dataset.turnIndex = String(turnIndex);
+      sourceDetails.open = expandedSources.has(String(turnIndex));
+      sourceDetails.append(create("summary", null, `Sources & checks (${citations.childElementCount})`), meta, citations);
+      agentBubble.append(sourceDetails);
       conversationHost.append(item);
     });
     if (conversation.length === 0 && state.agentPlatformAnswer) {
       conversationHost.append(create("p", null, state.agentPlatformAnswer));
+    }
+    conversationHost.renderedConversation = conversationSignature;
+    if (followConversation) conversationHost.scrollTop = conversationHost.scrollHeight;
     }
     const answerEvidence = $("platform-answer-evidence");
     answerEvidence.replaceChildren();
@@ -2058,7 +2209,8 @@
     const actions = $("platform-execution-actions");
     const actionState = value(execution.status);
     const actionBusy = state.agentPlatformActionBusy;
-    actions.hidden = !Boolean(platform.mode && platform.mode.execution_available);
+    actions.hidden = !Boolean(platform.mode && platform.mode.execution_available)
+      || value(agentRun.state) !== "PLAN_READY" || actionState !== "AWAITING_MANAGER_APPROVAL";
     $("platform-approve-execute").disabled = actionBusy || value(agentRun.state) !== "PLAN_READY" || actionState !== "AWAITING_MANAGER_APPROVAL";
     $("platform-reject-plan").disabled = actionBusy || value(agentRun.state) !== "PLAN_READY" || actionState !== "AWAITING_MANAGER_APPROVAL";
     const packetNode = $("platform-resolution-packet");
@@ -2066,7 +2218,7 @@
     if (packet) {
       $("platform-packet-id").textContent = value(packet.packet_id);
       const postState = packet.post_state && typeof packet.post_state === "object" ? packet.post_state : {};
-      $("platform-packet-summary").textContent = `Verified · ${value(packet.guard).replaceAll("_", " ")} · ${Object.entries(postState).map(([key, itemValue]) => `${key.replaceAll("_", " ")}: ${value(itemValue)}`).join(" · ")}`;
+      $("platform-packet-summary").textContent = `Verified · ${value(packet.guard).replaceAll("_", " ")} · ${Object.entries(postState).map(([key, itemValue]) => `${key.replaceAll("_", " ")}: ${itemValue == null ? "Unknown" : value(itemValue)}`).join(" · ")}`;
       const packetScope = $("platform-packet-scope");
       packetScope.replaceChildren();
       [["Receipt post", packetTuple.receipt_post_quantity], ["Quality transfer", packetTuple.quality_transfer_quantity]].forEach(([label, amount]) => {
@@ -2111,6 +2263,9 @@
 
     const activity = $("platform-activity");
     const events = Array.isArray(platform.activity) ? platform.activity.slice(-18) : [];
+    const activitySignature = JSON.stringify(events);
+    if (activity.renderedEvents !== activitySignature) {
+    const followActivity = activity.scrollHeight - activity.scrollTop - activity.clientHeight < 40;
     activity.replaceChildren();
     events.forEach((event) => {
       if (!event || typeof event !== "object") return;
@@ -2119,9 +2274,7 @@
       const main = create("div", "platform-activity-main");
       main.append(create("strong", null, value(event.label)), create("span", null, value(event.detail)));
       const occurredAt = new Date(value(event.occurred_at || event.timestamp || event.created_at));
-      const timeLabel = Number.isNaN(occurredAt.getTime())
-        ? `#${value(event.sequence)}`
-        : occurredAt.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const timeLabel = operatorEventTime(occurredAt, event.sequence);
       item.append(
         create("time", "platform-activity-sequence", timeLabel),
         main,
@@ -2129,8 +2282,10 @@
       );
       activity.append(item);
     });
-    window.requestAnimationFrame(() => { activity.scrollTop = activity.scrollHeight; });
-    $("platform-event-count").textContent = `${value(platform.latest_sequence || 0)} events`;
+    activity.renderedEvents = activitySignature;
+    if (followActivity) window.requestAnimationFrame(() => { activity.scrollTop = activity.scrollHeight; });
+    }
+    $("platform-event-count").textContent = `${Array.isArray(platform.activity) ? platform.activity.length : 0} events`;
     const outcomeState = executionStatus === "VERIFIED"
       ? "VERIFIED"
       : executionStatus === "VERIFYING"
@@ -2152,17 +2307,19 @@
     const packetPostState = packet && packet.post_state && typeof packet.post_state === "object"
       ? packet.post_state
       : {};
-    const currentAvailable = number(packetPreState.available, number(caseQuantities && caseQuantities.available));
+    const currentAvailable = packetPreState.available == null ? "Unknown" : number(packetPreState.available);
     const targetAvailable = number(packetPostState.available, number(caseQuantities && caseQuantities.available));
-    const priorInvoice = value(packetPreState.invoice_status || "PAYMENT_HOLD").replaceAll("_", " ");
+    const priorInvoice = value(packetPreState.invoice_status || "EARLIER STATE NOT RETAINED").replaceAll("_", " ");
     const currentInvoice = value(packetPostState.invoice_status || (caseFacts && caseFacts.invoice_held ? "PAYMENT HOLD" : "OPEN")).replaceAll("_", " ");
     transition.hidden = executionStatus !== "VERIFIED";
     if (!transition.hidden) {
+      transition.setAttribute("role", "group");
+      transition.setAttribute("aria-label", `Invoice state from ${priorInvoice} to ${currentInvoice}; case balance from ${currentAvailable} to ${targetAvailable}. Verified readback.`);
       transition.replaceChildren(
         create("span", null, priorInvoice),
         create("i", "ph ph-arrow-right", ""),
         create("span", null, currentInvoice),
-        create("small", null, `Inventory ${currentAvailable} → ${targetAvailable} · no duplicate posting`),
+        create("small", null, `Case balance ${currentAvailable} → ${targetAvailable} · verified readback`),
       );
       transition.querySelector("i")?.setAttribute("aria-hidden", "true");
     } else {
@@ -2199,6 +2356,7 @@
     const cleanQuestion = value(question).trim();
     if (!cleanQuestion || state.agentPlatformQuestionBusy) return;
     state.agentPlatformQuestionBusy = true;
+    state.agentPlatformQuestionAttempt = { question: cleanQuestion, status: "READING", detail: "" };
     scheduleRender();
     try {
       const response = await requestJSON("/api/v1/agent-platform/ask", {
@@ -2211,11 +2369,19 @@
       state.agentPlatformAdvisory = response.agent_advisory && typeof response.agent_advisory === "object"
         ? response.agent_advisory
         : null;
+      state.agentPlatformQuestionAttempt = {
+        question: cleanQuestion,
+        status: state.agentPlatformAdvisory?.status || "COMPLETE",
+        detail: state.agentPlatformAnswer,
+        retainedViews: Array.isArray(state.agentPlatformAdvisory?.retained_views)
+          ? state.agentPlatformAdvisory.retained_views : [],
+      };
       state.agentPlatformError = "";
     } catch (error) {
       state.agentPlatformError = error.message;
       state.agentPlatformAnswer = `Evidence question unavailable: ${error.message}`;
       state.agentPlatformAdvisory = { status: "AGENT_UNAVAILABLE", mode: "real_strands", result: null };
+      state.agentPlatformQuestionAttempt = { question: cleanQuestion, status: "AGENT_UNAVAILABLE", detail: error.message };
     } finally {
       state.agentPlatformQuestionBusy = false;
       scheduleRender();
@@ -2328,6 +2494,9 @@
 
   async function requestJSON(path, options) {
     const init = { credentials: "same-origin", ...options };
+    // Bound reads so a stalled source cannot leave first paint waiting forever.
+    // Writes retain their existing acknowledgement/reconciliation semantics.
+    if (!init.signal && (!init.method || init.method === "GET")) init.signal = AbortSignal.timeout(20000);
     if (init.body && typeof init.body !== "string") {
       init.body = JSON.stringify(init.body);
     }
@@ -3279,7 +3448,7 @@
 
   function shortTime(raw) {
     const parsed = new Date(raw);
-    return Number.isNaN(parsed.getTime()) ? "—" : parsed.toISOString().slice(11, 19);
+    return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleTimeString([], { hour12: false });
   }
 
   function unitNodeId(unit) {
@@ -3407,12 +3576,25 @@
     }
   }
 
+  function liveReceivingSummary(platform) {
+    const { expected, posted, gap, uom, invoiceHeld } = platform;
+    if (gap > 0) return { title: `${gap} ${uom} need reconciliation`, detail: "Receiving exception", label: "needs reconciliation" };
+    if (invoiceHeld) return { title: "Supplier invoice on hold", detail: "Invoice review required", label: "invoice on hold" };
+    if (expected <= 0) return { title: "No ordered quantity recorded", detail: "Check the purchase order", label: "order quantity unavailable" };
+    if (posted > expected) return { title: `${posted - expected} ${uom} received above order quantity`, detail: "Check over-receipt", label: "over-receipt" };
+    const remaining = Math.max(0, expected - posted);
+    if (posted === 0) return { title: `Awaiting receipt · ${expected} ${uom} ordered`, detail: `${remaining} ${uom} still to receive`, label: "awaiting receipt" };
+    if (remaining > 0) return { title: `${posted} of ${expected} ${uom} received`, detail: `${remaining} ${uom} still to receive`, label: "partially received" };
+    return { title: `${posted} ${uom} received`, detail: "Receipt posting complete", label: "receipt posted in ERP" };
+  }
+
   function renderHeader() {
     const snapshot = state.snapshot;
     if (!snapshot) return;
     const incident = snapshot.incident || {};
     const counts = snapshot.unit_counts || {};
     const platform = platformFlowProjection();
+    const receivingSummary = platform?.provenance === "live-read" ? liveReceivingSummary(platform) : null;
     const expected = platform
       ? platform.expected
       : number(incident.expected_quantity, number(counts.total));
@@ -3438,28 +3620,28 @@
     const trendTime = $("trend-time");
     if (trendTime) trendTime.textContent = state.connection === "live" ? "LIVE" : "PAUSED";
     const incidentRowDetail = $("incident-row-detail");
-    if (incidentRowDetail) incidentRowDetail.textContent = normalScenario
+    if (incidentRowDetail) incidentRowDetail.textContent = receivingSummary?.detail || (normalScenario
       ? `${expected} units moving`
       : missing
         ? `${missing} units held at queue`
-        : "Flow reconciled";
+        : "Flow reconciled");
     if (heroKicker) {
       heroKicker.textContent = normalScenario
         ? "LIVE SUPPLY FLOW"
         : "LIVE SYNTHETIC INCIDENT";
     }
-    $("incident-title").textContent = missing
+    $("incident-title").textContent = receivingSummary?.title || (missing
       ? `${missing}-${unit.replace(/s$/, "")} gap. Five systems disagree.`
       : platform?.invoiceHeld
         ? `Invoice hold blocks the ${expected}-${unit.replace(/s$/, "")} receipt.`
-        : `All ${expected} ${unit} are accounted for`;
-    $("incident-subtitle").textContent = closedRecovery
+        : `All ${expected} ${unit} are accounted for`);
+    $("incident-subtitle").textContent = receivingSummary?.detail || (closedRecovery
       ? "Investigation complete"
       : state.replaying
       ? "Ledger replay"
       : missing
         ? "Queue exception"
-        : "Flow verified";
+        : "Flow verified");
     const incidentIdNode = $("incident-id");
     incidentIdNode.textContent = `Incident ${value(platform?.caseId || snapshot.incident_id)}`;
     incidentIdNode.hidden = normalScenario;
@@ -3479,7 +3661,8 @@
       || number(snapshot.projection_sequence);
     $("hero-sequence").textContent = String(authoritativeSequence || "—");
     const heroLabel = document.querySelector(".hero-count span");
-    if (heroLabel) heroLabel.textContent = missing ? "stopped at queue" : "verified in ERP";
+    if (heroLabel) heroLabel.textContent = receivingSummary?.label
+      || (missing ? "stopped at queue" : "verified in ERP");
     const mode = value(snapshot.mode);
     const execution = snapshot.execution || {};
     document.body.dataset.recovered = String(
@@ -3593,17 +3776,17 @@
             received_at: value(event.occurred_at),
             unit_counts: {
               total: number(metrics.expected),
-              erp_recorded: number(metrics.recorded),
+              erp_recorded: number(metrics.receipt_posted_quantity, number(metrics.received)),
               queue_failed: number(metrics.gap),
             },
             queue_depth: number(metrics.gap),
-            recorded_quantity: number(metrics.recorded),
+            recorded_quantity: number(metrics.receipt_posted_quantity, number(metrics.received)),
             invoice_count: number(metrics.invoice_count),
             flow_run_id: value(event.run_id || platform.runId || platform.caseId),
             stage_counts: {
-              warehouse: number(metrics.expected),
-              message_queue: number(metrics.expected),
-              erp: number(metrics.recorded),
+              warehouse: number(metrics.physically_arrived, number(metrics.received)),
+              message_queue: number(metrics.receipt_unresolved),
+              erp: number(metrics.receipt_posted_quantity, number(metrics.received)),
               invoice: number(metrics.invoice_count),
             },
             business_metrics: {
@@ -3892,7 +4075,8 @@
   }
 
   function renderDiagramCursorLabels(point = state.selectedPoint) {
-    const label = point && pointTime(point)
+    const label = document.body.dataset.sourceFreshness === "unavailable" ? "HISTORY"
+      : point && pointTime(point)
       ? shortTime(pointTime(point))
       : state.connection === "live" ? "LIVE" : "PAUSED";
     ["trend-time", "flow-health-cursor", "source-status-summary", "business-trend-time"].forEach((id) => {
@@ -4519,33 +4703,36 @@
     const latestSequence = number(state.agentPlatform?.latest_sequence);
     const advanced = latestSequence > state.businessMetricSequence;
     const entries = [
-      ["business-availability", impact ? `${number(impact.inventory_availability_percent).toFixed(1)}%` : "—", false],
-      ["business-reconciliation", impact ? `${number(impact.erp_reconciliation_percent).toFixed(1)}%` : "—", false],
+      ["business-availability", impact?.inventory_availability_percent != null ? `${number(impact.inventory_availability_percent).toFixed(1)}%` : "—", false],
+      ["business-reconciliation", impact?.erp_reconciliation_percent != null ? `${number(impact.erp_reconciliation_percent).toFixed(1)}%` : "—", false],
       ["business-working-capital", impact ? formatCurrency(impact.working_capital_at_risk, currency) : "—", number(impact?.working_capital_at_risk) > 0],
       ["business-invoice-hold", impact ? formatCurrency(impact.invoice_hold_value, currency) : "—", number(impact?.invoice_hold_value) > 0],
       ["business-unit-cost", impact ? formatCurrency(impact.po_unit_cost, currency) : "—", false],
       ["business-price-variance", impact ? `${number(impact.purchase_price_variance) > 0 ? "+" : ""}${formatCurrency(impact.purchase_price_variance, currency)}` : "—", number(impact?.purchase_price_variance) !== 0],
       ["business-quality-hold", impact ? formatCurrency(impact.quality_hold_value, currency) : "—", number(impact?.quality_hold_value) > 0],
-      ["business-value-protected", impact ? formatCurrency(impact.value_protected, currency) : "—", false],
+      ["business-value-protected", proof ? formatCurrency(observed.billed_revenue, currency) : "—", false],
       ["business-booked-revenue", proof ? formatCurrency(observed.booked_revenue, currency) : "—", false],
       ["business-revenue-at-risk", proof ? formatCurrency(counterfactual.revenue_at_risk_if_hold_persists, currency) : "—", number(counterfactual.revenue_at_risk_if_hold_persists) > 0],
-      ["business-delivered-quantity", proof ? `${number(observed.delivered_quantity)} / ${number(observed.order_quantity)}` : "—", false],
-      ["business-gross-spread", proof && value(proof.status) === "BILLED_VERIFIED" ? formatCurrency(observed.gross_spread, currency) : "—", false],
+      ["business-delivered-quantity", proof && observed.delivered_quantity != null && observed.order_quantity != null ? `${number(observed.delivered_quantity)} / ${number(observed.order_quantity)}` : "—", false],
+      ["business-gross-spread", proof && value(proof.status) === "BILLED_VERIFIED" ? formatCurrency(proof.estimated?.gross_spread, currency) : "—", false],
     ];
     entries.forEach(([id, text, alert]) => {
       const node = $(id);
       if (!node) return;
+      const changed = node.textContent !== text;
       node.textContent = text;
       const metric = node.closest(".business-metric");
       if (metric) {
-        metric.dataset.tone = alert ? "alert" : id === "business-value-protected" && number(impact?.value_protected) > 0 ? "success" : "neutral";
+        metric.dataset.tone = alert ? "alert" : id === "business-value-protected" && number(observed.billed_revenue) > 0 ? "success" : "neutral";
       }
-      if (advanced) {
+      if (advanced && changed) {
         node.classList.remove("is-live-update");
         void node.offsetWidth;
         node.classList.add("is-live-update");
       }
     });
+    const detailAlert = $("business-detail-alert");
+    if (detailAlert) detailAlert.hidden = !document.querySelector('#business-all-metrics .business-metric[data-tone="alert"]');
     const detailValues = [
       ["business-receipt-gap", impact ? formatCurrency(impact.receipt_gap_value, currency) : "—"],
       ["business-quality-hold-detail", impact ? formatCurrency(impact.quality_hold_value, currency) : "—"],
@@ -4570,14 +4757,14 @@
     const supplier = $("business-supplier-status");
     if (supplier) {
       const status = value(impact?.supplier_status || "—").toUpperCase();
-      supplier.textContent = `SUPPLIER ${status}`;
-      supplier.dataset.tone = impact?.supplier_payment_hold ? "alert" : "healthy";
+      supplier.textContent = status === "UNKNOWN" ? "SUPPLIER NOT CHECKED" : `SUPPLIER ${status}`;
+      supplier.dataset.tone = status === "UNKNOWN" ? "neutral" : impact?.supplier_payment_hold ? "alert" : "healthy";
     }
     const invoice = $("business-invoice-status");
     if (invoice) {
       const status = value(impact?.invoice_status || "—").toUpperCase();
       invoice.textContent = `INVOICE ${status}`;
-      invoice.dataset.tone = status === "HELD" || status === "BLOCKED" ? "alert" : "healthy";
+      invoice.dataset.tone = ["HELD", "BLOCKED", "PAYMENT HOLD"].includes(status) ? "alert" : status === "UNKNOWN" ? "neutral" : "healthy";
     }
     const order = $("business-order-status");
     if (order) {
@@ -4649,9 +4836,7 @@
         const isBusiness = card.classList.contains("business-metric");
         const businessMetric = value(card.dataset.businessMetric);
         const tone = value(card.dataset.tone);
-        const exactERPLink = (kind, route) => liveERPDocument(kind)
-          ? erpDocumentLink(kind, route, "")
-          : EXTERNAL_SERVICE_LINKS.erpnext;
+        const exactERPLink = (kind, route) => erpDocumentLink(kind, route);
         const externalByMetric = {
           "booked-revenue": exactERPLink("sales_order", "sales-order"),
           "revenue-risk": exactERPLink("sales_order", "sales-order"),
@@ -4675,7 +4860,7 @@
             ["Source", isBusiness ? "ERPNext authoritative reread" : "MES + demand + supplier evidence"],
           ],
           external: isBusiness
-            ? externalByMetric[businessMetric] || erpDocumentLink("purchase_order", "purchase-order", "")
+            ? externalByMetric[businessMetric] || erpDocumentLink("purchase_order", "purchase-order")
             : null,
         });
       };
@@ -4926,10 +5111,10 @@
       ? platform.expected
       : number(snapshotCounts.total, number(flowSummary.expected, number(nodeMap.get("warehouse")?.count)));
     const recorded = platform
-      ? platform.recorded
+      ? platform.posted
       : number(snapshotCounts.erp_recorded, number(flowSummary.recorded, number(nodeMap.get("erp")?.count)));
     const queueException = platform
-      ? platform.gap
+      ? platform.receiptUnresolved
       : number(snapshotCounts.queue_failed, number(flowSummary.queue_exception, number(nodeMap.get("message-queue")?.count)));
     const stageProjection = latestStageProjection(snapshot);
     const stageCounts = stageProjection.counts;
@@ -4941,18 +5126,21 @@
     $("expected-count").textContent = String(expected);
     $("recorded-count").textContent = String(recorded);
     $("queue-count").textContent = String(queueException);
+    const recordedLabel = $("recorded-count").parentElement?.querySelector("small");
+    if (recordedLabel) recordedLabel.textContent = platform ? "RECEIPT POSTED" : "RECORDED";
     const allNodesHealthy = platform
-      ? platform.verified && platform.gap === 0 && !platform.invoiceHeld
+      ? platform.sourceCurrent && platform.gap === 0 && !platform.invoiceHeld && platform.posted <= platform.expected
       : nodes.length > 0 && nodes.every((item) => ["HEALTHY", "RELEASED"].includes(value(item.status).toUpperCase()));
     const projectedStatus = (item) => {
       if (!platform) return value(item.status).toUpperCase();
-      if (allNodesHealthy) return value(item.id) === "invoice" ? "OPEN" : "HEALTHY";
+      if (value(item.id) === "invoice") return platform.invoiceStatus;
+      if (allNodesHealthy) return "HEALTHY";
       if (value(item.id) === "warehouse") return "HEALTHY";
       if (value(item.id) === "message-queue") return platform.receiptUnresolved > 0 ? "ANOMALY" : "HEALTHY";
       if (value(item.id) === "erp") return platform.gap > 0 ? "PARTIAL" : "HEALTHY";
       return platform.invoiceHeld ? "HELD" : "OPEN";
     };
-    setBadge($("path-status"), allNodesHealthy ? "Healthy" : "Attention needed", allNodesHealthy ? "HEALTHY" : "ANOMALY");
+    setBadge($("path-status"), platform && !platform.sourceCurrent ? "Source unavailable" : allNodesHealthy ? "Healthy" : "Attention needed", allNodesHealthy ? "HEALTHY" : "ANOMALY");
     const projectedNodes = {
       warehouse: { healthId: "health-warehouse", sourceId: "source-warehouse" },
       "message-queue": { healthId: "health-queue", sourceId: "source-queue", sourceNodeId: "queue" },
@@ -4963,18 +5151,18 @@
       const projection = projectedNodes[value(item.id)];
       if (!projection) return;
       const count = value(item.id) === "warehouse"
-        ? projectedCount("warehouse", expected)
+        ? projectedCount("warehouse", platform ? platform.received : expected)
         : value(item.id) === "message-queue"
           ? projectedCount("message-queue", queueException)
           : value(item.id) === "erp"
             ? projectedCount("erp", recorded)
-            : projectedCount("invoice", platform ? (platform.invoiceHeld ? 0 : recorded) : number(item.count));
+            : projectedCount("invoice", platform ? platform.invoiceCount : number(item.count));
       [projection.healthId, projection.sourceId].forEach((id) => {
         const target = $(id);
         if (target) target.textContent = String(count);
       });
       const status = projectedStatus(item);
-      const alert = !["HEALTHY", "OPEN", "RELEASED"].includes(status);
+      const alert = !["HEALTHY", "OPEN", "RELEASED", "NOT YET INVOICED"].includes(status);
       const sourceNodeId = projection.sourceNodeId || value(item.id);
       document.querySelectorAll(`[data-health-node="${value(item.id)}"], [data-source-node="${sourceNodeId}"]`).forEach((target) => {
         target.classList.toggle("is-alert", alert);
@@ -5000,12 +5188,12 @@
       const column = create("div", "flow-column");
       const nodeId = value(item.id);
       const count = nodeId === "warehouse"
-        ? projectedCount("warehouse", expected)
+        ? projectedCount("warehouse", platform ? platform.received : expected)
         : nodeId === "message-queue"
           ? projectedCount("message-queue", queueException)
           : nodeId === "erp"
             ? projectedCount("erp", recorded)
-          : projectedCount("invoice", platform ? (platform.invoiceHeld ? 0 : recorded) : number(item.count));
+          : projectedCount("invoice", platform ? platform.invoiceCount : number(item.count));
       const previousCount = state.flowStageCounts.get(nodeId);
       const stageUpdated = previousCount != null && previousCount !== count;
       const node = create(
@@ -5041,7 +5229,8 @@
       const badge = create("span", "state-badge", null);
       const nodeStatus = projectedStatus(item);
       badge.classList.add(stateClass(nodeStatus));
-      const badgeIcon = ["HEALTHY", "OPEN", "RELEASED"].includes(nodeStatus)
+      const badgeIcon = nodeStatus === "NOT YET INVOICED" ? "ph-bold ph-clock"
+        : ["HEALTHY", "OPEN", "RELEASED"].includes(nodeStatus)
         ? "ph-bold ph-check"
         : "ph-bold ph-warning";
       badge.append(create("i", badgeIcon));
@@ -5059,7 +5248,7 @@
           : nodeId === "erp"
             ? "posted"
             : nodeId === "invoice"
-              ? "matched"
+              ? platform?.provenance === "live-read" ? "invoices" : "matched"
               : "records";
       const countLabel = create("span", "flow-node-count-label", semantics);
       node.setAttribute(
@@ -5149,8 +5338,8 @@
         purpose: "Physical receipt and available inventory entering the control loop.",
         external: { label: "Open ERPNext stock", url: "https://missing20.v.frappe.cloud/app/stock-entry" },
         metrics: [
-          ["Physically arrived", `${number(flow?.expected, item?.count)} units`],
-          ["Available", `${number(flow?.recorded)} units`],
+          ["Received", `${number(flow?.received, item?.count)} ${flow?.uom || "units"}`],
+          ["Case balance after issues", `${number(flow?.recorded)} ${flow?.uom || "units"}`],
           ["Days of supply", operations ? `${number(operations.inventory?.days_of_supply).toFixed(1)} days` : "—"],
           ["Stock ledger rows", String(stockLedger.length)],
         ],
@@ -5159,16 +5348,16 @@
         purpose: "Carries the receipt event and exposes acknowledgements, retries and unresolved records.",
         external: EXTERNAL_SERVICE_LINKS.celigo,
         metrics: [
-          ["Published", `${number(flow?.expected, item?.count)} units`],
+          ["Receipt posted", `${number(flow?.posted, item?.count)} ${flow?.uom || "units"}`],
           ["Unresolved", `${number(flow?.receiptUnresolved)} units`],
           ["Business key", value(caseFacts.receipt_business_key || "—")],
         ],
       },
       erp: {
         purpose: "Authoritative inventory ledger used to reconcile physical receipt, quality and financial state.",
-        external: erpDocumentLink("purchase_order", "purchase-order", "PUR-ORD-2026-00011"),
+        external: erpDocumentLink("purchase_order", "purchase-order"),
         metrics: [
-          ["ERP accounted", `${number(flow?.recorded, item?.count)} units`],
+          ["Receipt posted", `${number(flow?.posted, item?.count)} ${flow?.uom || "units"}`],
           ["Reconciled", impact ? `${number(impact.erp_reconciliation_percent).toFixed(1)}%` : "—"],
           ["Live source", value(liveERPDocument("purchase_order")?.name || "WAITING")],
           ["GL rows", String(generalLedger.length)],
@@ -5178,8 +5367,8 @@
         ],
       },
       invoice: {
-        purpose: "Payment control that remains held until receipt and exact-lot evidence reconcile.",
-        external: erpDocumentLink("purchase_invoice", "purchase-invoice", "ACC-PINV-2026-00007"),
+        purpose: "Current supplier invoice payment control, checked against receipt and exact-lot evidence.",
+        external: erpDocumentLink("purchase_invoice", "purchase-invoice"),
         metrics: [
           ["Invoice", value(impact?.invoice_status || (flow?.invoiceHeld ? "HELD" : "OPEN"))],
           ["Invoice value", impact ? formatCurrency(impact.invoice_value, currency) : "—"],
@@ -5201,10 +5390,10 @@
     const latestSourceEvent = platformMetrics.at(-1) || null;
     const latest = latestSourceEvent || (state.telemetry.length ? state.telemetry[state.telemetry.length - 1] : null);
     const liveValues = {
-      warehouse: liveFlow?.expected,
-      "message-queue": liveFlow?.expected,
-      erp: liveFlow?.recorded,
-      invoice: liveFlow ? (liveFlow.invoiceHeld ? 0 : liveFlow.recorded) : latestSourceEvent?.metrics?.invoice_count,
+      warehouse: liveFlow?.received,
+      "message-queue": liveFlow?.receiptUnresolved,
+      erp: liveFlow?.posted,
+      invoice: liveFlow ? liveFlow.invoiceCount : latestSourceEvent?.metrics?.invoice_count,
     };
     const selectedValue = liveFlow
       ? number(liveValues[value(item.id)])
@@ -6103,6 +6292,7 @@
 
   function dashboardEventSource(event) {
     const payload = event && event.payload && typeof event.payload === "object" ? event.payload : {};
+    if (["receiving-scan", "receiving-photo"].includes(value(event.source_id || payload.source_id))) return "Receiving";
     const haystack = `${value(event.source_id || payload.source_id)} ${value(event.actor)} ${value(event.provider)} ${value(event.type)} ${value(event.label)} ${value(event.detail)}`.toLowerCase();
     if (haystack.includes("airtable")) return "Airtable";
     if (haystack.includes("celigo")) return "Celigo";
@@ -6113,6 +6303,14 @@
     if (haystack.includes("manager") || haystack.includes("approval")) return "Manager";
     if (haystack.includes("agent") || haystack.includes("strand") || haystack.includes("investigation")) return "Agent";
     return "Control plane";
+  }
+
+  function operatorEventTime(occurredAt, sequence) {
+    if (Number.isNaN(occurredAt.getTime())) return `#${value(sequence)}`;
+    const time = occurredAt.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return occurredAt.toDateString() === new Date().toDateString()
+      ? time
+      : `${occurredAt.toLocaleDateString([], { month: "short", day: "numeric" })} · ${time}`;
   }
 
   function renderDashboardEventRail() {
@@ -6160,11 +6358,11 @@
     // control-plane row; otherwise the operator sees five sources plus flow.
     const newestBySource = new Map();
     allEvents.forEach((event) => newestBySource.set(dashboardEventSource(event), event));
-    const agentState = value(state.agentPlatform?.agent_run?.state).toUpperCase();
-    const agentIsActive = ["RUNNING", "INVESTIGATING", "PLAN_READY"].includes(agentState);
-    const preferredSources = agentIsActive && newestBySource.has("Agent")
-      ? ["ERPNext", "Airtable", "Celigo", "Jira", "Slack", "Agent"]
-      : ["ERPNext", "Airtable", "Celigo", "Jira", "Slack", "Control plane"];
+    // A completed answer is still a new event; do not hide it when the agent
+    // returns to VERIFIED/idle after a live conversation.
+    const preferredSources = newestBySource.has("Agent")
+      ? ["ERPNext", "Airtable", "Celigo", "Jira", "Slack", "Receiving", "Agent"]
+      : ["ERPNext", "Airtable", "Celigo", "Jira", "Slack", "Receiving", "Control plane"];
     const events = preferredSources
       .map((source) => newestBySource.get(source))
       .filter(Boolean)
@@ -6180,9 +6378,7 @@
       row.dataset.source = slug(dashboardEventSource(event));
       if (previousLatest > 0 && sequence > previousLatest) row.classList.add("is-new");
       const occurredAt = new Date(value(event.occurred_at || event.timestamp || event.created_at));
-      const timeLabel = Number.isNaN(occurredAt.getTime())
-        ? `#${value(event.sequence)}`
-        : occurredAt.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const timeLabel = operatorEventTime(occurredAt, event.sequence);
       const body = create("div", "dashboard-event-copy");
       body.append(
         create("span", "dashboard-event-source", dashboardEventSource(event)),
@@ -6193,6 +6389,11 @@
       feed.append(row);
     });
     $("dashboard-event-count").textContent = `${allEvents.length} events`;
+    const newest = events[events.length - 1];
+    const latestLabel = $("dashboard-event-now")?.firstElementChild;
+    if (latestLabel) latestLabel.textContent = newest
+      ? `Latest · ${operatorEventTime(new Date(value(newest.occurred_at || newest.timestamp || newest.created_at)), newest.sequence)}`
+      : "Waiting for events";
     if (latest > state.dashboardLatestRenderedSequence) state.dashboardLatestRenderedSequence = latest;
     if (state.dashboardEventFollow) window.requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; });
   }
@@ -6220,7 +6421,7 @@
               ? "Agent unavailable · retry required"
               : runState === "BLOCKED"
                 ? "Safe stop"
-            : ["RUNNING", "INVESTIGATING"].includes(runState)
+            : ["RUNNING", "REASONING", "INVESTIGATING"].includes(runState)
               ? "Investigating"
               : isNormalScenario() && !sourceAttention
                 ? "Monitoring"
@@ -6292,6 +6493,16 @@
       ["airtable", "erp"],
       ["slack", "invoice"],
     ];
+    // Source access remains useful while operational quantities are unknown.
+    // Hidden targets have zero bounds: positioning against them stacks every
+    // source at x=0 and draws dangling lines across the heading.
+    const connected = links.every(([, targetId]) => {
+      const target = $("flow-map")?.querySelector(`[data-node-id="${targetId}"]`);
+      const bounds = target?.getBoundingClientRect();
+      return bounds && bounds.width > 0 && bounds.height > 0;
+    });
+    map.dataset.layout = connected ? "connected" : "standalone";
+    if (!connected) return;
     links.forEach(([sourceId, targetId]) => {
       const source = map.querySelector(`[data-dashboard-evidence="${sourceId}"]`);
       const target = $("flow-map")?.querySelector(`[data-node-id="${targetId}"]`);
@@ -6325,7 +6536,9 @@
   }
 
   function renderDashboardEvidence() {
-    const sources = Array.isArray(state.saasEvidence?.sources) ? state.saasEvidence.sources : [];
+    const liveSystems = hasLiveSourceAuthority() && Array.isArray(state.agentPlatform?.systems)
+      ? state.agentPlatform.systems : null;
+    const sources = liveSystems || (Array.isArray(state.saasEvidence?.sources) ? state.saasEvidence.sources : []);
     const platformNodes = Array.isArray(state.agentPlatform?.evidence_constellation?.nodes)
       ? state.agentPlatform.evidence_constellation.nodes
       : [];
@@ -6339,12 +6552,14 @@
     if (evidenceLinks) evidenceLinks.hidden = hideEvidenceMap;
     document.querySelectorAll("[data-dashboard-evidence]").forEach((node) => {
       const id = value(node.dataset.dashboardEvidence);
-      const evidence = sources.find((item) => `${value(item.provider)} ${value(item.source_id)}`.toLowerCase().includes(id));
+      const evidence = sources.find((item) => `${value(item.id)} ${value(item.provider)} ${value(item.source_id)}`.toLowerCase().includes(id));
       const platformEvidence = platformNodes.find((item) => value(item?.id) === platformSourceIds[id]);
       const hasLiveRead = Boolean(evidence?.record_id);
+      const titleNode = node.querySelector("strong");
+      if (titleNode && id === "airtable") titleNode.textContent = evidence?.name === "Airtable Receiving" ? "Airtable Receiving" : "Airtable Quality";
       const status = value(
-        hasLiveRead
-          ? evidence.status || "CONNECTED"
+        (liveSystems || hasLiveRead)
+          ? evidence?.status || (liveSystems ? "NOT CONFIGURED" : "CONNECTED")
           : usePlatformTruth
             ? platformEvidence?.status || "WAITING"
             : state.saasEvidence ? "CONNECTED" : "WAITING",
@@ -6353,15 +6568,17 @@
       if (statusNode) statusNode.textContent = status;
       node.dataset.sourceStatus = status;
       node.dataset.sourceDetail = value(
-        hasLiveRead
-          ? `${value(evidence.provider)} · ${value(evidence.record_id)} · ${value(evidence.detail)}`
+        (liveSystems || hasLiveRead)
+          ? `${value(evidence?.name || evidence?.provider)} · ${value(evidence?.record_id)} · ${value(evidence?.detail)}`
           : usePlatformTruth
             ? platformEvidence?.detail || `${value(platformEvidence?.role || id)} evidence · sequence ${value(platformEvidence?.latest_sequence || "—")}`
             : evidence?.detail || evidence?.label || "No source event received yet",
       );
       node.dataset.sourceSequence = value(evidence?.record_id || platformEvidence?.latest_sequence || state.lastSequence || "—");
+      node.dataset.sourceRecordId = value(evidence?.record_id);
+      node.dataset.sourceUrl = value(evidence?.url || "");
       node.classList.toggle("is-live", hasLiveRead || (usePlatformTruth ? Boolean(platformEvidence) : Boolean(evidence)));
-      node.classList.toggle("is-attention", ["UNKNOWN", "TIMEOUT", "HELD", "BLOCKED"].includes(status.toUpperCase()));
+      node.classList.toggle("is-attention", ["UNKNOWN", "TIMEOUT", "HELD", "BLOCKED", "DEGRADED", "NOT CONFIGURED"].includes(status.toUpperCase()));
     });
     window.requestAnimationFrame(renderDashboardEvidenceLinks);
   }
@@ -7155,11 +7372,60 @@
     $("agent-view").hidden = state.view !== "agent";
     $("scenario-view").hidden = !state.demoControlsOpen;
     $("demo-controls-toggle")?.setAttribute("aria-expanded", String(state.demoControlsOpen));
+    renderSourceFreshness();
     bodyReady();
   }
 
+  function renderSourceFreshness() {
+    const sourceCase = state.agentPlatform?.case_projection;
+    const sourceQuantities = sourceCase?.case?.quantities;
+    const quantitiesUnknown = sourceCase?.provenance === "live-read" && sourceQuantities
+      && ["ordered", "available", "quality_hold", "receipt_unresolved"].some((key) => sourceQuantities[key] == null);
+    const unavailable = state.agentPlatform?.source_freshness?.status === "UNAVAILABLE"
+      || Boolean(state.agentPlatformReadError) || Boolean(quantitiesUnknown);
+    const wasUnavailable = document.body.dataset.sourceFreshness === "unavailable";
+    document.body.dataset.sourceFreshness = unavailable ? "unavailable" : "current";
+    $("source-unavailable").hidden = !unavailable;
+    $("source-unavailable-title").textContent = state.agentPlatform?.source_freshness?.error_code === "RATE_LIMITED"
+      ? "ERPNext is rate-limiting reads. Retrying after its cooldown." : "ERP data is temporarily unavailable.";
+    if (!unavailable) return;
+    // Missing source records are not zero stock. Keep historical events/proof,
+    // but do not manufacture a current healthy state from null quantities.
+    $("incident-title").textContent = quantitiesUnknown ? "Receipt quantities need verification" : "Waiting for ERP data";
+    $("header-incident-state").textContent = "SOURCE UNAVAILABLE";
+    setBadge($("path-status"), "UNKNOWN", "BLOCKED");
+    ["expected-count", "recorded-count", "queue-count"].forEach((id) => { $(id).textContent = "—"; });
+    $("platform-title").textContent = "Current evidence unavailable";
+    $("platform-correlation-detail").textContent = "Earlier investigation retained · waiting for a fresh ERP read";
+    setBadge($("platform-run-state"), "HISTORY", "NEUTRAL");
+    setBadge($("platform-diagnosis-status"), "HISTORY", "NEUTRAL");
+    $("platform-diagnosis-summary").textContent = "Waiting for current source evidence.";
+    if (!state.agentPlatformQuestionBusy && !state.agentPlatformQuestionAttempt
+      && state.agentPlatform?.conversation?.length) {
+      setBadge($("platform-answer-status"), "HISTORY", "NEUTRAL");
+    }
+    $("platform-confidence").textContent = "Current quantities unknown";
+    $("platform-conclusion").textContent = "FRESH EVIDENCE REQUIRED";
+    $("platform-outcome-status").textContent = "HISTORICAL RESULT";
+    $("platform-outcome-summary").textContent = "The prior result is retained; the current ERP state could not be verified.";
+    $("platform-state-transition").hidden = true;
+    $("platform-execution-actions").hidden = true;
+    $("platform-diagnose").hidden = true;
+    $("business-supplier-status").textContent = "SUPPLIER UNKNOWN";
+    $("business-invoice-status").textContent = "INVOICE UNKNOWN";
+    $("business-order-status").textContent = "ORDER UNKNOWN";
+    document.querySelectorAll(".business-status-chip").forEach((item) => { item.dataset.tone = "alert"; });
+    document.querySelectorAll(".business-metric strong").forEach((item) => { item.textContent = "—"; });
+    $("business-detail-alert").hidden = true;
+    ["trend-time", "business-trend-time"].forEach((id) => { $(id).textContent = "HISTORY"; });
+    $("platform-case-tuple").querySelectorAll(".platform-tuple > span").forEach((item) => { item.textContent = "—"; });
+    $("platform-reconciled-findings").replaceChildren();
+    if (!wasUnavailable) closeDashboardComponentInspector();
+  }
+
   function bodyReady() {
-    const ready = state.loaded && state.units.size > 0;
+    const ready = state.loaded && state.units.size > 0
+      && Boolean(state.agentPlatform || state.agentPlatformError);
     document.body.dataset.workspaceReady = ready ? "true" : "false";
     if (ready) document.body.dataset.bootState = "ready";
     const disconnected = state.connection === "paused" && Boolean(state.streamError);
@@ -7321,13 +7587,32 @@
   $("dashboard-inject-incident").addEventListener("click", () => {
     const liveFlow = platformFlowProjection();
     if (liveFlow?.provenance === "live-read") {
-      window.open(EXTERNAL_SERVICE_LINKS.erpnext.url, "_blank", "noopener,noreferrer");
+      window.open(erpDocumentLink("purchase_order", "purchase-order").url, "_blank", "noopener,noreferrer");
       return;
     }
     selectScenario("incident");
   });
   $("platform-diagnose")?.addEventListener("click", runPlatformDiagnosis);
   $("platform-stop")?.addEventListener("click", () => runPlatformAction("stop"));
+  $("platform-automation")?.addEventListener("click", async () => {
+    const platform = state.agentPlatform;
+    if (!platform?.automation || state.agentPlatformActionBusy) return;
+    state.agentPlatformActionBusy = true;
+    scheduleRender();
+    try {
+      const automation = await requestJSON("/api/v1/agent-platform/automation", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: { enabled: !platform.automation.enabled, case_id: platform.case_id, operator_id: "M20 Demo Operator" },
+      });
+      setAgentPlatformProjection({ ...platform, automation });
+      state.agentPlatformError = "";
+    } catch (error) {
+      state.agentPlatformError = error.message;
+    } finally {
+      state.agentPlatformActionBusy = false;
+      scheduleRender();
+    }
+  });
   $("platform-approve-execute")?.addEventListener("click", () => runPlatformAction("approve-and-execute", { manager_id: "M20 Demo Manager", idempotency_key: makeKey("m20-platform-execute") }));
   $("platform-reject-plan")?.addEventListener("click", () => runPlatformAction("reject", {
     manager_id: "M20 Demo Manager",
@@ -7450,10 +7735,12 @@
         title: value(node.querySelector("strong")?.textContent || node.dataset.dashboardEvidence),
         status: value(node.dataset.sourceStatus || "WAITING"),
         purpose: value(node.dataset.sourceDetail || "Connected source evidence for the active case."),
-        external: EXTERNAL_SERVICE_LINKS[value(node.dataset.dashboardEvidence)] || null,
+        external: node.dataset.sourceUrl?.startsWith("https://")
+          ? { url: node.dataset.sourceUrl, label: "Open source record" }
+          : EXTERNAL_SERVICE_LINKS[value(node.dataset.dashboardEvidence)] || null,
         metrics: [
           ["Status", value(node.dataset.sourceStatus || "WAITING")],
-          ["Ledger sequence", value(node.dataset.sourceSequence || "—")],
+          [node.dataset.sourceRecordId ? "Source record" : "Ledger sequence", value(node.dataset.sourceSequence || "—")],
           ["Case", value(state.agentPlatform?.case_id || state.snapshot?.incident_id || "—")],
         ],
       });

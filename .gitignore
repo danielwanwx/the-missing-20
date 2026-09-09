@@ -25,6 +25,7 @@ cdk.out/
 *.tfstate.*
 research-runs/
 .missing20-runtime/
+.missing20-*/
 .superpowers/
 artifacts/runtime/
 

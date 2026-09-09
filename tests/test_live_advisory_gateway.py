@@ -49,6 +49,17 @@ def test_gateway_model_budget_matches_structured_investigation_output_limit() ->
     assert factory.config.budget.max_output_tokens_per_request == factory.config.max_tokens
 
 
+def test_sdk_error_result_is_failure_even_without_exception() -> None:
+    progress = []
+    hooks = advisory_module._RuntimeTelemetryHooks(lambda name, phase: progress.append(phase))
+    hooks.after_tool(SimpleNamespace(
+        tool_use={"name": "consult_quality", "toolUseId": "t1"},
+        result={"status": "error"}, exception=None,
+    ))
+    assert progress == ["failed"]
+    assert hooks.events[-1]["type"] == "tool.failed"
+
+
 def test_sdk_hooks_emit_redacted_runtime_telemetry_and_progress() -> None:
     progress: list[tuple[str, str]] = []
     runtime_progress: list[dict[str, object]] = []
@@ -114,6 +125,80 @@ def test_gateway_preserves_failure_diagnostics_without_publishing_an_answer() ->
     assert investigation["validation_diagnostics"] == diagnostics
 
 
+def test_gateway_does_not_publish_nested_rejected_candidate() -> None:
+    def runner(*args, **kwargs):
+        error = advisory_module.AdvisoryValidationError("test rejection")
+        error.diagnostics = [
+            {
+                "stage": "validation",
+                "candidate": {
+                    "reason": "UNSAFE_CANDIDATE_PROSE",
+                    "safe_next_step": "POST_WITHOUT_APPROVAL",
+                    "evidence_ids": ["UNSUPPORTED_CITATION"],
+                },
+            }
+        ]
+        raise error
+
+    gateway = DashboardAdvisoryGateway(
+        AmbiguousCasePlatform(), settings=_settings(AgentProvider.BEDROCK), runner=runner
+    )
+    for response in (gateway.ask("Investigate"), gateway.investigate(gateway._platform.current())):
+        assert response["validation_diagnostics"] == [{"stage": "validation"}]
+        assert "UNSAFE_CANDIDATE" not in str(response)
+        assert "POST_WITHOUT_APPROVAL" not in str(response)
+        assert "UNSUPPORTED_CITATION" not in str(response)
+
+
+def test_missing_live_source_is_not_claimed_as_a_failed_model_answer() -> None:
+    class Platform:
+        def current(self):
+            return {"source_freshness": {"status": "UNAVAILABLE", "error_code": "RATE_LIMITED"}}
+
+    def runner(*args, **kwargs):
+        raise AssertionError("missing current evidence must not spend model budget")
+
+    response = DashboardAdvisoryGateway(
+        Platform(),
+        settings=_settings(AgentProvider.BEDROCK),
+        runner=runner,
+    ).ask("Show the receiving trend")
+    assert response["agent_advisory"]["status"] == "SOURCE_UNAVAILABLE"
+    assert response["agent_advisory"]["mode"] == "not_invoked"
+    assert "no model request was started" in response["answer"]
+
+
+def test_outage_history_question_can_inspect_retained_data_without_faking_an_agent_answer():
+    class Platform:
+        def current(self):
+            return {
+                "case_id": "case-history",
+                "source_freshness": {"status": "UNAVAILABLE"},
+                "operational_history": {
+                    "case_id": "case-history",
+                    "points": [{"case_id": "case-history", "id": 1,
+                                "metrics": {"received": 10}}],
+                    "baseline": {"status": "INSUFFICIENT_DATA"},
+                },
+            }
+
+    def runner(*args, **kwargs):
+        raise AssertionError("historical data display must not claim a model invocation")
+
+    gateway = DashboardAdvisoryGateway(
+        Platform(), settings=_settings(AgentProvider.BEDROCK), runner=runner,
+    )
+    response = gateway.ask("Show the receiving trend and its historical baseline.")
+    advisory = response["agent_advisory"]
+    assert advisory["status"] == "SOURCE_UNAVAILABLE"
+    assert advisory["mode"] == "not_invoked"
+    assert advisory["result"] is None
+    assert advisory["tool_calls"] == []
+    assert advisory["retained_views"][0]["history"]["points"][0]["metrics"]["received"] == 10
+    assert advisory["retained_views"][0]["metric"] == "received"
+    assert "retained_views" not in gateway.ask("Can I submit this receipt?")["agent_advisory"]
+
+
 def test_verified_answer_does_not_require_a_magic_completion_word() -> None:
     advisory_module.validate_advisory(
         LiveAdvisoryResult(
@@ -128,6 +213,83 @@ def test_verified_answer_does_not_require_a_magic_completion_word() -> None:
         expected_disposition=AdvisoryDisposition.RECOVERY_COMPLETE,
         expected_safe_next_step="No further action is required.",
     )
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("12.8 units", False),
+        ("12 and 8 units", True),
+        ("12 units, 8.", True),
+    ],
+)
+def test_explanation_cannot_match_quantities_from_decimal_fragments(text, expected) -> None:
+    assert all(advisory_module._contains_quantity(text, value) for value in (12, 8)) is expected
+
+
+@pytest.mark.parametrize(
+    "next_step",
+    [
+        "Review the records and execute the write.",
+        "Post the duplicate receipt now.",
+        "We should retry the import.",
+    ],
+)
+def test_refused_or_denied_turn_cannot_suggest_a_write(next_step) -> None:
+    for disposition, read_only in [
+        (AdvisoryDisposition.DENY, False),
+        (AdvisoryDisposition.RECOVERY_READY, True),
+    ]:
+        with pytest.raises(advisory_module.AdvisoryValidationError):
+            advisory_module.validate_advisory(
+                LiveAdvisoryResult(
+                    disposition=disposition,
+                    evidence_ids=("receipt",),
+                    reason="Inspect the existing source records.",
+                    safe_next_step=next_step,
+                    write_performed=False,
+                ),
+                calls=("read_control_context", "read_erp_evidence"),
+                evidence_ids=("receipt",),
+                expected_disposition=disposition,
+                expected_safe_next_step="Inspect only.",
+                read_only_requested=read_only,
+            )
+
+
+@pytest.mark.parametrize(
+    "next_step",
+    [
+        "Monitor the open invoice.",
+        "Review the release record.",
+        "Do not retry; inspect the receipt.",
+    ],
+)
+def test_completed_turn_can_monitor_or_inspect_without_reopening_recovery(next_step) -> None:
+    advisory_module.validate_advisory(
+        LiveAdvisoryResult(
+            disposition=AdvisoryDisposition.RECOVERY_COMPLETE,
+            evidence_ids=("receipt",),
+            reason="The authoritative records reconcile.",
+            safe_next_step=next_step,
+            write_performed=False,
+        ),
+        calls=("read_control_context", "read_erp_evidence"),
+        evidence_ids=("receipt",),
+        expected_disposition=AdvisoryDisposition.RECOVERY_COMPLETE,
+        expected_safe_next_step="Review only.",
+    )
+
+
+def test_repair_feedback_does_not_invent_transfer_or_force_completed_case_approval() -> None:
+    feedback = advisory_module._repair_instruction(
+        "safe next step conflicts with verified recovery control", []
+    )
+    assert "complete case needs no recovery approval" in feedback
+    for failure in ("residual invoice hold", "deterministic recovery readiness"):
+        assert "completed quality transfer is present" not in advisory_module._repair_instruction(
+            failure, []
+        )
 
 
 def test_source_explanation_cannot_collapse_receipt_gap_and_quality_hold() -> None:
@@ -252,7 +414,8 @@ def test_unlabelled_advisory_uses_bounded_evaluator_feedback(
     assert "Validation failed" in messages[1]
     assert "RECOVERY_READY" not in messages[1]
     if len(messages) == 3:
-        assert "deterministic control-plane disposition" in messages[2]
+        assert "Independently re-evaluate" in messages[2]
+        assert "RECOVERY_READY" not in messages[2]
     assert all("expected_disposition" not in read for read in reads)
 
 
@@ -430,6 +593,7 @@ def test_live_erp_projection_becomes_a_source_investigation_without_synthetic_id
             "source_sequence": 4,
             "case": {
                 "case_id": "M20-LIVE-1",
+                "uom": "EA",
                 "purchase_order": "PO-LIVE-1",
                 "purchase_receipt": "PR-LIVE-1",
                 "purchase_invoice": "PI-LIVE-1",
@@ -506,6 +670,7 @@ def test_live_erp_projection_does_not_invent_a_quality_transfer_from_zero_hold()
             "source_sequence": 4,
             "case": {
                 "case_id": "M20-LIVE-NO-TRANSFER",
+                "uom": "EA",
                 "purchase_order": "PO-LIVE-2",
                 "purchase_receipt": "PR-LIVE-2",
                 "purchase_invoice": "PI-LIVE-2",
@@ -557,6 +722,7 @@ def test_live_customer_order_gap_is_visible_to_agent_and_requires_manager_gate()
             "source_sequence": 5,
             "case": {
                 "case_id": "M20-LIVE-ORDER",
+                "uom": "EA",
                 "purchase_order": "PO-LIVE-ORDER",
                 "purchase_receipt": "PR-LIVE-ORDER",
                 "purchase_invoice": "PI-LIVE-ORDER",
@@ -826,7 +992,7 @@ def test_competition_packet_starts_unsolved_and_switches_after_execution() -> No
     assert post_execution["expected_disposition"] == "DENY"
 
 
-def test_connected_competition_packet_exposes_fresh_external_read_receipts() -> None:
+def test_connected_competition_packet_keeps_fresh_connection_receipts_outside_case_facts() -> None:
     projection = AmbiguousCasePlatform().current()
     erp = {
         "status": "CONNECTED",
@@ -879,16 +1045,19 @@ def test_connected_competition_packet_exposes_fresh_external_read_receipts() -> 
         projection, erp_evidence=erp, saas_evidence=saas
     )
 
-    assert packet["source"] == "connected-demo-evidence"
+    assert packet["source"] == "synthetic-demo-fixture"
     assert packet["connected_sources"] == 5
-    assert "PUR-ORD-2026-00011" in packet["evidence_ids"]
-    assert "rec-real-4817" in packet["evidence_ids"]
-    sources = packet["tool_payload"]["sources"]
-    assert sources["read_erp_evidence"]["live_read"]["sequence"] == 31
-    assert sources["read_airtable_evidence"]["live_read"]["record_id"] == "rec-real-4817"
-    assert sources["read_celigo_evidence"]["live_read"]["record_id"] == "run-real-4817"
-    collaboration = sources["read_collaboration_evidence"]["live_reads"]
-    assert {item["source_id"] for item in collaboration} == {
+    assert "PUR-ORD-2026-00011" not in packet["evidence_ids"]
+    assert "rec-real-4817" not in packet["evidence_ids"]
+    receipts = {item["source_id"]: item for item in packet["connection_receipts"]}
+    assert receipts["erpnext-missing20"]["sequence"] == 31
+    assert receipts["erpnext-missing20"]["record_count"] == 3
+    assert receipts["airtable-quality-registry"]["received_at"] == "2026-09-07T05:00:01Z"
+    assert all(item["case_evidence"] is False for item in receipts.values())
+    assert set(receipts) == {
+        "erpnext-missing20",
+        "airtable-quality-registry",
+        "celigo-quality-release",
         "jira-capa",
         "slack-quality-alerts",
     }

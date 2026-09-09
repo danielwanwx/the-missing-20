@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+from configparser import ConfigParser
+from configparser import Error as ConfigError
 from dataclasses import dataclass
 from pathlib import Path
+from shlex import quote
 from typing import Any
 
 from the_missing_20.config import ConfigurationError, Settings
@@ -63,6 +67,66 @@ def validate_cli_version(version_output: str) -> None:
         raise PreflightError("AWS CLI 2.32.0 or newer is required")
 
 
+def resolve_login_profile(profile: str, config: ConfigParser) -> str:
+    """Follow role sources without overwriting an AssumeRole or SSO profile."""
+    visited: set[str] = set()
+    while profile not in visited:
+        visited.add(profile)
+        section = "default" if profile == "default" else f"profile {profile}"
+        if config.has_option(section, "role_arn"):
+            source = config.get(section, "source_profile", fallback="").strip()
+            if not source:
+                raise PreflightError(
+                    "role profile needs a verified source_profile; do not overwrite it"
+                )
+            profile = source
+        elif config.has_option(section, "login_session"):
+            return profile
+        else:
+            raise PreflightError(
+                "no login_session found; inspect the configured authentication method"
+            )
+    raise PreflightError("AWS source_profile cycle; repair configuration before login")
+
+
+def login_recovery_message(profile: str, region: str) -> str:
+    return (
+        f"Start a fresh same-device login: aws login --profile {quote(profile)} "
+        f"--region {quote(region)}. Keep that process running and open only its newly generated "
+        "URL; old localhost callbacks expire. See docs/runbooks/aws-login.md. "
+        "No browser session or credential was deleted by this check."
+    )
+
+
+def _identity_failure(settings: Settings, error: subprocess.CalledProcessError) -> PreflightError:
+    # Never echo provider output: it can contain sign-in URLs or other auth material.
+    detail = (error.stderr or "").lower()
+    if any(word in detail for word in ("throttl", "rate exceeded", "token bucket", "429")):
+        return PreflightError(
+            "AWS identity request rate-limited; wait before retrying, not re-login"
+        )
+    auth_failures = (
+        "expiredtoken",
+        "invalidclienttokenid",
+        "token has expired",
+        "login expired",
+        "credentials have expired",
+        "unable to locate credentials",
+        "login session has expired",
+        "error loading login credentials",
+        "sso session associated with this profile has expired",
+    )
+    if not any(word in detail for word in auth_failures):
+        return PreflightError("AWS identity request failed; check network and STS access")
+    config = ConfigParser(interpolation=None)
+    try:
+        config.read(Path(os.environ.get("AWS_CONFIG_FILE", str(Path.home() / ".aws/config"))))
+        profile = resolve_login_profile(settings.aws_profile or "", config)
+    except (ConfigError, OSError, PreflightError) as exc:
+        return PreflightError(f"AWS authentication unavailable: {exc}")
+    return PreflightError(login_recovery_message(profile, settings.aws_region))
+
+
 def load_identity(settings: Settings) -> Identity:
     aws = shutil.which("aws")
     if aws is None:
@@ -70,7 +134,9 @@ def load_identity(settings: Settings) -> Identity:
     if settings.aws_profile is None:
         raise PreflightError("MISSING20_AWS_PROFILE is required")
 
-    version = subprocess.run([aws, "--version"], check=True, capture_output=True, text=True)
+    version = subprocess.run(
+        [aws, "--version"], check=True, capture_output=True, text=True, timeout=10
+    )
     validate_cli_version(version.stdout or version.stderr)
 
     command = [
@@ -83,8 +149,16 @@ def load_identity(settings: Settings) -> Identity:
         settings.aws_region,
         "--output",
         "json",
+        "--cli-connect-timeout",
+        "10",
+        "--cli-read-timeout",
+        "15",
+        "--no-cli-pager",
     ]
-    completed = subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=45)
+    except subprocess.CalledProcessError as exc:
+        raise _identity_failure(settings, exc) from None
     payload: dict[str, Any] = json.loads(completed.stdout)
     return Identity(account_id=str(payload["Account"]), arn=str(payload["Arn"]))
 

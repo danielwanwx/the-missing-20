@@ -1,0 +1,66 @@
+{
+  "version": 2,
+  "scope": "Public-photo development fixtures, not an unseen physical warehouse benchmark. Truth was visually annotated before model evaluation. Only normalized image bytes reach the model.",
+  "cases": [
+    {
+      "id": "p01", "file": "p01.jpg", "title": "Four separated battery pieces",
+      "source_url": "https://commons.wikimedia.org/wiki/File:AA_batteries.JPG",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/c/c1/AA_batteries.JPG",
+      "license": "CC BY-SA 3.0", "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "AA batteries — Dmitry G; original bytes, no local edits.",
+      "sha256": "e8c7e911239950530cc12cbaaf1123b363dc1c3c1600d47830f113344a188e28",
+      "truth": {"visibility": "clear", "statuses": ["COUNT_CANDIDATE"], "countable": true, "visible_count": 4, "receiving_unit": "piece", "item_codes": [""], "supplier_lots": [""], "label_declared_quantity": null},
+      "annotation": "Four complete separated batteries of different brands. Model/type/voltage text is not an ERP SKU. No PO identity or stock arrival is established."
+    },
+    {
+      "id": "p02", "file": "p02.jpg", "title": "One complete bearing assembly",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Ball_bearing.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Ball_bearing.jpg",
+      "license": "CC BY-SA 3.0", "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Ball bearing — Solaris2006; CC BY-SA license migration option; original bytes, no local edits.",
+      "sha256": "05b88a4187c86f2bd6aa6982b19548fb981e92f847099d96a135ab955d9e1ff1",
+      "truth": {"visibility": "clear", "statuses": ["COUNT_CANDIDATE"], "countable": true, "visible_count": 1, "receiving_unit": "piece", "item_codes": [""], "supplier_lots": [""], "label_declared_quantity": null},
+      "annotation": "One complete bearing, not a shipment of its internal steel balls. No legible SKU or lot. Surface appearance cannot establish functional quality."
+    },
+    {
+      "id": "p03", "file": "p03.jpg", "title": "Overlapping batteries require a retake",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Four_AA_batteries.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/8/83/Four_AA_batteries.jpg",
+      "license": "CC BY 2.0", "license_url": "https://creativecommons.org/licenses/by/2.0/",
+      "attribution": "Four AA batteries — Metalphoenix; Commons crop/gamma correction by Wdwd; no further local edits.",
+      "sha256": "bd63f42e368df0f57a9bbbda4211f6832105298c518d9b070461a7f66a36e052",
+      "truth": {"visibility": "occluded", "statuses": ["NEEDS_PHOTO"], "countable": false, "visible_count": null, "item_codes": [""], "supplier_lots": [""], "reshoot_required": true},
+      "annotation": "Four apparent batteries, but the rear diagonal one is obscured. Strict pilot requires separated complete objects; no accepted count should be emitted."
+    },
+    {
+      "id": "p04", "file": "p04.jpg", "title": "Cropped batteries require a wider view",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Duracell_AA_batteries.JPG",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/7/71/Duracell_AA_batteries.JPG",
+      "license": "Public domain", "license_url": "https://commons.wikimedia.org/wiki/File:Duracell_AA_batteries.JPG#Summary",
+      "attribution": "Duracell AA batteries — Mygoodsweaties; worldwide public-domain release on Commons source page; original bytes.",
+      "sha256": "fe19674166446b05b864b29c35050f0b1742ec4baec6fdf30c9a5317bb2d6546",
+      "truth": {"visibility": "cropped", "statuses": ["NEEDS_PHOTO"], "countable": false, "visible_count": null, "item_codes": [""], "supplier_lots": [""], "reshoot_required": true},
+      "annotation": "Top and bottom batteries cross the image boundary; glare and blur. Neither brand nor best-before date is an ERP identity or supplier lot."
+    },
+    {
+      "id": "p05", "file": "p05.jpg", "title": "Outer carton is not its contents",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Cardboard_box.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/d/d7/Cardboard_box.jpg",
+      "license": "CC BY-SA 4.0", "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attribution": "Cardboard box — MrBeastRapper; original JPEG and EXIF orientation preserved in fixture, normalized only on intake.",
+      "sha256": "e82150d70bf8165671690ee252ae2d7851384295ac1bb4fb02ced05efe20b2b6",
+      "truth": {"visibility": "clear", "statuses": ["COUNT_CANDIDATE", "NEEDS_REVIEW"], "countable": true, "visible_count": 1, "receiving_unit": "carton", "item_codes": [""], "supplier_lots": [""], "label_declared_quantity": null},
+      "annotation": "One open carton. Hidden contents unknown, not a sealed package. Do not infer part quantity from box flaps, printed form or the carton count. Condition review allowed."
+    },
+    {
+      "id": "p06", "file": "p06.jpg", "title": "Outdoor scene is not receiving evidence",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Blue_sky_image.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Blue_sky_image.jpg",
+      "license": "CC0 1.0", "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "attribution": "Blue sky image — Renukarenu1861; original bytes, no local edits.",
+      "sha256": "7453adb9c9961b80ccfe8d6a0cd710323d63d928f14d77d3cd5c8bb0a1e45154",
+      "truth": {"visibility": "no_goods", "statuses": ["NEEDS_PHOTO"], "countable": false, "visible_count": null, "item_codes": [""], "supplier_lots": [""], "reshoot_required": true},
+      "annotation": "Clouds, palm trees and distant aircraft are not receiving goods. No count or identity can be promoted to stock."
+    }
+  ]
+}

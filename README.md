@@ -227,4 +227,7 @@ SQLite · Server-Sent Events · Vanilla JavaScript/CSS
 
 ## License
 
-[MIT](LICENSE)
+Project source code: [MIT](LICENSE). Third-party public photo fixtures in
+`tests/fixtures/photo_receiving/` are **not MIT-licensed**: each retains the
+CC BY, CC BY-SA, CC0 or public-domain terms and attribution recorded in the
+[fixture manifest](tests/fixtures/photo_receiving/manifest.json).

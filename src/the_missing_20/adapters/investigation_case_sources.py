@@ -7,6 +7,7 @@ computed discrepancy partition or recommended repair.
 
 from collections.abc import Mapping
 from copy import deepcopy
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 Variant = Literal[
@@ -504,9 +505,21 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
     matched_records = [
         row for row in records if row["po"] == invoice["po"] and row["line"] == invoice["line"]
     ]
-    available_quantity = sum(
+    legacy_available_quantity = sum(
         row["quantity"] for row in matched_records if row["stock_type"] == "AVAILABLE"
     )
+    accepted_records = [row for row in matched_records if row["stock_type"] == "ACCEPTED_RECEIPT"]
+    accepted_quantity = (
+        sum(row["quantity"] for row in accepted_records)
+        if accepted_records
+        else legacy_available_quantity
+    )
+    issued_quantity = sum(
+        row["quantity"]
+        for row in ledger.get("recorded_issues", [])
+        if row.get("po") == invoice["po"] and row.get("line") == invoice["line"]
+    )
+    available_quantity = accepted_quantity - issued_quantity
     quality_quantity = sum(
         row["quantity"] for row in matched_records if row["stock_type"] == "QUALITY_INSPECTION"
     )
@@ -559,8 +572,10 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
             "invoice_status": invoice["status"],
             "physical_received_quantity": physical_quantity,
             "erp_available_quantity": available_quantity,
+            "erp_accepted_receipt_quantity": accepted_quantity,
+            "erp_recorded_issue_quantity": issued_quantity,
             "erp_quality_inspection_quantity": quality_quantity,
-            "erp_accounted_quantity": available_quantity + quality_quantity,
+            "erp_accounted_quantity": accepted_quantity + quality_quantity,
             "ledger_read_status": ledger["status"],
             "ledger_pagination_complete": ledger["pagination_complete"],
             "integration_attempt_quantity": attempt["quantity"],
@@ -596,6 +611,9 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
             "customer_delivered_quantity": customer_delivered_quantity,
             "customer_booked_revenue": customer_booked_revenue,
             "customer_billed_revenue": customer_billed_revenue,
+            "customer_billing_complete": (
+                customer_order.get("billing_complete") if customer_order_present else None
+            ),
             "causal_revenue_increase_proven": causal_revenue_increase_proven,
             "customer_delivery_note": (
                 customer_order.get("delivery_note") if customer_order_present else None
@@ -619,9 +637,26 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
     key_present = observed["integration_business_key_present_in_erp"]
     transfer_present = observed["exact_held_lot_transfer_present"]
     duplicate_invoice = observed["duplicate_supplier_invoice_present"]
-    commercial_match = (
-        observed["invoice_unit_price"] == observed["po_unit_price"]
-        and observed["invoice_currency"] == observed["po_currency"]
+
+    def price(value: object) -> Decimal | None:
+        try:
+            amount = Decimal(str(value))
+            return amount if amount.is_finite() and amount >= 0 else None
+        except InvalidOperation:
+            return None
+
+    invoice_price, po_price = (
+        price(observed["invoice_unit_price"]),
+        price(observed["po_unit_price"]),
+    )
+    commercial_known = (
+        invoice_price is not None
+        and po_price is not None
+        and bool(observed["invoice_currency"])
+        and bool(observed["po_currency"])
+    )
+    commercial_match = commercial_known and (
+        invoice_price == po_price and observed["invoice_currency"] == observed["po_currency"]
     )
     supplier_active = (
         observed["supplier_status"] == "ACTIVE" and observed["supplier_payment_hold"] is False
@@ -638,13 +673,31 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
         and observed["invoice_status"] == "OPEN"
     )
     customer_order_present = observed.get("customer_order_present") is True
-    customer_order_read_complete = not customer_order_present or all(
-        isinstance(observed.get(key), (int, float))
-        for key in (
-            "customer_order_quantity",
-            "customer_delivered_quantity",
-            "customer_booked_revenue",
-            "customer_billed_revenue",
+    explicit_billing_complete = observed.get("customer_billing_complete")
+    customer_order_read_complete = not customer_order_present or (
+        all(
+            isinstance(observed.get(key), (int, float))
+            for key in (
+                "customer_order_quantity",
+                "customer_delivered_quantity",
+            )
+        )
+        and (
+            isinstance(explicit_billing_complete, bool)
+            or all(
+                isinstance(observed.get(key), (int, float))
+                for key in ("customer_booked_revenue", "customer_billed_revenue")
+            )
+        )
+    )
+    billing_complete = (
+        explicit_billing_complete
+        if isinstance(explicit_billing_complete, bool)
+        else bool(
+            customer_order_read_complete
+            and customer_order_present
+            and observed["customer_booked_revenue"] > 0
+            and observed["customer_billed_revenue"] >= observed["customer_booked_revenue"]
         )
     )
     customer_order_requires_fulfillment = (
@@ -653,7 +706,7 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
         and (
             observed.get("customer_order_status") == "ORDER_HELD"
             or observed["customer_delivered_quantity"] < observed["customer_order_quantity"]
-            or observed["customer_billed_revenue"] < observed["customer_booked_revenue"]
+            or not billing_complete
         )
     )
     customer_order_complete = (
@@ -661,8 +714,7 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
         and customer_order_read_complete
         and observed["customer_order_quantity"] > 0
         and observed["customer_delivered_quantity"] >= observed["customer_order_quantity"]
-        and observed["customer_booked_revenue"] > 0
-        and observed["customer_billed_revenue"] >= observed["customer_booked_revenue"]
+        and billing_complete
         and bool(observed.get("customer_delivery_note"))
         and bool(observed.get("customer_sales_invoice"))
     )
@@ -676,6 +728,11 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
         disposition, reason = (
             "DENY",
             "The supplier invoice number already exists on another posted ERP document.",
+        )
+    elif not commercial_known:
+        disposition, reason = (
+            "NEEDS_EVIDENCE",
+            "Matched net invoice/PO prices and currency are not available for comparison.",
         )
     elif not commercial_match:
         disposition, reason = (
@@ -700,7 +757,7 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
     elif customer_order_present and not customer_order_read_complete:
         disposition, reason = (
             "NEEDS_EVIDENCE",
-            "The customer order-to-cash read is incomplete.",
+            "The customer issue and billing read is incomplete.",
         )
     elif already_complete and customer_order_requires_fulfillment:
         disposition, reason = (
@@ -711,7 +768,8 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
     elif already_complete and customer_order_complete:
         disposition, reason = (
             "RECOVERY_COMPLETE",
-            "Procurement, customer delivery, and customer billing are authoritatively reconciled.",
+            "Procurement, recorded goods issue, and billing are authoritatively reconciled; "
+            "carrier delivery and cash collection are not asserted.",
         )
     elif already_complete:
         disposition, reason = (

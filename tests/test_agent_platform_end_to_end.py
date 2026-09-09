@@ -327,6 +327,17 @@ def test_live_customer_order_is_manager_gated_and_verified_to_billed_revenue() -
     next(row for row in erp.payload["documents"] if row.get("kind") == "purchase_order")[  # type: ignore[union-attr]
         "line_value"
     ] = 24000
+    next(row for row in erp.payload["documents"] if row.get("kind") == "purchase_order").update(  # type: ignore[union-attr]
+        {
+            "quantity": 20,
+            "unit_rate": 1200,
+            "currency": "USD",
+            "items": [{"item_code": "ECU", "uom": "Nos"}],
+        }
+    )
+    next(row for row in erp.payload["documents"] if row.get("kind") == "purchase_receipt").update(  # type: ignore[union-attr]
+        {"received": 20, "accepted": 12}
+    )
     erp.payload["documents"].extend(  # type: ignore[union-attr]
         [
             {
@@ -367,6 +378,7 @@ def test_live_customer_order_is_manager_gated_and_verified_to_billed_revenue() -
                         "status": "SUBMITTED",
                         "billed_revenue": 42000,
                         "currency": "USD",
+                        "items": [{"item_code": "ECU", "uom": "Nos"}],
                     },
                 ]
             )
@@ -421,9 +433,11 @@ def test_live_customer_order_is_manager_gated_and_verified_to_billed_revenue() -
     assert verified["execution"]["status"] == "VERIFIED"
     assert verified["value_proof"]["status"] == "BILLED_VERIFIED"
     assert verified["value_proof"]["observed"]["billed_revenue"] == 42000
-    assert verified["value_proof"]["observed"]["gross_spread"] == 18000
+    assert verified["value_proof"]["observed"]["gross_spread"] is None
+    assert verified["value_proof"]["estimated"]["gross_spread"] == 18000
     assert (
-        verified["business_impact"]["value_protected_classification"] == "OBSERVED_BILLED_REVENUE"
+        verified["business_impact"]["value_protected_classification"]
+        == "OBSERVED_BILLING_NOT_INCREMENTAL_REVENUE"
     )
     assert verified["resolution_packet"]["effects"]["sales_invoice"] == "SI-M20-20"
     assert verified["human_review"]["status"] == "COMPLETE"
@@ -621,7 +635,10 @@ def test_restart_quarantines_a_historical_unsupported_causal_claim(tmp_path: Pat
 
     turn = projection["conversation"][0]
     assert turn["validation_status"] == "REJECTED_CAUSAL_CLAIM"
-    assert "does not prove" in turn["answer"]
+    assert "withheld" in turn["answer"]
+    assert "unproven revenue uplift" in turn["answer"]
+    assert "no replacement business conclusion" in turn["answer"]
+    assert "$42,000" not in turn["answer"]
 
 
 def test_normal_receipt_uses_the_same_guarded_evidence_path_without_an_incident() -> None:

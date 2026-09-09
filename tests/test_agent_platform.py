@@ -23,6 +23,21 @@ class _Reader:
         return deepcopy(self.payload)
 
 
+def test_chat_tool_activity_is_immediate_and_cannot_change_control_state() -> None:
+    platform = AgentPlatform(_Reader(_erp()), _Reader(_saas()))
+    before = platform.current()
+    platform.record_conversation_tool_progress("read_erp_evidence", "started", "chat-1")
+    platform.record_conversation_tool_progress("read_erp_evidence", "succeeded", "chat-1")
+    after = platform.current()
+    events = [
+        row for row in after["activity"] if row["event_type"].startswith("conversation.tool.")
+    ]
+    assert [row["status"] for row in events] == ["STARTED", "SUCCEEDED"]
+    assert all(row["read_only"] and row["record_id"] == "chat-1" for row in events)
+    for key in ("agent_run", "diagnosis", "execution", "approval"):
+        assert after.get(key) == before.get(key)
+
+
 def _erp(*, status: str = "CONNECTED", quality_hold: bool = True) -> dict[str, object]:
     return {
         "sequence": 1,
@@ -107,6 +122,16 @@ def test_live_projection_and_chart_metrics_come_from_the_same_erp_read() -> None
         "available": 12.0,
         "quality_hold": 8.0,
         "receipt_unresolved": 0.0,
+        "received": 20.0,
+        "outstanding_order_quantity": 0.0,
+        "available_to_promise": None,
+        "received_cumulative": 20.0,
+        "accepted_cumulative": 12.0,
+        "released_quantity": 0.0,
+        "delivered_quantity": 0.0,
+        "case_balance": 12.0,
+        "receipt_posted_quantity": 20.0,
+        "invoice_count": 1.0,
     }
     assert case["invoice_held"] is True
     assert projection["business_impact"]["working_capital_at_risk"] == 9600.0

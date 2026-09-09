@@ -11,6 +11,7 @@ requires-python = ">=3.12,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Weixiang Wan" }]
 dependencies = [
+  "Pillow>=12.3,<13",
   "awscrt>=0.31,<1",
   "boto3>=1.42,<2",
   "pydantic>=2.11,<3",

@@ -5,8 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from decimal import Decimal
 from typing import Any, Protocol
+from uuid import uuid4
 
+from the_missing_20.adapters.conversation_views import history_attachment, retained_history_view
 from the_missing_20.adapters.investigation_case_sources import investigation_packet
+from the_missing_20.adapters.role_task_journal import RoleTaskJournal
 from the_missing_20.adapters.strands_models import BedrockNovaProConfig, BedrockNovaProFactory
 from the_missing_20.agents.live_advisory import (
     ADVISORY_OUTPUT_TOKENS,
@@ -21,6 +24,14 @@ from the_missing_20.ports.agent_model import AgentBudget, AgentBudgetLedger, Age
 
 AdvisoryRunner = Callable[..., AdvisoryRun]
 PacketFactory = Callable[[Mapping[str, object]], Mapping[str, Any]]
+
+
+def public_validation_diagnostics(diagnostics: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep rejected model prose in private audit artifacts, never in the browser response."""
+    allowed = {"stage", "case_id", "attempt", "disposition", "tool_calls", "failure"}
+    return [
+        {key: value for key, value in attempt.items() if key in allowed} for attempt in diagnostics
+    ]
 
 
 def competition_investigation_packet(projection: Mapping[str, object]) -> Mapping[str, Any]:
@@ -61,53 +72,37 @@ def connected_competition_investigation_packet(
     erp_evidence: Mapping[str, object],
     saas_evidence: Mapping[str, object],
 ) -> Mapping[str, Any]:
-    """Attach fresh, redacted SaaS read receipts to the normalized case packet.
+    """Keep connection proof separate from an isolated synthetic case's facts.
 
-    The normalized records keep the synthetic demo scenario deterministic. The
-    attached live reads prove which external records were actually fetched for
-    this Agent turn; credentials and provider-write capabilities never enter the
-    packet.
+    Current external records can belong to another PO or a later business state.
+    A successful read does not admit those records as evidence for this synthetic
+    case. Actual live-case investigation uses live_recovery_packet instead.
     """
 
     packet = dict(competition_investigation_packet(projection))
-    tool_payload = packet.get("tool_payload")
-    if not isinstance(tool_payload, Mapping):
-        return packet
-    raw_sources = tool_payload.get("sources")
-    if not isinstance(raw_sources, Mapping):
-        return packet
-    sources = {
-        name: dict(payload) for name, payload in raw_sources.items() if isinstance(payload, Mapping)
-    }
-    admitted = [str(item) for item in packet.get("evidence_ids", ()) if str(item)]
-    connected_sources = 0
     receipts: list[dict[str, object]] = []
 
     if str(erp_evidence.get("status", "")).upper() == "CONNECTED":
-        documents = [
-            dict(item) for item in erp_evidence.get("documents", []) if isinstance(item, Mapping)
-        ]
-        names = [str(item.get("name", "")) for item in documents if item.get("name")]
-        live_read = {
-            "source_id": "erpnext-missing20",
-            "provider": str(erp_evidence.get("provider", "ERPNext")),
-            "status": "CONNECTED",
-            "sequence": erp_evidence.get("sequence"),
-            "received_at": erp_evidence.get("received_at"),
-            "read_only": True,
-            "documents": documents,
-        }
-        sources.setdefault("read_erp_evidence", {})["live_read"] = live_read
-        sources["read_erp_evidence"].setdefault("evidence_ids", []).extend(names)
-        admitted.extend(names)
-        receipts.append(live_read)
-        connected_sources += 1
+        documents = erp_evidence.get("documents", [])
+        receipts.append(
+            {
+                "source_id": "erpnext-missing20",
+                "provider": str(erp_evidence.get("provider", "ERPNext")),
+                "status": "CONNECTED",
+                "sequence": erp_evidence.get("sequence"),
+                "received_at": erp_evidence.get("received_at"),
+                "read_only": True,
+                "record_count": len(documents) if isinstance(documents, list) else 0,
+                "case_evidence": False,
+            }
+        )
 
-    provider_map = {
-        "airtable-quality-registry": "read_airtable_evidence",
-        "celigo-quality-release": "read_celigo_evidence",
+    provider_ids = {
+        "airtable-quality-registry",
+        "celigo-quality-release",
+        "jira-capa",
+        "slack-quality-alerts",
     }
-    collaboration_reads: list[dict[str, object]] = []
     raw_saas_sources = saas_evidence.get("sources", [])
     if str(saas_evidence.get("status", "")).upper() == "CONNECTED" and isinstance(
         raw_saas_sources, list
@@ -116,57 +111,22 @@ def connected_competition_investigation_packet(
             if not isinstance(item, Mapping):
                 continue
             source_id = str(item.get("source_id", ""))
-            record_id = str(item.get("record_id", ""))
-            if not source_id or not record_id:
+            if source_id not in provider_ids or not item.get("record_id"):
                 continue
-            live_read = {
-                key: value
-                for key, value in item.items()
-                if key
-                in {
-                    "source_id",
-                    "provider",
-                    "record_id",
-                    "status",
-                    "read_only",
-                    "occurred_at",
-                    "detail",
-                    "correlation",
-                    "erp_acknowledged",
+            receipts.append(
+                {
+                    "source_id": source_id,
+                    "provider": str(item.get("provider", "")),
+                    "status": item.get("status"),
+                    "sequence": saas_evidence.get("sequence"),
+                    "received_at": saas_evidence.get("received_at") or item.get("occurred_at"),
+                    "read_only": True,
+                    "record_count": 1,
+                    "case_evidence": False,
                 }
-            }
-            tool_name = provider_map.get(source_id)
-            if tool_name:
-                sources.setdefault(tool_name, {})["live_read"] = live_read
-                sources[tool_name].setdefault("evidence_ids", []).append(record_id)
-            elif source_id in {"jira-capa", "slack-quality-alerts"}:
-                collaboration_reads.append(live_read)
-                sources.setdefault("read_collaboration_evidence", {}).setdefault(
-                    "evidence_ids", []
-                ).append(record_id)
-            else:
-                continue
-            admitted.append(record_id)
-            receipts.append(live_read)
-            connected_sources += 1
-    if collaboration_reads:
-        sources.setdefault("read_collaboration_evidence", {})["live_reads"] = collaboration_reads
-
-    control = sources.get("read_control_context")
-    if isinstance(control, dict):
-        control["connected_source_receipts"] = [
-            {
-                "source_id": receipt.get("source_id"),
-                "provider": receipt.get("provider"),
-                "status": receipt.get("status"),
-                "received_at": receipt.get("received_at") or receipt.get("occurred_at"),
-            }
-            for receipt in receipts
-        ]
-    packet["tool_payload"] = {"sources": sources}
-    packet["evidence_ids"] = tuple(dict.fromkeys(admitted))
-    packet["connected_sources"] = connected_sources
-    packet["source"] = "connected-demo-evidence" if connected_sources else packet.get("source")
+            )
+    packet["connection_receipts"] = receipts
+    packet["connected_sources"] = len(receipts)
     return packet
 
 
@@ -184,11 +144,13 @@ class DashboardAdvisoryGateway:
         settings: Settings | None = None,
         runner: AdvisoryRunner = run_live_advisory,
         packet_factory: PacketFactory = live_recovery_packet,
+        delegation_journal: RoleTaskJournal | None = None,
     ) -> None:
         self._platform = platform
         self._settings = settings or Settings.from_env()
         self._runner = runner
         self._packet_factory = packet_factory
+        self._delegation_journal = delegation_journal
 
     def runtime_truth(self) -> dict[str, object]:
         """Expose non-secret provider configuration without making a provider call."""
@@ -201,9 +163,27 @@ class DashboardAdvisoryGateway:
         }
 
     def _run(
-        self, packet: Mapping[str, Any], *, question: str, emit_progress: bool = False
+        self,
+        packet: Mapping[str, Any],
+        *,
+        question: str,
+        emit_progress: bool = False,
+        conversation_id: str = "",
     ) -> AdvisoryRun:
+        if conversation_id and self._delegation_journal is not None:
+            # Each human turn has independent work ownership, not the last diagnosis's run.
+            packet = {**packet, "run_id": f"conversation:{conversation_id}"}
         kwargs: dict[str, Any] = {"factory": self._factory(), "question": question}
+        if (
+            self._delegation_journal is not None
+            and packet.get("case_class") == "source_investigation"
+        ):
+            kwargs["delegation_journal"] = self._delegation_journal
+            is_active = getattr(self._platform, "agent_run_is_active", None)
+            if emit_progress:
+                if not callable(is_active):
+                    raise AdvisoryUnavailable("role workflow requires a parent-run guard")
+                kwargs["continue_requested"] = lambda: is_active(str(packet.get("run_id", "")))
         progress = getattr(self._platform, "record_agent_tool_progress", None)
         runtime_progress = getattr(self._platform, "record_agent_runtime_progress", None)
         if emit_progress and self._runner is run_live_advisory:
@@ -214,6 +194,12 @@ class DashboardAdvisoryGateway:
                 )
             if callable(runtime_progress):
                 kwargs["on_runtime_event"] = lambda event: runtime_progress(event, run_id)
+        if conversation_id and self._runner is run_live_advisory:
+            chat_progress = getattr(self._platform, "record_conversation_tool_progress", None)
+            if callable(chat_progress):
+                kwargs["on_tool_call"] = lambda name, phase="started": chat_progress(
+                    name, phase, conversation_id
+                )
         return self._runner(packet, **kwargs)
 
     def ask(self, question: str) -> dict[str, object]:
@@ -227,31 +213,101 @@ class DashboardAdvisoryGateway:
                 code="VALIDATION_FAILED",
                 detail="Ask a specific evidence question using at most 500 characters.",
             )
+        record_request = getattr(self._platform, "record_human_request", None)
+        prior_projection = dict(projection)
+        if callable(record_request):
+            projection = {
+                **projection,
+                **record_request(clean_question, str(projection.get("case_id", ""))),
+            }
         if self._settings.agent_provider is not AgentProvider.BEDROCK:
             return self._unavailable(
                 projection,
                 code="AGENT_UNAVAILABLE",
                 detail="Real Strands Agent is not configured; no fallback answer was generated.",
             )
+        freshness = projection.get("source_freshness")
+        if isinstance(freshness, Mapping) and freshness.get("status") == "UNAVAILABLE":
+            response = self._unavailable(
+                projection,
+                code="SOURCE_UNAVAILABLE",
+                detail="Current ERP evidence is unavailable; no model request was started. "
+                "Retained observations remain available in Dashboard trends.",
+            )
+            unavailable_advisory = response["agent_advisory"]
+            if isinstance(unavailable_advisory, dict):
+                unavailable_advisory["mode"] = "not_invoked"
+                retained_views = retained_history_view(projection, clean_question)
+                if retained_views:
+                    unavailable_advisory["retained_views"] = retained_views
+            return response
         try:
-            packet = self._packet_factory(projection)
-            history = self._conversation_history(projection)
+            packet = dict(self._packet_factory(projection))
+            raw_intent = projection.get("human_intent", {})
+            intent = raw_intent if isinstance(raw_intent, Mapping) else {}
+            packet["read_only_requested"] = bool(intent.get("read_only_requested"))
+            # Broad diagnosis requires the complete discrepancy partition. A
+            # focused dialogue turn must answer its actual question; safety and
+            # contradiction checks still use the unchanged current-case facts.
+            broad_question = any(
+                word in clean_question.lower()
+                for word in (
+                    "attention",
+                    "diagnos",
+                    "all discrep",
+                    "overall",
+                    "current status",
+                    "what is wrong",
+                    "注意",
+                    "诊断",
+                    "整体",
+                    "所有问题",
+                )
+            )
+            if broad_question:
+                packet["explanation_scope"] = "full_investigation"
+            else:
+                packet["expected_reason_quantities"] = ()
+            history = self._conversation_history(prior_projection)
             contextual_question = self._contextual_question(history, clean_question)
-            run = self._run(packet, question=contextual_question)
+            if packet["read_only_requested"]:
+                contextual_question += (
+                    "\nRetained human constraint (not execution authorization): "
+                    + str(intent.get("constraint_question", "Read-only investigation requested."))
+                    + "\nAcknowledge the retained refusal/read-only boundary. "
+                    "Continue investigation "
+                    "does not authorize a write."
+                )
+            if "read_operational_history" in packet.get("tool_payload", {}).get("sources", {}):
+                contextual_question += (
+                    "\nIf this asks for trends or benchmarks, read_operational_history and select "
+                    "chart_metric; the server will render its actual source data. Never invent "
+                    "history. Offer up to three useful read-only follow_up_questions."
+                )
+            run = self._run(packet, question=contextual_question, conversation_id=uuid4().hex)
         except AdvisoryValidationError as error:
             failed = self._unavailable(
                 projection,
                 code="VALIDATION_FAILED",
                 detail="The real Agent response failed safety validation; no conclusion was shown.",
             )
-            failed["validation_diagnostics"] = error.diagnostics
+            failed["validation_diagnostics"] = public_validation_diagnostics(error.diagnostics)
+            advisory_failure = failed["agent_advisory"]
+            if isinstance(advisory_failure, dict):
+                advisory_failure["usage"] = error.usage
             return failed
-        except (AdvisoryUnavailable, OSError, ValueError):
-            return self._unavailable(
+        except (AdvisoryUnavailable, OSError, ValueError) as error:
+            failed = self._unavailable(
                 projection,
                 code="AGENT_UNAVAILABLE",
                 detail="The real Strands Agent is unavailable; no fallback answer was generated.",
             )
+            if isinstance(error, AdvisoryUnavailable):
+                failed["validation_diagnostics"] = public_validation_diagnostics(error.diagnostics)
+                advisory_failure = failed["agent_advisory"]
+                if isinstance(advisory_failure, dict):
+                    advisory_failure["usage"] = error.usage
+            return failed
         result = run.result.model_dump(mode="json")
         answer = (
             f"Disposition: {result['disposition']}. {result['reason']} "
@@ -268,6 +324,10 @@ class DashboardAdvisoryGateway:
             "evidence_findings": run.evidence_findings,
             "runtime_events": list(run.runtime_events),
             "context_turns": len(history),
+            "attachments": history_attachment(
+                packet, run.result.chart_metric, run.tool_calls, question=clean_question
+            ),
+            "follow_up_questions": [question[:160] for question in run.result.follow_up_questions],
         }
         record_turn = getattr(self._platform, "record_conversation_turn", None)
         if callable(record_turn):
@@ -297,7 +357,16 @@ class DashboardAdvisoryGateway:
             answer = " ".join(str(turn.get("answer", "")).split())[:650]
             if question and answer:
                 history.append({"human": question, "agent": answer})
-        return history
+        # Include requests whose model turn failed; never include rejected prose.
+        requests = projection.get("human_requests", [])
+        if isinstance(requests, list):
+            for request in requests[-3:]:
+                if not isinstance(request, Mapping):
+                    continue
+                question = str(request.get("question", ""))[:300]
+                if question and not any(turn["human"] == question for turn in history):
+                    history.append({"human": question, "agent": "No validated answer recorded."})
+        return history[-3:]
 
     @staticmethod
     def _contextual_question(history: list[dict[str, str]], question: str) -> str:
@@ -310,8 +379,10 @@ class DashboardAdvisoryGateway:
             "Continue the evidence conversation below. Treat prior dialogue only as context, "
             "not as current evidence. Resolve references in the new question. Before answering "
             "this turn, you MUST call read_control_context, read_erp_evidence, "
-            "read_airtable_evidence, read_celigo_evidence, read_collaboration_evidence, and then "
-            "reconcile_source_records exactly once. Do not answer from the transcript alone.\n\n"
+            "read_airtable_evidence, read_celigo_evidence, read_collaboration_evidence exactly "
+            "once. If reconcile_source_records is available for this lifecycle, use it after "
+            "those reads. Do not request tools absent from this lifecycle. "
+            "Do not answer from the transcript alone.\n\n"
             f"Prior conversation:\n{transcript}\n\nNewest human question: {question}"
         )
 
@@ -332,7 +403,8 @@ class DashboardAdvisoryGateway:
                 "detail": "Real Strands Agent is not configured; no fallback conclusion was used.",
             }
         try:
-            packet = self._packet_factory(projection)
+            packet = dict(self._packet_factory(projection))
+            packet["explanation_scope"] = "full_investigation"
             run = self._run(
                 packet,
                 emit_progress=True,
@@ -344,7 +416,8 @@ class DashboardAdvisoryGateway:
             )
         except AdvisoryValidationError as error:
             return {
-                "validation_diagnostics": error.diagnostics,
+                "validation_diagnostics": public_validation_diagnostics(error.diagnostics),
+                "usage": error.usage,
                 "status": "VALIDATION_FAILED",
                 "mode": "real_strands",
                 "tool_calls": [],
@@ -361,6 +434,10 @@ class DashboardAdvisoryGateway:
                 "result": None,
                 "detail": "The real Strands Agent is unavailable; no fallback conclusion was used.",
                 "diagnostic": f"{type(error).__name__}: {error}",
+                "validation_diagnostics": (
+                    error.diagnostics if isinstance(error, AdvisoryUnavailable) else []
+                ),
+                "usage": error.usage if isinstance(error, AdvisoryUnavailable) else {},
             }
         return {
             "status": "COMPLETE",
@@ -379,7 +456,9 @@ class DashboardAdvisoryGateway:
 
     def _factory(self) -> BedrockNovaProFactory:
         budget = AgentBudget(
-            max_requests=16,
+            # A team can consume several bounded expert turns in addition to
+            # the coordinator. Keep the same token/cost/time ceilings.
+            max_requests=32 if self._delegation_journal is not None else 16,
             max_input_tokens=250_000,
             # A source investigation uses six tool/model turns and may need up to
             # two typed-output repairs.  Four thousand tokens could exhaust the

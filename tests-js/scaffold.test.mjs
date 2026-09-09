@@ -204,7 +204,7 @@ test("dashboard rebaseline exposes one live incident control and stage projectio
   assert.match(html, /data-health-node="message-queue"/);
   assert.match(html, /id="dashboard-live-sources"[^>]*route-risk detector/);
   assert.match(app, /\$\("dashboard-inject-incident"\)\.addEventListener\("click", \(\) => \{/);
-  assert.match(app, /liveFlow\?\.provenance === "live-read"[\s\S]*window\.open\(EXTERNAL_SERVICE_LINKS\.erpnext\.url/);
+  assert.match(app, /liveFlow\?\.provenance === "live-read"[\s\S]*window\.open\(erpDocumentLink\("purchase_order", "purchase-order"\)\.url/);
   assert.match(app, /selectScenario\("incident"\)/);
   assert.match(app, /route-risk-detector/);
   assert.match(app, /function latestStageProjection\(snapshot\)/);
@@ -271,7 +271,7 @@ test("live ERP projection owns KPIs, charts, and the external trigger path", asy
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   assert.match(app, /platform\.case_projection/);
   assert.match(app, /const liveAuthority = value\(caseProjection\?\.provenance\).*=== "live-read"/);
-  assert.match(app, /if \(!liveAuthority\) return null/);
+  assert.match(app, /if \(!liveAuthority && !syntheticAuthority\) return null/);
   assert.match(app, /platformMetricEvents[\s\S]*latestPlatformMetric\.change_count/);
   assert.match(app, /authoritative: platform\.provenance === "live-read"/);
   assert.match(app, /scheduleAgentPlatformProjectionRefresh\(\)/);
@@ -988,7 +988,7 @@ test("case console presents one judge-readable evidence-to-outcome workflow", as
   const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
   const css = await readFile(new URL("../workspace/style.css", import.meta.url), "utf8");
   assert.match(html, /class="platform-command-canvas"/);
-  assert.match(html, />Signals</);
+  assert.match(html, />Inventory</);
   assert.match(html, />Investigation</);
   assert.match(html, />Manager decision</);
   assert.match(html, /id="platform-source-receipts"/);
@@ -1039,7 +1039,7 @@ test("case console is a borderless, movable command canvas with atomic live node
   assert.match(html, /data-canvas-module="investigation"/);
   assert.match(html, /data-canvas-module="agent-console"/);
   assert.match(html, /data-canvas-module="conversation"/);
-  assert.match(html, />Evidence conversation</);
+  assert.match(html, />Ask the agent</);
   assert.match(html, /id="platform-investigation-links"/);
   assert.match(html, /data-investigation-node="erpnext"/);
   assert.match(html, /data-investigation-node="airtable"/);
@@ -1189,7 +1189,8 @@ test("manager can reject a prepared plan without executing it", async () => {
   assert.match(html, /id="platform-reject-plan"/);
   assert.match(app, /runPlatformAction\("reject"/);
   assert.match(app, /\/api\/v1\/agent-platform\/\$\{path\}/);
-  assert.match(app, /case_matrix_size, 14/);
+  assert.doesNotMatch(app, /case_matrix_size, 14/);
+  assert.match(html, /<dt>Scenario set<\/dt><dd id="platform-metric-cases">—<\/dd>/);
 });
 
 test("dashboard projects source-derived operating economics and event-time exposure", async () => {
@@ -1272,8 +1273,9 @@ test("dashboard and investigation components expose live parameters on click wit
   assert.match(app, /Stock Ledger Entry/);
   assert.match(app, /General Ledger/);
   assert.match(app, /Difference \$\{formatCurrency/);
-  assert.match(app, /Inventory \$\{currentAvailable\} → \$\{targetAvailable\} · no duplicate posting/);
-  assert.match(app, /AFTER EXECUTION · \$\{status\}/);
+  assert.match(app, /Case balance \$\{currentAvailable\} → \$\{targetAvailable\} · verified readback/);
+  assert.match(html, /id="platform-findings-history"[^>]*hidden><summary>Findings at diagnosis/);
+  assert.doesNotMatch(app, /AFTER EXECUTION · \$\{status\}/);
   assert.match(css, /\.dashboard-component-inspector\s*\{/);
   assert.match(css, /component-problem-pulse/);
   assert.match(css, /\.platform-investigation-node\.is-problem/);

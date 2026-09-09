@@ -14,6 +14,8 @@
       body:not([data-boot-state="loading"]) .workspace-boot { display: none; }
     </style>
     <link rel="stylesheet" href="/style.css?v=source-driven-final-v32" />
+    <link rel="stylesheet" href="/photo-receiving.css" />
+    <link rel="stylesheet" href="/operations-history.css" />
     <title>The Missing 20 | Live operations</title>
   </head>
   <body data-workspace-ready="false" data-boot-state="loading" data-connection="connecting" data-view="dashboard">
@@ -39,6 +41,7 @@
         </button>
       </nav>
       <div class="topbar-context">
+        <button id="photo-receiving-open" class="demo-controls-toggle" type="button" aria-label="Count from photo"><i class="ph ph-camera" aria-hidden="true"></i><span>Count from photo</span></button>
         <button id="demo-controls-toggle" class="demo-controls-toggle" type="button" aria-controls="scenario-view" aria-expanded="false">
           <i class="ph ph-sliders-horizontal" aria-hidden="true"></i><span>Demo Controls</span>
         </button>
@@ -58,6 +61,7 @@
         <div><strong>Stream unavailable</strong><p id="unavailable-detail">The local experiment did not return a usable state.</p></div>
         <button id="retry-button" class="button button-quiet" type="button"><i class="ph ph-arrow-clockwise" aria-hidden="true"></i>Reconnect</button>
       </div>
+      <div id="source-unavailable" class="source-unavailable" hidden role="status"><strong id="source-unavailable-title">ERP data is temporarily unavailable.</strong><span>Current quantities are unknown. Earlier events and verified results remain in history; new actions are paused.</span></div>
 
       <section id="dashboard-view" class="view-panel dashboard-view" role="tabpanel" aria-labelledby="tab-dashboard">
         <section id="agent-platform-console" class="agent-platform-console" aria-labelledby="platform-title" hidden>
@@ -72,22 +76,23 @@
 
           <section class="platform-incident-ribbon" aria-label="Current incident">
             <div><strong id="platform-incident-code">M20</strong><span id="platform-correlation-detail">Waiting for the server-owned evidence ledger.</span></div>
+            <details class="operator-details platform-run-details"><summary>Run details</summary>
             <dl class="platform-run-metrics" aria-label="Current Strands run metrics">
               <div><dt>Runtime</dt><dd id="platform-metric-runtime">—</dd></div>
               <div><dt>Latency</dt><dd id="platform-metric-latency">—</dd></div>
               <div><dt>Tools</dt><dd id="platform-metric-tools">—</dd></div>
               <div><dt>Evidence</dt><dd id="platform-metric-evidence">—</dd></div>
-              <div><dt>Cases</dt><dd id="platform-metric-cases">8</dd></div>
+              <div><dt>Scenario set</dt><dd id="platform-metric-cases">—</dd></div>
               <div><dt>Tokens</dt><dd id="platform-metric-tokens">—</dd></div>
               <div><dt>Cost</dt><dd id="platform-metric-cost">—</dd></div>
-            </dl>
+            </dl></details>
             <span id="platform-run-state" class="state-badge state-neutral">IDLE</span>
           </section>
 
           <section id="platform-command-canvas" class="platform-command-canvas" data-arrange="false" aria-label="Hybrid investigation command canvas">
             <article class="platform-signal-card platform-canvas-module" data-canvas-module="signals">
               <header class="platform-module-header" data-module-handle>
-                <h2>Signals</h2>
+                <h2>Inventory</h2>
                 <div><span id="platform-signal-count" class="platform-module-count">0 LIVE</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Signals"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div>
               </header>
               <div id="platform-case-tuple" class="platform-case-tuple"></div>
@@ -97,7 +102,7 @@
 
             <article class="platform-agent-card platform-agent-hero platform-canvas-module" data-canvas-module="investigation">
               <header class="platform-module-header" data-module-handle>
-                <div><span class="platform-module-kicker">STRANDS AGENT LOOP</span><h2>Investigation trace</h2></div>
+                <div><h2>Investigation</h2></div>
                 <div><span id="platform-diagnosis-status" class="state-badge state-neutral">IDLE</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Investigation"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div>
               </header>
               <ol id="platform-loop-stages" class="platform-loop-stages" aria-label="Agent investigation stages">
@@ -120,28 +125,32 @@
               </div>
               <p id="platform-diagnosis-summary" class="platform-diagnosis-summary">Read correlated evidence across connected systems.</p>
               <div id="platform-reconciled-findings" class="platform-reconciled-findings" aria-live="polite"></div>
-              <div id="platform-hypotheses" class="platform-hypotheses" aria-live="polite"></div>
+              <details id="platform-findings-history" class="operator-details" hidden><summary>Findings at diagnosis</summary><div id="platform-hypotheses" class="platform-hypotheses" aria-live="polite"></div></details>
               <div id="platform-agent-conclusion" class="platform-agent-conclusion"><strong id="platform-conclusion">NO RELEASE</strong><span id="platform-confidence" class="platform-confidence">—</span></div>
               <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Investigation"></button>
             </article>
 
             <aside class="platform-console-card platform-canvas-module" data-canvas-module="agent-console">
               <header class="platform-module-header" data-module-handle>
-                <h2>Agent</h2>
+                <h2>Recent activity</h2>
                 <div><span id="platform-strands-status" class="state-badge state-neutral">STRANDS —</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Agent Console"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div>
               </header>
-              <div id="platform-tool-calls" class="platform-tool-calls platform-tool-ledger" aria-label="Agent-selected tools"></div>
-              <div class="platform-runtime-head"><span>SDK flight recorder</span><span id="platform-runtime-count" class="sequence-label">0 hooks</span></div>
-              <ol id="platform-runtime-trace" class="platform-runtime-trace" aria-label="Strands SDK lifecycle trace" aria-live="polite"></ol>
-              <div class="platform-activity-head"><span>Live activity</span><span id="platform-event-count" class="sequence-label">0 events</span></div>
+              <div class="platform-activity-head"><span>Latest source events</span><span id="platform-event-count" class="sequence-label">0 events</span></div>
               <ol id="platform-activity" class="platform-activity" aria-live="polite"></ol>
-              <div class="platform-control-actions"><button id="platform-diagnose" class="button button-primary" type="button"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Start investigation</button><button id="platform-stop" class="button button-quiet" type="button" hidden>Pause</button></div>
+              <div class="platform-control-actions"><button id="platform-diagnose" class="button button-primary" type="button"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Start investigation</button><button id="platform-stop" class="button button-quiet" type="button" hidden>Pause</button><button id="platform-automation" class="button button-quiet" type="button" hidden>Auto-investigate</button><span id="platform-automation-status" role="status" hidden></span></div>
+              <details class="operator-details" id="platform-technical-details"><summary>Tools &amp; execution log</summary>
+                <div id="platform-tool-calls" class="platform-tool-calls platform-tool-ledger" aria-label="Agent-selected tools"></div>
+                <div class="platform-runtime-head"><span>SDK flight recorder</span><span id="platform-runtime-count" class="sequence-label">0 hooks</span></div>
+                <ol id="platform-runtime-trace" class="platform-runtime-trace" aria-label="Strands SDK lifecycle trace" aria-live="polite"></ol>
+              </details>
               <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Agent Console"></button>
             </aside>
 
             <aside class="platform-chat-card platform-canvas-module" data-canvas-module="conversation">
-              <header class="platform-module-header" data-module-handle><div><span class="platform-module-kicker">HUMAN ↔ AGENT</span><h2>Evidence conversation</h2></div><div><span id="platform-answer-status" class="state-badge state-neutral">READY</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Evidence Conversation"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div></header>
-              <section id="platform-answer" class="platform-answer" hidden aria-live="polite"><div class="platform-answer-head"><span>Case-scoped conversation</span><span id="platform-answer-trace" class="platform-answer-trace"></span></div><div id="platform-answer-text" class="platform-conversation"></div><div id="platform-answer-evidence" class="platform-tool-calls"></div></section>
+              <header class="platform-module-header" data-module-handle><div><h2>Ask the agent</h2></div><div><span id="platform-answer-status" class="state-badge state-neutral">READY</span><button class="platform-icon-button" type="button" data-module-focus aria-label="Focus Evidence Conversation"><i class="ph ph-arrows-out" aria-hidden="true"></i></button></div></header>
+              <section id="platform-answer" class="platform-answer" hidden aria-live="polite"><div class="platform-answer-head"><span id="platform-answer-trace" class="platform-answer-trace"></span></div><div id="platform-answer-text" class="platform-conversation"></div><div id="platform-answer-evidence" class="platform-tool-calls"></div></section>
+              <div id="platform-question-feedback" class="platform-question-feedback" hidden role="status"></div>
+              <div id="platform-question-suggestions" class="conversation-suggestions" aria-label="Suggested evidence questions"></div>
               <form id="platform-question-form" class="platform-question-form"><label class="sr-only" for="platform-question">Ask the evidence agent</label><input id="platform-question" maxlength="500" placeholder="Ask a question, then continue with a follow-up…" /><button id="platform-question-submit" class="button button-primary" type="submit">Ask Agent</button></form>
               <button class="platform-resize-handle" type="button" data-module-resize aria-label="Resize Evidence Conversation"></button>
             </aside>
@@ -211,10 +220,16 @@
             </section>
 
             <aside class="dashboard-event-rail" aria-labelledby="dashboard-event-title">
-              <div class="dashboard-event-heading"><h2 id="dashboard-event-title">Live events</h2><span id="dashboard-event-count">0</span></div>
+              <div class="dashboard-event-heading"><h2 id="dashboard-event-title">Recent events</h2><span id="dashboard-event-count">0</span></div>
               <ol id="dashboard-event-feed" class="dashboard-event-feed newest-at-bottom" aria-live="polite"></ol>
-              <div id="dashboard-event-now" class="dashboard-event-now"><span>NOW</span><i aria-hidden="true"></i></div>
+              <div id="dashboard-event-now" class="dashboard-event-now"><span>Waiting for events</span><i aria-hidden="true"></i></div>
             </aside>
+
+            <section id="goods-gallery" class="goods-gallery" aria-labelledby="goods-gallery-title">
+              <header><h2 id="goods-gallery-title">Goods</h2><button id="goods-gallery-add" type="button">Photograph goods</button></header>
+              <p id="goods-gallery-status" role="status">No photos loaded</p>
+              <div id="goods-gallery-items" class="goods-gallery-items"></div>
+            </section>
 
             <section class="business-impact" aria-labelledby="business-impact-title">
               <div class="business-impact-heading">
@@ -226,19 +241,23 @@
                 </div>
               </div>
               <div class="business-metric-grid">
-                <article class="business-metric" data-business-metric="availability"><span>Inventory available</span><strong id="business-availability">—</strong><small>physical arrival</small></article>
+                <article class="business-metric" data-business-metric="availability"><span>Order stock coverage</span><strong id="business-availability">—</strong><small>received + released − issued</small></article>
+                <article class="business-metric" data-business-metric="revenue-risk"><span>Revenue at risk</span><strong id="business-revenue-at-risk">—</strong><small>counterfactual hold</small></article>
+                <article class="business-metric" data-business-metric="delivered"><span>Issued for delivery</span><strong id="business-delivered-quantity">—</strong><small>delivery note reread</small></article>
+                <article class="business-metric" data-business-metric="value-protected"><span>Billed revenue</span><strong id="business-value-protected">—</strong><small>sales invoice reread</small></article>
+              </div>
+              <details class="operator-details" id="business-all-metrics"><summary>Costs, holds &amp; reconciliation <span id="business-detail-alert" hidden>Needs attention</span></summary>
+              <div class="business-metric-grid">
                 <article class="business-metric" data-business-metric="reconciliation"><span>ERP reconciled</span><strong id="business-reconciliation">—</strong><small>receipt + quality</small></article>
                 <article class="business-metric" data-business-metric="working-capital"><span>Working capital at risk</span><strong id="business-working-capital">—</strong><small>unavailable material</small></article>
                 <article class="business-metric" data-business-metric="invoice-hold"><span>Invoice value on hold</span><strong id="business-invoice-hold">—</strong><small>payment control</small></article>
                 <article class="business-metric" data-business-metric="unit-cost"><span>PO unit cost</span><strong id="business-unit-cost">—</strong><small>purchase order</small></article>
                 <article class="business-metric" data-business-metric="price-variance"><span>Purchase price variance</span><strong id="business-price-variance">—</strong><small>invoice vs PO</small></article>
                 <article class="business-metric" data-business-metric="quality-hold"><span>Quality hold value</span><strong id="business-quality-hold">—</strong><small>blocked inventory</small></article>
-                <article class="business-metric" data-business-metric="value-protected"><span>Billed revenue</span><strong id="business-value-protected">—</strong><small>sales invoice reread</small></article>
                 <article class="business-metric" data-business-metric="booked-revenue"><span>Booked revenue</span><strong id="business-booked-revenue">—</strong><small>customer order</small></article>
-                <article class="business-metric" data-business-metric="revenue-risk"><span>Revenue at risk</span><strong id="business-revenue-at-risk">—</strong><small>counterfactual hold</small></article>
-                <article class="business-metric" data-business-metric="delivered"><span>Delivered</span><strong id="business-delivered-quantity">—</strong><small>delivery note reread</small></article>
-                <article class="business-metric" data-business-metric="gross-spread"><span>Gross spread</span><strong id="business-gross-spread">—</strong><small>invoice − PO basis</small></article>
+                <article class="business-metric" data-business-metric="gross-spread"><span>Estimated order spread</span><strong id="business-gross-spread">—</strong><small>net invoice − PO; excludes freight and operating costs</small></article>
               </div>
+              </details>
               <details class="business-economics-details">
                 <summary><span>Break down exposure</span><i class="ph ph-caret-down" aria-hidden="true"></i></summary>
                 <div class="business-economics-body">
@@ -281,10 +300,19 @@
               <div class="business-impact-source"><i class="ph ph-database" aria-hidden="true"></i><span>PO · receipt · quality · customer order · delivery · customer invoice · GL</span><strong id="business-impact-sequence">LEDGER —</strong></div>
             </section>
 
+            <section id="operations-history" class="operations-history" aria-labelledby="operations-history-title">
+              <header><h2 id="operations-history-title">Trends &amp; internal baseline</h2><label>Window <select id="history-window"><option value="24">24 hours</option><option value="168">7 days</option><option value="720">30 days</option><option value="0">All retained</option></select></label><button id="history-refresh" type="button">Refresh</button></header>
+              <p id="history-status" role="status">Waiting for the source connection</p>
+              <div id="history-metrics" class="history-metrics" role="radiogroup" aria-label="Choose a trend"></div>
+              <div id="history-chart" class="history-chart"></div>
+              <div id="history-samples" class="history-samples" aria-label="Inspect an observation"></div>
+              <details id="history-detail"><summary>Observation details</summary><dl id="history-record"></dl></details>
+            </section>
+
             <section class="diagram-deck" aria-label="Live control tower diagrams">
               <article class="diagram-panel diagram-reconciliation" aria-labelledby="reconciliation-diagram-title">
                 <div class="diagram-heading">
-                  <div><span class="object-label">LIVE FLOW</span><h2 id="reconciliation-diagram-title">Stage throughput</h2></div>
+                  <div><span class="object-label">LIVE FLOW</span><h2 id="reconciliation-diagram-title">Receipt posting</h2></div>
                   <span id="trend-time" class="diagram-cursor-label">LIVE</span>
                 </div>
                 <div class="chart-legend" aria-label="Live flow series"><span class="legend-expected">Warehouse</span><span class="legend-recorded">ERP posted</span><span class="legend-gap">Exception</span></div>
@@ -484,6 +512,10 @@
       <div class="compatibility-state" aria-hidden="true"><span id="incident-subtitle"></span><span id="incident-id"></span><span id="trace-id"></span><span id="missing-count"></span><span id="hero-expected"></span><span id="hero-recorded"></span><span id="hero-queue"></span><span id="hero-sequence"></span><span id="mode-dot"></span><span id="mode-label"></span><span id="mode-detail"></span><span id="live-heartbeat"></span><span id="metric-throughput"></span><span id="metric-queue-depth"></span><span id="metric-active-agents"></span><span id="metric-sequence"></span><span id="spark-throughput"></span><span id="spark-queue"></span><span id="spark-agents"></span><span id="spark-ledger"></span><div hidden><button id="dashboard-start-investigation" type="button"></button><button id="agent-start-investigation" type="button"></button><button id="dashboard-replay-investigation" type="button"></button></div></div>
     </main>
     <footer class="site-footer"><span>THE MISSING 20</span><span id="footer-status">Ledger connecting</span></footer>
-    <script src="/app.js?v=source-driven-final-v32" defer></script>
+    <script src="/operations-history.js" defer></script>
+    <script src="/conversation-views.js" defer></script>
+    <script src="/app.js?v=source-driven-final-v33" defer></script>
+    <script src="/barcode-capture.js" defer></script>
+    <script src="/photo-receiving.js" defer></script>
   </body>
 </html>

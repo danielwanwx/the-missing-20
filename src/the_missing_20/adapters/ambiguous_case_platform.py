@@ -17,6 +17,7 @@ from threading import RLock
 from typing import Any
 from uuid import uuid4
 
+from the_missing_20.adapters import dialogue_intent
 from the_missing_20.adapters.case_console_store import CaseConsoleStore
 from the_missing_20.adapters.connected_operations import build_connected_operations
 from the_missing_20.adapters.investigation_case_sources import (
@@ -48,6 +49,7 @@ class AmbiguousCasePlatform:
         self._case_version = 1
         self._diagnosis_authorization: dict[str, object] = {}
         self._conversation: list[dict[str, object]] = []
+        self._dialogue_intent: dict[str, object] = {}
         self._runtime_events: list[dict[str, object]] = []
         self._evidence_observed_at = self._now()
         self._agent_state = "IDLE"
@@ -89,6 +91,7 @@ class AmbiguousCasePlatform:
         self._case_version = int(snapshot.get("case_version", 1))
         self._diagnosis_authorization = dict(snapshot.get("diagnosis_authorization", {}))
         self._scenario_variant = str(snapshot.get("scenario_variant", "uncommitted_receipt"))
+        self._dialogue_intent = dict(snapshot.get("dialogue_intent", {}))
         self._conversation = [
             dict(turn) for turn in snapshot.get("conversation", []) if isinstance(turn, Mapping)
         ]
@@ -131,6 +134,7 @@ class AmbiguousCasePlatform:
             "diagnosis_authorization": dict(self._diagnosis_authorization),
             "scenario_variant": self._scenario_variant,
             "conversation": list(self._conversation),
+            "dialogue_intent": self._dialogue_intent,
             "runtime_events": list(self._runtime_events),
             "evidence_observed_at": self._evidence_observed_at,
             "recovery_scope": dict(self._recovery_scope),
@@ -228,7 +232,10 @@ class AmbiguousCasePlatform:
             verified=self._execution.get("status") == "VERIFIED",
         )
 
-    def _append(self, event_type: str, status: str, label: str, detail: str) -> None:
+    def _append(
+        self, event_type: str, status: str, label: str, detail: str,
+        *, task_identity: Mapping[str, object] | None = None,
+    ) -> None:
         quantities = self._case.evidence_projection()["quantities"]
         assert isinstance(quantities, Mapping)
         business = self._business_impact()
@@ -286,6 +293,12 @@ class AmbiguousCasePlatform:
             # transitions can change the local synthetic tenant.
             "read_only": event_type.startswith(("source.", "agent.", "policy.")),
         }
+        if task_identity is not None:
+            event["task"] = {
+                key: value for key, value in task_identity.items()
+                if key in {"task_id", "role", "case_scope", "tool"}
+                and isinstance(value, str) and len(value) <= 240
+            }
         self._events.append(event)
         self._persist(event=event)
 
@@ -310,6 +323,7 @@ class AmbiguousCasePlatform:
         self._case_version = 1
         self._diagnosis_authorization = {}
         self._conversation = []
+        self._dialogue_intent = {}
         self._runtime_events = []
         self._evidence_observed_at = self._now()
         self._agent_state = "IDLE"
@@ -971,6 +985,7 @@ class AmbiguousCasePlatform:
             },
             "case_version": self._case_version,
             "conversation": list(self._conversation),
+            **dialogue_intent.public_state(self._dialogue_intent, self._case.case_id),
             "activity": list(self._events[-80:]),
             "latest_sequence": self._sequence,
         }
@@ -991,6 +1006,10 @@ class AmbiguousCasePlatform:
         }
 
     def stop(self) -> dict[str, object]:
+        with self._run_lock:
+            return self._stop_locked()
+
+    def _stop_locked(self) -> dict[str, object]:
         if self._agent_state in {"IDLE", "STOPPED", "VERIFIED"}:
             raise ValueError("only an active investigation can be paused")
         self._agent_state = "STOPPED"
@@ -1250,6 +1269,12 @@ class AmbiguousCasePlatform:
     def record_agent_tool_progress(
         self, tool_name: str, phase: str = "started", run_id: str | None = None
     ) -> None:
+        with self._run_lock:
+            self._record_agent_tool_progress_locked(tool_name, phase, run_id)
+
+    def _record_agent_tool_progress_locked(
+        self, tool_name: str, phase: str, run_id: str | None,
+    ) -> None:
         """Publish each real model tool call while the HTTP request is still running."""
 
         if self._agent_state == "STOPPED" or (run_id is not None and run_id != self._run_id):
@@ -1263,7 +1288,17 @@ class AmbiguousCasePlatform:
             "read_collaboration_evidence": "Warehouse scans",
             "reconcile_source_records": "Cross-source reconciliation",
             "apply_control_policy": "Deterministic policy gate",
+            "consult_receiving": "Receiving specialist",
+            "consult_inventory": "Inventory specialist",
+            "consult_quality": "Quality specialist",
         }
+        if phase == "failed":
+            self._append(
+                "agent.strands.tool.failed", "FAILED",
+                source_labels.get(tool_name, tool_name),
+                "Evidence task failed; no recovery was authorized.",
+            )
+            return
         synthesis = tool_name in {"reconcile_source_records", "apply_control_policy"}
         if phase == "started":
             self._agent_state = "SYNTHESIZING" if synthesis else "GATHERING"
@@ -1291,6 +1326,12 @@ class AmbiguousCasePlatform:
     def record_agent_runtime_progress(
         self, runtime_event: Mapping[str, object], run_id: str | None = None
     ) -> None:
+        with self._run_lock:
+            self._record_agent_runtime_progress_locked(runtime_event, run_id)
+
+    def _record_agent_runtime_progress_locked(
+        self, runtime_event: Mapping[str, object], run_id: str | None,
+    ) -> None:
         """Project genuine SDK model-call hooks into the live event ledger.
 
         Tool hook events already have richer source labels through
@@ -1299,7 +1340,17 @@ class AmbiguousCasePlatform:
         when deterministic evidence tools are executing.
         """
 
+        from the_missing_20.agents.role_delegation import task_activity
+
         if self._agent_state == "STOPPED" or (run_id is not None and run_id != self._run_id):
+            return
+        activity = task_activity(runtime_event)
+        if activity is not None:
+            status, label, detail = activity
+            self._append(
+                f"agent.{runtime_event['type']}", status, label, detail,
+                task_identity=runtime_event,
+            )
             return
         event_type = str(runtime_event.get("type", ""))
         if event_type not in {
@@ -1348,7 +1399,19 @@ class AmbiguousCasePlatform:
             label = "Model turn complete"
         self._append(f"agent.strands.{event_type}", status, label, detail)
 
+    def agent_run_is_active(self, run_id: str) -> bool:
+        with self._run_lock:
+            return bool(run_id) and run_id == self._run_id and self._agent_state in {
+                "GATHERING", "REASONING", "SYNTHESIZING", "OBSERVING",
+            }
+
     def record_strands_investigation(self, advisory: Mapping[str, object]) -> dict[str, object]:
+        with self._run_lock:
+            return self._record_strands_investigation_locked(advisory)
+
+    def _record_strands_investigation_locked(
+        self, advisory: Mapping[str, object],
+    ) -> dict[str, object]:
         """Persist a real Strands trace without granting it control-plane authority."""
 
         advisory_run_id = str(advisory.get("run_id", ""))
@@ -1534,6 +1597,16 @@ class AmbiguousCasePlatform:
         approval_id = str(execution["approval_id"])
         self.execute(approval_id, idempotency_key)
         return self.verify()
+
+    def record_human_request(self, question: str, case_id: str) -> dict[str, object]:
+        with self._run_lock:
+            if case_id != self._case.case_id:
+                raise ValueError("Conversation case changed; reread current context.")
+            self._dialogue_intent = dialogue_intent.record_request(
+                self._dialogue_intent, case_id, question, self._now()
+            )
+            self._persist()
+            return dialogue_intent.public_state(self._dialogue_intent, case_id)
 
     def record_conversation_turn(
         self, question: str, answer: str, advisory: Mapping[str, object]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from scripts.decision_workspace_server import DecisionWorkspaceServer
 from scripts.run_decision_workspace_smoke import _CDPBrowser, _chrome, _wait_ui
 from the_missing_20.adapters.agent_platform import AgentPlatform
 from the_missing_20.adapters.ambiguous_case_platform import AmbiguousCasePlatform
+from the_missing_20.adapters.live_advisory_gateway import DashboardAdvisoryGateway
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,11 +40,13 @@ def _erp() -> dict[str, object]:
             }
         ],
         "documents": [
-            {"kind": "purchase_order", "name": "PO-20"},
+            {"kind": "purchase_order", "name": "PO-20", "quantity": 20},
             {
                 "kind": "purchase_receipt",
                 "name": "PR-20",
                 "status": "PARTIAL_QUALITY_HOLD",
+                "received": 20,
+                "accepted": 12,
                 "rejected": 8,
             },
             {"kind": "purchase_invoice", "name": "PI-20", "status": "PAYMENT_HOLD"},
@@ -178,7 +182,9 @@ def test_browser_renders_live_agent_platform_and_keeps_writes_disabled(tmp_path:
             assert browser.evaluate(
                 "['WAITING', 'MANAGER REVIEW'].includes("
                 "document.querySelector('#platform-outcome-status')?.textContent) && "
-                "document.querySelector('#platform-diagnose')?.disabled"
+                "!document.querySelector('#platform-diagnose')?.disabled && "
+                "document.querySelector('#platform-diagnose')?.textContent === "
+                "'Start investigation'"
             )
             geometry = browser.evaluate(
                 "(() => {"
@@ -210,18 +216,14 @@ def test_browser_renders_live_agent_platform_and_keeps_writes_disabled(tmp_path:
             )
             assert geometry["ok"], geometry
 
+            browser.evaluate("document.querySelector('#platform-diagnose').click()")
             _wait_ui(
                 browser,
                 (
-                    "document.querySelector('#platform-run-state')?.textContent.includes("
-                    "'PLAN READY') && document.querySelector('#platform-diagnosis-status')?"
-                    ".textContent.includes('PLAN READY')"
+                    "document.querySelector('#platform-outcome-status')?.textContent === "
+                    "'SAFE STOP' && document.querySelector('#platform-approve-execute')?.disabled"
                 ),
-                "agent-platform diagnosis",
-            )
-            assert browser.evaluate(
-                "document.querySelectorAll("
-                "'#platform-hypotheses .platform-hypothesis').length === 4"
+                "unconfigured real Agent safely withholds a plan",
             )
             browser.evaluate(
                 "document.querySelector('#platform-question').value = "
@@ -244,6 +246,22 @@ def test_browser_renders_live_agent_platform_and_keeps_writes_disabled(tmp_path:
 def test_browser_completes_human_gated_case_and_exposes_resolution_packet(
     tmp_path: Path,
 ) -> None:
+    class BrowserAdvisoryDouble(DashboardAdvisoryGateway):
+        """Offline UI control test; real model quality is measured separately."""
+
+        def investigate(self, projection: Mapping[str, object]) -> dict[str, object]:
+            run = projection["agent_run"]
+            assert isinstance(run, Mapping)
+            return {
+                "status": "COMPLETE",
+                "run_id": run["run_id"],
+                "mode": "test_double",
+                "provider": {"provider": "test_double"},
+                "tool_calls": [],
+                "runtime_events": [],
+                "result": {"disposition": "RECOVERY_READY", "write_performed": False},
+            }
+
     platform = AmbiguousCasePlatform(store_path=tmp_path / "case-console.sqlite3")
     try:
         server = DecisionWorkspaceServer(
@@ -251,6 +269,7 @@ def test_browser_completes_human_gated_case_and_exposes_resolution_packet(
             ROOT,
             runtime_directory=tmp_path / "runtime",
             agent_platform=platform,
+            agent_advisory=BrowserAdvisoryDouble(platform),
         )
     except PermissionError:
         pytest.skip("the managed test sandbox disallows loopback sockets")
@@ -282,6 +301,14 @@ def test_browser_completes_human_gated_case_and_exposes_resolution_packet(
                 "document.querySelector('#agent-platform-console')?.hidden === false",
                 "investigation workspace",
             )
+            _wait_ui(
+                browser,
+                "document.querySelector('#platform-diagnose')?.textContent === "
+                "'Authorize diagnosis' && !document.querySelector('#platform-diagnose')?.disabled",
+                "human diagnosis authorization gate",
+            )
+            assert platform.current()["judge_proof"]["diagnosis_authorized"] is False
+            browser.evaluate("document.querySelector('#platform-diagnose').click()")
             _wait_ui(
                 browser,
                 (

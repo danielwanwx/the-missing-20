@@ -8,14 +8,19 @@ writes are performed by the separate, explicit seed script.
 from __future__ import annotations
 
 import json
+import math
 import os
+import threading
+import time
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -65,6 +70,9 @@ class ERPNextEvidenceSource:
         purchase_invoice: str = DEFAULT_INVOICE,
         case_id: str = DEFAULT_CASE_ID,
         customer_purchase_order: str = "",
+        discover_purchase_documents: bool = False,
+        cache_seconds: float = 0,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._credentials = credentials
         self._transport = transport or self._default_transport
@@ -74,19 +82,32 @@ class ERPNextEvidenceSource:
         self._purchase_invoice = purchase_invoice
         self._case_id = case_id
         self._customer_purchase_order = customer_purchase_order
+        self._discover_purchase_documents = discover_purchase_documents
         self._sequence = 0
         self._last_fingerprint = ""
         self._last_changed_at: datetime | None = None
+        self._cache_seconds = max(0, cache_seconds)
+        self._clock = clock
+        self._read_lock = threading.RLock()
+        self._cached: dict[str, object] | None = None
+        self._cache_until = 0.0
+        self._retry_not_before = 0.0
 
     def _finalize(self, projection: dict[str, object], now: datetime) -> dict[str, object]:
         """Version the projection by external business state, not polling cadence."""
 
+        raw_activity = projection.get("activity", [])
+        source_activity = raw_activity if isinstance(raw_activity, list) else []
         semantic = {
             "status": projection.get("status"),
             "documents": projection.get("documents", []),
+            "document_lifecycle": projection.get("document_lifecycle", {}),
+            "read_errors": projection.get("read_errors", []),
+            "read_error": projection.get("read_error"),
+            "primary_document_names": projection.get("primary_document_names", {}),
             "activity": [
                 {key: value for key, value in item.items() if key != "occurred_at"}
-                for item in projection.get("activity", [])
+                for item in source_activity
                 if isinstance(item, Mapping)
             ],
         }
@@ -98,7 +119,7 @@ class ERPNextEvidenceSource:
         changed_at = self._last_changed_at or now
         activity = [
             {**item, "occurred_at": changed_at.isoformat()}
-            for item in projection.get("activity", [])
+            for item in source_activity
             if isinstance(item, Mapping)
         ]
         return {
@@ -130,6 +151,8 @@ class ERPNextEvidenceSource:
             customer_purchase_order=values.get(
                 "MISSING20_ERPNEXT_CUSTOMER_PO", DEFAULT_CUSTOMER_PO
             ),
+            discover_purchase_documents=True,
+            cache_seconds=30,
         )
 
     @staticmethod
@@ -157,6 +180,28 @@ class ERPNextEvidenceSource:
         document = payload.get("data") if isinstance(payload, Mapping) else None
         if not isinstance(document, Mapping):
             raise ValueError(f"ERPNext returned no {doctype} document")
+        numeric_fields = {
+            "qty",
+            "received_qty",
+            "rejected_qty",
+            "rate",
+            "amount",
+            "net_rate",
+            "net_amount",
+            "grand_total",
+            "net_total",
+            "total_qty",
+            "docstatus",
+        }
+        for record in [document, *self._items(document)]:
+            for key in numeric_fields.intersection(record):
+                value = record[key]
+                if value is not None and (
+                    not isinstance(value, (str, int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(float(value))
+                ):
+                    raise ValueError("ERPNext returned invalid numeric evidence")
         return document
 
     def _get_rows(
@@ -195,6 +240,153 @@ class ERPNextEvidenceSource:
             raise ValueError(f"ERPNext returned no {doctype} rows")
         return [row for row in rows if isinstance(row, Mapping)]
 
+    def _optional_document(self, doctype: str, name: str) -> Mapping[str, Any]:
+        # Only an unconfigured future document is optional. A configured ID
+        # disappearing, access denial, malformed response or timeout is an outage.
+        return self._get_document(doctype, name) if name else {}
+
+    def _purchase_documents(
+        self, po: Mapping[str, Any], doctype: str, configured: Mapping[str, Any]
+    ) -> list[Mapping[str, Any]]:
+        """Bound parent reads, then prove each exact PO child relationship.
+
+        Direct child-table REST queries are denied to the least-privilege demo
+        user. Do not quietly present the first page as a complete history.
+        """
+        if not self._discover_purchase_documents:
+            return [configured] if configured else []
+        if not po.get("supplier"):
+            raise ValueError("Purchase order supplier is required for scoped discovery")
+        filters: list[list[object]] = [["supplier", "=", po["supplier"]]]
+        if po.get("company"):
+            filters.append(["company", "=", po["company"]])
+        if po.get("creation"):
+            filters.append(["creation", ">=", po["creation"]])
+        rows = self._get_rows(doctype, fields=["name"], filters=filters, limit=100)
+        if len(rows) >= 100:
+            raise ValueError("Scoped purchase document page is incomplete")
+        names = sorted({str(row["name"]) for row in rows if row.get("name")})
+        configured_name = str(configured.get("name", ""))
+        names = [name for name in names if name != configured_name]
+        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="m20-purchase-read") as pool:
+            fetched = list(pool.map(lambda name: self._get_document(doctype, name), names))
+        candidates = ([configured] if configured else []) + fetched
+        selected: list[Mapping[str, Any]] = []
+        for document in candidates:
+            items = self._items(document)
+            matched = [item for item in items if item.get("purchase_order") == po.get("name")]
+            if not matched:
+                if document.get("name") == configured_name:
+                    raise ValueError("Configured purchase document does not match this order")
+                continue
+            selected.append(
+                {**document, "items": matched, "case_scope_complete": len(matched) == len(items)}
+            )
+        return selected
+
+    @staticmethod
+    def _business_metadata(document: Mapping[str, Any]) -> dict[str, object]:
+        """Allowlist source identity and net accounting bases, never raw payloads."""
+        fields = (
+            "docstatus",
+            "modified",
+            "posting_date",
+            "posting_time",
+            "transaction_date",
+            "schedule_date",
+            "company",
+            "currency",
+            "net_total",
+            "total_taxes_and_charges",
+            "discount_amount",
+            "is_return",
+            "return_against",
+            "case_scope_complete",
+        )
+        metadata: dict[str, object] = {key: document[key] for key in fields if key in document}
+        item_fields = (
+            "name",
+            "item_code",
+            "qty",
+            "uom",
+            "stock_uom",
+            "conversion_factor",
+            "net_rate",
+            "net_amount",
+            "rate",
+            "amount",
+            "purchase_order",
+            "po_detail",
+            "purchase_order_item",
+            "purchase_receipt",
+            "purchase_receipt_item",
+            "warehouse",
+            "batch_no",
+            "received_qty",
+            "rejected_qty",
+            "rejected_warehouse",
+            "schedule_date",
+        )
+        items = ERPNextEvidenceSource._items(document)
+        if any(item.get("item_code") for item in items):
+            metadata["items"] = [
+                {key: item[key] for key in item_fields if key in item} for item in items
+            ]
+            units = {str(item.get("uom")) for item in items if item.get("uom")}
+            if len(units) == 1 and all(item.get("uom") for item in items):
+                metadata["uom"] = next(iter(units))
+        return metadata
+
+    def _purchase_summary(self, document: Mapping[str, Any], kind: str) -> dict[str, object]:
+        items = self._items(document)
+        lifecycle = document.get("docstatus")
+        status = "CANCELLED" if lifecycle == 2 else "DRAFT" if lifecycle == 0 else "RECEIVED"
+        summary: dict[str, object] = {
+            "kind": kind,
+            "name": str(document.get("name", "")),
+            "status": status,
+            **self._business_metadata(document),
+        }
+        if kind == "purchase_receipt":
+            accepted = sum(float(item.get("qty") or 0) for item in items)
+            rejected = sum(float(item.get("rejected_qty") or 0) for item in items)
+            received = sum(
+                float(item["received_qty"])
+                if item.get("received_qty") is not None
+                else float(item.get("qty") or 0) + float(item.get("rejected_qty") or 0)
+                for item in items
+            )
+            summary.update(
+                accepted=accepted,
+                rejected=rejected,
+                received=received,
+                quality_hold_remaining=max(0.0, rejected),
+                delivery_note=str(document.get("supplier_delivery_note", "")),
+            )
+            if lifecycle == 1 and rejected > 0:
+                summary["status"] = "PARTIAL_QUALITY_HOLD"
+        else:
+            held = bool(document.get("on_hold"))
+            summary.update(
+                on_hold=held,
+                bill_no=str(document.get("bill_no", "")),
+                hold_comment=str(document.get("hold_comment", "")),
+                grand_total=document.get("grand_total"),
+                linked_receipts=sorted(
+                    {
+                        str(item["purchase_receipt"])
+                        for item in items
+                        if item.get("purchase_receipt")
+                    }
+                ),
+            )
+            if lifecycle == 1:
+                summary["status"] = "PAYMENT_HOLD" if held else "OPEN"
+            if document.get("case_scope_complete") is False:
+                summary["grand_total"] = None
+                summary["amount_status"] = "DOCUMENT_CONTAINS_OTHER_ORDERS"
+        return summary
+
     def _ledger_evidence(
         self,
         *,
@@ -203,6 +395,7 @@ class ERPNextEvidenceSource:
         recovery_transfer: str,
         delivery_note: str = "",
         sales_invoice: str = "",
+        additional_purchase_documents: list[str] | None = None,
     ) -> dict[str, object]:
         """Read the exact stock and accounting postings behind the demo documents.
 
@@ -211,7 +404,11 @@ class ERPNextEvidenceSource:
         business effect.
         """
 
-        voucher_names = [purchase_receipt, purchase_invoice]
+        voucher_names = [
+            name
+            for name in [purchase_receipt, purchase_invoice, *(additional_purchase_documents or [])]
+            if name
+        ]
         if recovery_transfer:
             voucher_names.append(recovery_transfer)
         if delivery_note:
@@ -302,8 +499,8 @@ class ERPNextEvidenceSource:
             }
             for row in general_rows
         ]
-        debit_total = sum(float(row["debit"]) for row in general_entries)
-        credit_total = sum(float(row["credit"]) for row in general_entries)
+        debit_total = sum(float(str(row["debit"])) for row in general_entries)
+        credit_total = sum(float(str(row["credit"])) for row in general_entries)
         balanced = bool(general_entries) and abs(debit_total - credit_total) < 0.005
         return {
             "status": "CONNECTED",
@@ -314,7 +511,7 @@ class ERPNextEvidenceSource:
             "general_ledger_entries": general_entries,
             "totals": {
                 "stock_value_difference": sum(
-                    float(row["stock_value_difference"]) for row in stock_entries
+                    float(str(row["stock_value_difference"])) for row in stock_entries
                 ),
                 "debit": debit_total,
                 "credit": credit_total,
@@ -438,12 +635,34 @@ class ERPNextEvidenceSource:
         return [item for item in raw if isinstance(item, Mapping)] if isinstance(raw, list) else []
 
     def current(self) -> dict[str, object]:
+        """Share one observed snapshot across UI polls; respect provider cooldowns."""
+        with self._read_lock:
+            if self._cached is not None and self._clock() < max(
+                self._cache_until, self._retry_not_before
+            ):
+                return deepcopy(self._cached)
+            self._cached = self._read_current()
+            self._cache_until = self._clock() + self._cache_seconds
+            return deepcopy(self._cached)
+
+    def invalidate_cache(self) -> None:
+        """Require a fresh write-boundary read without bypassing a provider's backoff."""
+        with self._read_lock:
+            self._cache_until = 0
+
+    def _read_current(self) -> dict[str, object]:
         """Return an API-safe evidence projection or a safe degraded state."""
 
         now = datetime.now(UTC)
         base: dict[str, object] = {
             "schema_version": ERP_NEXT_SCHEMA_VERSION,
             "source_id": "erpnext-missing20",
+            "case_id": self._case_id,
+            "configured_document_names": {
+                "purchase_order": self._purchase_order,
+                "purchase_receipt": self._purchase_receipt,
+                "purchase_invoice": self._purchase_invoice,
+            },
             "provider": "ERPNext / Frappe Cloud",
             "read_only": True,
         }
@@ -464,10 +683,10 @@ class ERPNextEvidenceSource:
             with ThreadPoolExecutor(max_workers=5, thread_name_prefix="m20-erp-read") as pool:
                 po_future = pool.submit(self._get_document, "Purchase Order", self._purchase_order)
                 receipt_future = pool.submit(
-                    self._get_document, "Purchase Receipt", self._purchase_receipt
+                    self._optional_document, "Purchase Receipt", self._purchase_receipt
                 )
                 invoice_future = pool.submit(
-                    self._get_document, "Purchase Invoice", self._purchase_invoice
+                    self._optional_document, "Purchase Invoice", self._purchase_invoice
                 )
                 recovery_future = pool.submit(self._find_recovery_transfer)
                 value_future = pool.submit(self._find_value_chain)
@@ -476,13 +695,39 @@ class ERPNextEvidenceSource:
                 invoice = invoice_future.result()
                 recovery_transfer = recovery_future.result()
                 sales_order, delivery_note, sales_invoice = value_future.result()
-        except (OSError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+            receipts = self._purchase_documents(po, "Purchase Receipt", receipt)
+            invoices = self._purchase_documents(po, "Purchase Invoice", invoice)
+            receipt = next(
+                (row for row in receipts if row.get("name") == self._purchase_receipt),
+                receipts[0] if receipts else {},
+            )
+            invoice = next(
+                (row for row in invoices if row.get("name") == self._purchase_invoice),
+                invoices[0] if invoices else {},
+            )
+        except (OSError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as error:
+            rate_limited = isinstance(error, HTTPError) and error.code == 429
+            if isinstance(error, HTTPError) and error.code == 429:
+                raw_delay = error.headers.get("Retry-After", "60") if error.headers else "60"
+                try:
+                    delay = max(30.0, float(raw_delay))
+                    if not math.isfinite(delay):
+                        delay = 60.0
+                except ValueError:
+                    try:
+                        delay = max(30.0, (parsedate_to_datetime(raw_delay) - now).total_seconds())
+                    except (TypeError, ValueError, OverflowError):
+                        delay = 60.0
+                self._retry_not_before = self._clock() + delay
             return self._finalize(
                 {
                     **base,
                     "status": "DEGRADED",
                     "documents": [],
                     "activity": [],
+                    "read_error": {
+                        "code": "RATE_LIMITED" if rate_limited else "SOURCE_READ_FAILED"
+                    },
                 },
                 now,
             )
@@ -526,8 +771,13 @@ class ERPNextEvidenceSource:
             recovery_transfer=str(recovery_transfer.get("name", "")) if recovery_transfer else "",
             delivery_note=str(delivery_note.get("name", "")) if delivery_note else "",
             sales_invoice=str(sales_invoice.get("name", "")) if sales_invoice else "",
+            additional_purchase_documents=[
+                str(row["name"])
+                for row in [*receipts, *invoices]
+                if row.get("name") not in {receipt.get("name"), invoice.get("name")}
+            ],
         )
-        documents = [
+        documents: list[dict[str, Any]] = [
             {
                 "kind": "purchase_order",
                 "name": str(po.get("name", "")),
@@ -536,7 +786,7 @@ class ERPNextEvidenceSource:
                 "supplier": str(po.get("supplier", "")),
                 "unit_rate": po_unit_rate,
                 "line_value": po_line_value,
-                "currency": str(po.get("currency", "USD")),
+                "currency": str(po.get("currency") or ""),
             },
             {
                 "kind": "purchase_receipt",
@@ -570,7 +820,7 @@ class ERPNextEvidenceSource:
                 "on_hold": held,
                 "hold_comment": str(invoice.get("hold_comment", "")),
                 "grand_total": float(invoice.get("grand_total") or 0),
-                "currency": str(invoice.get("currency", "USD")),
+                "currency": str(invoice.get("currency") or ""),
                 "linked_receipts": sorted(
                     {
                         str(item.get("purchase_receipt", ""))
@@ -605,7 +855,7 @@ class ERPNextEvidenceSource:
                         "customer_purchase_order": str(sales_order.get("po_no", "")),
                         "quantity": float(sales_order.get("total_qty") or 0),
                         "booked_value": float(sales_order.get("grand_total") or 0),
-                        "currency": str(sales_order.get("currency", "USD")),
+                        "currency": str(sales_order.get("currency") or ""),
                         "delivered_percent": float(sales_order.get("per_delivered") or 0),
                         "billed_percent": float(sales_order.get("per_billed") or 0),
                         "delivery_date": str(sales_order.get("delivery_date", "")),
@@ -627,7 +877,7 @@ class ERPNextEvidenceSource:
                         ),
                         "quantity": float(delivery_note.get("total_qty") or 0),
                         "value": float(delivery_note.get("grand_total") or 0),
-                        "currency": str(delivery_note.get("currency", "USD")),
+                        "currency": str(delivery_note.get("currency") or ""),
                     }
                 ]
                 if delivery_note
@@ -645,16 +895,52 @@ class ERPNextEvidenceSource:
                             or ""
                         ),
                         "quantity": float(sales_invoice.get("total_qty") or 0),
-                        "billed_revenue": float(sales_invoice.get("grand_total") or 0),
+                        "billed_revenue": sales_invoice.get("net_total"),
+                        "billed_amount": sales_invoice.get("grand_total"),
                         "outstanding_amount": float(sales_invoice.get("outstanding_amount") or 0),
-                        "currency": str(sales_invoice.get("currency", "USD")),
+                        "currency": str(sales_invoice.get("currency") or ""),
                     }
                 ]
                 if sales_invoice
                 else []
             ),
         ]
-        activity = [
+        source_documents = {
+            str(row.get("name", "")): row
+            for row in [
+                po,
+                receipt,
+                invoice,
+                recovery_transfer,
+                sales_order,
+                delivery_note,
+                sales_invoice,
+            ]
+            if row
+        }
+        documents = [row for row in documents if row.get("name")]
+        for row in documents:
+            raw = source_documents[str(row["name"])]
+            metadata = self._business_metadata(raw)
+            if row["kind"] == "quality_release_transfer":
+                metadata.pop("docstatus", None)  # already asserted submitted by the scoped finder
+            row.update(metadata)
+            if raw.get("docstatus") in (0, 2):
+                row["status"] = "CANCELLED" if raw["docstatus"] == 2 else "DRAFT"
+            if raw.get("case_scope_complete") is False and row["kind"] == "purchase_invoice":
+                row["grand_total"] = None
+                row["amount_status"] = "DOCUMENT_CONTAINS_OTHER_ORDERS"
+        additional_documents = [
+            self._purchase_summary(row, kind)
+            for kind, rows, primary in (
+                ("purchase_receipt", receipts, receipt),
+                ("purchase_invoice", invoices, invoice),
+            )
+            for row in rows
+            if row.get("name") != primary.get("name")
+        ]
+        documents.extend(additional_documents)
+        activity: list[dict[str, Any]] = [
             {
                 "id": f"erp-po-{po.get('name', '')}",
                 "source_id": "erpnext-missing20",
@@ -662,7 +948,7 @@ class ERPNextEvidenceSource:
                 "occurred_at": now.isoformat(),
                 "status": "VERIFIED",
                 "label": f"ERP read · purchase order {po.get('name', '')}",
-                "detail": f"{quantity:g} ECU controllers ordered from {po.get('supplier', '')}",
+                "detail": f"Purchase order from {po.get('supplier', '')}",
             },
             {
                 "id": f"erp-receipt-{receipt.get('name', '')}",
@@ -767,13 +1053,47 @@ class ERPNextEvidenceSource:
                 else []
             ),
         ]
+        activity = [row for row in activity if not str(row["id"]).endswith("-")]
+        activity.extend(
+            {
+                "id": f"erp-{row['kind']}-{row['name']}",
+                "source_id": "erpnext-missing20",
+                "provider": "ERPNext / Frappe Cloud",
+                "occurred_at": now.isoformat(),
+                "status": row.get("status", "UNKNOWN"),
+                "label": f"ERP read · {str(row['kind']).replace('_', ' ')} {row['name']}",
+                "detail": "Additional document linked to this purchase order",
+            }
+            for row in additional_documents
+        )
         return self._finalize(
             {
                 **base,
                 "case_id": self._case_id,
                 "status": "CONNECTED",
                 "documents": documents,
+                "primary_document_names": {
+                    kind: str(document.get("name", ""))
+                    for kind, document in (
+                        ("purchase_order", po),
+                        ("purchase_receipt", receipt),
+                        ("purchase_invoice", invoice),
+                        ("quality_release_transfer", recovery_transfer),
+                        ("sales_order", sales_order),
+                        ("delivery_note", delivery_note),
+                        ("sales_invoice", sales_invoice),
+                    )
+                    if document
+                },
                 "ledger_evidence": ledger_evidence,
+                "document_lifecycle": {
+                    "purchase_order": "PRESENT",
+                    "purchase_receipt": "PRESENT" if receipts else "AWAITING_RECEIPT",
+                    "purchase_invoice": "PRESENT" if invoices else "AWAITING_INVOICE",
+                },
+                "purchase_scope": "ALL_LINKED_DOCUMENTS"
+                if self._discover_purchase_documents
+                else "CONFIGURED_DOCUMENTS",
                 "activity": activity,
             },
             now,

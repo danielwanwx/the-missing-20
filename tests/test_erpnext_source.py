@@ -1,10 +1,77 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
+from email.message import Message
+from email.utils import format_datetime
+from urllib.error import HTTPError
 from urllib.request import Request
 
 from the_missing_20.adapters.erpnext_source import ERPNextCredentials, ERPNextEvidenceSource
+
+
+def test_rate_limit_backoff_is_shared_and_cannot_be_bypassed_by_refresh():
+    clock = [0.0]
+    calls = []
+    headers = Message()
+    headers["Retry-After"] = "120"
+
+    def limited(request, timeout):
+        calls.append(request.full_url)
+        raise HTTPError(request.full_url, 429, "limited", headers, None)
+
+    source = ERPNextEvidenceSource(
+        ERPNextCredentials("https://demo.invalid", "key", "secret"),
+        transport=limited,
+        cache_seconds=15,
+        clock=lambda: clock[0],
+    )
+    first = source.current()
+    assert first["status"] == "DEGRADED"
+    assert first["read_error"]["code"] == "RATE_LIMITED"
+    count = len(calls)
+    for instant in (1, 16, 119):
+        clock[0] = instant
+        source.invalidate_cache()
+        assert source.current() == first
+    assert len(calls) == count
+    clock[0] = 121
+    source.current()
+    assert len(calls) > count
+
+
+def test_poll_cache_preserves_observation_time_but_explicit_refresh_reads_again():
+    clock = [1.0]
+    source = ERPNextEvidenceSource(None, cache_seconds=15, clock=lambda: clock[0])
+    first = source.current()
+    assert source.current() == first
+    first["status"] = "FAKE"  # callers cannot corrupt the shared cache
+    assert source.current()["status"] == "NOT_CONFIGURED"
+    source.invalidate_cache()
+    assert source.current()["received_at"] != first["received_at"]
+
+
+def test_http_date_retry_after_is_honored_and_error_type_advances_sequence():
+    clock = [0.0]
+    status = [429]
+    headers = Message()
+    headers["Retry-After"] = format_datetime(datetime.now(UTC) + timedelta(minutes=5))
+
+    def transport(request, timeout):
+        raise HTTPError(request.full_url, status[0], "unavailable", headers, None)
+
+    source = ERPNextEvidenceSource(
+        ERPNextCredentials("https://demo.invalid", "key", "secret"),
+        transport=transport,
+        clock=lambda: clock[0],
+    )
+    limited = source.current()
+    assert 295 < source._retry_not_before <= 300
+    clock[0] = 301
+    status[0] = 503
+    failed = source.current()
+    assert failed["sequence"] > limited["sequence"]
+    assert failed["read_error"]["code"] == "SOURCE_READ_FAILED"
 
 
 def _transport(request: Request, _timeout: float) -> bytes:

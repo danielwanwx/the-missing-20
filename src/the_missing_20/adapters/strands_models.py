@@ -378,15 +378,36 @@ class BudgetedModel(Model):
         model_state: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AsyncGenerator[StreamEvent, None]:
-        serialized_length = self.serialized_request_byte_length(
-            messages=messages,
-            tool_specs=tool_specs,
-            system_prompt=system_prompt,
-            system_prompt_content=system_prompt_content,
-            invocation_state=invocation_state,
-            model_state=model_state,
-            kwargs=kwargs,
-        )
+        if STRANDS_AVAILABLE and type(self._delegate) is BedrockModel:
+            # Bedrock ignores the event-loop invocation/model state. Its trace
+            # can repeat every tool result without adding any provider input.
+            # Keep the conservative UTF-8 byte bound on the SDK's actual wire
+            # request, including tool schemas and configured request fields.
+            system_content = system_prompt_content
+            if system_prompt and system_content is None:
+                system_content = [{"text": system_prompt}]
+            request = self._delegate.format_request(
+                messages,
+                tool_specs,
+                system_content,
+                tool_choice,
+                kwargs.get("dynamic_trailing_blocks", 0),
+            )
+            serialized_length = len(
+                json.dumps(
+                    request, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+                ).encode("utf-8")
+            )
+        else:
+            serialized_length = self.serialized_request_byte_length(
+                messages=messages,
+                tool_specs=tool_specs,
+                system_prompt=system_prompt,
+                system_prompt_content=system_prompt_content,
+                invocation_state=invocation_state,
+                model_state=model_state,
+                kwargs=kwargs,
+            )
         reservation = self.ledger.reserve_request(
             input_token_upper_bound=serialized_length,
             output_token_upper_bound=self._output_token_ceiling(),

@@ -7,10 +7,12 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test tests-js/*.test.mjs",
+    "test": "node --test tests-js/*.test.mjs tests-js/*.test.cjs",
     "check": "npm test"
   },
   "dependencies": {
-    "@phosphor-icons/web": "^2.1.2"
+    "@phosphor-icons/web": "^2.1.2",
+    "@zxing/browser": "0.1.5",
+    "@zxing/library": "0.21.3"
   }
 }
