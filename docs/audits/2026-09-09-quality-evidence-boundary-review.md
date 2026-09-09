@@ -17,3 +17,5 @@ Intermediate complete check: 1,579 passed / 1 stale-package failure. It ran befo
 Records under `artifacts/audits/2026-09-09-quality-evidence-boundary/` preserve original and reviewer counterexamples. No real model or business-system call was needed for the source-policy regression. First-turn model reasoning, native summary/session, same-order downstream, full UI and final release remain open; F03 remains FAILED.
 
 Final frozen-code `make check` completed successfully: 1,582 Python tests and 101 JavaScript tests, zero test failures; 233-file format check, Ruff lint and 51-file strict mypy pass. Independent backend reviewer approved the final two-file source-policy correction after rerunning its 51 focused tests and four branch checks. Independent release reviewer verified the metadata refresh is exactly the three expected hash/size/digest fields, not a readiness change. No code changed during this final run; only audit/tracker prose was appended afterward.
+
+Artifact formatting: two pytest diagnostic whitespace-only lines were normalized after capture; assertions, failures and counts are unchanged.

@@ -11,7 +11,7 @@ ______ test_receipt_only_gap_does_not_require_quality_approval_or_lookup _______
         policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
 >       assert policy["disposition"] == "RECOVERY_READY"
 E       AssertionError: assert 'NEEDS_EVIDENCE' == 'RECOVERY_READY'
-E         
+E
 E         - RECOVERY_READY
 E         + NEEDS_EVIDENCE
 
@@ -24,7 +24,7 @@ ________ test_explicit_pending_quality_is_denied_even_without_quantity _________
         policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
 >       assert policy["disposition"] == "DENY"
 E       AssertionError: assert 'NEEDS_EVIDENCE' == 'DENY'
-E         
+E
 E         - DENY
 E         + NEEDS_EVIDENCE
 
