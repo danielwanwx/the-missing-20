@@ -1736,7 +1736,7 @@
       : (strands.provider && typeof strands.provider === "object" ? strands.provider : {});
     const modelId = value(provider.model);
     const runtimeStatus = value(strands.status).toUpperCase();
-    const runtimeLabel = ["AGENT_UNAVAILABLE", "VALIDATION_FAILED"].includes(runtimeStatus)
+    const runtimeLabel = runtimeStatus === "AGENT_UNAVAILABLE"
       ? "Unavailable"
       : modelId.includes("nova-pro")
       ? "Nova Pro"
@@ -2094,7 +2094,7 @@
       : reviewAction === "RESUME_AFTER_EVIDENCE"
         ? "Resume after evidence"
         : reviewAction === "RETRY_INVESTIGATION"
-          ? "Retry real Agent"
+          ? "Retry investigation"
         : reviewAction === "RESUME_INVESTIGATION"
           ? "Resume investigation"
           : "Start investigation";
@@ -6452,7 +6452,9 @@
           ? "Manager approved"
           : runState === "PLAN_READY"
             ? "Awaiting manager review"
-            : runState === "BLOCKED" && ["AGENT_UNAVAILABLE", "AGENT_VALIDATION_FAILED"].includes(finding)
+            : runState === "BLOCKED" && finding === "AGENT_VALIDATION_FAILED"
+              ? "Agent answer needs review"
+            : runState === "BLOCKED" && finding === "AGENT_UNAVAILABLE"
               ? "Agent unavailable · retry required"
               : runState === "BLOCKED"
                 ? "Safe stop"

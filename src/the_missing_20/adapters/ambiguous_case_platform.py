@@ -534,7 +534,13 @@ class AmbiguousCasePlatform:
             "AGENT_UNAVAILABLE",
             "AGENT_VALIDATION_FAILED",
         }:
-            conclusion = ("AGENT UNAVAILABLE", "BLOCKED", 0.0)
+            conclusion = (
+                "ANSWER NEEDS REVIEW"
+                if self._diagnosis.get("finding") == "AGENT_VALIDATION_FAILED"
+                else "AGENT UNAVAILABLE",
+                "BLOCKED",
+                0.0,
+            )
         elif disposition is CaseDisposition.RECOVERY_READY:
             conclusion = ("GUARDED PLAN", "GUARDED", 0.94)
         elif disposition is CaseDisposition.RECONCILE_ONLY:
@@ -1461,8 +1467,11 @@ class AmbiguousCasePlatform:
                     "status": "BLOCKED",
                     "finding": failure_finding,
                     "summary": (
-                        "The real Strands Agent did not complete, so no diagnosis or recovery "
-                        "plan was released. Retry after the provider is available."
+                        "The Agent answer did not pass business validation. No recovery plan "
+                        "was released. Review the run details before retrying the investigation."
+                        if status == "VALIDATION_FAILED"
+                        else "The real Strands run did not complete. No diagnosis or recovery "
+                        "plan was released. Check the run details before retrying."
                     ),
                     "confidence": 0.0,
                 }
@@ -1470,7 +1479,9 @@ class AmbiguousCasePlatform:
             self._append(
                 "agent.strands.degraded",
                 "BLOCKED",
-                "Strands investigation unavailable",
+                "Agent answer needs review"
+                if status == "VALIDATION_FAILED"
+                else "Strands investigation unavailable",
                 "No model conclusion or recovery plan was released; deterministic "
                 "controls failed closed.",
             )

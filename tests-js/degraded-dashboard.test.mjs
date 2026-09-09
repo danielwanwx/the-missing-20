@@ -174,3 +174,22 @@ test("case coverage is unknown without proof, never a hard-coded demo case count
   vm.runInNewContext(assignment, context);
   assert.equal(observed, "3");
 });
+
+test("selected case distinguishes rejected answers from unavailable runs", () => {
+  const nodes = {};
+  const context = {
+    state: {events: [], agentPlatform: {
+      agent_run: {state: "BLOCKED"}, diagnosis: {finding: "AGENT_VALIDATION_FAILED"},
+    }},
+    $: id => nodes[id] ||= {dataset: {}, querySelector: () => ({})},
+    platformFlowProjection: () => ({gap: 12}), receivingNeedsAttention: () => false,
+    isNormalScenario: () => false, number: (v, d = 0) => v == null ? d : Number(v),
+    value: v => String(v ?? ""), slug: v => v,
+  };
+  vm.runInNewContext(source("renderDashboardAgentStatus"), context);
+  context.renderDashboardAgentStatus();
+  assert.equal(nodes["dashboard-agent-stage"].textContent, "Agent answer needs review");
+  context.state.agentPlatform.diagnosis.finding = "AGENT_UNAVAILABLE";
+  context.renderDashboardAgentStatus();
+  assert.equal(nodes["dashboard-agent-stage"].textContent, "Agent unavailable · retry required");
+});

@@ -717,3 +717,23 @@ def test_single_manager_action_executes_and_verifies_bound_scope() -> None:
     assert packet["execution"]["approval_id"] == packet["approval"]["approval_id"]
     assert packet["approval"]["scope"]["receipt_post_quantity"] == 12
     assert packet["approval"]["scope"]["quality_transfer_quantity"] == 8
+
+
+def test_validation_failure_reports_answer_review_not_provider_outage(tmp_path: Path) -> None:
+    store = tmp_path / "validation.sqlite3"
+    platform = AmbiguousCasePlatform(store_path=store)
+    platform.authorize_diagnosis("operator")
+    platform.claim_diagnosis()
+    failed = platform.record_strands_investigation(
+        {"status": "VALIDATION_FAILED", "tool_calls": ["read_erp_evidence"], "result": None}
+    )
+    for projection in (failed, AmbiguousCasePlatform(store_path=store).current()):
+        assert projection["diagnosis"]["finding"] == "AGENT_VALIDATION_FAILED"
+        assert "did not pass business validation" in projection["diagnosis"]["summary"]
+        assert "provider" not in projection["diagnosis"]["summary"].lower()
+        assert projection["execution"]["available"] is False
+        assert projection["execution"]["status"] == "SAFE_STOP"
+        assert projection["evidence_constellation"]["conclusion"]["label"] == "ANSWER NEEDS REVIEW"
+        assert projection["activity"][-1]["label"] == "Agent answer needs review"
+    with pytest.raises(ValueError, match="requires a current recovery-ready"):
+        platform.approve("manager")
