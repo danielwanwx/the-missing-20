@@ -1,0 +1,102 @@
+{
+  "schema_version": "research_summary.v1",
+  "run_id": "2026-09-09-award-winning-enterprise-ai-agents-across-aws-microsoft-google-s",
+  "topic": "Award-winning enterprise AI agents across AWS Microsoft Google SAP: official judging feedback, public user discussions about agent reliability, supply chain warehouse receiving inventory B2B exception handling, multi-turn factual accuracy and complex task evaluation; evidence-backed gaps and release priorities for The Missing 20",
+  "pack": {
+    "id": "generic",
+    "label": "Generic research",
+    "intent": "general_research",
+    "profile": "generic"
+  },
+  "profile": "generic",
+  "status": "complete_with_warnings",
+  "as_of": "2026-09-09",
+  "headline": "Collected 54 eligible row(s) from 106 total across 1 connector(s).",
+  "stance": "evidence_collected_needs_analysis",
+  "confidence": "medium",
+  "action_bias": "analyze_before_action",
+  "rationale": [
+    "0 claim buckets are supported.",
+    "Matrix gap assessment: not_applicable."
+  ],
+  "quality_warnings": [
+    "5 invalid evidence row(s) excluded from claims.",
+    "47 discovery-only evidence row(s) excluded from claims.",
+    "48 duplicate evidence row(s) detected across 12 cluster(s).",
+    "43 low-quality evidence row(s) need source review.",
+    "1 directional conflict flag(s) need review before synthesis.",
+    "web_page invalid content for https://www.bcg.com/publications/2026/how-ai-agents-are-transforming-supply-chains: insufficient_text",
+    "web_page invalid content for https://the-agent-report.com/2026/05/sap-autonomous-enterprise-200-agents/: empty_content,insufficient_text",
+    "web_page invalid content for https://www.facebook.com/algolia/posts/steven-chung-joins-algolia-as-chief-revenue-officer-veronica-servantez-joins-as-/2032931374326703/: robots_denied",
+    "web_page invalid content for https://www.pymnts.com/news/artificial-intelligence/2026/microsoft-puts-25-ai-agents-work-supply-chain-costs/: empty_content,insufficient_text",
+    "web_page invalid content for https://www.linkedin.com/posts/alexandergreb_%F0%9D%97%98%F0%9D%98%83%F0%9D%97%B2%F0%9D%97%BF%F0%9D%98%86%F0%9D%97%BC%F0%9D%97%BB%F0%9D%97%B2-%F0%9D%97%B6%F0%9D%98%80-%F0%9D%97%B2%F0%9D%98%85%F0%9D%97%B0%F0%9D%97%B6%F0%9D%98%81%F0%9D%97%B2%F0%9D%97%B1-%F0%9D%97%AE%F0%9D%97%AF-activity-7438956957920706560-rO4T: robots_denied"
+  ],
+  "scope_warnings": [
+    "Missing required facets: primary_sources, current_evidence, alternatives, risks"
+  ],
+  "key_evidence": [
+    {
+      "evidence_id": "ev-0027",
+      "title": "SAP Just Bet the Whole Company on 200 AI Agents",
+      "url": "https://aibizinsider.com/2026/05/20/sap-autonomous-enterprise-200-agents-2026-05-20/",
+      "quality_tier": "high"
+    },
+    {
+      "evidence_id": "ev-0058",
+      "title": "Manufacturing Supply Chain Intelligence Agent - AWS",
+      "url": "https://aws.amazon.com/marketplace/pp/prodview-cqxekiikwh5c4",
+      "quality_tier": "high"
+    },
+    {
+      "evidence_id": "ev-0025",
+      "title": "Microsoft Foundry vs AWS Bedrock AgentCore vs Google Vertex ...",
+      "url": "https://agentmarketcap.ai/blog/2026/04/07/azure-ai-foundry-enterprise-agent-platform-2026",
+      "quality_tier": "high"
+    },
+    {
+      "evidence_id": "ev-0031",
+      "title": "Supply Chain 2.0: How Microsoft is powering simulations, AI ...",
+      "url": "https://www.microsoft.com/en-us/microsoft-cloud/blog/mobility/2026/03/24/supply-chain-2-0-how-microsoft-is-powering-simulations-ai-agents-and-physical-ai/",
+      "quality_tier": "high"
+    },
+    {
+      "evidence_id": "ev-0059",
+      "title": "Top 7 Enterprise AI Agents Companies (2026)",
+      "url": "https://assistents.ai/blogs/enterprise-ai-agents-companies-list",
+      "quality_tier": "high"
+    },
+    {
+      "evidence_id": "ev-0061",
+      "title": "Agentic AI for inventory to deliver: From procurement ...",
+      "url": "https://www.microsoft.com/en-us/dynamics-365/blog/business-leader/2026/02/02/agentic-ai-for-inventory-to-deliver-from-procurement-to-fulfillment/",
+      "quality_tier": "high"
+    },
+    {
+      "evidence_id": "ev-0017",
+      "title": "SAP Autonomous Enterprise: 200+ AI Agents Go Live | The Agent ...",
+      "url": "https://the-agent-report.com/2026/05/sap-autonomous-enterprise-200-agents/",
+      "quality_tier": "low"
+    },
+    {
+      "evidence_id": "ev-0010",
+      "title": "SAP Just Bet the Whole Company on 200 AI Agents",
+      "url": "https://aibizinsider.com/2026/05/20/sap-autonomous-enterprise-200-agents-2026-05-20/",
+      "quality_tier": "low"
+    },
+    {
+      "evidence_id": "ev-0062",
+      "title": "Best Enterprise AI Agent Platforms 2025–2026",
+      "url": "https://sanalabs.com/agents-blog/leading-ai-enterprise-fortune-500",
+      "quality_tier": "high"
+    },
+    {
+      "evidence_id": "ev-0033",
+      "title": "AI Agent ROI Calculator & Cost Estimator | FactoryJet",
+      "url": "https://factoryjet.com/tools/ai-agent-roi-calculator",
+      "quality_tier": "high"
+    }
+  ],
+  "loop_status": "complete_with_review_required",
+  "stop_reason": "completed_with_review_required",
+  "network_diagnostics": {}
+}

@@ -1,0 +1,344 @@
+{
+  "generated_at": "2026-09-09T22:55:05.818789+00:00",
+  "topic": "Award-winning enterprise AI agents across AWS Microsoft Google SAP: official judging feedback, public user discussions about agent reliability, supply chain warehouse receiving inventory B2B exception handling, multi-turn factual accuracy and complex task evaluation; evidence-backed gaps and release priorities for The Missing 20",
+  "pack_id": "generic",
+  "row_count": 106,
+  "invalid_evidence_count": 5,
+  "claim_ineligible_count": 52,
+  "unique_evidence_id_count": 106,
+  "evidence_id_collision_count": 0,
+  "unique_evidence_count": 58,
+  "unique_content_count": 58,
+  "duplicate_cluster_count": 12,
+  "average_quality_score": 0.583,
+  "tier_counts": {
+    "low": 43,
+    "medium": 5,
+    "high": 58
+  },
+  "connector_counts": {
+    "web_search": 38,
+    "web_page": 68
+  },
+  "duplicate_clusters": [
+    {
+      "cluster_id": "dup-0001",
+      "dedupe_key": "url:https://agentmarketcap.ai/blog/2026/04/07/azure-ai-foundry-enterprise-agent-platform-2026",
+      "evidence_ids": [
+        "chunk-0c84aa854364f0cf",
+        "chunk-883e3e2f1a8c7179",
+        "chunk-8c74b88f172fbb44",
+        "chunk-b6c40956a210883b"
+      ],
+      "titles": [
+        "Microsoft Foundry vs AWS Bedrock AgentCore vs Google Vertex ...",
+        "Microsoft Foundry vs AWS Bedrock AgentCore vs Google Vertex ... — Multi-Agent Orchestration: Three Different Bets",
+        "Microsoft Foundry vs AWS Bedrock AgentCore vs Google Vertex ... — Observability and Evaluation: Who Can Actually Debug a Multi-Agent System?"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0002",
+      "dedupe_key": "url:https://aibizinsider.com/2026/05/20/sap-autonomous-enterprise-200-agents-2026-05-20",
+      "evidence_ids": [
+        "chunk-aba0174f0d0adc2e",
+        "chunk-afd65b1bbc027b48",
+        "chunk-4b44258ebf2a07a3",
+        "chunk-02502b548918f427"
+      ],
+      "titles": [
+        "SAP Just Bet the Whole Company on 200 AI Agents",
+        "SAP Just Bet the Whole Company on 200 AI Agents — Claude Inside The General Ledger",
+        "https://aibizinsider.com/2026/05/20/sap-autonomous-enterprise-200-agents-2026-05-20/"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0003",
+      "dedupe_key": "url:https://assistents.ai/blogs/enterprise-ai-agents-companies-list",
+      "evidence_ids": [
+        "chunk-542e133ccf17ce60",
+        "chunk-9623df3db1414386",
+        "chunk-f54b80bdf8e2b183",
+        "chunk-afaed0a1043cee5d",
+        "chunk-a40f54f2ffcf4692",
+        "chunk-34df3ab6131bdc55",
+        "chunk-4a78272b8ddb8003",
+        "chunk-063102029a4bb6ce"
+      ],
+      "titles": [
+        "Top 7 Enterprise AI Agents Companies (2026)",
+        "Top 7 Enterprise AI Agents Companies (2026) — Why Enterprises Are Moving from Chatbots to AI Agents in 2026",
+        "Top 7 Enterprise AI Agents Companies (2026) — 3. Microsoft Copilot Studio — Best for Microsoft 365 Environments"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0005",
+      "dedupe_key": "url:https://aws.amazon.com/blogs/machine-learning/evaluating-ai-agents-real-world-lessons-from-building-agentic-systems-at-amazon",
+      "evidence_ids": [
+        "chunk-43ec98af2380f083",
+        "chunk-ab1ff17c9c1a2425"
+      ],
+      "titles": [
+        "Evaluating AI agents: Real-world lessons from building ...",
+        "https://aws.amazon.com/blogs/machine-learning/evaluating-ai-agents-real-world-lessons-from-building-agentic-systems-at-amazon/"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0006",
+      "dedupe_key": "url:https://aws.amazon.com/marketplace/pp/prodview-cqxekiikwh5c4",
+      "evidence_ids": [
+        "chunk-6feccf63b9471b46",
+        "chunk-a6da117e66cb5c87",
+        "chunk-17ecbbd39edfbf8a"
+      ],
+      "titles": [
+        "Manufacturing Supply Chain Intelligence Agent - AWS",
+        "Manufacturing Supply Chain Intelligence Agent - AWS — Details",
+        "Manufacturing Supply Chain Intelligence Agent - AWS — Vendor support"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0007",
+      "dedupe_key": "url:https://factoryjet.com/tools/ai-agent-roi-calculator",
+      "evidence_ids": [
+        "chunk-2458eb6eb29c5a67",
+        "chunk-57508af83af95ff4",
+        "chunk-092ce476f175b66f",
+        "chunk-6376d0672b396ef2",
+        "chunk-d3fffde67bea3b3e"
+      ],
+      "titles": [
+        "AI Agent ROI Calculator & Cost Estimator | FactoryJet",
+        "AI Agent ROI Calculator & Cost Estimator | FactoryJet — Customer Support & Ticket Resolution Agents",
+        "AI Agent ROI Calculator & Cost Estimator | FactoryJet — Questions Operations Leaders Ask Before Building Agents"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0008",
+      "dedupe_key": "url:https://futurumgroup.com/press-release/agentic-ai-the-leading-vendors-winning-the-enterprise-in-2026",
+      "evidence_ids": [
+        "chunk-78720225deab8ee4",
+        "chunk-84f1fb00b4004a8e"
+      ],
+      "titles": [
+        "Agentic AI: The Leading Vendors Winning the Enterprise in ...",
+        "https://futurumgroup.com/press-release/agentic-ai-the-leading-vendors-winning-the-enterprise-in-2026/"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0009",
+      "dedupe_key": "url:https://linesncircles.com/Blog/Enterprise/Enterprise_Agent_Platforms_2026",
+      "evidence_ids": [
+        "chunk-f5223b73a29cb279",
+        "chunk-a15ff5b32a68d4b5",
+        "chunk-f5eb3b1d480d9112"
+      ],
+      "titles": [
+        "Enterprise Agent Platforms 2026: A Vendor Comparison",
+        "Enterprise Agent Platforms 2026: A Vendor Comparison — 3. Salesforce Agentforce & Agent Fabric",
+        "Enterprise Agent Platforms 2026: A Vendor Comparison — 6. The 2026 Buyer's Framework: How to Choose"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0010",
+      "dedupe_key": "url:https://sanalabs.com/agents-blog/leading-ai-enterprise-fortune-500",
+      "evidence_ids": [
+        "chunk-f6c00a4574fad977",
+        "chunk-ef2a0bc8bb1e54ed",
+        "chunk-3011f9344525e725",
+        "chunk-5208095df2112add",
+        "chunk-1b1382c1a6a75d1b"
+      ],
+      "titles": [
+        "Best Enterprise AI Agent Platforms 2025–2026",
+        "Best Enterprise AI Agent Platforms 2025–2026 — What Sana Does Differently Inside Workday",
+        "Best Enterprise AI Agent Platforms 2025–2026 — Enterprise‑Grade Infrastructure"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0014",
+      "dedupe_key": "url:https://www.bintelligence.com/posts/2026-artificial-intelligence-excellence-awards-honoring-the-organizations-products-teams-and-individuals-defining-what-ai-can-actually-do",
+      "evidence_ids": [
+        "chunk-17330d6f7cec0b48",
+        "chunk-b7003c0ec57454be",
+        "chunk-98ff0c8190bccd13",
+        "chunk-0ddb4c689615ce0e",
+        "chunk-98889b98f6f6bd20",
+        "chunk-576fd016fbed5a4c",
+        "chunk-dabac214d0995666",
+        "chunk-33149ef7747dc5b1",
+        "chunk-e98cdcca2afb2259",
+        "chunk-d23ca5a7741a957a",
+        "chunk-628d60850ba31c6c",
+        "chunk-0d5d5fd400b46ee0",
+        "chunk-1ffce2687a7ccfac",
+        "chunk-f89e7821b0d17abd"
+      ],
+      "titles": [
+        "2026 Artificial Intelligence Excellence Awards: Honoring the ...",
+        "2026 Artificial Intelligence Excellence Awards: Honoring the ... — Overall Winner - AI Excellence Awards: AI Clearing",
+        "2026 Artificial Intelligence Excellence Awards: Honoring the ... — Award-Winning Organizations"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0017",
+      "dedupe_key": "url:https://www.microsoft.com/en-us/dynamics-365/blog/business-leader/2026/02/02/agentic-ai-for-inventory-to-deliver-from-procurement-to-fulfillment",
+      "evidence_ids": [
+        "chunk-32b28ec4f4a3b8c0",
+        "chunk-ae3f4e1df1d75413",
+        "chunk-d5353a139858d6be"
+      ],
+      "titles": [
+        "Agentic AI for inventory to deliver: From procurement ...",
+        "Agentic AI for inventory to deliver: From procurement ... — Explore partner agents to support the inventory to deliver process",
+        "Agentic AI for inventory to deliver: From procurement ... — Get started with Dynamics 365"
+      ],
+      "reason": "same canonical URL"
+    },
+    {
+      "cluster_id": "dup-0018",
+      "dedupe_key": "url:https://www.microsoft.com/en-us/microsoft-cloud/blog/mobility/2026/03/24/supply-chain-2-0-how-microsoft-is-powering-simulations-ai-agents-and-physical-ai",
+      "evidence_ids": [
+        "chunk-136761cf1b89c19a",
+        "chunk-4c4392a5eefe0470",
+        "chunk-a59a94de753764a3",
+        "chunk-cedce0ed31735263",
+        "chunk-cbff3c36a5dbe6e5",
+        "chunk-0b5c3e534fada8c1",
+        "chunk-29cbda8af812d210"
+      ],
+      "titles": [
+        "Supply Chain 2.0: How Microsoft is powering simulations, AI ...",
+        "Supply Chain 2.0: How Microsoft is powering simulations, AI ... — Microsoft supply chains: Our own “customer zero” story",
+        "Supply Chain 2.0: How Microsoft is powering simulations, AI ... — Simulations: The digital twins of supply chains"
+      ],
+      "reason": "same canonical URL"
+    }
+  ],
+  "conflict_flags": [
+    {
+      "flag_id": "availability_pressure",
+      "support_evidence_ids": [
+        "chunk-4c4392a5eefe0470"
+      ],
+      "oppose_evidence_ids": [
+        "chunk-ae3f4e1df1d75413"
+      ],
+      "support_terms": [
+        "shortage",
+        "tight supply",
+        "scarce",
+        "constrained",
+        "capacity constraint"
+      ],
+      "oppose_terms": [
+        "oversupply",
+        "surplus",
+        "glut",
+        "excess inventory",
+        "inventory correction"
+      ],
+      "note": "Collected evidence contains directionally opposing terms; review before synthesis."
+    }
+  ],
+  "facet_coverage": {
+    "schema_version": "facet_coverage.v1",
+    "required_facets": 5,
+    "required_facets_covered": 1,
+    "missing_required_facets": [
+      "primary_sources",
+      "current_evidence",
+      "alternatives",
+      "risks"
+    ],
+    "omitted_required_facets": [],
+    "relevance_threshold": 0.15,
+    "facets": [
+      {
+        "facet_id": "overview",
+        "required": true,
+        "planned": true,
+        "query_ids": [
+          "q-0001"
+        ],
+        "relevant_yield_count": 1,
+        "evidence_ids": [
+          "chunk-aba0174f0d0adc2e"
+        ],
+        "status": "covered"
+      },
+      {
+        "facet_id": "primary_sources",
+        "required": true,
+        "planned": true,
+        "query_ids": [
+          "q-0002"
+        ],
+        "relevant_yield_count": 0,
+        "evidence_ids": [],
+        "status": "missing"
+      },
+      {
+        "facet_id": "current_evidence",
+        "required": true,
+        "planned": true,
+        "query_ids": [
+          "q-0003"
+        ],
+        "relevant_yield_count": 0,
+        "evidence_ids": [],
+        "status": "missing"
+      },
+      {
+        "facet_id": "alternatives",
+        "required": true,
+        "planned": true,
+        "query_ids": [
+          "q-0004"
+        ],
+        "relevant_yield_count": 0,
+        "evidence_ids": [],
+        "status": "missing"
+      },
+      {
+        "facet_id": "risks",
+        "required": true,
+        "planned": true,
+        "query_ids": [
+          "q-0005"
+        ],
+        "relevant_yield_count": 0,
+        "evidence_ids": [],
+        "status": "missing"
+      }
+    ]
+  },
+  "relevance_preview_evidence_ids": [
+    "chunk-aba0174f0d0adc2e",
+    "chunk-136761cf1b89c19a",
+    "chunk-542e133ccf17ce60",
+    "chunk-0c84aa854364f0cf",
+    "chunk-2458eb6eb29c5a67",
+    "chunk-f5223b73a29cb279",
+    "chunk-759f48b6e0a43b5c",
+    "chunk-e6ba07271571a00c",
+    "chunk-17330d6f7cec0b48",
+    "chunk-78720225deab8ee4"
+  ],
+  "warnings": [
+    "5 invalid evidence row(s) excluded from claims.",
+    "47 discovery-only evidence row(s) excluded from claims.",
+    "48 duplicate evidence row(s) detected across 12 cluster(s).",
+    "43 low-quality evidence row(s) need source review.",
+    "1 directional conflict flag(s) need review before synthesis."
+  ]
+}
