@@ -1,0 +1,552 @@
+.venv/bin/python -m ruff format --check src tests scripts
+233 files already formatted
+.venv/bin/python -m ruff check src tests scripts
+All checks passed!
+# Keep the strict static gate on the typed decision and safety core. Dynamic
+# SaaS/provider boundaries are contract-tested through pytest and browser smoke.
+.venv/bin/python -m mypy src/the_missing_20/domain src/the_missing_20/application src/the_missing_20/ports src/the_missing_20/authority_b src/the_missing_20/config.py src/the_missing_20/experiment src/the_missing_20/evaluation
+Success: no issues found in 51 source files
+.venv/bin/python -m pytest
+........................................................................ [  4%]
+........................................................................ [  9%]
+........................................................................ [ 13%]
+........................................................................ [ 18%]
+........................................................................ [ 22%]
+........................................................................ [ 27%]
+........................................................................ [ 31%]
+........................................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 45%]
+........................................................................ [ 50%]
+........................................................................ [ 54%]
+........................................................................ [ 59%]
+........................................................................ [ 63%]
+........................................................................ [ 68%]
+........................................................................ [ 72%]
+........................................................................ [ 77%]
+........................................................................ [ 81%]
+........................................................................ [ 86%]
+........................................................................ [ 91%]
+........................................................................ [ 95%]
+......................................................................   [100%]
+1582 passed in 153.77s (0:02:33)
+npm test
+
+> the-missing-20@0.1.0 test
+> node --test tests-js/*.test.mjs tests-js/*.test.cjs
+
+TAP version 13
+# Subtest: fallback format mapping follows pinned decoder enum, including QR and UPC
+ok 1 - fallback format mapping follows pinned decoder enum, including QR and UPC
+  ---
+  duration_ms: 9.702625
+  ...
+# Subtest: native runtime failure uses the bundled fallback
+ok 2 - native runtime failure uses the bundled fallback
+  ---
+  duration_ms: 4.111125
+  ...
+# Subtest: minified decoder no-code exceptions do not terminate scanning
+ok 3 - minified decoder no-code exceptions do not terminate scanning
+  ---
+  duration_ms: 1.374583
+  ...
+# Subtest: different orientation readings cannot identify goods from a glare-corrupted code
+ok 4 - different orientation readings cannot identify goods from a glare-corrupted code
+  ---
+  duration_ms: 1.372125
+  ...
+# Subtest: native one-dimensional identity must agree with fallback verification
+ok 5 - native one-dimensional identity must agree with fallback verification
+  ---
+  duration_ms: 5.373292
+  ...
+# Subtest: one transient decoded frame is not handed to the receiving workflow
+ok 6 - one transient decoded frame is not handed to the receiving workflow
+  ---
+  duration_ms: 2.80475
+  ...
+# Subtest: duplicate video frames invoke the business boundary once; stop releases camera
+ok 7 - duplicate video frames invoke the business boundary once; stop releases camera
+  ---
+  duration_ms: 3.399292
+  ...
+# Subtest: closing while permission is pending releases the late stream without decoding
+ok 8 - closing while permission is pending releases the late stream without decoding
+  ---
+  duration_ms: 14.078333
+  ...
+# Subtest: unsupported or oversized video does not open the camera
+ok 9 - unsupported or oversized video does not open the camera
+  ---
+  duration_ms: 2.207292
+  ...
+# Subtest: initial questions are read-only prompts, latest useful follow-ups replace them
+ok 10 - initial questions are read-only prompts, latest useful follow-ups replace them
+  ---
+  duration_ms: 2.890959
+  ...
+# Subtest: an outage at the end does not erase the last comparable historical cohort
+ok 11 - an outage at the end does not erase the last comparable historical cohort
+  ---
+  duration_ms: 0.69475
+  ...
+# Subtest: missing, nonfinite or unitless retained values do not masquerade as a trend
+ok 12 - missing, nonfinite or unitless retained values do not masquerade as a trend
+  ---
+  duration_ms: 0.297792
+  ...
+# Subtest: chat trends retain outage and case boundaries before selecting a cohort
+ok 13 - chat trends retain outage and case boundaries before selecting a cohort
+  ---
+  duration_ms: 0.267875
+  ...
+# Subtest: hidden flow targets do not collapse four source buttons onto one point
+ok 14 - hidden flow targets do not collapse four source buttons onto one point
+  ---
+  duration_ms: 4.238541
+  ...
+# Subtest: visible flow targets retain their existing connected layout
+ok 15 - visible flow targets retain their existing connected layout
+  ---
+  duration_ms: 1.025875
+  ...
+# Subtest: persistent source outage does not close a read-only inspector on every poll
+ok 16 - persistent source outage does not close a read-only inspector on every poll
+  ---
+  duration_ms: 0.914042
+  ...
+# Subtest: inspecting a source cannot relabel historical charts as live during an outage
+ok 17 - inspecting a source cannot relabel historical charts as live during an outage
+  ---
+  duration_ms: 0.712291
+  ...
+# Subtest: retained events show their actual last timestamp rather than a static NOW
+ok 18 - retained events show their actual last timestamp rather than a static NOW
+  ---
+  duration_ms: 5.139917
+  ...
+# Subtest: Investigation counts retained events, not the lifetime ledger sequence
+ok 19 - Investigation counts retained events, not the lifetime ledger sequence
+  ---
+  duration_ms: 1.294375
+  ...
+# Subtest: normal monitoring does not inherit a selected case's failed investigation
+ok 20 - normal monitoring does not inherit a selected case's failed investigation
+  ---
+  duration_ms: 1.398166
+  ...
+# Subtest: receiving conflicts remain visible beside an existing agent answer
+ok 21 - receiving conflicts remain visible beside an existing agent answer
+  ---
+  duration_ms: 8.21725
+  ...
+# Subtest: case coverage is unknown without proof, never a hard-coded demo case count
+ok 22 - case coverage is unknown without proof, never a hard-coded demo case count
+  ---
+  duration_ms: 1.38725
+  ...
+# Subtest: selected case distinguishes rejected answers from unavailable runs
+ok 23 - selected case distinguishes rejected answers from unavailable runs
+  ---
+  duration_ms: 3.459583
+  ...
+# Subtest: selected case clears foreign unit details and normal restores its own surface
+ok 24 - selected case clears foreign unit details and normal restores its own surface
+  ---
+  duration_ms: 5.635458
+  ...
+# Subtest: receiving lifecycle does not imply an incident diagnosis or display empty diagnosis metrics
+ok 25 - receiving lifecycle does not imply an incident diagnosis or display empty diagnosis metrics
+  ---
+  duration_ms: 1.534167
+  ...
+# Subtest: an unposted receiving exception stays visible without fabricating a stock gap
+ok 26 - an unposted receiving exception stays visible without fabricating a stock gap
+  ---
+  duration_ms: 0.580167
+  ...
+# Subtest: receiving does not draw fictional invoice to Slack routes
+ok 27 - receiving does not draw fictional invoice to Slack routes
+  ---
+  duration_ms: 1.563375
+  ...
+# Subtest: live order headlines distinguish unreceived, partial, held and posted goods
+ok 28 - live order headlines distinguish unreceived, partial, held and posted goods
+  ---
+  duration_ms: 1.62625
+  ...
+# Subtest: fully issued receipts remain posted and invoice documents are not stock units
+ok 29 - fully issued receipts remain posted and invoice documents are not stock units
+  ---
+  duration_ms: 5.221083
+  ...
+# Subtest: an absent live invoice is not open or released
+ok 30 - an absent live invoice is not open or released
+  ---
+  duration_ms: 0.915041
+  ...
+# Subtest: normal partial receiving does not require a recovery to be healthy
+ok 31 - normal partial receiving does not require a recovery to be healthy
+  ---
+  duration_ms: 15.97275
+  ...
+# Subtest: unknown monetary facts do not become zero dollar claims
+ok 32 - unknown monetary facts do not become zero dollar claims
+  ---
+  duration_ms: 29.499667
+  ...
+# Subtest: the billed revenue card uses observed billing, not legacy value protected
+ok 33 - the billed revenue card uses observed billing, not legacy value protected
+  ---
+  duration_ms: 2.132417
+  ...
+# Subtest: ERP redirects use the current source document or the matching list, never an old case
+ok 34 - ERP redirects use the current source document or the matching list, never an old case
+  ---
+  duration_ms: 1.195917
+  ...
+# Subtest: focus uses a native top-layer dialog, not a backdrop above the module
+ok 35 - focus uses a native top-layer dialog, not a backdrop above the module
+  ---
+  duration_ms: 0.230625
+  ...
+# Subtest: finished effects use past tense and missing prestate is not fabricated
+ok 36 - finished effects use past tense and missing prestate is not fabricated
+  ---
+  duration_ms: 0.417542
+  ...
+# Subtest: missing resolution facts remain explicitly unknown and transitions are named
+ok 37 - missing resolution facts remain explicitly unknown and transitions are named
+  ---
+  duration_ms: 0.386916
+  ...
+# Subtest: history has single-selection keyboard controls and follows business impact
+ok 38 - history has single-selection keyboard controls and follows business impact
+  ---
+  duration_ms: 10.807458
+  ...
+# Subtest: photo dialog restores the actual invoking control, including rebuilt captures
+ok 39 - photo dialog restores the actual invoking control, including rebuilt captures
+  ---
+  duration_ms: 3.499125
+  ...
+# Subtest: unknown values are not zero observations
+ok 40 - unknown values are not zero observations
+  ---
+  duration_ms: 4.956584
+  ...
+# Subtest: time windows use observed source history, not invented samples
+ok 41 - time windows use observed source history, not invented samples
+  ---
+  duration_ms: 0.231375
+  ...
+# Subtest: outages and unit changes break paths
+ok 42 - outages and unit changes break paths
+  ---
+  duration_ms: 0.559875
+  ...
+# Subtest: stock quantities use a step path, without interpolated arrival
+ok 43 - stock quantities use a step path, without interpolated arrival
+  ---
+  duration_ms: 0.213041
+  ...
+# Subtest: comparison is explicit, sample-bound, and not an industry improvement claim
+ok 44 - comparison is explicit, sample-bound, and not an industry improvement claim
+  ---
+  duration_ms: 72.121542
+  ...
+# Subtest: operator overview has four primary business metrics and retains all twelve hooks
+ok 45 - operator overview has four primary business metrics and retains all twelve hooks
+  ---
+  duration_ms: 2.777792
+  ...
+# Subtest: runtime and historical investigation facts are disclosed on demand
+ok 46 - runtime and historical investigation facts are disclosed on demand
+  ---
+  duration_ms: 1.55425
+  ...
+# Subtest: updates preserve conversation and do not animate unchanged business values
+ok 47 - updates preserve conversation and do not animate unchanged business values
+  ---
+  duration_ms: 4.741375
+  ...
+# Subtest: photo intake explains cloud handling and never claims a count posted stock
+ok 48 - photo intake explains cloud handling and never claims a count posted stock
+  ---
+  duration_ms: 0.272667
+  ...
+# Subtest: an unavailable ERP read cannot render zero inventory or a current recovery verdict
+ok 49 - an unavailable ERP read cannot render zero inventory or a current recovery verdict
+  ---
+  duration_ms: 4.446584
+  ...
+# Subtest: failed chat retains the current question and cannot reuse an older successful answer
+ok 50 - failed chat retains the current question and cannot reuse an older successful answer
+  ---
+  duration_ms: 2.130042
+  ...
+# Subtest: Jira receiving actions are never labelled as Airtable
+ok 51 - Jira receiving actions are never labelled as Airtable
+  ---
+  duration_ms: 5.415875
+  ...
+# Subtest: background draft results advance the open dialog without another click
+ok 52 - background draft results advance the open dialog without another click
+  ---
+  duration_ms: 0.910834
+  ...
+# Subtest: visible gallery polls actual state, not a timer that invents events
+ok 53 - visible gallery polls actual state, not a timer that invents events
+  ---
+  duration_ms: 0.22425
+  ...
+# Subtest: destination readback updates an unchanged receipt version
+ok 54 - destination readback updates an unchanged receipt version
+  ---
+  duration_ms: 1.307666
+  ...
+# Subtest: package is private during development
+ok 55 - package is private during development
+  ---
+  duration_ms: 22.642333
+  ...
+# Subtest: workspace exposes two primary views and presenter-only demo controls
+ok 56 - workspace exposes two primary views and presenter-only demo controls
+  ---
+  duration_ms: 5.799208
+  ...
+# Subtest: flow-first dashboard keeps live truth visible and delegates reasoning
+ok 57 - flow-first dashboard keeps live truth visible and delegates reasoning
+  ---
+  duration_ms: 5.827125
+  ...
+# Subtest: first paint gates the unhydrated dashboard behind one truthful loading state
+ok 58 - first paint gates the unhydrated dashboard behind one truthful loading state
+  ---
+  duration_ms: 4.73375
+  ...
+# Subtest: dashboard has coordinated operational diagrams with honest empty states
+ok 59 - dashboard has coordinated operational diagrams with honest empty states
+  ---
+  duration_ms: 3.729958
+  ...
+# Subtest: dashboard density and topology expose bounded, truthful access
+ok 60 - dashboard density and topology expose bounded, truthful access
+  ---
+  duration_ms: 6.276167
+  ...
+# Subtest: dashboard status rail and incident row do not duplicate workspace routing
+ok 61 - dashboard status rail and incident row do not duplicate workspace routing
+  ---
+  duration_ms: 5.806167
+  ...
+# Subtest: scenario rejection stays visible and names an authoritative recovery path
+ok 62 - scenario rejection stays visible and names an authoritative recovery path
+  ---
+  duration_ms: 2.97725
+  ...
+# Subtest: client binds the API and ordered event ledger rather than timers
+ok 63 - client binds the API and ordered event ledger rather than timers
+  ---
+  duration_ms: 4.880292
+  ...
+# Subtest: dashboard rebaseline exposes one live incident control and stage projections
+ok 64 - dashboard rebaseline exposes one live incident control and stage projections
+  ---
+  duration_ms: 3.979208
+  ...
+# Subtest: client recovers a reset stream from a fresh authoritative cursor
+ok 65 - client recovers a reset stream from a fresh authoritative cursor
+  ---
+  duration_ms: 2.722417
+  ...
+# Subtest: scenario controls fail closed on an explicit deep-linked run
+ok 66 - scenario controls fail closed on an explicit deep-linked run
+  ---
+  duration_ms: 6.54825
+  ...
+# Subtest: incident controls follow the authoritative scenario catalog
+ok 67 - incident controls follow the authoritative scenario catalog
+  ---
+  duration_ms: 5.603875
+  ...
+# Subtest: dashboard motion is labeled as source-triggered rather than a fake timer
+ok 68 - dashboard motion is labeled as source-triggered rather than a fake timer
+  ---
+  duration_ms: 5.081958
+  ...
+# Subtest: live ERP projection owns KPIs, charts, and the external trigger path
+ok 69 - live ERP projection owns KPIs, charts, and the external trigger path
+  ---
+  duration_ms: 3.858458
+  ...
+# Subtest: closed catalog history is never advertised as an active resume
+ok 70 - closed catalog history is never advertised as an active resume
+  ---
+  duration_ms: 4.652833
+  ...
+# Subtest: copilot role chat cannot regress handoff, completion, or degraded status
+ok 71 - copilot role chat cannot regress handoff, completion, or degraded status
+  ---
+  duration_ms: 4.661417
+  ...
+# Subtest: persisted closed verification projects completed stages and non-empty history
+ok 72 - persisted closed verification projects completed stages and non-empty history
+  ---
+  duration_ms: 7.257583
+  ...
+# Subtest: replay dashboard charts append the authoritative verified close
+ok 73 - replay dashboard charts append the authoritative verified close
+  ---
+  duration_ms: 5.486708
+  ...
+# Subtest: live stage chart stays scoped to the current flow run
+ok 74 - live stage chart stays scoped to the current flow run
+  ---
+  duration_ms: 5.712625
+  ...
+# Subtest: verified closed incident deep links select Recovery in the Scenario Lab
+ok 75 - verified closed incident deep links select Recovery in the Scenario Lab
+  ---
+  duration_ms: 4.2005
+  ...
+# Subtest: refresh uses one authoritative snapshot for units and status
+ok 76 - refresh uses one authoritative snapshot for units and status
+  ---
+  duration_ms: 3.218209
+  ...
+# Subtest: initial UI is quiet and stream loss pauses event-driven motion
+ok 77 - initial UI is quiet and stream loss pauses event-driven motion
+  ---
+  duration_ms: 7.894542
+  ...
+# Subtest: approval and forward controls fail closed until the live stream and quorum exist
+ok 78 - approval and forward controls fail closed until the live stream and quorum exist
+  ---
+  duration_ms: 4.406958
+  ...
+# Subtest: the live UI preserves truth and accessible targets
+ok 79 - the live UI preserves truth and accessible targets
+  ---
+  duration_ms: 9.562042
+  ...
+# Subtest: browser smoke waits for settled Copilot turns before chaining chat
+ok 80 - browser smoke waits for settled Copilot turns before chaining chat
+  ---
+  duration_ms: 3.768875
+  ...
+# Subtest: live source cards preserve disclosure and consume observation pulses once
+ok 81 - live source cards preserve disclosure and consume observation pulses once
+  ---
+  duration_ms: 3.812458
+  ...
+# Subtest: degraded mode removes advisory surfaces and preserves the deterministic gate
+ok 82 - degraded mode removes advisory surfaces and preserves the deterministic gate
+  ---
+  duration_ms: 4.16725
+  ...
+# Subtest: view tabs use a roving tabindex and the flow owns its narrow-screen scroll
+ok 83 - view tabs use a roving tabindex and the flow owns its narrow-screen scroll
+  ---
+  duration_ms: 3.570542
+  ...
+# Subtest: optional observability profile stays versioned and outside the native path
+ok 84 - optional observability profile stays versioned and outside the native path
+  ---
+  duration_ms: 3.891584
+  ...
+# Subtest: agent workspace exposes one launch path and a live selected-role context
+ok 85 - agent workspace exposes one launch path and a live selected-role context
+  ---
+  duration_ms: 5.1475
+  ...
+# Subtest: phase 2 workspace keeps chart focus, trace access, and evidence context honest
+ok 86 - phase 2 workspace keeps chart focus, trace access, and evidence context honest
+  ---
+  duration_ms: 5.508042
+  ...
+# Subtest: agent graph route contract stays contextual, centered, and clear of node interiors
+ok 87 - agent graph route contract stays contextual, centered, and clear of node interiors
+  ---
+  duration_ms: 25.911209
+  ...
+# Subtest: copilot density exposes concise labels and available actions only
+ok 88 - copilot density exposes concise labels and available actions only
+  ---
+  duration_ms: 7.035042
+  ...
+# Subtest: case console presents one judge-readable evidence-to-outcome workflow
+ok 89 - case console presents one judge-readable evidence-to-outcome workflow
+  ---
+  duration_ms: 8.105292
+  ...
+# Subtest: case console is a borderless, movable command canvas with atomic live nodes
+ok 90 - case console is a borderless, movable command canvas with atomic live nodes
+  ---
+  duration_ms: 8.529542
+  ...
+# Subtest: recovered and partial snapshots keep the UI state truthful
+ok 91 - recovered and partial snapshots keep the UI state truthful
+  ---
+  duration_ms: 10.905459
+  ...
+# Subtest: dashboard flow nodes are independent live instruments without throughput lines
+ok 92 - dashboard flow nodes are independent live instruments without throughput lines
+  ---
+  duration_ms: 5.299042
+  ...
+# Subtest: dashboard evidence ports and copy stay sparse and symmetric
+ok 93 - dashboard evidence ports and copy stay sparse and symmetric
+  ---
+  duration_ms: 4.134
+  ...
+# Subtest: dashboard agent rail projects the authoritative lifecycle label
+ok 94 - dashboard agent rail projects the authoritative lifecycle label
+  ---
+  duration_ms: 3.826334
+  ...
+# Subtest: final truth projection keeps advisory, closed state, and quantities honest
+ok 95 - final truth projection keeps advisory, closed state, and quantities honest
+  ---
+  duration_ms: 8.009709
+  ...
+# Subtest: live console reveals only reached states and refreshes metrics from SSE
+ok 96 - live console reveals only reached states and refreshes metrics from SSE
+  ---
+  duration_ms: 10.200375
+  ...
+# Subtest: manager can reject a prepared plan without executing it
+ok 97 - manager can reject a prepared plan without executing it
+  ---
+  duration_ms: 4.020792
+  ...
+# Subtest: dashboard projects source-derived operating economics and event-time exposure
+ok 98 - dashboard projects source-derived operating economics and event-time exposure
+  ---
+  duration_ms: 5.269708
+  ...
+# Subtest: dashboard exposes connected plant risk from backend history instead of static report values
+ok 99 - dashboard exposes connected plant risk from backend history instead of static report values
+  ---
+  duration_ms: 6.636042
+  ...
+# Subtest: dashboard and investigation components expose live parameters on click without framework tag noise
+ok 100 - dashboard and investigation components expose live parameters on click without framework tag noise
+  ---
+  duration_ms: 6.238458
+  ...
+# Subtest: connected source inspectors use fetched record ids and never link to the retired fake ERP document
+ok 101 - connected source inspectors use fetched record ids and never link to the retired fake ERP document
+  ---
+  duration_ms: 3.491583
+  ...
+1..101
+# tests 101
+# suites 0
+# pass 101
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 664.302208

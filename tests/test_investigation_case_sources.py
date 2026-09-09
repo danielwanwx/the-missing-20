@@ -196,3 +196,74 @@ def test_scoped_normal_complete_reconstructs_a_single_reconciled_ledger_row():
             "business_key": "RCPT-4817-L2-001",
         }
     ]
+
+
+@pytest.mark.parametrize("status,scope", [("UNAVAILABLE", "LOT-B"), ("COMPLETE", "LOT-X")])
+def test_quality_transfer_absence_requires_complete_exact_lot_lookup(status, scope):
+    sources = model_source_payloads(investigation_packet())
+    lookup = sources["read_airtable_evidence"]["transfer_read"]
+    lookup.update(status=status, lot=scope, records=[])
+    findings = correlate_investigation_sources(sources)
+    assert findings["observations"]["exact_held_lot_transfer_present"] is None
+    policy = evaluate_investigation_policy(findings)
+    assert policy["disposition"] == "NEEDS_EVIDENCE"
+    assert policy["write_authority"] == "NONE"
+    assert policy["manager_approval_required"] is False
+
+
+@pytest.mark.parametrize("quantity", [7, 9, None, "8", True, float("nan"), float("inf")])
+def test_quality_approval_must_cover_exact_held_quantity(quantity):
+    sources = model_source_payloads(investigation_packet())
+    sources["read_airtable_evidence"]["quality_records"][0]["quantity"] = quantity
+    policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+    assert policy["disposition"] != "RECOVERY_READY"
+    assert policy["checks"]["exact_held_lot_approved"] is False
+    assert policy["write_authority"] == "NONE"
+
+
+@pytest.mark.parametrize("change", ["missing_quantity", "duplicate_approval", "multiple_lots"])
+def test_unsupported_quality_evidence_requests_evidence(change):
+    sources = model_source_payloads(investigation_packet())
+    quality = sources["read_airtable_evidence"]
+    if change == "missing_quantity":
+        quality["quality_records"][0].pop("quantity")
+    elif change == "duplicate_approval":
+        quality["quality_records"].append(dict(quality["quality_records"][0]))
+    else:
+        ledger = sources["read_erp_evidence"]["ledger_read"]
+        extra = dict(
+            next(row for row in ledger["records"] if row["stock_type"] == "QUALITY_INSPECTION")
+        )
+        extra.update(lot="LOT-C", quantity=1, id="SECOND-HELD")
+        ledger["records"].append(extra)
+    policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+    assert policy["disposition"] == "NEEDS_EVIDENCE"
+    assert policy["manager_approval_required"] is False
+
+
+def test_completed_inventory_does_not_require_unused_quality_lookup():
+    sources = model_source_payloads(investigation_packet("normal_complete"))
+    sources["read_airtable_evidence"]["transfer_read"]["status"] = "UNAVAILABLE"
+    assert (
+        evaluate_investigation_policy(correlate_investigation_sources(sources))["disposition"]
+        == "RECOVERY_COMPLETE"
+    )
+
+
+def test_receipt_only_gap_does_not_require_quality_approval_or_lookup():
+    sources = model_source_payloads(investigation_packet())
+    for row in sources["read_erp_evidence"]["ledger_read"]["records"]:
+        if row["stock_type"] == "QUALITY_INSPECTION":
+            row["stock_type"] = "AVAILABLE"
+    sources["read_airtable_evidence"]["transfer_read"]["status"] = "UNAVAILABLE"
+    policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+    assert policy["disposition"] == "RECOVERY_READY"
+    assert policy["write_authority"] == "NONE"
+    assert "quality transfer" not in policy["reason"].lower()
+
+
+def test_explicit_pending_quality_is_denied_even_without_quantity():
+    sources = model_source_payloads(investigation_packet("wrong_quality_lot"))
+    sources["read_airtable_evidence"]["quality_records"][0].pop("quantity")
+    policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+    assert policy["disposition"] == "DENY"

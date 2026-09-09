@@ -1,0 +1,35 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_receipt_only_gap_does_not_require_quality_approval_or_lookup _______
+
+    def test_receipt_only_gap_does_not_require_quality_approval_or_lookup():
+        sources = model_source_payloads(investigation_packet())
+        for row in sources["read_erp_evidence"]["ledger_read"]["records"]:
+            if row["stock_type"] == "QUALITY_INSPECTION":
+                row["stock_type"] = "AVAILABLE"
+        sources["read_airtable_evidence"]["transfer_read"]["status"] = "UNAVAILABLE"
+        policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+>       assert policy["disposition"] == "RECOVERY_READY"
+E       AssertionError: assert 'NEEDS_EVIDENCE' == 'RECOVERY_READY'
+E         
+E         - RECOVERY_READY
+E         + NEEDS_EVIDENCE
+
+tests/test_investigation_case_sources.py:260: AssertionError
+________ test_explicit_pending_quality_is_denied_even_without_quantity _________
+
+    def test_explicit_pending_quality_is_denied_even_without_quantity():
+        sources = model_source_payloads(investigation_packet("wrong_quality_lot"))
+        sources["read_airtable_evidence"]["quality_records"][0].pop("quantity")
+        policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+>       assert policy["disposition"] == "DENY"
+E       AssertionError: assert 'NEEDS_EVIDENCE' == 'DENY'
+E         
+E         - DENY
+E         + NEEDS_EVIDENCE
+
+tests/test_investigation_case_sources.py:269: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_investigation_case_sources.py::test_receipt_only_gap_does_not_require_quality_approval_or_lookup
+FAILED tests/test_investigation_case_sources.py::test_explicit_pending_quality_is_denied_even_without_quantity
+2 failed, 49 deselected in 0.79s

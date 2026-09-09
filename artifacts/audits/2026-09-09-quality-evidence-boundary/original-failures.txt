@@ -1,0 +1,104 @@
+FFFFFFF                                                                  [100%]
+=================================== FAILURES ===================================
+_ test_quality_transfer_absence_requires_complete_exact_lot_lookup[UNAVAILABLE-LOT-B] _
+
+status = 'UNAVAILABLE', scope = 'LOT-B'
+
+    @pytest.mark.parametrize("status,scope", [("UNAVAILABLE", "LOT-B"), ("COMPLETE", "LOT-X")])
+    def test_quality_transfer_absence_requires_complete_exact_lot_lookup(status, scope):
+        sources = model_source_payloads(investigation_packet())
+        lookup = sources["read_airtable_evidence"]["transfer_read"]
+        lookup.update(status=status, lot=scope, records=[])
+        findings = correlate_investigation_sources(sources)
+>       assert findings["observations"]["exact_held_lot_transfer_present"] is None
+E       assert False is None
+
+tests/test_investigation_case_sources.py:207: AssertionError
+_ test_quality_transfer_absence_requires_complete_exact_lot_lookup[COMPLETE-LOT-X] _
+
+status = 'COMPLETE', scope = 'LOT-X'
+
+    @pytest.mark.parametrize("status,scope", [("UNAVAILABLE", "LOT-B"), ("COMPLETE", "LOT-X")])
+    def test_quality_transfer_absence_requires_complete_exact_lot_lookup(status, scope):
+        sources = model_source_payloads(investigation_packet())
+        lookup = sources["read_airtable_evidence"]["transfer_read"]
+        lookup.update(status=status, lot=scope, records=[])
+        findings = correlate_investigation_sources(sources)
+>       assert findings["observations"]["exact_held_lot_transfer_present"] is None
+E       assert False is None
+
+tests/test_investigation_case_sources.py:207: AssertionError
+___________ test_quality_approval_must_cover_exact_held_quantity[7] ____________
+
+quantity = 7
+
+    @pytest.mark.parametrize("quantity", [7, 9, None, "8", True])
+    def test_quality_approval_must_cover_exact_held_quantity(quantity):
+        sources = model_source_payloads(investigation_packet())
+        sources["read_airtable_evidence"]["quality_records"][0]["quantity"] = quantity
+        policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+>       assert policy["disposition"] != "RECOVERY_READY"
+E       AssertionError: assert 'RECOVERY_READY' != 'RECOVERY_READY'
+
+tests/test_investigation_case_sources.py:219: AssertionError
+___________ test_quality_approval_must_cover_exact_held_quantity[9] ____________
+
+quantity = 9
+
+    @pytest.mark.parametrize("quantity", [7, 9, None, "8", True])
+    def test_quality_approval_must_cover_exact_held_quantity(quantity):
+        sources = model_source_payloads(investigation_packet())
+        sources["read_airtable_evidence"]["quality_records"][0]["quantity"] = quantity
+        policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+>       assert policy["disposition"] != "RECOVERY_READY"
+E       AssertionError: assert 'RECOVERY_READY' != 'RECOVERY_READY'
+
+tests/test_investigation_case_sources.py:219: AssertionError
+__________ test_quality_approval_must_cover_exact_held_quantity[None] __________
+
+quantity = None
+
+    @pytest.mark.parametrize("quantity", [7, 9, None, "8", True])
+    def test_quality_approval_must_cover_exact_held_quantity(quantity):
+        sources = model_source_payloads(investigation_packet())
+        sources["read_airtable_evidence"]["quality_records"][0]["quantity"] = quantity
+        policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+>       assert policy["disposition"] != "RECOVERY_READY"
+E       AssertionError: assert 'RECOVERY_READY' != 'RECOVERY_READY'
+
+tests/test_investigation_case_sources.py:219: AssertionError
+___________ test_quality_approval_must_cover_exact_held_quantity[8] ____________
+
+quantity = '8'
+
+    @pytest.mark.parametrize("quantity", [7, 9, None, "8", True])
+    def test_quality_approval_must_cover_exact_held_quantity(quantity):
+        sources = model_source_payloads(investigation_packet())
+        sources["read_airtable_evidence"]["quality_records"][0]["quantity"] = quantity
+        policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+>       assert policy["disposition"] != "RECOVERY_READY"
+E       AssertionError: assert 'RECOVERY_READY' != 'RECOVERY_READY'
+
+tests/test_investigation_case_sources.py:219: AssertionError
+__________ test_quality_approval_must_cover_exact_held_quantity[True] __________
+
+quantity = True
+
+    @pytest.mark.parametrize("quantity", [7, 9, None, "8", True])
+    def test_quality_approval_must_cover_exact_held_quantity(quantity):
+        sources = model_source_payloads(investigation_packet())
+        sources["read_airtable_evidence"]["quality_records"][0]["quantity"] = quantity
+        policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
+>       assert policy["disposition"] != "RECOVERY_READY"
+E       AssertionError: assert 'RECOVERY_READY' != 'RECOVERY_READY'
+
+tests/test_investigation_case_sources.py:219: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_investigation_case_sources.py::test_quality_transfer_absence_requires_complete_exact_lot_lookup[UNAVAILABLE-LOT-B]
+FAILED tests/test_investigation_case_sources.py::test_quality_transfer_absence_requires_complete_exact_lot_lookup[COMPLETE-LOT-X]
+FAILED tests/test_investigation_case_sources.py::test_quality_approval_must_cover_exact_held_quantity[7]
+FAILED tests/test_investigation_case_sources.py::test_quality_approval_must_cover_exact_held_quantity[9]
+FAILED tests/test_investigation_case_sources.py::test_quality_approval_must_cover_exact_held_quantity[None]
+FAILED tests/test_investigation_case_sources.py::test_quality_approval_must_cover_exact_held_quantity[8]
+FAILED tests/test_investigation_case_sources.py::test_quality_approval_must_cover_exact_held_quantity[True]
+7 failed, 36 deselected in 0.55s

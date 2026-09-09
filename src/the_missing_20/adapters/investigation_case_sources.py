@@ -8,6 +8,7 @@ computed discrepancy partition or recommended repair.
 from collections.abc import Mapping
 from copy import deepcopy
 from decimal import Decimal, InvalidOperation
+from math import isfinite
 from typing import Any, Literal
 
 Variant = Literal[
@@ -529,7 +530,31 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
         if row["stock_type"] == "QUALITY_INSPECTION" and row.get("lot")
     }
     exact_quality = [row for row in quality["quality_records"] if row["lot"] in held_lots]
-    transfer_records = quality["transfer_read"]["records"]
+    transfer_read = quality["transfer_read"]
+    transfer_records = transfer_read["records"]
+    transfer_read_complete = transfer_read.get("status") == "COMPLETE" and held_lots.issubset(
+        {transfer_read.get("lot")}
+    )
+    quality_quantity_known = bool(held_lots)
+    quality_quantity_matches = bool(held_lots)
+    for lot in held_lots:
+        approvals = [row for row in exact_quality if row["lot"] == lot]
+        quantity = approvals[0].get("quantity") if len(approvals) == 1 else None
+        held_quantity = sum(
+            row["quantity"]
+            for row in matched_records
+            if row["stock_type"] == "QUALITY_INSPECTION" and row.get("lot") == lot
+        )
+        known = (
+            isinstance(quantity, (int, float))
+            and not isinstance(quantity, bool)
+            and isfinite(quantity)
+            and quantity >= 0
+            and isfinite(held_quantity)
+            and held_quantity > 0
+        )
+        quality_quantity_known = quality_quantity_known and known
+        quality_quantity_matches = quality_quantity_matches and known and quantity == held_quantity
     scanned_lots = {row.get("lot") for row in scans if row.get("lot")}
     conversion = attempt.get("conversion_factor_to_po_uom")
     normalized_attempt_quantity = (
@@ -589,8 +614,12 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
             "exact_held_lot_quality_dispositions": tuple(
                 sorted(row["disposition"] for row in exact_quality)
             ),
-            "exact_held_lot_transfer_present": any(
-                row.get("lot") in held_lots for row in transfer_records
+            "exact_held_lot_quality_quantity_known": quality_quantity_known,
+            "exact_held_lot_quality_quantity_matches": quality_quantity_matches,
+            "exact_held_lot_transfer_present": (
+                any(row.get("lot") in held_lots for row in transfer_records)
+                if transfer_read_complete
+                else None
             ),
             "completed_quality_transfer_present": bool(transfer_records),
             "held_lots_present_in_physical_scans": held_lots.issubset(scanned_lots),
@@ -632,7 +661,11 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
     complete = (
         observed["ledger_read_status"] == "COMPLETE" and observed["ledger_pagination_complete"]
     )
-    exact_lot_approved = observed["exact_held_lot_quality_dispositions"] == ("APPROVED",)
+    exact_lot_approved = (
+        observed["exact_held_lot_quality_dispositions"] == ("APPROVED",)
+        and observed.get("exact_held_lot_quality_quantity_matches") is True
+    )
+    quality_release_required = observed["erp_quality_inspection_quantity"] > 0
     physical_reconciles = observed["physical_received_quantity"] == observed["invoice_quantity"]
     key_present = observed["integration_business_key_present_in_erp"]
     transfer_present = observed["exact_held_lot_transfer_present"]
@@ -797,10 +830,32 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
             "NEEDS_EVIDENCE",
             "The integration attempt quantity conflicts with the authoritative ERP gap.",
         )
-    elif not exact_lot_approved:
+    elif (
+        quality_release_required
+        and len(dispositions := observed["exact_held_lot_quality_dispositions"]) == 1
+        and dispositions[0] != "APPROVED"
+    ):
         disposition, reason = (
             "DENY",
             "The exact ERP-held quality lot is not approved for release.",
+        )
+    elif quality_release_required and transfer_present is None:
+        disposition, reason = (
+            "NEEDS_EVIDENCE",
+            "The quality transfer lookup is unavailable or does not cover the held lot.",
+        )
+    elif (
+        quality_release_required
+        and observed.get("exact_held_lot_quality_quantity_known") is not True
+    ):
+        disposition, reason = (
+            "NEEDS_EVIDENCE",
+            "A single finite approval quantity for the exact held lot is not available.",
+        )
+    elif quality_release_required and not exact_lot_approved:
+        disposition, reason = (
+            "DENY",
+            "The exact ERP-held lot lacks approval for its full held quantity.",
         )
     elif not physical_reconciles or transfer_present:
         disposition, reason = (
@@ -810,8 +865,9 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
     else:
         disposition, reason = (
             "RECOVERY_READY",
-            "The missing receipt and approved exact-lot transfer are eligible for "
-            "bounded recovery.",
+            "The missing receipt and approved exact-lot transfer are eligible for bounded recovery."
+            if quality_release_required
+            else "The missing receipt is eligible for recovery; no quality release is needed.",
         )
     return {
         "disposition": disposition,
