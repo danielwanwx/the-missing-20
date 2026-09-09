@@ -1,4 +1,4 @@
-"""Resume authorized receipt *drafts* after interruption; never post inventory."""
+"""Resume drafts and read back confirmed uncertain submissions; never post inventory."""
 
 from contextlib import suppress
 from threading import Event, Thread
@@ -13,13 +13,16 @@ class ReceivingDraftWorker:
         self.thread: Thread | None = None
 
     def start(self) -> None:
-        if not self.receiving.auto_prepare or self.thread is not None:
+        if (not self.receiving.drafts_enabled or self.receiving.erp is None
+                or self.thread is not None):
             return
         self.thread = Thread(target=self._run, name="receiving-drafts", daemon=True)
         self.thread.start()
 
     def _run(self) -> None:
         while not self.closed.is_set():
+            with suppress(ValueError):
+                self.receiving.reconcile_next_submission()
             with suppress(ValueError):
                 self.receiving.prepare_next_draft()
             if self.closed.wait(30):

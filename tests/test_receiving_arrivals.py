@@ -243,6 +243,62 @@ def test_lost_ack_reopens_original_arrival_after_restart(tmp_path):
     assert transport.writes == transport.submits == 1
 
 
+@pytest.mark.parametrize("committed", [True, False])
+def test_worker_reconciles_confirmed_unknown_submit_without_resending(tmp_path, committed):
+    transport = MultiReceiptTransport()
+    service = service_at(tmp_path / "db", transport)
+    state = service.upload(service.create(arrival_id="delivery-A")["id"], photo())
+    draft = service.draft(state["id"])
+    if committed:
+        transport.lose_submit_ack = True
+    else:
+        service.erp.submit = lambda *a, **kw: (_ for _ in ()).throw(TimeoutError("not sent"))
+    unknown = submit(service, draft)
+    assert unknown["status"] == "SUBMIT_UNKNOWN"
+    service.db.close()
+    restarted = service_at(tmp_path / "db", transport)
+    for _ in range(3):
+        restarted.reconcile_next_submission()
+    recovered = restarted.current(state["id"])
+    assert recovered["status"] == ("RECEIPT_SUBMITTED" if committed else "SUBMIT_UNKNOWN")
+    assert transport.writes == 1 and transport.submits == int(committed)
+
+
+def test_worker_never_invents_a_first_receiving_confirmation(tmp_path):
+    transport = MultiReceiptTransport()
+    service = service_at(tmp_path / "db", transport, auto_prepare=True)
+    state = service.upload(service.create(arrival_id="delivery-A")["id"], photo())
+    service.reconcile_next_submission()
+    assert service.current(state["id"])["status"] == "DRAFT_VERIFIED"
+    assert transport.submits == 0
+
+
+@pytest.mark.parametrize("field,value", [
+    ("physical_receiving_confirmation", None), ("draft", []),
+    ("candidate", None), ("work_item", "invalid"),
+])
+def test_reconciliation_skips_malformed_intent_and_progresses_next_record(tmp_path, field, value):
+    transport = MultiReceiptTransport()
+    service = service_at(tmp_path / "db", transport)
+    captures = []
+    for arrival, color in [("delivery-A", "white"), ("delivery-B", "red")]:
+        state = service.upload(service.create(arrival_id=arrival)["id"], photo(color))
+        draft = service.draft(state["id"])
+        transport.lose_submit_ack = True
+        captures.append(submit(service, draft))
+    bad, good = sorted(captures, key=lambda state: state["id"])
+    bad[field] = value
+    service.db.execute("UPDATE captures SET state=? WHERE id=?", (json.dumps(bad), bad["id"]))
+    service.db.commit()
+    service.db.close()
+    restarted = service_at(tmp_path / "db", transport)
+    restarted.reconcile_next_submission()
+    restarted.reconcile_next_submission()
+    assert restarted.current(bad["id"])["status"] == "SUBMIT_UNKNOWN"
+    assert restarted.current(good["id"])["status"] == "RECEIPT_SUBMITTED"
+    assert transport.submits == transport.writes == 2
+
+
 def test_same_box_cannot_be_registered_in_two_arrivals(tmp_path):
     data = manifest()
     data["arrivals"][1]["handling_unit_ids"] = ["box-02", "box-03"]

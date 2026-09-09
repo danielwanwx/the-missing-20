@@ -434,6 +434,7 @@ class PhotoReceiving:
         self.reader, self.erp, self.drafts_enabled = reader, erp, drafts_enabled
         self.auto_prepare = auto_prepare
         self._draft_cursor = ""
+        self._submit_cursor = ""
         self.lock = threading.RLock()
         self.work = threading.Lock()
         self.arrivals = None
@@ -986,6 +987,49 @@ class PhotoReceiving:
             )
             self.db.commit()
         return self.current(capture_id)
+
+    def reconcile_next_submission(self) -> None:
+        """Read back one already-confirmed intent; never authorize a first stock write."""
+        if not self.drafts_enabled or self.erp is None:
+            return
+        with self.lock:
+            query = "SELECT id FROM captures WHERE json_extract(state,'$.status')='SUBMIT_UNKNOWN' "
+            row = (self.db.execute(query + "AND id>? ORDER BY id LIMIT 1",
+                                   (self._submit_cursor,)).fetchone()
+                   or self.db.execute(query + "ORDER BY id LIMIT 1").fetchone())
+        if not row:
+            return
+        self._submit_cursor = row[0]
+        state = self.current(row[0])
+        confirmation = state.get("physical_receiving_confirmation", {})
+        draft = state.get("draft", {})
+        if not all(isinstance(value, dict) for value in (
+            confirmation, draft, state.get("candidate"),
+        )):
+            return
+        if not (
+            state.get("submit_attempted") is True
+            and type(state.get("submit_confirmation_version")) is int
+            and confirmation.get("receipt_name") == draft.get("name")
+            and draft.get("name")
+            and isinstance(state.get("digest"), str) and len(state["digest"]) == 64
+            and type(state.get("image_version")) is int and state["image_version"] > 0
+            and isinstance(confirmation.get("confirmed_at"), str)
+            and confirmation["confirmed_at"]
+            and confirmation.get("digest") == state.get("digest")
+            and confirmation.get("image_version") == state.get("image_version")
+            and confirmation.get("candidate") == state.get("candidate")
+        ):
+            return
+        try:
+            self.submit(
+                state["id"], receipt_name=draft["name"],
+                expected_version=state["submit_confirmation_version"], confirm_received=True,
+            )  # submit_attempted forces lookup-only, including after restart.
+        except (KeyError, TypeError):
+            # A malformed legacy scope is not authority. Leave its intent untouched;
+            # the cursor allows a different valid record to progress next tick.
+            return
 
     def prepare_next_draft(self) -> None:
         """Advance one candidate fairly; unknown effects are lookup-only, never rewritten."""
