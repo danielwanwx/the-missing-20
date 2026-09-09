@@ -1,0 +1,259 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R3",
+  "started_at": "2026-09-09T22:13:20.482564+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "acceptance_scope": "runtime_contract_only",
+  "independent_answer_quality_review_required": true,
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "Disposition: SAFE_NOOP. The ordered quantity is 40 boxes, the physically received quantity is 2 boxes, and the posted quantity is also 2 boxes. The outstanding balance of 38 boxes is not evidence of missing stock, as it represents the remaining quantity that has not yet been received. The current balance after issues is 2 boxes, and there is no quality-held stock. The unposted physical receipts are 0 boxes. The accepted + released - issued quantity equals the current case balance, and the accepted + released + current quality hold quantity equals the posted receipts. There are no issues that exceed the accepted + released quantity. Therefore, the answer is SAFE_NOOP: no recovery is indicated for the current receiving stage. The verified receipts should not be retried, as they have already been submitted and the exact stock ledger quantity has been verified. An outstanding order alone does not prove missing stock. Next: Inspect the expected delivery date for the remaining 38 boxes, check for any quality issues or incidents reported for the received 2 boxes, and verify the current inventory level of the item M20-DEMO-CARTON in the warehouse.",
+      "advisory": {
+        "attachments": [],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [
+          "What is the expected delivery date for the remaining 38 boxes?",
+          "Are there any quality issues or incidents reported for the received 2 boxes?",
+          "What is the current inventory level of the item M20-DEMO-CARTON in the warehouse?"
+        ],
+        "latency_ms": 23710,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "receiving_references": {
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "receipt_ids": [
+            "MAT-PRE-2026-00005",
+            "MAT-PRE-2026-00006"
+          ],
+          "source_sequence": 1,
+          "status": "COMPLETE"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "SAFE_NOOP",
+          "evidence_ids": [
+            "PUR-ORD-2026-00015",
+            "MAT-PRE-2026-00005",
+            "MAT-PRE-2026-00006",
+            "MAT-PRE-2026-00005:ledger",
+            "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+            "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+            "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+            "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+          ],
+          "follow_up_questions": [
+            "What is the expected delivery date for the remaining 38 boxes?",
+            "Are there any quality issues or incidents reported for the received 2 boxes?",
+            "What is the current inventory level of the item M20-DEMO-CARTON in the warehouse?"
+          ],
+          "reason": "The ordered quantity is 40 boxes, the physically received quantity is 2 boxes, and the posted quantity is also 2 boxes. The outstanding balance of 38 boxes is not evidence of missing stock, as it represents the remaining quantity that has not yet been received. The current balance after issues is 2 boxes, and there is no quality-held stock. The unposted physical receipts are 0 boxes. The accepted + released - issued quantity equals the current case balance, and the accepted + released + current quality hold quantity equals the posted receipts. There are no issues that exceed the accepted + released quantity. Therefore, the answer is SAFE_NOOP: no recovery is indicated for the current receiving stage. The verified receipts should not be retried, as they have already been submitted and the exact stock ledger quantity has been verified. An outstanding order alone does not prove missing stock.",
+          "safe_next_step": "Inspect the expected delivery date for the remaining 38 boxes, check for any quality issues or incidents reported for the received 2 boxes, and verify the current inventory level of the item M20-DEMO-CARTON in the warehouse.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2247,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 1782,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_K3wynP8PLbgF0U87wY7mOr",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_eztN3TUL3ihVFxHPU7g4fA",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_UN5VqUu2twUd1c8H7nyJxF",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_sYGQ95Hla6ldMWvBR7x4t0",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_PQHJ8n7IteskLTK4hR15VM",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 8,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_4PPcnXsgTRbFaAyyl4HbDI",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 9,
+            "sequence": 9,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_K3wynP8PLbgF0U87wY7mOr",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 9,
+            "sequence": 10,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_eztN3TUL3ihVFxHPU7g4fA",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 8,
+            "sequence": 11,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_UN5VqUu2twUd1c8H7nyJxF",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 8,
+            "sequence": 12,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_sYGQ95Hla6ldMWvBR7x4t0",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 13,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_PQHJ8n7IteskLTK4hR15VM",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 14,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_4PPcnXsgTRbFaAyyl4HbDI",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 9839,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2485,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 16131,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 7366,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 18023,
+            "sequence": 19,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 6765,
+            "sequence": 20,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 21,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_PagoHpwQd6VDzmNcXoqnHj",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 22,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_PagoHpwQd6VDzmNcXoqnHj",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 18687,
+            "sequence": 23,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 5281,
+            "sequence": 24,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 25,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_6QsRvC3AyERh8duZy5qtAB",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 26,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_6QsRvC3AyERh8duZy5qtAB",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.064168,
+          "input_tokens": 70974,
+          "output_tokens": 2309,
+          "request_count": 5,
+          "source_cache_hits": 1,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    },
+    {
+      "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+      "answer": "The real Strands Agent is unavailable; no fallback answer was generated.",
+      "advisory": {
+        "mode": "real_strands",
+        "result": null,
+        "status": "AGENT_UNAVAILABLE",
+        "tool_calls": [],
+        "usage": {
+          "incremental_cost_usd": 0.1039544,
+          "input_tokens": 111911,
+          "output_tokens": 4508,
+          "request_count": 7
+        }
+      },
+      "validation_diagnostics": [
+        {
+          "failure": "SdkInvocationLimit",
+          "stage": "budget",
+          "stop_reason": "limit_total_tokens"
+        }
+      ]
+    }
+  ]
+}

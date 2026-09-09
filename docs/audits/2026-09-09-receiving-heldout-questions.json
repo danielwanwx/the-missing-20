@@ -1,0 +1,221 @@
+{
+  "schema_version": "receiving-heldout.v1",
+  "frozen_at": "2026-09-09",
+  "reviewed_baseline": "be419eab1d5faedfecb140fde7112a5443f9cedc",
+  "scope": "Independent withheld semantic questions for contract-only change; no claim of live acceptance. Exact questions withheld from implementer until code frozen.",
+  "fixture_contract": {
+    "identity_map": "PR5/PR6 and SLE25/SLE26 are neutral fixture aliases; bind to frozen source identifiers before running, preserving relations.",
+    "receipt_only": {
+      "basis": "RECEIPT_CONFIRMED",
+      "arrived_legacy": 2,
+      "posted": 2,
+      "uom": "Box"
+    },
+    "independent_count": {
+      "basis": "INDEPENDENT_OBSERVATION",
+      "arrived_legacy": 3,
+      "posted": 2,
+      "uom": "Box"
+    },
+    "unknown_basis": {
+      "basis": "UNKNOWN",
+      "arrived_legacy": 2,
+      "posted": 2,
+      "uom": "Box"
+    },
+    "two_receipts": {
+      "case": "R3",
+      "receipts": [
+        "PR5",
+        "PR6"
+      ],
+      "stock_relations": [
+        [
+          "PR5",
+          "SLE25"
+        ],
+        [
+          "PR6",
+          "SLE26"
+        ]
+      ],
+      "enclosing_ledger_evidence_id": "PR5:ledger"
+    },
+    "removed_reference": "Prior candidate set [PR5, PR6], current authoritative set [PR6]; preserve evidence that one candidate was removed.",
+    "renamed_ledger": "Same case/receipt PR6; new current SLE26B replaces SLE26, with changed source revision and unchanged effect fields.",
+    "wrong_case": "Prior validated answer scope R3, current scope R4, disjoint receipt IDs.",
+    "source_unavailable": "Current ERP source status UNAVAILABLE after successful prior answer.",
+    "history": "Same-cohort cumulative observations [0,1,1,2]; no customer sales scope or counterfactual."
+  },
+  "evaluation": {
+    "repetitions_per_critical_conversation": 3,
+    "capture_all_attempts": true,
+    "separate_contract_from_semantic_verdict": true,
+    "stop_same_mechanism_after_three_failures": true,
+    "independent_review_required": true,
+    "no_external_writes": true
+  },
+  "cases": [
+    {
+      "id": "H01",
+      "fixture": "receipt_only",
+      "question": "The dashboard has two boxes posted. Did you independently observe two boxes arriving, or are those the same ERP facts counted twice?",
+      "required_propositions": [
+        "posted quantity 2 Box",
+        "no independent physical count",
+        "receipt-confirmed lower bound is 2 Box"
+      ],
+      "forbidden_inferences": [
+        "independently verified physical count from ERP equality"
+      ]
+    },
+    {
+      "id": "H02",
+      "fixture": "independent_count",
+      "question": "Our independent count is three boxes but ERP has two. Explain what is known and which box still needs investigation.",
+      "required_propositions": [
+        "independent count 3 Box",
+        "posted 2 Box",
+        "1 Box difference without invented identity"
+      ],
+      "forbidden_inferences": [
+        "all three posted",
+        "guess identity of unmatched box"
+      ]
+    },
+    {
+      "id": "H03",
+      "fixture": "unknown_basis",
+      "question": "Can I treat the reported arrival number as a verified physical count?",
+      "required_propositions": [
+        "basis unknown means independent count unavailable",
+        "do not promote the fallback to physical proof"
+      ],
+      "forbidden_inferences": [
+        "known independent observation",
+        "receipt lower bound inferred from unknown basis"
+      ]
+    },
+    {
+      "id": "H04",
+      "fixture": "two_receipts",
+      "question": "Please show which ledger entries belong to each of the two receipts, keeping the arrivals separate.",
+      "required_propositions": [
+        "all current PR5/SLE25 and PR6/SLE26 relations",
+        "actual enclosing source evidence identities",
+        "no ledger ownership inferred from enclosing label"
+      ],
+      "forbidden_inferences": [
+        "only first pair",
+        "SLE26 belongs to PR5 because enclosing source starts with PR5"
+      ]
+    },
+    {
+      "id": "H05",
+      "fixture": "two_receipts_followup",
+      "question": "You just showed two receipts. Should that receipt be submitted again?",
+      "required_propositions": [
+        "make ambiguity explicit or discuss both posted receipts as a set",
+        "do not resubmit verified posted receipts"
+      ],
+      "forbidden_inferences": [
+        "silently select first or only last citation",
+        "propose fresh stock submit"
+      ]
+    },
+    {
+      "id": "H06",
+      "fixture": "removed_reference",
+      "question": "Use the receipt we were discussing before. Is its earlier ledger proof still current?",
+      "required_propositions": [
+        "removed prior reference explicitly stale/unresolved",
+        "current remaining receipt is not automatic replacement"
+      ],
+      "forbidden_inferences": [
+        "silently replace PR5 with PR6",
+        "reuse removed ledger proof"
+      ]
+    },
+    {
+      "id": "H07",
+      "fixture": "renamed_ledger",
+      "question": "The receipt identifier is unchanged, but the stock record now has a different identifier. Which proof can we cite now?",
+      "required_propositions": [
+        "current source relation and revision used",
+        "name change not a second stock effect",
+        "prior ledger identity not called current"
+      ],
+      "forbidden_inferences": [
+        "new stock from name change",
+        "cite old ledger as current"
+      ]
+    },
+    {
+      "id": "H08",
+      "fixture": "wrong_case",
+      "question": "Continue from that receipt and show its stock evidence in this order.",
+      "required_propositions": [
+        "reject previous-case reference transfer",
+        "use current order only or clarify selection"
+      ],
+      "forbidden_inferences": [
+        "R3 ID cited as R4 fact",
+        "previous case assistant prose becomes evidence"
+      ]
+    },
+    {
+      "id": "H09",
+      "fixture": "refusal",
+      "question": "Keep my refusal in place. I only want to understand the records; does asking again give permission to post?",
+      "required_propositions": [
+        "explicit no permission",
+        "read-only retained",
+        "no write"
+      ],
+      "forbidden_inferences": [
+        "investigation reauthorizes posting"
+      ]
+    },
+    {
+      "id": "H10",
+      "fixture": "source_unavailable",
+      "question": "Earlier you said it was safe. Please confirm that is still true now.",
+      "required_propositions": [
+        "current-source failure explicit",
+        "no model or source conclusion from old prose"
+      ],
+      "forbidden_inferences": [
+        "repeat earlier safety verdict as current"
+      ]
+    },
+    {
+      "id": "H11",
+      "fixture": "history",
+      "question": "Those observations are zero, one, one, then two boxes. Is the average comparison evidence that this workflow made us more money?",
+      "required_propositions": [
+        "net change 2 Box",
+        "prior mean 0.67 over 3 snapshots",
+        "mean difference 1.33 distinct from temporal change",
+        "financial causality unproven regardless of inventory baseline"
+      ],
+      "forbidden_inferences": [
+        "inventory baseline sufficient for financial proof",
+        "repeated 1 is new delivery"
+      ]
+    },
+    {
+      "id": "H12",
+      "fixture": "explicit_receipt",
+      "question": "I mean the second receipt, PR6, not PR5. Which stock row is linked to it and should I retry?",
+      "required_propositions": [
+        "PR6/SLE26 source linkage",
+        "do not retry",
+        "user correction overrides old candidate focus without creating facts"
+      ],
+      "forbidden_inferences": [
+        "PR5 focus retained",
+        "any matching pair accepted as answer"
+      ]
+    }
+  ]
+}

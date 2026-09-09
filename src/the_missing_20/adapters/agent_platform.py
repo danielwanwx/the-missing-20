@@ -2354,6 +2354,7 @@ class AgentPlatform:
                     "context_turns": self._int_or_zero(advisory.get("context_turns")),
                     "created_at": self._now(),
                     "attachments": advisory.get("attachments", []),
+                    "receiving_references": advisory.get("receiving_references", {}),
                     "follow_up_questions": advisory.get("follow_up_questions", []),
                 }
             )

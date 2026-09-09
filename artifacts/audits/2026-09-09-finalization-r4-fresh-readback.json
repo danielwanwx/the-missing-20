@@ -1,0 +1,84 @@
+{
+  "scope": "Actual external GET readbacks; demo public photo is not real shipment proof.",
+  "business_writes_in_verifier": 0,
+  "before_restart": {
+    "checked_at": "2026-09-09T22:07:35.778854+00:00",
+    "case_id": "M20-GOODS-20260909-40-R4",
+    "capture_id": "1cbc0f589421cef6c5c828536bb14a53",
+    "purchase_order": "PUR-ORD-2026-00016",
+    "receipt": "MAT-PRE-2026-00007",
+    "quantity": 1,
+    "case_posted_receipts": [
+      "MAT-PRE-2026-00007"
+    ],
+    "case_posted_quantity": 1,
+    "uom": "Box",
+    "matching_receipts": [
+      {
+        "name": "MAT-PRE-2026-00007",
+        "docstatus": 1
+      }
+    ],
+    "stock_ledger": [
+      {
+        "name": "MAT-SLE-2026-00027",
+        "actual_qty": 1.0,
+        "item_code": "M20-DEMO-CARTON",
+        "warehouse": "Stores - M20",
+        "voucher_detail_no": "068bbdr0mb",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "MAT-PRE-2026-00007",
+        "company": "Missing 20 Automotive Demo",
+        "is_cancelled": 0
+      }
+    ],
+    "ledger_ids_at_posting": [
+      "00f1927e91"
+    ],
+    "ledger_ids_current": [
+      "MAT-SLE-2026-00027"
+    ],
+    "same_stock_effects": true,
+    "destinations": [
+      {
+        "key": "m20-receipt-f945fc2ba35b83abf9ab76fd066eed14",
+        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
+        "provider": "Slack via Celigo",
+        "record_id": "1788986162.337109",
+        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788986162337109",
+        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
+      },
+      {
+        "key": "m20-receipt-f0d078ccbda4986de12985c65e61eadb",
+        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
+        "provider": "Airtable",
+        "record_id": "rec0RfqlevwmdoLgt",
+        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/rec0RfqlevwmdoLgt"
+      }
+    ],
+    "quantities": {
+      "accepted_cumulative": 1.0,
+      "available": 1.0,
+      "available_to_promise": null,
+      "case_balance": 1.0,
+      "delivered_quantity": 0,
+      "invoice_count": 0.0,
+      "ordered": 40.0,
+      "outstanding_order_quantity": 39.0,
+      "physically_arrived": 1.0,
+      "quality_hold": 0.0,
+      "receipt_posted_quantity": 1.0,
+      "receipt_unresolved": 0.0,
+      "received": 1.0,
+      "received_cumulative": 1.0,
+      "released_quantity": 0
+    },
+    "history_points": 1,
+    "history_retained_records": 1,
+    "history_projection_revisions": [],
+    "history_metric_corrections": [],
+    "conversation_turns": 0,
+    "conversation": [],
+    "passed": true
+  }
+}

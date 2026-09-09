@@ -19,6 +19,7 @@ from the_missing_20.agents.live_advisory import (
     live_recovery_packet,
     run_live_advisory,
 )
+from the_missing_20.agents.receiving_facts import receipt_relations, reference_candidates
 from the_missing_20.config import Settings
 from the_missing_20.ports.agent_model import AgentBudget, AgentBudgetLedger, AgentProvider
 
@@ -268,6 +269,22 @@ class DashboardAdvisoryGateway:
                 packet["explanation_scope"] = "full_investigation"
             else:
                 packet["expected_reason_quantities"] = ()
+            if packet.get("case_class") == "receiving_operations":
+                sources = packet["tool_payload"]["sources"]
+                turns = prior_projection.get("conversation", [])
+                last = turns[-1] if isinstance(turns, list) and turns else {}
+                previous = last.get("receiving_references", {}) if isinstance(last, Mapping) else {}
+                sources["read_control_context"] = {
+                    **sources["read_control_context"],
+                    "prior_reference_candidates": reference_candidates(
+                        previous if isinstance(previous, Mapping) else {},
+                        case_id=packet["case_id"],
+                        relations=receipt_relations(sources["read_erp_evidence"]),
+                        source_sequence=projection.get("case_projection", {}).get(
+                            "source_sequence"
+                        ),
+                    ),
+                }
             history = self._conversation_history(prior_projection)
             contextual_question = self._contextual_question(
                 history, clean_question,
@@ -335,6 +352,17 @@ class DashboardAdvisoryGateway:
             ),
             "follow_up_questions": [question[:160] for question in run.result.follow_up_questions],
         }
+        if packet.get("case_class") == "receiving_operations":
+            relations = receipt_relations(packet["tool_payload"]["sources"]["read_erp_evidence"])
+            cited = set(result.get("evidence_ids", []))
+            advisory["receiving_references"] = {
+                "case_id": packet["case_id"], "status": "COMPLETE",
+                "source_sequence": projection.get("case_projection", {}).get("source_sequence"),
+                "receipt_ids": sorted({
+                    row["receipt_id"] for row in relations
+                    if row["receipt_id"] in cited or row["evidence_id"] in cited
+                }),
+            }
         record_turn = getattr(self._platform, "record_conversation_turn", None)
         if callable(record_turn):
             projection = record_turn(

@@ -28,6 +28,7 @@ from the_missing_20.agents.receiving_advisory import (
     receiving_packet,
     receiving_prompt,
 )
+from the_missing_20.agents.receiving_facts import model_receiving_source
 from the_missing_20.domain.models import ContractModel, NonEmptyStr
 from the_missing_20.ports.agent_model import (
     MAX_OUTPUT_TOKENS_PER_REQUEST,
@@ -1190,6 +1191,8 @@ def _policy_prompt() -> str:
 def model_source_payloads(packet: Mapping[str, Any]) -> dict[str, Any]:
     """Scope model reads without changing the retained audit/UI evidence packet."""
     payloads = dict(source_payloads(packet))
+    if packet.get("case_class") == "receiving_operations":
+        payloads["read_erp_evidence"] = model_receiving_source(payloads["read_erp_evidence"])
     history = payloads.get(HISTORY_TOOL_NAME)
     if isinstance(history, Mapping):
         baseline = history.get("baseline", {})
@@ -2002,7 +2005,7 @@ async def _invoke(
             if receiving:
                 gaps = receiving_answer_gaps(
                     newest_question, candidate.reason,
-                    {name: payloads[name] for name in calls}, candidate.chart_metric,
+                    {name: source_payloads(packet)[name] for name in calls}, candidate.chart_metric,
                 )
                 if gaps:
                     raise AdvisoryValidationError("Answer omitted " + "; ".join(gaps))
