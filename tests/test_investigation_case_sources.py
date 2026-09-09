@@ -267,3 +267,232 @@ def test_explicit_pending_quality_is_denied_even_without_quantity():
     sources["read_airtable_evidence"]["quality_records"][0].pop("quantity")
     policy = evaluate_investigation_policy(correlate_investigation_sources(sources))
     assert policy["disposition"] == "DENY"
+
+
+def test_correlation_marks_invoice_ledger_and_attempt_scopes_and_key_state():
+    absent_sources = model_source_payloads(investigation_packet())
+    absent = correlate_investigation_sources(absent_sources)["observations"]
+    assert absent["invoice_po_scope_matches"] is True
+    assert absent["ledger_scope_matches"] is True
+    assert absent["attempt_scope_matches"] is True
+    assert absent["integration_business_key_present_in_erp"] is False
+
+    present_sources = model_source_payloads(investigation_packet("lost_ack"))
+    present = correlate_investigation_sources(present_sources)["observations"]
+    assert present["invoice_po_scope_matches"] is True
+    assert present["ledger_scope_matches"] is True
+    assert present["attempt_scope_matches"] is True
+    assert present["integration_business_key_present_in_erp"] is True
+
+
+@pytest.mark.parametrize("field", ["po", "line"])
+def test_ledger_scope_must_match_invoice_scope_even_when_records_look_current(field):
+    sources = model_source_payloads(investigation_packet())
+    sources["read_erp_evidence"]["ledger_read"][field] = "PO-OTHER" if field == "po" else 99
+    findings = correlate_investigation_sources(sources)
+    assert findings["observations"]["ledger_scope_matches"] is False
+    assert findings["observations"]["integration_business_key_present_in_erp"] is None
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize("field", ["po", "line"])
+def test_missing_ledger_scope_is_not_equal_to_missing_invoice_scope(field):
+    sources = model_source_payloads(investigation_packet())
+    sources["read_erp_evidence"]["ledger_read"].pop(field)
+    findings = correlate_investigation_sources(sources)
+    assert findings["observations"]["ledger_scope_matches"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize("field", ["po", "line"])
+def test_missing_invoice_and_ledger_scope_is_not_a_match(field):
+    sources = model_source_payloads(investigation_packet())
+    sources["read_erp_evidence"]["invoice"].pop(field)
+    sources["read_erp_evidence"]["ledger_read"].pop(field)
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["invoice_po_scope_matches"] is False
+    assert observed["ledger_scope_matches"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize("field", ["id", "line"])
+def test_missing_purchase_order_scope_is_not_a_match(field):
+    sources = model_source_payloads(investigation_packet())
+    sources["read_erp_evidence"]["purchase_order"].pop(field)
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["invoice_po_scope_matches"] is False
+    assert observed["ledger_scope_matches"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize(
+    ("scope", "value"),
+    [
+        pytest.param("po", " ", id="blank-po"),
+        pytest.param("line", True, id="boolean-line"),
+        pytest.param("line", 0, id="zero-line"),
+    ],
+)
+def test_blank_boolean_and_out_of_range_line_scopes_never_match(scope, value):
+    sources = model_source_payloads(investigation_packet())
+    erp = sources["read_erp_evidence"]
+    invoice = erp["invoice"]
+    purchase_order = erp["purchase_order"]
+    ledger = erp["ledger_read"]
+    attempt = sources["read_celigo_evidence"]["attempts"][0]
+    if scope == "po":
+        invoice["po"] = value
+        purchase_order["id"] = value
+        ledger["po"] = value
+        attempt["po"] = value
+    else:
+        invoice["line"] = value
+        purchase_order["line"] = value
+        ledger["line"] = value
+        attempt["line"] = value
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["invoice_po_scope_matches"] is False
+    assert observed["ledger_scope_matches"] is False
+    assert observed["attempt_scope_matches"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(0, id="integer-zero"),
+        pytest.param([], id="empty-list"),
+        pytest.param({}, id="empty-dict"),
+    ],
+)
+def test_purchase_order_scope_identifiers_must_be_nonblank_strings(value):
+    sources = model_source_payloads(investigation_packet())
+    erp = sources["read_erp_evidence"]
+    erp["invoice"]["po"] = value
+    erp["purchase_order"]["id"] = value
+    erp["ledger_read"]["po"] = value
+    sources["read_celigo_evidence"]["attempts"][0]["po"] = value
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["invoice_po_scope_matches"] is False
+    assert observed["ledger_scope_matches"] is False
+    assert observed["attempt_scope_matches"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(0, id="integer-zero"),
+        pytest.param([], id="empty-list"),
+        pytest.param({}, id="empty-dict"),
+    ],
+)
+def test_shipment_scope_identifier_must_be_a_string(value):
+    sources = model_source_payloads(investigation_packet())
+    erp = sources["read_erp_evidence"]
+    erp["purchase_order"]["shipment"] = value
+    sources["read_celigo_evidence"]["attempts"][0]["asn"] = value
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["invoice_po_scope_matches"] is True
+    assert observed["ledger_scope_matches"] is True
+    assert observed["attempt_scope_matches"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+def test_ledger_pagination_must_be_true_boolean_for_key_presence_and_completion():
+    sources = model_source_payloads(investigation_packet("lost_ack"))
+    sources["read_erp_evidence"]["ledger_read"]["pagination_complete"] = 1
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["ledger_scope_matches"] is True
+    assert observed["integration_business_key_present_in_erp"] is None
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize("field", ["id", "line"])
+def test_invoice_and_purchase_order_scope_must_match(field):
+    sources = model_source_payloads(investigation_packet())
+    sources["read_erp_evidence"]["purchase_order"][field] = "PO-OTHER" if field == "id" else 99
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["invoice_po_scope_matches"] is False
+    assert observed["ledger_scope_matches"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        pytest.param({"po": "PO-OTHER"}, id="wrong-po"),
+        pytest.param({"line": 99}, id="wrong-line"),
+        pytest.param({"asn": "ASN-OTHER"}, id="wrong-asn"),
+        pytest.param({"business_key": ""}, id="empty-business-key"),
+        pytest.param({"business_key": None}, id="missing-business-key"),
+    ],
+)
+def test_attempt_scope_is_required_before_using_business_key_for_receipt_retry(change):
+    sources = model_source_payloads(investigation_packet())
+    sources["read_celigo_evidence"]["attempts"][0].update(change)
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["attempt_scope_matches"] is False
+    assert observed["integration_business_key_present_in_erp"] is None
+    assert evaluate_investigation_policy(findings)["disposition"] == "NEEDS_EVIDENCE"
+
+
+def test_same_business_key_on_another_po_is_not_a_match_for_this_attempt():
+    sources = model_source_payloads(investigation_packet())
+    records = sources["read_erp_evidence"]["ledger_read"]["records"]
+    foreign = dict(records[0])
+    foreign.update(id="MAT-OTHER", po="PO-OTHER", business_key="RCPT-4817-L2", quantity=12)
+    records.append(foreign)
+    findings = correlate_investigation_sources(sources)
+    observed = findings["observations"]
+    assert observed["ledger_scope_matches"] is True
+    assert observed["attempt_scope_matches"] is True
+    assert observed["integration_business_key_present_in_erp"] is False
+    assert evaluate_investigation_policy(findings)["disposition"] == "RECOVERY_READY"
+
+
+def test_wrong_ledger_declaration_blocks_completed_recovery_even_with_current_records():
+    sources = model_source_payloads(investigation_packet("normal_complete"))
+    sources["read_erp_evidence"]["ledger_read"]["po"] = "PO-OTHER"
+    findings = correlate_investigation_sources(sources)
+    assert findings["observations"]["ledger_scope_matches"] is False
+    policy = evaluate_investigation_policy(findings)
+    assert policy["disposition"] == "NEEDS_EVIDENCE"
+    assert policy["checks"]["already_complete"] is False
+
+
+@pytest.mark.parametrize(
+    ("variant", "invoice_status", "expected"),
+    [
+        ("normal_complete", "OPEN", "RECOVERY_COMPLETE"),
+        ("normal_complete", "PAYMENT_HOLD", "RECOVERY_READY"),
+    ],
+)
+def test_irrelevant_historical_attempt_scope_does_not_block_completed_or_invoice_release(
+    variant, invoice_status, expected
+):
+    sources = model_source_payloads(investigation_packet(variant))
+    sources["read_erp_evidence"]["invoice"]["status"] = invoice_status
+    sources["read_celigo_evidence"]["attempts"][0]["po"] = "PO-OTHER"
+    findings = correlate_investigation_sources(sources)
+    assert findings["observations"]["attempt_scope_matches"] is False
+    policy = evaluate_investigation_policy(findings)
+    assert policy["disposition"] == expected
+
+
+def test_wrong_ledger_scope_blocks_invoice_release_ready_before_policy_shortcuts():
+    sources = model_source_payloads(investigation_packet("normal_complete"))
+    sources["read_erp_evidence"]["invoice"]["status"] = "PAYMENT_HOLD"
+    sources["read_erp_evidence"]["ledger_read"]["line"] = 99
+    findings = correlate_investigation_sources(sources)
+    policy = evaluate_investigation_policy(findings)
+    assert findings["observations"]["ledger_scope_matches"] is False
+    assert policy["disposition"] == "NEEDS_EVIDENCE"

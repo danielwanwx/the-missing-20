@@ -488,6 +488,38 @@ def investigation_packet(
     }
 
 
+def _scope_value_matches(left: object, right: object) -> bool:
+    """Match nonblank string identifiers without treating absent values as equal."""
+
+    return (
+        isinstance(left, str)
+        and isinstance(right, str)
+        and bool(left.strip())
+        and bool(right.strip())
+        and left == right
+    )
+
+
+def _line_scope_matches(left: object, right: object) -> bool:
+    """Match only positive integer line numbers from the same source contract."""
+
+    return (
+        isinstance(left, int)
+        and not isinstance(left, bool)
+        and isinstance(right, int)
+        and not isinstance(right, bool)
+        and left > 0
+        and right > 0
+        and left == right
+    )
+
+
+def _business_key_is_present(value: object) -> bool:
+    """A retry key must be a non-blank string before it can identify an effect."""
+
+    return isinstance(value, str) and bool(value.strip())
+
+
 def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
     """Join raw fixture records into checkable facts without choosing an action."""
     erp = sources["read_erp_evidence"]
@@ -496,15 +528,36 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
     integration = sources["read_celigo_evidence"]
     invoice = erp["invoice"]
     ledger = erp["ledger_read"]
+    purchase_order = erp["purchase_order"]
     scans = warehouse["scans"]
     records = ledger["records"]
     attempts = integration["attempts"]
-    attempt = attempts[0]
+    attempt = attempts[0] if attempts else {}
+    invoice_po = invoice.get("po")
+    invoice_line = invoice.get("line")
+    invoice_po_scope_matches = _scope_value_matches(
+        invoice_po, purchase_order.get("id")
+    ) and _line_scope_matches(invoice_line, purchase_order.get("line"))
+    ledger_scope_matches = (
+        invoice_po_scope_matches
+        and _scope_value_matches(ledger.get("po"), invoice_po)
+        and _line_scope_matches(ledger.get("line"), invoice_line)
+    )
+    attempt_scope_matches = (
+        invoice_po_scope_matches
+        and _scope_value_matches(attempt.get("po"), invoice_po)
+        and _line_scope_matches(attempt.get("line"), invoice_line)
+        and _scope_value_matches(attempt.get("asn"), purchase_order.get("shipment"))
+        and _business_key_is_present(attempt.get("business_key"))
+    )
     physical_quantity = sum(
-        row["quantity"] for row in scans if row["asn"] == erp["purchase_order"]["shipment"]
+        row["quantity"] for row in scans if row["asn"] == purchase_order["shipment"]
     )
     matched_records = [
-        row for row in records if row["po"] == invoice["po"] and row["line"] == invoice["line"]
+        row
+        for row in records
+        if _scope_value_matches(row.get("po"), invoice_po)
+        and _line_scope_matches(row.get("line"), invoice_line)
     ]
     legacy_available_quantity = sum(
         row["quantity"] for row in matched_records if row["stock_type"] == "AVAILABLE"
@@ -518,7 +571,8 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
     issued_quantity = sum(
         row["quantity"]
         for row in ledger.get("recorded_issues", [])
-        if row.get("po") == invoice["po"] and row.get("line") == invoice["line"]
+        if _scope_value_matches(row.get("po"), invoice_po)
+        and _line_scope_matches(row.get("line"), invoice_line)
     )
     available_quantity = accepted_quantity - issued_quantity
     quality_quantity = sum(
@@ -557,8 +611,14 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
         quality_quantity_matches = quality_quantity_matches and known and quantity == held_quantity
     scanned_lots = {row.get("lot") for row in scans if row.get("lot")}
     conversion = attempt.get("conversion_factor_to_po_uom")
+    attempt_quantity = attempt.get("quantity")
     normalized_attempt_quantity = (
-        attempt["quantity"] * conversion if isinstance(conversion, (int, float)) else None
+        attempt_quantity * conversion
+        if isinstance(attempt_quantity, (int, float))
+        and not isinstance(attempt_quantity, bool)
+        and isinstance(conversion, (int, float))
+        and not isinstance(conversion, bool)
+        else None
     )
     duplicate_invoice_records = erp["duplicate_invoice_read"]["records"]
     customer_order = erp.get("customer_order")
@@ -576,21 +636,26 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
     causal_revenue_increase_proven = (
         customer_order.get("causal_revenue_increase_proven") if customer_order_present else None
     )
+    ledger_read_complete = (
+        ledger.get("status") == "COMPLETE"
+        and ledger.get("pagination_complete") is True
+        and ledger_scope_matches
+    )
     key_present = (
-        None
-        if ledger["status"] != "COMPLETE" or not ledger["pagination_complete"]
-        else any(row.get("business_key") == attempt["business_key"] for row in matched_records)
+        any(row.get("business_key") == attempt.get("business_key") for row in matched_records)
+        if ledger_read_complete and attempt_scope_matches
+        else None
     )
     return {
         "evidence_ids": tuple(
             identifier for source in sources.values() for identifier in source["evidence_ids"]
         ),
         "join_keys": {
-            "purchase_order": invoice["po"],
-            "line": invoice["line"],
-            "shipment": erp["purchase_order"]["shipment"],
-            "integration_lot": attempt["lot"],
-            "integration_business_key": attempt["business_key"],
+            "purchase_order": invoice_po,
+            "line": invoice_line,
+            "shipment": purchase_order.get("shipment"),
+            "integration_lot": attempt.get("lot"),
+            "integration_business_key": attempt.get("business_key"),
         },
         "observations": {
             "invoice_quantity": invoice["quantity"],
@@ -603,12 +668,15 @@ def correlate_investigation_sources(sources: dict[str, Any]) -> dict[str, Any]:
             "erp_accounted_quantity": accepted_quantity + quality_quantity,
             "ledger_read_status": ledger["status"],
             "ledger_pagination_complete": ledger["pagination_complete"],
-            "integration_attempt_quantity": attempt["quantity"],
+            "invoice_po_scope_matches": invoice_po_scope_matches,
+            "ledger_scope_matches": ledger_scope_matches,
+            "attempt_scope_matches": attempt_scope_matches,
+            "integration_attempt_quantity": attempt_quantity,
             "integration_attempt_uom": attempt.get("uom"),
             "integration_conversion_factor": conversion,
             "integration_normalized_quantity": normalized_attempt_quantity,
             "integration_source_po_revision": attempt.get("source_po_revision"),
-            "integration_attempt_response": attempt["response"],
+            "integration_attempt_response": attempt.get("response"),
             "integration_business_key_present_in_erp": key_present,
             "held_lots": tuple(sorted(held_lots)),
             "exact_held_lot_quality_dispositions": tuple(
@@ -659,8 +727,12 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
 
     observed = findings["observations"]
     complete = (
-        observed["ledger_read_status"] == "COMPLETE" and observed["ledger_pagination_complete"]
+        observed["ledger_read_status"] == "COMPLETE"
+        and observed["ledger_pagination_complete"] is True
+        and observed.get("ledger_scope_matches") is True
     )
+    ledger_scope_matches = observed.get("ledger_scope_matches") is True
+    attempt_scope_matches = observed.get("attempt_scope_matches") is True
     exact_lot_approved = (
         observed["exact_held_lot_quality_dispositions"] == ("APPROVED",)
         and observed.get("exact_held_lot_quality_quantity_matches") is True
@@ -757,7 +829,12 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
         and observed["erp_quality_inspection_quantity"] == 0
         and observed["invoice_status"] == "PAYMENT_HOLD"
     )
-    if duplicate_invoice:
+    if not ledger_scope_matches:
+        disposition, reason = (
+            "NEEDS_EVIDENCE",
+            "The ERP ledger declaration does not match the invoice and purchase-order scope.",
+        )
+    elif duplicate_invoice:
         disposition, reason = (
             "DENY",
             "The supplier invoice number already exists on another posted ERP document.",
@@ -814,6 +891,12 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
             "RECOVERY_READY",
             "Inventory is fully reconciled but the matched invoice remains payment-held; "
             "Manager approval is required for the bounded release.",
+        )
+    elif not attempt_scope_matches:
+        disposition, reason = (
+            "NEEDS_EVIDENCE",
+            "The integration attempt is not scoped to this invoice, purchase-order line, "
+            "or shipment.",
         )
     elif not complete or key_present is None:
         disposition, reason = (
@@ -874,6 +957,9 @@ def evaluate_investigation_policy(findings: dict[str, Any]) -> dict[str, Any]:
         "reason": reason,
         "checks": {
             "authoritative_read_complete": complete,
+            "invoice_po_scope_matches": observed.get("invoice_po_scope_matches") is True,
+            "ledger_scope_matches": ledger_scope_matches,
+            "attempt_scope_matches": attempt_scope_matches,
             "physical_quantity_reconciles": physical_reconciles,
             "integration_business_key_present": key_present,
             "exact_held_lot_approved": exact_lot_approved,
