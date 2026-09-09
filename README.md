@@ -1,5 +1,15 @@
 # The Missing 20
 
+> **September 9 finalization status: NOT READY.** The 20-unit / USD 42,000
+> evidence below belongs to the historical September 7 scenario. The separate
+> R4 photo-receiving case (PO16/PR7) proves one Box posted and recovered after a
+> lost acknowledgement, with verified Airtable/Slack handoffs. It has no linked
+> invoice or customer fulfillment. R3 real multi-turn receiving remains FAILED;
+> the September 6 8/8 and 15/15 results do not cover that path.
+> See the [current finalization ledger](docs/submission/finalization-tracker.md) and
+> [R4 scope audit](docs/audits/2026-09-09-r4-automatic-receiving-recovery-review.md).
+
+
 **Find the gap. Prove the cause. Close it safely.**
 
 The Missing 20 is an agentic operations control system for supply-chain teams. It
@@ -7,7 +17,7 @@ connects fragmented evidence from ERPNext, Airtable, Celigo, Jira, and Slack; le
 Strands agent investigate the discrepancy; stops for a Manager only when a consequential
 recovery is ready; and verifies the result against authoritative business records.
 
-The hero case starts with a 20-unit automotive controller shipment split across two
+The historical September 7 hero case starts with a 20-unit automotive controller shipment split across two
 operational truths: 12 units accepted into Stores and 8 units held for quality review.
 The downstream USD 42,000 customer order is neither delivered nor billed. No single
 system contains enough evidence to explain the situation safely.
@@ -31,7 +41,7 @@ The Strands loop performs that evidence work. Deterministic code—not the model
 state classification, action eligibility, approval binding, execution, verification,
 and replay safety.
 
-## The five-minute judge path
+## Historical 20-unit judge path
 
 1. **Detect** — an external demo-system change advances the source version and the
    ordered event ledger; the Dashboard never animates invented traffic.
@@ -58,7 +68,7 @@ The main path is intentionally asymmetric:
 - **Strands + Nova Pro** investigate, retrieve, reconcile, evaluate, and explain.
 - **Deterministic policy** independently reconstructs the admissible business facts.
 - **Manager Gate** retains the stop-or-release decision for a bound plan.
-- **Guarded Executor** has the only write path and accepts only the approved scope and
+- **Guarded Executor** owns the historical recovery write path and accepts only the approved scope and
   idempotency key.
 - **Independent Verifier** closes the case only after authoritative ERPNext rereads,
   Celigo receipt correlation, and ledger checks.
@@ -69,6 +79,10 @@ Explore the [interactive architecture](docs/architecture/the-missing-20-live-arc
 or read the [as-built architecture](docs/architecture/as-built-architecture.md). The
 AgentCore Runtime deployment is separately proven; the current local hero UI uses
 direct Strands Bedrock transport and does not pretend to route through AgentCore.
+
+The following connection table describes the historical hero. The newer receiving
+flow additionally writes verified receipt notifications to Airtable and Slack through
+Celigo, and creates/resolves Jira only for relevant exceptions.
 
 ## What is genuinely connected
 
@@ -101,7 +115,7 @@ This is not a single prompt wrapped in a dashboard. The implementation includes:
 - case-scoped multi-turn conversation with evidence citations;
 - a hard boundary that prevents model output from becoming business-write authority.
 
-The current real-provider evidence includes 8/8 ambiguous case variants and 15/15
+The historical September 6 real-provider evidence includes 8/8 ambiguous case variants and 15/15
 multi-turn cases (45 dialogue turns), including approve, reject, deny, and
 needs-evidence outcomes. These are bounded demo-set results, not a production SLO.
 
@@ -204,8 +218,11 @@ artifacts/                redacted machine-readable proof and judge captures
 - Credentials remain in ignored `.env` files and never reach the browser.
 - Source tools are allowlisted and read-only.
 - Model output is parsed as untrusted data and is not policy input.
-- The only external write path is case-bound, Manager-gated, idempotent, and restricted
-  to exact M20 records in the isolated ERPNext demo tenant.
+- Historical recovery is case-bound, Manager-gated and idempotent in the isolated ERPNext demo tenant.
+- Photo receiving separately submits a confirmation-bound receipt. Its worker reconciles
+  uncertain submissions by lookup, then journals configured Airtable/Slack handoffs
+  and Jira exception updates. These are additional bounded write paths; advisory tools
+  do not gain write authority.
 - The local Manager is a declared demo persona, not an authentication claim.
 
 See [known limitations](docs/submission/known-limitations.md) and

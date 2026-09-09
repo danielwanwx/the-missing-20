@@ -1,5 +1,15 @@
 # Release Evidence Matrix
 
+> **September 9 finalization status: NOT READY.** The 20-unit / USD 42,000
+> evidence below belongs to the historical September 7 scenario. The separate
+> R4 photo-receiving case (PO16/PR7) proves one Box posted and recovered after a
+> lost acknowledgement, with verified Airtable/Slack handoffs. It has no linked
+> invoice or customer fulfillment. R3 real multi-turn receiving remains FAILED;
+> the September 6 8/8 and 15/15 results do not cover that path.
+> See the [current finalization ledger](finalization-tracker.md) and
+> [R4 scope audit](../audits/2026-09-09-r4-automatic-receiving-recovery-review.md).
+
+
 All business records in this release are purpose-built demo data. The approved hero
 execution bundle writes to an isolated ERPNext demo tenant and is followed by fresh
 provider reads. Evidence classes are intentionally not interchangeable.
@@ -17,7 +27,7 @@ provider reads. Evidence classes are intentionally not interchangeable.
 | Real AgentCore role chat | `PROVEN` | PASS | A deployed Runtime session answered a role-specific current-state question with three citations and no prepare, approve, authorize, execute, or business-write capability. | `artifacts/aws/2026-08-30-devpost-real-acceptance.json` |
 | AgentCore Runtime deployment, invocation, and observability | `PROVEN` | PASS | The redacted proof records a READY Runtime deployment, a completed invocation boundary, runtime logs, and trace-delivery status. | `artifacts/aws/2026-08-29-agentcore-runtime-proof.json`, `artifacts/aws/m6-proof-bundle-v1.json` |
 | AgentCore Gateway and Policy | `NOT_PROVEN` | NOT_PROVEN | No Gateway or Policy behavior is asserted by this package. | `artifacts/aws/2026-08-29-agentcore-runtime-proof.json`, `artifacts/aws/m6-proof-bundle-v1.json` |
-| Nova behavior across the bounded evaluated demo set | `PROVEN` | PASS | The latest bounded evaluation passed 8/8 case variants and 15/15 multi-turn cases. This is demo-set evidence, not a production accuracy or generalization claim. | `artifacts/agent/2026-09-06-hybrid-loop-8-case-real.json`, `artifacts/agent/2026-09-06-human-agent-dialogue-matrix-final-v2.json` |
+| Nova behavior across the bounded evaluated demo set | `PROVEN` | PASS | The historical September 6 bounded evaluation passed 8/8 case variants and 15/15 multi-turn cases. This is demo-set evidence, not a production accuracy or generalization claim. | `artifacts/agent/2026-09-06-hybrid-loop-8-case-real.json`, `artifacts/agent/2026-09-06-human-agent-dialogue-matrix-final-v2.json` |
 | Model authority to approve, execute, verify, or replay an operational action | `PROVEN` | PASS | Advisory records carry the no-write boundary; deterministic code and one declared Manager persona own the Manager-gated ERPNext demo-tenant execution bundle. The legacy two-role harness remains a separate, stricter regression proof. | `artifacts/audits/2026-09-07-current-hero-proof.json`, `artifacts/workspace/authority-b-lifecycle-v1.json` |
 
 ## Reading rule

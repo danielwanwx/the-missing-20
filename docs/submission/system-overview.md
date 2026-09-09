@@ -1,5 +1,15 @@
 # System Overview
 
+> **September 9 finalization status: NOT READY.** The 20-unit / USD 42,000
+> evidence below belongs to the historical September 7 scenario. The separate
+> R4 photo-receiving case (PO16/PR7) proves one Box posted and recovered after a
+> lost acknowledgement, with verified Airtable/Slack handoffs. It has no linked
+> invoice or customer fulfillment. R3 real multi-turn receiving remains FAILED;
+> the September 6 8/8 and 15/15 results do not cover that path.
+> See the [current finalization ledger](finalization-tracker.md) and
+> [R4 scope audit](../audits/2026-09-09-r4-automatic-receiving-recovery-review.md).
+
+
 ## Problem
 
 An enterprise exception rarely has one obvious cause. In the hero case, one 20-unit
@@ -14,7 +24,7 @@ wrong lot, or create unsupported delivery and invoice records.
 The Missing 20 is a reusable agentic incident-control platform for connected operations.
 It combines a live control tower, a Strands investigation workspace, case-scoped human
 conversation, deterministic action eligibility, a Manager decision gate, bounded
-bounded execution, authoritative reread, and regression-tested duplicate protection.
+execution, authoritative reread, and regression-tested duplicate protection.
 
 The Dashboard answers: What changed? How large is the operational and financial risk?
 Which systems disagree? The Investigation workspace answers: What did the agent read?
@@ -58,8 +68,10 @@ case version, source identity, evidence tuple, business-key state, quality appro
 recovery scope, and invariants. Only then does a Manager receive an approve/reject
 choice for the exact packet.
 
-Approval is bound to the plan digest and idempotency key. Execution is limited to the
-isolated external ERPNext demo tenant. A fresh reread—not an optimistic API response—must prove the
+Approval is bound to the plan digest and idempotency key. Historical recovery execution is limited to the
+isolated external ERPNext demo tenant. The receiving extension separately journals
+Airtable/Slack notification writes and relevant Jira updates; see the
+[receiving architecture](../architecture/as-built-architecture.md#receiving-extension-september-9). A fresh reread—not an optimistic API response—must prove the
 postconditions before the case can be marked verified. The verified value chain keeps
 booked revenue, billed revenue, estimated gross spread, and counterfactual revenue at
 risk separate. Deterministic regression tests cover duplicate-effect protection; the

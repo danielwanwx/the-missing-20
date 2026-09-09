@@ -1,5 +1,15 @@
 # Competition Benchmark
 
+> **September 9 finalization status: NOT READY.** The 20-unit / USD 42,000
+> evidence below belongs to the historical September 7 scenario. The separate
+> R4 photo-receiving case (PO16/PR7) proves one Box posted and recovered after a
+> lost acknowledgement, with verified Airtable/Slack handoffs. It has no linked
+> invoice or customer fulfillment. R3 real multi-turn receiving remains FAILED;
+> the September 6 8/8 and 15/15 results do not cover that path.
+> See the [current finalization ledger](finalization-tracker.md) and
+> [R4 scope audit](../audits/2026-09-09-r4-automatic-receiving-recovery-review.md).
+
+
 Research date: 2026-08-27.
 
 ## Official 2026 bar
@@ -25,7 +35,7 @@ yet been published, so there are no current entrants that can be responsibly ran
 The closest public benchmark is the official
 [2025 AWS AI Agent Global Hackathon winner announcement](https://aws-agent-hackathon.devpost.com/updates/38140-congratulations-to-the-winners-of-the-aws-ai-agent-global-hackathon).
 
-| Project | What judges could immediately see | Lesson for The Missing 20 |
+| Project | Entrant-described presentation | Lesson for The Missing 20 |
 | --- | --- | --- |
 | [EcoLafaek — 1st place](https://devpost.com/software/ecolafaek) | A live civic product, multimodal reporting, maps, search, multi-tool AgentCore workflow, public documentation, and visible usage | Lead with the human problem and working product; keep architecture evidence behind the story |
 | [AegisAgent — 2nd place](https://devpost.com/software/aegisagent-an-insurance-claim-app-fully-developed-by-kiro) | Evidence curation, policy interpretation, adversarial review, pause/resume, citations, and a deployed decision packet | Our closest conceptual peer; make agent investigation and bounded human decision visually obvious |
@@ -33,7 +43,7 @@ The closest public benchmark is the official
 
 ## Current competitive position
 
-### Stronger than typical demos
+### Demonstrated historical strengths
 
 - Deterministic separation between probabilistic investigation and write authority.
 - One case/version-bound Manager gate in the primary UI, plus a stricter two-role
@@ -44,8 +54,8 @@ The closest public benchmark is the official
 
 ### Gaps to close before public release
 
-- Real Strands/Nova behavior now passes the bounded 8-case and 15-case multi-turn
-  matrices. Production accuracy and generalization remain unproven.
+- September 6 Strands/Nova evidence passed bounded 8-case and 15-case multi-turn
+  matrices. R3 receiving multi-turn later failed; production accuracy and generalization remain unproven.
 - AgentCore Runtime deployment, invocation, read-only role chat, and runtime-log
   evidence are implemented and proven within the redacted evidence boundary. Gateway
   and Policy are not proven and should not be implied.

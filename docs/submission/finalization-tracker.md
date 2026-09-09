@@ -1,0 +1,62 @@
+# Finalization tracker — authoritative current ledger
+
+Updated 2026-09-09. **NOT READY.** This ledger supersedes older overall readiness wording; historical audits remain evidence for their named case/version only. Initial repository and remote main: `be419eab1d5faedfecb140fde7112a5443f9cedc` (fresh `git ls-remote`). Product baseline: `aa4966e`; subsequent commit is handoff documentation. Tracked working tree initially clean; unrelated untracked research/runtime artifacts preserved.
+
+## Schedule and official gates
+
+Direct official web reads on September 9, 2026: [rules](https://agentsforhumans.devpost.com/rules), [overview](https://agentsforhumans.devpost.com/), [FAQ](https://agentsforhumans.devpost.com/details/faqs). These independently verified sources supersede the Research Engine's failed claim-grounding run.
+
+- Submission: September 14, 2026, 17:00 America/Los_Angeles (PDT, UTC−07); September 15, 00:00 UTC.
+- Judging: September 15, 09:00–October 8, 17:00 Pacific. Free testing access must persist through its end. Announcement expected around October 14, 14:00 Pacific.
+- Internal targets, not organizer dates: business freeze September 12, 17:00; recording/materials September 13; submission target September 14, 12:00 (five-hour buffer). Reassess scope daily against actual unresolved gates.
+- Required: new in-period Strands project, functioning as depicted; authorized integrations/assets; English materials; public functional code/README/detectable MIT or Apache license; architecture; public YouTube/Vimeo working demo ≤5 minutes; Builder ID; free test build/demo access.
+- Eligibility: adult eligible resident, exclusions/conflicts apply. Existing form is not proof of all personal eligibility conditions; entrant final attestation remains necessary.
+- One track: Professional Agents fits this operator. AgentCore and hosted demo are optional score enhancements. Five dimensions equally weighted: Technical Implementation, Design, Potential Impact, Creativity & Originality, Presentation.
+- Rule header records August 12 bonus-hashtag removal; optional Builder article should use “Agents for Humans” in title. Credits request cutoff September 11 noon Pacific; no new purchase/subscription planned.
+
+## Account and runtime observations
+
+Authenticated Chrome read-only inspection of entry `1162519`: **DRAFT, 3/5 steps done**. Professional Agents selected; repository URL and architecture attachment present; Builder ID field populated (private value intentionally omitted); test instructions populated; required video URL empty; optional hosted demo/blog empty. Stored description still covers the older 20-unit case and says “latest” 8/8 and 15/15 plus “only external write path”; it has not been updated in this session. No Save/Submit action taken.
+
+Process arguments verified directly: 8893 uses `.missing20-goods-date-fixed`; 8896 uses R3 and 8897 R4, both with handoffs and paused auto-prepare. R4 GET at 21:55:51Z: PO16, 40 ordered, 1 posted, 39 outstanding, no invoice, CURRENT ERP read. `physical_observation_basis=RECEIPT_CONFIRMED`: equality with posted quantity is not independent physical corroboration. No legacy runtime reset, fault injection, or business replay performed during this startup check.
+
+## States and acceptance discipline
+
+`NOT_STARTED`, `IMPLEMENTED_NOT_VERIFIED`, `VERIFIED_IN_DEMO`, `FAILED`, `BLOCKED`, `DEFERRED`. A research/spec completion is not a product pass. “Verified” below always names the limited demonstration. Owners are responsibilities, not invented human signoffs. Effort is a planning estimate and never overrides acceptance.
+
+| ID / priority | Requirement and current status | Case/version and evidence | Gap, risk and acceptance condition | Dependency / owner / estimate / target |
+|---|---|---|---|---|
+| F01 P0 | Official requirements: VERIFIED_IN_DEMO (document/account inspection only) | September 9 direct sources and form observation above | Video absent; eligibility attestation and final release/access still open. Recheck rules and final form at submission | Release reviewer / 1h / Sep14 |
+| F02 P0 | Competition/industry comparison: VERIFIED_IN_DEMO (research only) | Current research reports linked below | Five source-labelled comparisons and industry protocol independently reviewed; no comparative performance or measured ROI claimed | Research + impact/product reviewers / 2h / Sep9 |
+| F03 P0 | Real multi-turn receiving: FAILED | R3; R4 audit and rejected raw artifacts; backend baseline below | Missing retry answer, faulty financial explanation, implicit referents. Frozen C1–C11 + held-out variants, each critical conversation repeated 3 real runs, every attempt independently reviewed | Contract design before implementation; backend reviewer / 1–2d / Sep11 |
+| F04 P0 | R4 lost-ACK recovery: VERIFIED_IN_DEMO (limited slice) | R4 PO16/PR7, aa4966e; R4 audit | Keep receipt and stock/destination identity across restart/replay; must not transfer result to unknown/not-committed branch | Existing preserved runtime; backend / retain / Sep9 |
+| F05 P0 | Same new-order downstream chain: NOT_STARTED (acceptance) | R4 has PR7 only; no new invoice/customer chain | Obtain explicit synthetic supplier invoice or authorized SO/fulfillment basis before relevant documents. Verify exact line/UOM/amount and external readbacks; no real payment, no fabricated supplier issuance | Scenario design + admitted business evidence; warehouse/backend / 1d / Sep11 |
+| F06 P0 | Full complex matrix: NOT_STARTED (consolidated acceptance) | R3 interleaving and R4 ACK are separate slices | Cover normal partial, identity/UOM, multiview duplicate, unknown/not-submitted, stale approval, QA/refusal/resume, concurrency and partial destination failure; zero unjustified effects | Frozen spec, isolated cases; warehouse/backend / 1–2d / Sep12 |
+| F07 P0 | Current pages/external UX: NOT_STARTED (full acceptance) | R4 gallery links previously checked; no full current click matrix | Mouse-test all menus/actions/approval/error states and exact ERP/Airtable/Celigo/Jira/Slack records; screenshots with no secrets | Stable business path; product reviewer / 0.5d / Sep12 |
+| F08 P0 | Claim consistency: VERIFIED_IN_DEMO (local text correction only) | README/submission/as-built text still old-case-wide claims | Historical 8/8/15/15 and 42k scoped, receiving writers disclosed. Local text independently approved; saved Devpost update/current diagram still pending | Research and baseline; release reviewer / 2h / Sep9 |
+| F09 P0 | Clean checkout/start: IMPLEMENTED_NOT_VERIFIED | README make targets and existing release proof | New cold clone, documented prerequisites only, offline judge path and appropriate tests; exact SHA recorded; receiving live setup separate | Claims/code freeze; release reviewer / 2h / Sep12 |
+| F10 P0 | Final video/materials: BLOCKED | Devpost video empty; previous architecture attached | Record only frozen same-case working path, English ≤5 min, playable public link; final preview gate before publishing/submitting | F03–F09 and user physical input for final physical claim; primary/user / 0.5d / Sep13 |
+| F11 P1 | Business efficiency: NOT_STARTED (measurement) | No matched human control or production pilot | Same workload active time/touches/fields, all failures, wall time/token/cost; label unavailable ROI and sample limits; formulas in impact research | Frozen tasks + actual operator; impact reviewer / 0.5d / Sep12 |
+| F12 P1 | Physical final trial: BLOCKED (human evidence only) | Public p05 + typed QR are test substitutes | User's staged garage photos/label interaction remain needed for final physical claim; continue public-fixture code/tests independently | Actual user input; operator / 1h / Sep12 |
+| F13 P1 | Production suitability: NOT_STARTED (complete audit) | Demo persona/loopback, no pilot | Auth roles, durable deployment, quotas/expiry, webhook/source freshness, retention, independent controls and operator training before pilot; no production-ready claim | Release/security/operations reviewer / scoped report / Sep12 |
+| F14 P2 | Optional hosted UI/AgentCore/blog: DEFERRED pending core path | Separate historical Runtime proof | Do not migrate just for score; new public exposure/publication has final approval gate; optional work cannot displace P0 | Core freeze; primary/user / TBD |
+
+## Frozen verification and review contract
+
+Goal → current source inputs → one bounded change → original failing case + relevant regressions → independent review → repair/retest → precise stage/commit/push → verify remote SHA. Stop a variant after three repeated same-mechanism real failures and diagnose; continue independent tasks. No average score overrides wrong business effects, authority errors, false success or unreachable core actions.
+
+Independent roles: backend reviewer; warehouse operator reviewer; product-design reviewer; business-impact reviewer; release/reproducibility reviewer. Give exact version, raw evidence, rubric and failures. Distinguish code read, actual operation and inference. Backend C1–C11 are frozen in the linked baseline before product changes; semantic review remains separate from deterministic identity/arithmetic/authority tests.
+
+Submission indispensable: truthful new-order evidence chain, stable real conversation, core failure recovery, inspectable UI/external effects, accessible reproducible code, accurate English diagram/text/video. Production pilot additionally needs authenticated organization roles, operational ownership, durable hosting, monitored quotas/expiry, tested scale/concurrency/retention and a real workload study. No manufacturing/MES rebuild, carrier platform, framework migration, new subscriptions or payment integration belongs to this freeze.
+
+## Evidence index and delivery log
+
+- [R4 accepted slice and remaining failures](../audits/2026-09-09-r4-automatic-receiving-recovery-review.md)
+- [R3 receipt/Jira and conversation failures](../audits/2026-09-09-r3-receiving-jira-conversation-review.md)
+- [Independent backend baseline and C1–C11](../audits/2026-09-09-finalization-backend-baseline.md)
+- [Five comparator and product-design review](../research/2026-09-09-finalization-comparators.md)
+- [Industry and business-impact review](../research/2026-09-09-finalization-industry-impact.md)
+- Research Engine collection: `artifacts/research/finalization-20260909/2026-09-09-agents-for-humans-devpost-september-2026-official-rules-deadline/`. Run `complete_with_warnings`, 16 raw / 26 total rows, zero eligible claim rows; `critical_check_failed:claim_grounding`. Four invalid, 22 discovery-only, ten duplicate rows. Direct official web reads used independently; failed Engine grounding is not validated evidence.
+- Release reviewer: `make judge-demo` PASS for historical 20-unit proof. `make m7-audit` reports stale persisted audit after current document changes; not a product test failure or current package pass. Regenerated offline audit was independently reviewed: only document hashes/sizes/digest changed. `make m7-audit` now PASS (digest d2173636173714350d5a07764f61288285beab5ae7ed4ae000c1a5ce39439c34). This legacy package status is not overall finalization acceptance.
+- Startup: local/remote be419eab verified. First documentation/research optimization independently approved; exact delivery SHA follows in Git and subsequent ledger entry.
+- [Independent research/release recheck](../audits/2026-09-09-finalization-research-release-review.md). Baseline Python run: 1,549 passed / 1 stale-package failure while documentation changed; original failed package suite retest 49 passed after regenerated audit. Frontend baseline 98 passed. Full exact-final-code run remains due after implementation.

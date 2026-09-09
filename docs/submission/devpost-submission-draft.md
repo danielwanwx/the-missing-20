@@ -1,8 +1,20 @@
 # Devpost Submission Copy — The Missing 20
 
+> **September 9 finalization status: NOT READY.** The 20-unit / USD 42,000
+> evidence below belongs to the historical September 7 scenario. The separate
+> R4 photo-receiving case (PO16/PR7) proves one Box posted and recovered after a
+> lost acknowledgement, with verified Airtable/Slack handoffs. It has no linked
+> invoice or customer fulfillment. R3 real multi-turn receiving remains FAILED;
+> the September 6 8/8 and 15/15 results do not cover that path.
+> See the [current finalization ledger](finalization-tracker.md) and
+> [R4 scope audit](../audits/2026-09-09-r4-automatic-receiving-recovery-review.md).
+
+
 **Submission:** `1162519`
-**State:** repository and written content ready; public video pending
+**State:** DRAFT, 3/5 steps done in authenticated Devpost on September 9; video empty; current-path acceptance and copy revision pending
 **Track:** Professional Agents
+
+The saved Devpost description has not yet been synchronized with these scope corrections.
 
 ## Core fields
 
@@ -70,7 +82,7 @@ competing hypotheses, synthesis and evaluator feedback, evidence handoffs, and S
 lifecycle hooks that drive the visible Investigation flight recorder. The same case
 scope powers a multi-turn evidence conversation.
 
-The latest real-provider evaluation covers 8/8 ambiguous case variants and 15/15
+The historical September 6 real-provider evaluation covers 8/8 ambiguous case variants and 15/15
 multi-turn cases (45 dialogue turns), including recovery-ready, reconcile-only, deny,
 needs-evidence, Manager approve, and Manager reject paths.
 
@@ -81,7 +93,7 @@ owns evidence integrity, state classification, action eligibility, policy, appro
 binding, execution, verification, and replay. The model has no tool that can approve,
 write, or mark a case verified.
 
-The only external write path is restricted to exact M20-scoped records in an isolated
+The historical recovery execution path is restricted to exact M20-scoped records in an isolated
 ERPNext demo tenant. It requires a current policy-approved packet plus one bound Manager
 decision. A successful API response is not enough: authoritative rereads, accounting
 invariants, a cross-system receipt, and idempotency checks must pass before closure.
@@ -156,7 +168,7 @@ run restore the same authoritative state instead of reconstructing a cosmetic su
 
 - A real Manager-gated write to an external ERPNext demo tenant, followed by fresh
   document, Stock Ledger, and GL reads.
-- A complete order-to-cash outcome with exact Sales Order, Delivery Note, Sales
+- A historical order-to-billing outcome (no cash collection proof) with exact Sales Order, Delivery Note, Sales
   Invoice, Celigo receipt, and observed USD 42,000 billing evidence.
 - Six real Strands source/reconciliation tools, typed output, evaluator feedback, and
   22 visible SDK lifecycle events in the verified hero run.

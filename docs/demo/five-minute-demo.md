@@ -1,5 +1,10 @@
 # The Missing 20 — Five-Minute Demo Script
 
+> Historical September 7 storyboard only. Current receiving finalization is not
+> accepted; do not join R4 photo/PR7 footage to this separate 20-unit billing case.
+> See [current tracker](../submission/finalization-tracker.md). Final recording waits
+> for the frozen business path.
+
 **Target length:** 4:35–4:50.
 **Primary path:** Dashboard → Investigation → Manager decision → verified closure.
 **Disclosure:** all enterprise records are purpose-built demo data. The hero path reads
@@ -16,7 +21,7 @@ stop-or-release decision, and an authoritative reread proves whether the fix wor
 
 | Time | Screen and action | Spoken narration |
 | --- | --- | --- |
-| 0:00–0:25 | Open **Dashboard** in the healthy baseline. Let the live sequence and event feed move for several seconds. | “Supply-chain teams rarely have one source of truth. ERP, integration, quality, ticketing, and collaboration tools each hold part of the answer. The Missing 20 turns those disconnected facts into one live, human-controlled investigation loop.” |
+| 0:00–0:25 | Open **Dashboard** in the healthy baseline. Show current source state; unchanged records should remain still. | “Supply-chain teams rarely have one source of truth. ERP, integration, quality, ticketing, and collaboration tools each hold part of the answer. The Missing 20 turns those disconnected facts into one live, human-controlled investigation loop.” |
 | 0:25–0:50 | Open the linked ERPNext record, apply the prepared demo exception, and return to the Dashboard. | “Twenty controllers physically arrived. Twelve entered Stores and eight remain quality-held, while a USD 42,000 customer order is still undelivered and unbilled. That is the symptom—not the diagnosis. The external demo-tenant source change is what advances this Dashboard and its ordered backend ledger.” |
 | 0:50–1:20 | Point to live movement, system states, working capital, the held USD 42,000 customer order, and the scrolling event feed. Click one source node to expose its parameters and external-system link. | “ERPNext records the receipt and customer order. Airtable carries the exact-lot quality disposition. Celigo carries an integration attempt and independent receipt. Jira and Slack add operating context, but cannot prove the root cause. USD 42,000 remains explicitly labeled as counterfactual revenue at risk—not revenue earned.” |
 | 1:20–1:45 | Click **Investigation**. Ask: “Why is this not a physical shortage, and what must be reread before any retry?” | “Before starting a model run, an operator can question the evidence agent. The answer is case-scoped, cites the source records it used, and has no approval or write capability.” |
@@ -29,8 +34,8 @@ stop-or-release decision, and an authoritative reread proves whether the fix wor
 
 ## Required visible proof
 
-- The live sequence changes and at least three new events enter while the camera stays
-  on Dashboard.
+- The live sequence changes only when an actual source/workflow event occurs. Do not
+  create extra events to satisfy a recording count.
 - Clicking a system opens real identifiers, source status, and an external-system link.
 - The Investigation run visibly changes tools, hooks, stage, latency, token, evidence,
   and confidence fields.
@@ -46,7 +51,7 @@ stop-or-release decision, and an authoritative reread proves whether the fix wor
 
 If the real provider is unavailable, do not pretend the model completed. Show the
 visible degraded state and say: “The advisory layer is unavailable, so the system does
-not invent a diagnosis or unlock recovery.” Then restart the local controlled hero run.
+not invent a diagnosis or unlock recovery.” Show any local controlled fallback explicitly as a separate synthetic path.
 Do not spend the primary video switching through every negative mode.
 
 ## Claims to avoid
