@@ -156,3 +156,26 @@ Final scope: public code downloads and installs; synthetic default server starts
 The primary agent proposed replacing the six unavailable historical metrics only for the synthetic case without business-history observations. Reviewed `workspace/operations-history.js` render/refresh logic, its HTML and existing unit tests. Current render sets the synthetic status label but still unconditionally renders six metric radios whose baseline helper defaults to 0/3. A single specific empty state is a clearer and more accurate representation.
 
 **Design approved, implementation not yet accepted.** Restrict it to `SYNTHETIC_CASE` with no valid business observations, not every empty filtered time window. Keep title, Window, Refresh and the controlled-scenario disclosure. Clear stale metrics/chart/samples/detail values and close empty details on case transition. Preserve real data, source-unavailable recovery, radio keyboard operation and sample inspection. Test synthetic→real one/multiple observations→synthetic transitions, unavailable-source retry and window changes; rerun the complete original smoke with the 180-word threshold unchanged. No new framework is justified.
+
+## Candidate implementation review — limited approval
+
+Reviewed exactly the eight added lines in `workspace/operations-history.js`; copied only that candidate file into the existing clean checkout. SHA-256: `0d7cc66377a376b6be01c69c842628fecfbcca60bdbab2076865423c467beafb`. No other cloned source or smoke assertion changed.
+
+The original complete `make workspace-smoke` was rerun with allowed local socket/browser permissions. It passed the former dashboard-word-count location and continued, but **failed later**, so it is not a full smoke pass:
+
+```text
+authoritative incident transition failed:
+{'incident': 'Incident M20-PO-4817', 'recorded': '88', 'gap': '12',
+ 'failed': 20, 'scenario_error': '', 'selected': 'incident', 'control_disabled': True}
+```
+
+Retained `/private/tmp/m20-finalization-cold-smoke-candidate.log`, SHA-256 `c7a53e672fea8a692e772f21fe2e2c12828cc9850cca1d04c4f993f6bee87981`. This later business-transition failure is outside the empty-state change; its cause is not established by this review. Subsequent smoke assertions remain unexecuted.
+
+Visible Chrome mouse/keyboard inspection through CUA covered:
+
+- Candidate synthetic server 8919: one controlled-scenario empty message, no six spurious 0/3 metric cards; Refresh remains enabled and preserves the empty state. Window successfully selects All retained. Title and controls remain visible. Screenshot inspected for this limited layout.
+- Existing R4 server 8897: current page still shows one source observation, six real metric choices, Received 1 Box and Still to receive 39 Box. Mouse-selected Still to receive, then its sample. Details displayed 39 Box, `erpnext-missing20`, PO `PUR-ORD-2026-00016` and receipt `MAT-PRE-2026-00007`. Window All retained preserves that observation. Net billed sales remains unavailable. This is UI inspection of the current retained projection, not a new independent ERP readback or write.
+
+A separate local Node VM/minimal DOM fixture executed the actual candidate renderer and mocked only DOM/fetch. Nine checks passed: synthetic empty; real one; real multiple; radio keyboard selection; real→synthetic clearing details; unavailable source; successful retry; synthetic status with actual points preserved; real history outside the selected window remaining non-synthetic. Eight mocked requests occurred. These are isolated software fixtures, not business observations or real-browser state-switch coverage. Fixture script `/private/tmp/m20-history-candidate-fixture.cjs` SHA-256 `0a0993a2b73160f70de4893a951f346c116d3431b6e1188bc6dac3498d017e11`; result `/private/tmp/m20-history-candidate-fixture.json` SHA-256 `bc096bb032380723d336296c1d3de8209b901f240c5721cfb97ee98cfd48d38e`.
+
+**Approve the scoped synthetic-history empty-state implementation.** It removes misleading nonexistent baselines without hiding real points or raising the existing threshold. Current whole-dashboard visual acceptance, browser outage/case-switch testing, the later incident-transition failure and complete smoke remain open. The separate isolated 8919 server was stopped via its own session; R4 service was left running. No model call, confirmation, external record mutation or real payment was performed by this acceptance.

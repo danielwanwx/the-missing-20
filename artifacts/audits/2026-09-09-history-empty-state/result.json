@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "requests": 8,
+  "cases": [
+    "synthetic-empty",
+    "real-one",
+    "real-multiple",
+    "radio-keyboard",
+    "real-to-synthetic-clears-details",
+    "source-unavailable",
+    "retry-real",
+    "synthetic-with-points-preserved",
+    "empty-real-time-window"
+  ]
+}

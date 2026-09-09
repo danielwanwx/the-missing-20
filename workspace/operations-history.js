@@ -108,6 +108,14 @@
       ? "Controlled scenario · connected business history is separate"
       : !points.length ? "No observations in this window. History begins with the first source read."
         : `${points.length} source observations · ${date(points[0].observed_at)} — ${date(latest.observed_at)}`;
+    if (payload.status === "SYNTHETIC_CASE" && !payload.points?.length) {
+      $("history-metrics").replaceChildren();
+      $("history-chart").replaceChildren(el("p", "Open a connected case to inspect its business observations."));
+      $("history-samples").replaceChildren();
+      $("history-record").replaceChildren();
+      $("history-detail").open = false;
+      return;
+    }
     $("history-metrics").replaceChildren(...measures.map((measure, index) => {
       const button = el("button", "", "history-metric");
       button.type = "button"; button.setAttribute("role", "radio");
