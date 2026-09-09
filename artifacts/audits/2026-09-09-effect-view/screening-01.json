@@ -1,0 +1,97 @@
+{
+  "status": "AdvisoryValidationError",
+  "started_at": "2026-09-09T23:47:59.451315+00:00",
+  "finished_at": "2026-09-09T23:48:23.287143+00:00",
+  "source_sha256": "3f7c5a5ca6df360bd654926e549ba0fc50e17cb5d95fc3b8f5a14d7321cc7258",
+  "model_sources_sha256": "7d934b7485599c3f2bbe1b53f3e2976a1224d2535d5350badd7ff7ad5bb8924b",
+  "code_provenance": {
+    "git_sha": "610f355e36ff95bdc4592a47f5a73be135688dd3",
+    "related_file_sha256": {
+      "src/the_missing_20/agents/live_advisory.py": "73c473905b83867cbf06269f2cc87456d6d6064e6ba26134a6cea028e2a31bc4",
+      "src/the_missing_20/agents/investigation_effect_facts.py": "6ce1df613e881bb42ebfbdc0d9c2b4860e4b75d63b1e59fb045a11e13587e4c3",
+      "src/the_missing_20/adapters/investigation_case_sources.py": "9126d8d0dea317f891fb5f8091b5bb155288522aeeece54754f35894110dca21",
+      "scripts/diagnostics/probe_investigation_effect_view.py": "d7c6d592630e4109fcb13d819701d3945dbcfca7447e69bf13ccd4bf98416f77"
+    }
+  },
+  "sdk_version": "1.53.0",
+  "model_id": "us.amazon.nova-pro-v1:0",
+  "question": "Investigate this case. Read the source evidence you need, compare the competing hypotheses, and explain each discrepancy with its observed quantity and source evidence. Then state a safe next step.",
+  "usage": {
+    "request_count": 8,
+    "input_tokens": 52193,
+    "output_tokens": 2351,
+    "incremental_cost_usd": 0.0492776
+  },
+  "ledger": {
+    "request_count": 8,
+    "input_tokens": 52193,
+    "output_tokens": 2351,
+    "request_cap": 16,
+    "input_token_cap": 250000,
+    "output_token_cap": 12000,
+    "reserved_input_tokens": 0,
+    "reserved_output_tokens": 0,
+    "reserved_cost_usd": 0.0,
+    "reserved_incremental_cost_usd": 0.0492776,
+    "reserved_cumulative_cost_usd": 0.0492776,
+    "incremental_cost_usd": 0.0492776,
+    "cumulative_cost_usd": 0.0492776,
+    "prior_cost_usd": 0.0,
+    "incremental_cost_cap_usd": 0.16,
+    "cumulative_cost_cap_usd": 0.16,
+    "remaining_incremental_cost_usd": 0.1107224,
+    "remaining_cumulative_cost_usd": 0.1107224,
+    "budget_error_count": 0
+  },
+  "writer_invoked": false,
+  "candidate_capture_scope": "Final accepted candidate plus candidates exposed in validation diagnostics; provider responses hidden before validation are not available through the run API.",
+  "diagnostics": [
+    {
+      "stage": "validation",
+      "case_id": "M20-PO-4817",
+      "attempt": 1,
+      "disposition": "NEEDS_EVIDENCE",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "failure": "real advisory disposition conflicts with the deterministic control context"
+    },
+    {
+      "stage": "validation",
+      "case_id": "M20-PO-4817",
+      "attempt": 2,
+      "disposition": "DENY",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "failure": "real advisory disposition conflicts with the deterministic control context"
+    },
+    {
+      "stage": "validation",
+      "case_id": "M20-PO-4817",
+      "attempt": 3,
+      "disposition": "NEEDS_EVIDENCE",
+      "tool_calls": [
+        "read_control_context",
+        "read_erp_evidence",
+        "read_airtable_evidence",
+        "read_celigo_evidence",
+        "read_collaboration_evidence",
+        "reconcile_source_records"
+      ],
+      "failure": "real advisory disposition conflicts with the deterministic control context"
+    }
+  ],
+  "acceptance": "FAILED_SEMANTIC_SCREENING",
+  "subsequent_repeats": "NOT_RUN_STOPPED_VARIANT"
+}

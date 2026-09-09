@@ -1,0 +1,74 @@
+diff --git a/src/the_missing_20/agents/live_advisory.py b/src/the_missing_20/agents/live_advisory.py
+index 6ab4c95..8eea305 100644
+--- a/src/the_missing_20/agents/live_advisory.py
++++ b/src/the_missing_20/agents/live_advisory.py
+@@ -10,6 +10,7 @@ import math
+ import re
+ import time
+ from collections.abc import Callable, Mapping
++from copy import deepcopy
+ from dataclasses import dataclass, field
+ from enum import StrEnum
+ from typing import Any, Literal
+@@ -23,6 +24,7 @@ from the_missing_20.adapters.investigation_case_sources import (
+ )
+ from the_missing_20.adapters.role_task_journal import RoleTaskJournal
+ from the_missing_20.adapters.strands_models import BedrockNovaProFactory
++from the_missing_20.agents.investigation_effect_facts import investigation_effect_facts
+ from the_missing_20.agents.receiving_advisory import (
+     receiving_answer_gaps,
+     receiving_packet,
+@@ -1605,6 +1607,7 @@ async def _invoke(
+         if source_investigation
+         else {}
+     )
++    model_correlated_findings = correlated_findings
+     evidence_findings = correlated_findings
+     if source_investigation:
+         policy_result = evaluate_investigation_policy(correlated_findings)
+@@ -1619,7 +1622,35 @@ async def _invoke(
+             "quality_stock_recorded_in_erp": observed["erp_quality_inspection_quantity"],
+             "normalized_integration_attempt": observed["integration_normalized_quantity"],
+         }
+-        payloads[CORRELATION_TOOL_NAME] = correlated_findings
++        # Keep the canonical correlation and policy inputs intact for the
++        # independent validation boundary.  The model receives a relationship
++        # view so it can trace an attempt to the scoped destination lookup and
++        # exact quality lot without rereading duplicate flat observations.
++        model_correlated_findings = deepcopy(correlated_findings)
++        model_correlated_findings["effect_facts"] = investigation_effect_facts(
++            {name: payloads[name] for name in SOURCE_TOOL_NAMES},
++            correlated_findings=correlated_findings,
++        )
++        model_observations = model_correlated_findings["observations"]
++        for key in (
++            "ledger_read_status",
++            "ledger_pagination_complete",
++            "integration_attempt_quantity",
++            "integration_attempt_uom",
++            "integration_conversion_factor",
++            "integration_normalized_quantity",
++            "integration_source_po_revision",
++            "integration_attempt_response",
++            "integration_business_key_present_in_erp",
++            "held_lots",
++            "exact_held_lot_quality_dispositions",
++            "exact_held_lot_quality_quantity_known",
++            "exact_held_lot_quality_quantity_matches",
++            "exact_held_lot_transfer_present",
++            "completed_quality_transfer_present",
++        ):
++            model_observations.pop(key, None)
++        payloads[CORRELATION_TOOL_NAME] = model_correlated_findings
+         payloads[POLICY_TOOL_NAME] = policy_result
+         evidence_findings = {**correlated_findings, "policy": policy_result}
+     evidence_ids = admitted_evidence_ids(packet)
+@@ -1822,7 +1853,7 @@ async def _invoke(
+                         "to independently answer this request, not merely summarize tools. "
+                         "Here is the same facts-only reconciliation returned by your tool "
+                         "(not a suggested verdict): "
+-                        + json.dumps(correlated_findings, ensure_ascii=False, sort_keys=True)
++                        + json.dumps(model_correlated_findings, ensure_ascii=False, sort_keys=True)
+                         if source_investigation
+                         else "\nSource acquisition is complete for this receiving request. "
+                         "Use the records already returned to answer; do not reread completed "
