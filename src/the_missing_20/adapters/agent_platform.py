@@ -1059,7 +1059,9 @@ class AgentPlatform:
         if receiving.get("status") == "CONFIGURED" and not self._live_flow_metrics(erp).get(
             "quality_hold"
         ):
-            for index, source_id in ((1, "airtable-receiving"), (3, "celigo-receiving")):
+            for index, source_id in (
+                (1, "airtable-receiving"), (2, "jira-receiving"), (3, "celigo-receiving")
+            ):
                 notification = by_source.get(source_id)
                 if (
                     notification
@@ -1067,12 +1069,21 @@ class AgentPlatform:
                     and notification.get("purchase_order") == receiving.get("purchase_order")
                 ):
                     systems[index] = system(
-                        "airtable" if index == 1 else "celigo",
-                        "Airtable Receiving" if index == 1 else "Celigo",
+                        {1: "airtable", 2: "jira", 3: "celigo"}[index],
+                        {1: "Airtable Receiving", 2: "Jira Receiving", 3: "Celigo"}[index],
                         notification,
+                        "Receiving review record; not QA, billing or stock authority"
+                        if index == 2 else
                         "Receipt notification copy; not QA, billing or stock authority",
                     )
-                    systems[index]["write_state"] = "EVENT_DRIVEN_NOTIFICATION"
+                    systems[index]["write_state"] = (
+                        "RECEIVING_REVIEW" if index == 2 else "EVENT_DRIVEN_NOTIFICATION"
+                    )
+                    if index == 2:
+                        systems[index].update({
+                            key: notification.get(key)
+                            for key in ("arrival_id", "capture_id", "operation", "last_failure")
+                        })
         return systems
 
     def _correlation(

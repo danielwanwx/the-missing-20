@@ -63,6 +63,29 @@ class EmptySaaS:
         return {"sources": [], "status": "NOT_CONFIGURED"}
 
 
+def test_receiving_jira_projection_is_scoped_workflow_not_stock_authority(tmp_path):
+    transport = MultiReceiptTransport()
+    source = Source(transport)
+    receiving = service_at(tmp_path / "photos.db", transport)
+    platform = AgentPlatform(source, EmptySaaS(), receiving=receiving)
+    erp = source.current()
+    erp["receiving_work"] = {"status": "CONFIGURED", "purchase_order": "PO-1"}
+    review = {"source_id": "jira-receiving", "case_id": source.case_id,
+              "purchase_order": "PO-1", "status": "UNKNOWN", "record_id": "", "url": "",
+              "arrival_id": "delivery-A", "capture_id": "capture-A", "operation": "create"}
+    systems = platform._systems(erp, {"sources": [review]})
+    jira = next(row for row in systems if row["id"] == "jira")
+    assert jira["write_state"] == "RECEIVING_REVIEW"
+    assert jira["record_id"] == jira["url"] == ""
+    assert jira["arrival_id"] == "delivery-A" and jira["capture_id"] == "capture-A"
+    assert jira["operation"] == "create" and "not QA" in jira["authority"]
+    for key in ("case_id", "purchase_order"):
+        wrong = {**review, key: "another-case"}
+        jira = next(row for row in platform._systems(erp, {"sources": [wrong]})
+                    if row["id"] == "jira")
+        assert jira["write_state"] != "RECEIVING_REVIEW"
+
+
 def test_receipt_photo_and_history_share_case_after_restart(tmp_path: Path):
     transport = MultiReceiptTransport()
     receiving = service_at(tmp_path / "photos.db", transport)

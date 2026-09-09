@@ -14,6 +14,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--case-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--questions-file", type=Path)
     args = parser.parse_args()
     base = f"http://127.0.0.1:{args.port}"
 
@@ -37,6 +38,11 @@ def main() -> None:
         "Keep that read-only constraint. Show the receiving trend and historical baseline. "
         "Explain net change versus the prior-observation average; is this proof of revenue gain?",
     )
+    if args.questions_file:
+        questions = json.loads(args.questions_file.read_text())
+        assert isinstance(questions, list) and 1 <= len(questions) <= 10
+        assert all(isinstance(question, str) and 1 <= len(question) <= 2000
+                   for question in questions)
     report = {"case_id": args.case_id, "started_at": datetime.now(UTC).isoformat(),
               "source": "real local HTTP gateway to Strands/Bedrock",
               "acceptance_scope": "runtime_contract_only",
@@ -63,7 +69,7 @@ def main() -> None:
     contexts = [turn["advisory"]["context_turns"] for turn in report["turns"]]
     # The gateway intentionally retains at most three prior turns, including
     # failed human requests. A saturated window must not be mistaken for lost context.
-    assert contexts == [min(3, contexts[0] + index) for index in range(3)]
+    assert contexts == [min(3, contexts[0] + index) for index in range(len(questions))]
     report.update(passed=True, quantities_unchanged=True,
                   completed_at=datetime.now(UTC).isoformat())
     args.output.write_text(json.dumps(report, indent=2) + "\n")

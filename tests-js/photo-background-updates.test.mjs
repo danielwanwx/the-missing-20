@@ -15,6 +15,8 @@ test("Jira receiving actions are never labelled as Airtable", () => {
     assert.equal(scope.handoffLabel({route: `jira-receiving:QRC:${operation}`, status: "VERIFIED", evidence: {operation}}), `Jira · ${text} ↗`);
   }
   assert.equal(scope.handoffLabel({route: "jira-receiving:QRC:create", status: "UNKNOWN"}), "Jira · checking delivery");
+  assert.equal(scope.handoffLabel({route: "jira-receiving:QRC:create", status: "UNKNOWN", last_failure: {kind: "access_denied"}}), "Jira · connection permission required");
+  assert.equal(scope.handoffLabel({route: "jira-receiving:QRC:create", status: "UNKNOWN", last_failure: {kind: "evidence_mismatch"}}), "Jira · evidence needs review");
   assert.equal(scope.handoffLabel({route: "airtable-receiving:base:table", status: "VERIFIED"}), "Airtable · synced ↗");
 });
 

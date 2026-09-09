@@ -16,6 +16,10 @@ def main() -> int:
     parser.add_argument("--runtime-directory", type=Path, required=True)
     parser.add_argument("--port", type=int, default=8893)
     parser.add_argument("--enable-handoffs", action="store_true")
+    parser.add_argument(
+        "--pause-auto-prepare", action="store_true",
+        help="Require an explicit draft action; does not disable evidence or handoff processing",
+    )
     args = parser.parse_args()
     runtime = args.runtime_directory.resolve()
     manifest_path = runtime / "receiving-manifest.json"
@@ -36,7 +40,7 @@ def main() -> int:
             "MISSING20_ERPNEXT_CUSTOMER_PO": "",
             "MISSING20_PHOTO_PURCHASE_ORDER": manifest["purchase_order"],
             "MISSING20_PHOTO_DRAFTS_ENABLED": "1",
-            "MISSING20_PHOTO_AUTO_PREPARE": "1",
+            "MISSING20_PHOTO_AUTO_PREPARE": "0" if args.pause_auto_prepare else "1",
             "MISSING20_RECEIVING_HANDOFF_ENABLED": "1" if args.enable_handoffs else "0",
             "MISSING20_RECEIVING_MANIFEST": str(manifest_path),
         }

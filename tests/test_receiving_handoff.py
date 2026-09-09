@@ -71,6 +71,57 @@ def test_unknown_without_record_never_resends(tmp_path):
     assert state["status"] == "UNKNOWN" and target.writes == 1
 
 
+def test_access_failure_is_visible_without_secrets_or_unsafe_retry(tmp_path):
+    from urllib.error import HTTPError
+
+    target = Destination()
+
+    def rejected(payload, key):
+        target.writes += 1
+        raise HTTPError("https://secret.invalid/token", 401, "private token", {}, None)
+
+    target.send = rejected
+    journal = HandoffJournal(tmp_path / "outbox.sqlite3")
+    state = journal.deliver("jira:case", event(), target)
+    assert state["last_failure"] == {
+        "phase": "send", "kind": "access_denied", "http_status": 401,
+    }
+    assert "secret" not in str(state) and "private" not in str(state)
+    assert journal.deliver("jira:case", event(), target)["status"] == "UNKNOWN"
+    assert target.writes == 1
+    target.records[state["key"]] = {"record_id": "verified-after-readback"}
+    state = journal.deliver("jira:case", event(), target)
+    assert state["status"] == "VERIFIED" and "last_failure" not in state
+
+
+def test_recovered_lookup_clears_only_obsolete_warning_without_resend(tmp_path):
+    from urllib.error import HTTPError
+
+    target = Destination()
+
+    def uncertain(payload, key):
+        target.writes += 1
+        raise TimeoutError("uncertain send")
+
+    target.send = uncertain
+    journal = HandoffJournal(tmp_path / "outbox.sqlite3")
+    first = journal.deliver("jira:case", event(), target)
+    assert first["last_failure"]["phase"] == "send"
+    assert journal.deliver("jira:case", event(), target)["last_failure"]["phase"] == "send"
+    original_find = target.find
+
+    def denied(payload, key):
+        raise HTTPError("https://private.invalid", 401, "private", {}, None)
+
+    target.find = denied
+    blocked = journal.deliver("jira:case", event(), target)
+    assert blocked["last_failure"]["phase"] == "lookup"
+    target.find = original_find
+    resumed = HandoffJournal(tmp_path / "outbox.sqlite3").deliver("jira:case", event(), target)
+    assert resumed["status"] == "UNKNOWN" and "last_failure" not in resumed
+    assert resumed["send_failure"]["phase"] == "send" and target.writes == 1
+
+
 def test_read_outage_before_intent_does_not_write_and_can_resume(tmp_path):
     target = Destination()
     target.unavailable = True

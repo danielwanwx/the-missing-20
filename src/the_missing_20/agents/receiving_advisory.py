@@ -114,6 +114,20 @@ def receiving_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
         )
 
     arrivals = [row for row in work.get("arrivals", []) if isinstance(row, Mapping)]
+    attention_states = {"NEEDS_REVIEW", "NEEDS_PHOTO", "UNAVAILABLE",
+                        "DRAFT_UNKNOWN", "SUBMIT_UNKNOWN"}
+    known_states = attention_states | {
+        "AWAITING_PHOTO", "ANALYZING", "COUNT_CANDIDATE", "RECEIPT_PREPARED",
+        "DRAFT_VERIFIED", "DUPLICATE_EVIDENCE", "RECEIPT_SUBMITTED",
+    }
+    if any(row.get("status") not in known_states for row in arrivals):
+        raise ValueError("Receiving arrival has an unknown state; inspect the source version")
+    if disposition == "SAFE_NOOP" and any(
+        row.get("status") in attention_states for row in arrivals
+    ):
+        # Reconciled posted stock does not clear an unposted arrival's stale plan
+        # or uncertain write. Photo observations must not be added to ERP inventory.
+        disposition = "NEEDS_EVIDENCE"
     photos = [
         {"evidence_id": row["photo_evidence_id"], **dict(row)}
         for row in arrivals
@@ -183,6 +197,9 @@ def receiving_prompt() -> str:
         "arrival and posted receipts conflict, or accepted + released - issued does not equal "
         "the current case balance, or accepted + released + current quality hold does not equal "
         "posted receipts, or issues exceed accepted + released. Inspect, never invent a repair. "
+        "Also use NEEDS_EVIDENCE when a receiving arrival is NEEDS_REVIEW, NEEDS_PHOTO, "
+        "UNAVAILABLE, DRAFT_UNKNOWN or SUBMIT_UNKNOWN, even if already-posted ERP stock "
+        "reconciles. Read that arrival's actual events; never count it as posted inventory. "
         "Only for internally consistent quantities use PROTECT for over-receipt beyond the "
         "ordered amount. Otherwise use SAFE_NOOP: "
         "no recovery is indicated for the current receiving stage, even if the order is partial. "

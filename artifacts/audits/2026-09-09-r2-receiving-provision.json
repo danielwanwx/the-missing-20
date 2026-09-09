@@ -1,0 +1,43 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R2",
+  "purchase_order": "PUR-ORD-2026-00014",
+  "item_code": "M20-DEMO-CARTON",
+  "quantity": 40,
+  "uom": "Box",
+  "currency": "USD",
+  "unit_rate": 50,
+  "price_basis": "explicit synthetic demo order, not market price",
+  "company": "Missing 20 Automotive Demo",
+  "docstatus": 1,
+  "inventory_writes": 0,
+  "physical_goods": "public photo stand-in until operator supplies physical holdout",
+  "verified_at": "2026-09-09T14:48:45.124994+00:00",
+  "receiving_manifest": {
+    "case_id": "M20-GOODS-20260909-40-R2",
+    "purchase_order": "PUR-ORD-2026-00014",
+    "arrivals": [
+      {
+        "arrival_id": "ARRIVAL-01",
+        "purchase_order_item": "7sf98ds17e",
+        "item_code": "M20-DEMO-CARTON",
+        "uom": "Box",
+        "warehouse": "Stores - M20",
+        "handling_unit_ids": [
+          "M20-GOODS-20260909-40-R2-001"
+        ],
+        "origin": "demo_scan"
+      },
+      {
+        "arrival_id": "ARRIVAL-02",
+        "purchase_order_item": "7sf98ds17e",
+        "item_code": "M20-DEMO-CARTON",
+        "uom": "Box",
+        "warehouse": "Stores - M20",
+        "handling_unit_ids": [
+          "M20-GOODS-20260909-40-R2-002"
+        ],
+        "origin": "demo_scan"
+      }
+    ]
+  }
+}

@@ -6,6 +6,30 @@ import vm from "node:vm";
 const app = await readFile(new URL("../workspace/app.js", import.meta.url), "utf8");
 const section = (name, next) => app.slice(app.indexOf(`  function ${name}(`), app.indexOf(`  function ${next}(`));
 const number = (v, fallback = 0) => v == null || !Number.isFinite(Number(v)) ? fallback : Number(v);
+test("an unposted receiving exception stays visible without fabricating a stock gap", () => {
+  const context = {};
+  vm.runInNewContext(section("receivingNeedsAttention", "platformFlowProjection"), context);
+  for (const status of ["NEEDS_REVIEW", "NEEDS_PHOTO", "DRAFT_UNKNOWN", "SUBMIT_UNKNOWN", "UNAVAILABLE"]) {
+    assert.equal(context.receivingNeedsAttention({receiving_work: {status: "CONFIGURED", arrivals: [{status}]}}), true);
+  }
+  for (const status of ["AWAITING_PHOTO", "COUNT_CANDIDATE", "RECEIPT_PREPARED", "RECEIPT_SUBMITTED"]) {
+    assert.equal(context.receivingNeedsAttention({receiving_work: {status: "CONFIGURED", arrivals: [{status}]}}), false);
+  }
+  assert.match(app, /platform-confidence"\)\.hidden = receivingEvidenceOnly/);
+  assert.match(app, /platform-guard"\)\.hidden = receivingEvidenceOnly/);
+});
+
+test("receiving does not draw fictional invoice to Slack routes", () => {
+  const svg = {setAttribute() {}, replaceChildren() {this.cleared = true;}};
+  const map = {dataset: {}, getBoundingClientRect: () => ({width: 800})};
+  const stage = {offsetParent: {}, getBoundingClientRect: () => ({width: 800, height: 200})};
+  const context = {state: {agentPlatform: {receiving_work: {status: "CONFIGURED"}}},
+    document: {querySelector: () => stage}, $: id => id === "dashboard-evidence-map" ? map : svg};
+  vm.runInNewContext(section("renderDashboardEvidenceLinks", "renderDashboardEvidence"), context);
+  context.renderDashboardEvidenceLinks();
+  assert.equal(svg.cleared, true);
+  assert.equal(map.dataset.layout, "standalone");
+});
 test("live order headlines distinguish unreceived, partial, held and posted goods", () => {
   const context = { number };
   vm.runInNewContext(section("liveReceivingSummary", "renderHeader"), context);

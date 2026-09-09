@@ -539,7 +539,7 @@
     const risk = operations.risk_signal || {};
     const agentRun = platform.agent_run || {};
     const humanReview = platform.human_review || {};
-    const receivingNotification = system.write_state === "EVENT_DRIVEN_NOTIFICATION";
+    const receivingNotification = ["EVENT_DRIVEN_NOTIFICATION", "RECEIVING_REVIEW"].includes(system.write_state);
     const liveRecord = receivingNotification ? system : liveSaaSRecord(componentId);
     const livePO = liveERPDocument("purchase_order");
     const liveReceipt = liveERPDocument("purchase_receipt");
@@ -578,7 +578,10 @@
     };
     if (receivingNotification) return {
       ...common, title: value(system.name), status: value(system.status), purpose: value(system.detail),
-      metrics: [["Source record", value(system.record_id) || "Waiting"], ["Scope", "Receipt notification"], ["Authority", "ERPNext stock ledger"]],
+      metrics: [["Source record", value(system.record_id) || "Not verified"],
+        ["Scope", system.write_state === "RECEIVING_REVIEW" ? "Receiving review" : "Receipt notification"],
+        ...(system.arrival_id ? [["Arrival", system.arrival_id]] : []),
+        ["Authority", system.write_state === "RECEIVING_REVIEW" ? "Workflow record, not stock authority" : "ERPNext stock ledger"]],
       external: value(system.url).startsWith("https://") ? { url: system.url, label: "Open source record" } : common.external,
     };
     if (componentId === "erpnext") common.external = erpDocumentLink(
@@ -789,6 +792,13 @@
       if (!facts?.purchase_invoice && !facts?.quantities?.invoice_count) return "UNKNOWN";
     }
     return facts?.invoice_held ? "HELD" : facts ? "OPEN" : "UNKNOWN";
+  }
+
+  function receivingNeedsAttention(platform) {
+    return platform?.receiving_work?.status === "CONFIGURED"
+      && Array.isArray(platform.receiving_work.arrivals)
+      && platform.receiving_work.arrivals.some((arrival) =>
+        ["NEEDS_REVIEW", "NEEDS_PHOTO", "UNAVAILABLE", "DRAFT_UNKNOWN", "SUBMIT_UNKNOWN"].includes(arrival.status));
   }
 
   function platformFlowProjection() {
@@ -1595,7 +1605,8 @@
     // is an incident workspace: it appears only after the server-backed anomaly
     // transition, then remains available through recovery and verification.
     const liveFlow = platformFlowProjection();
-    const sourceAttention = Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
+    const sourceAttention = receivingNeedsAttention(platform)
+      || Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
     // Live users can ask evidence questions even without an incident. The sparse
     // normal scene is only the explicitly controlled scenario, never live truth.
     const normalScenario = isNormalScenario() && !sourceAttention && !hasLiveSourceAuthority();
@@ -1674,15 +1685,18 @@
     const ribbonExecutionStatus = value(platform.execution && platform.execution.status).toUpperCase();
     const inventoryReconciled = Boolean(liveFlow && liveFlow.gap === 0);
     const receivingNormal = platform.receiving_work?.status === "CONFIGURED"
+      && !receivingNeedsAttention(platform)
       && inventoryReconciled && liveFlow.sourceCurrent && !liveFlow.invoiceHeld;
     if (receivingNormal) setBadge($("platform-correlation"), "RECEIVING", "HEALTHY");
+    else if (receivingNeedsAttention(platform)) setBadge($("platform-correlation"), "REVIEW REQUIRED", "NEEDS_REVIEW");
     $("platform-title").textContent = ribbonExecutionStatus === "VERIFIED"
       ? "Verified recovery"
       : inventoryReconciled && liveFlow.invoiceHeld
         ? "Invoice payment hold"
         : liveFlow?.gap > 0
           ? "Receipt reconciliation"
-          : receivingNormal ? "Receiving operations" : "Connected investigation";
+          : receivingNeedsAttention(platform) ? "Receiving needs review"
+            : receivingNormal ? "Receiving operations" : "Connected investigation";
     $("platform-correlation-detail").textContent = caseFacts && caseQuantities
       ? (ribbonExecutionStatus === "VERIFIED"
         ? "Receipt reconciled · recovery independently verified"
@@ -1690,7 +1704,8 @@
           ? "Inventory reconciled · invoice payment hold awaits agent diagnosis"
           : liveFlow?.gap > 0
             ? `${liveFlow.gap} units require cross-source reconciliation`
-            : receivingNormal ? liveReceivingSummary(liveFlow).detail
+            : receivingNeedsAttention(platform) ? "Receiving evidence needs review · posted stock unchanged"
+              : receivingNormal ? liveReceivingSummary(liveFlow).detail
               : `Receipt confirmed · integration ${["ACKNOWLEDGED", "VERIFIED"].includes(integrationOutcome) ? "acknowledged" : "requires review"}`)
       : missing.length
       ? `Partial correlation · ${missing.join(", ")}`
@@ -1847,15 +1862,21 @@
       node.dataset.nodeDetail = detail;
     });
     const conclusionNode = $("platform-conclusion");
-    conclusionNode.textContent = value(conclusion.label || "NO RELEASE");
+    conclusionNode.textContent = receivingNeedsAttention(platform) ? "Review receiving evidence"
+      : receivingNormal ? "Receiving in progress"
+      : value(conclusion.label || "NO RELEASE");
     const conclusionCard = $("platform-agent-conclusion");
     conclusionCard.className = `platform-agent-conclusion is-${value(conclusion.status).toLowerCase()}`;
     if (latestSequence > pulseAfter) conclusionCard.classList.add("is-live");
+    const receivingEvidenceOnly = platform.receiving_work?.status === "CONFIGURED"
+      && !["AUTHORIZED", "VERIFYING", "VERIFIED"].includes(executionStatus);
+    $("platform-confidence").hidden = receivingEvidenceOnly;
     $("platform-confidence").textContent = executionStatus === "VERIFIED"
       ? "Residual gap · 0 units"
       : number(conclusion.confidence)
         ? `Confidence · ${number(conclusion.confidence).toFixed(2)}`
         : "Not scored";
+    $("platform-guard").hidden = receivingEvidenceOnly;
     const guardCopy = executionStatus === "VERIFIED"
       ? "RECOVERY VERIFIED"
       : executionStatus === "VERIFYING"
@@ -5140,7 +5161,10 @@
       if (value(item.id) === "erp") return platform.gap > 0 ? "PARTIAL" : "HEALTHY";
       return platform.invoiceHeld ? "HELD" : "OPEN";
     };
-    setBadge($("path-status"), platform && !platform.sourceCurrent ? "Source unavailable" : allNodesHealthy ? "Healthy" : "Attention needed", allNodesHealthy ? "HEALTHY" : "ANOMALY");
+    const receivingAttention = receivingNeedsAttention(state.agentPlatform);
+    setBadge($("path-status"), platform && !platform.sourceCurrent ? "Source unavailable"
+      : receivingAttention ? "Receiving review" : allNodesHealthy ? "Healthy" : "Attention needed",
+      allNodesHealthy && !receivingAttention ? "HEALTHY" : "ANOMALY");
     const projectedNodes = {
       warehouse: { healthId: "health-warehouse", sourceId: "source-warehouse" },
       "message-queue": { healthId: "health-queue", sourceId: "source-queue", sourceNodeId: "queue" },
@@ -6401,7 +6425,8 @@
   function renderDashboardAgentStatus() {
     const platform = state.agentPlatform || {};
     const liveFlow = platformFlowProjection();
-    const sourceAttention = Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
+    const sourceAttention = receivingNeedsAttention(platform)
+      || Boolean(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
     const agentRun = platform.agent_run && typeof platform.agent_run === "object" ? platform.agent_run : {};
     const diagnosis = platform.diagnosis && typeof platform.diagnosis === "object" ? platform.diagnosis : {};
     const proof = platform.judge_proof && typeof platform.judge_proof === "object" ? platform.judge_proof : {};
@@ -6474,7 +6499,7 @@
     const openInvestigation = $("dashboard-open-investigation");
     if (openInvestigation) {
       openInvestigation.hidden = isNormalScenario()
-        && !(liveFlow && (liveFlow.gap > 0 || liveFlow.invoiceHeld));
+        && !sourceAttention;
     }
   }
 
@@ -6487,6 +6512,12 @@
     const mapBounds = map.getBoundingClientRect();
     svg.setAttribute("viewBox", `0 0 ${Math.max(1, stageBounds.width)} ${Math.max(1, stageBounds.height)}`);
     svg.replaceChildren();
+    if (state.agentPlatform?.receiving_work?.status === "CONFIGURED") {
+      // Receipt notifications are linked from their verified records, not an
+      // invented warehouse→Jira or invoice→Slack physical-goods route.
+      map.dataset.layout = "standalone";
+      return;
+    }
     const links = [
       ["jira", "warehouse"],
       ["celigo", "message-queue"],

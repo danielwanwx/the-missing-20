@@ -57,7 +57,8 @@ class LiveAdvisoryResult(ContractModel):
             "task remains. An unperformed eligible transfer is work to do, NOT missing evidence. "
             "A complete false business-key lookup proves absence despite a timeout. "
             "Zero held stock requires no quality approval or transfer. SAFE_NOOP also means "
-            "normal ongoing receiving: posted arrivals reconcile, no exception recovery, and "
+            "normal ongoing receiving: posted arrivals reconcile, no unresolved arrival review "
+            "or uncertain receiving write, no exception recovery, and "
             "remaining planned deliveries or a future invoice are not an incident."
         )
     )
@@ -1523,6 +1524,22 @@ async def _invoke(
     payloads = model_source_payloads(packet)
     receiving = packet.get("case_class") == "receiving_operations"
     current_question = question.rsplit("Newest human question:", 1)[-1]
+    receiving_focus = ""
+    if receiving:
+        work = payloads["read_collaboration_evidence"].get("receiving_work", {})
+        receiving_focus = "\nCurrent arrival facts copied from the collaboration source: "
+        receiving_focus += json.dumps([
+            {key: row.get(key) for key in (
+                "arrival_id", "status", "photo_evidence_id", "posted_quantity"
+            )}
+            for row in work.get("arrivals", [])
+        ])
+        receiving_focus += (
+            " Classify the case using all arrivals, not merely the history chart. "
+            "Keep safe_next_step read-only: inspect/read/verify records without executing "
+            "or suggesting an inventory write. Answer the history question as a separate "
+            "explanation; a stable chart does not close an unresolved receiving review."
+        )
     if receiving and not requests_history(current_question):
         payloads.pop(HISTORY_TOOL_NAME, None)
     source_investigation = packet.get("case_class") == "source_investigation"
@@ -1734,6 +1751,7 @@ async def _invoke(
             response = await asyncio.wait_for(
                 agent.invoke_async(
                     (question.rsplit("Newest human question:", 1)[-1] if receiving else question)
+                    + receiving_focus
                     + (
                         "\nSource acquisition is complete. Use the returned records "
                         "to independently answer this request, not merely summarize tools. "
@@ -1769,6 +1787,11 @@ async def _invoke(
                             "observations and Slack/Airtable/Celigo notification copies; "
                             "those copies do not independently prove posted stock. "
                             "For a requested history chart set chart_metric. "
+                            "Disposition classifies the whole current case, not only the "
+                            "selected chart: an arrival awaiting review or evidence, or an "
+                            "uncertain draft/submit, still needs evidence even when the "
+                            "posted-stock trend is internally consistent. Do not turn a "
+                            "read-only history question into clearance of an unresolved arrival. "
                             "For evidence_ids copy 1 to 8 exact IDs from these already-read "
                             "sources; never substitute a tool name, URL or shortened ID: "
                             + json.dumps([
@@ -2029,7 +2052,7 @@ async def _invoke(
             "IDs returned by any still-missing tools you read now. "
             "return the complete structured result. If evidence is genuinely "
             "missing, identify the exact missing fact; never guess."
-        )
+        ) + receiving_focus
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 repaired = await asyncio.wait_for(

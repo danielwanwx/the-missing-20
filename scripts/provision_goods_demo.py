@@ -25,14 +25,28 @@ CASE_ID = "M20-GOODS-20260908-40"
 
 
 def case_marker(case_id: str) -> str:
-    if not isinstance(case_id, str) or not re.fullmatch(r"M20-GOODS-\d{8}-40", case_id):
-        raise ValueError("A pilot case requires M20-GOODS-YYYYMMDD-40.")
+    if not isinstance(case_id, str) or not re.fullmatch(
+        r"M20-GOODS-\d{8}-40(?:-R[1-9][0-9]?)?", case_id
+    ):
+        raise ValueError("A pilot case requires M20-GOODS-YYYYMMDD-40 with optional -R1..R99.")
     date.fromisoformat(case_id[10:18])
     return MARKER if case_id == CASE_ID else f"{case_id} - SYNTHETIC TEST ORDER"
 
 
+def _batch_plan(first: int, additional: tuple[int, ...]) -> tuple[int, ...]:
+    if not isinstance(additional, tuple):
+        raise ValueError("Additional batch sizes must be an immutable tuple.")
+    sizes = (first, *additional)
+    if any(type(size) is not int or not 1 <= size <= 20 for size in sizes):
+        raise ValueError("Each batch requires 1..20 planned cartons.")
+    if len(sizes) > 50 or sum(sizes) > 40:
+        raise ValueError("Planned arrival quantities cannot exceed the 40-Box purchase order.")
+    return sizes
+
+
 def first_receiving_manifest(
-    order: Mapping[str, Any], *, first_batch_size: int = 10, case_id: str = CASE_ID
+    order: Mapping[str, Any], *, first_batch_size: int = 10, case_id: str = CASE_ID,
+    additional_batch_sizes: tuple[int, ...] = (),
 ) -> dict[str, Any]:
     """Bind the first normal batch to actual ERP line identity, never a guessed row.
 
@@ -40,8 +54,7 @@ def first_receiving_manifest(
     This does not mark any handling unit as scanned, delivered or posted.
     """
     marker = case_marker(case_id)
-    if type(first_batch_size) is not int or not 1 <= first_batch_size <= 20:
-        raise ValueError("First batch requires 1..20 planned cartons.")
+    sizes = _batch_plan(first_batch_size, additional_batch_sizes)
     lines = order.get("items", [])
     if (
         order.get("docstatus") != 1
@@ -64,29 +77,33 @@ def first_receiving_manifest(
     }
     if not line.get("name") or any(line.get(key) != value for key, value in expected.items()):
         raise ValueError("Receiving scope requires exact ERP row, unit, conversion and warehouse.")
+    arrivals = []
+    offset = 0
+    for index, size in enumerate(sizes, start=1):
+        arrivals.append({
+            "arrival_id": f"ARRIVAL-{index:02}",
+            "purchase_order_item": line["name"],
+            "item_code": ITEM,
+            "uom": "Box",
+            "warehouse": line["warehouse"],
+            "handling_unit_ids": [
+                f"{'M20-CARTON' if case_id == CASE_ID else case_id}-{n:03}"
+                for n in range(offset + 1, offset + size + 1)
+            ],
+            "origin": "demo_scan",
+        })
+        offset += size
     return {
         "case_id": case_id,
         "purchase_order": order["name"],
-        "arrivals": [
-            {
-                "arrival_id": "ARRIVAL-01",
-                "purchase_order_item": line["name"],
-                "item_code": ITEM,
-                "uom": "Box",
-                "warehouse": line["warehouse"],
-                "handling_unit_ids": [
-                    f"{'M20-CARTON' if case_id == CASE_ID else case_id}-{n:03}"
-                    for n in range(1, first_batch_size + 1)
-                ],
-                "origin": "demo_scan",
-            }
-        ],
+        "arrivals": arrivals,
     }
 
 
 def provision(
     client: ERPNextDemoExecutor, *, business_date: str, first_batch_size: int = 10,
     case_id: str = CASE_ID,
+    additional_batch_sizes: tuple[int, ...] = (),
 ) -> dict[str, Any]:
     marker = case_marker(case_id)
     # Explicit site business date, not the workstation's UTC calendar day.
@@ -94,8 +111,7 @@ def provision(
         raise ValueError("Business date must use YYYY-MM-DD.")
     if date.fromisoformat(case_id[10:18]).isoformat() != business_date:
         raise ValueError("Pilot case date must match the ERP business date.")
-    if type(first_batch_size) is not int or not 1 <= first_batch_size <= 20:
-        raise ValueError("First batch requires 1..20 planned cartons.")
+    _batch_plan(first_batch_size, additional_batch_sizes)
     if client._environment != "demo":
         raise ValueError("Only the authorized M20 demo environment is allowed.")
     reference = client._document("Purchase Order", REFERENCE_PO)
@@ -263,7 +279,8 @@ def provision(
         "physical_goods": "public photo stand-in until operator supplies physical holdout",
         "verified_at": datetime.now(UTC).isoformat(),
         "receiving_manifest": first_receiving_manifest(
-            reread, first_batch_size=first_batch_size, case_id=case_id
+            reread, first_batch_size=first_batch_size, case_id=case_id,
+            additional_batch_sizes=additional_batch_sizes,
         ),
     }
 
@@ -274,6 +291,8 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest-output", type=Path)
     parser.add_argument("--first-batch-size", type=int, required=True, choices=range(1, 21))
+    parser.add_argument("--next-batch-size", action="append", type=int, default=[],
+                        choices=range(1, 21), help="Preplan another arrival before runtime starts")
     parser.add_argument("--case-id", default=CASE_ID)
     parser.add_argument("--business-date", required=True, help="Verified ERP site date, YYYY-MM-DD")
     args = parser.parse_args()
@@ -283,6 +302,7 @@ def main() -> int:
     result = provision(
         client, business_date=args.business_date, first_batch_size=args.first_batch_size,
         case_id=args.case_id,
+        additional_batch_sizes=tuple(args.next_batch_size),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")

@@ -200,7 +200,14 @@
     const jira = handoff.route.startsWith("jira-receiving:");
     const provider = jira ? "Jira" : handoff.route.startsWith("celigo-slack:")
       ? "Slack via Celigo" : handoff.route.startsWith("airtable-receiving:") ? "Airtable" : "External service";
-    if (handoff.status !== "VERIFIED") return `${provider} · ${handoff.status === "UNKNOWN" ? "checking delivery" : "waiting to sync"}`;
+    if (handoff.status !== "VERIFIED") {
+      const failure = handoff.last_failure?.kind;
+      const detail = failure === "access_denied" ? "connection permission required"
+        : failure === "evidence_mismatch" ? "evidence needs review"
+          : failure ? "connection needs attention"
+            : handoff.status === "UNKNOWN" ? "checking delivery" : "waiting to sync";
+      return `${provider} · ${detail}`;
+    }
     const action = jira ? ({ create: "review opened", comment: "evidence updated", resolve: "review resolved" }[handoff.evidence?.operation] || "review synced") : "synced";
     return `${provider} · ${action} ↗`;
   }

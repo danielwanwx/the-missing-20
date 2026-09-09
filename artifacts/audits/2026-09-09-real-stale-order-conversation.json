@@ -1,0 +1,69 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R2",
+  "started_at": "2026-09-09T14:58:28.767915+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "acceptance_scope": "runtime_contract_only",
+  "independent_answer_quality_review_required": true,
+  "turns": [
+    {
+      "question": "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+      "answer": "The real Agent response failed safety validation; no conclusion was shown.",
+      "advisory": {
+        "mode": "real_strands",
+        "result": null,
+        "status": "VALIDATION_FAILED",
+        "tool_calls": [],
+        "usage": {
+          "incremental_cost_usd": 0.0728808,
+          "input_tokens": 80705,
+          "output_tokens": 2599,
+          "request_count": 7
+        }
+      },
+      "validation_diagnostics": [
+        {
+          "attempt": 1,
+          "case_id": "M20-GOODS-20260909-40-R2",
+          "disposition": "NEEDS_EVIDENCE",
+          "failure": "real advisory disposition conflicts with the deterministic control context",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        },
+        {
+          "attempt": 2,
+          "case_id": "M20-GOODS-20260909-40-R2",
+          "disposition": "NEEDS_EVIDENCE",
+          "failure": "real advisory disposition conflicts with the deterministic control context",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        },
+        {
+          "attempt": 3,
+          "case_id": "M20-GOODS-20260909-40-R2",
+          "disposition": "NEEDS_EVIDENCE",
+          "failure": "real advisory disposition conflicts with the deterministic control context",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        }
+      ]
+    }
+  ]
+}

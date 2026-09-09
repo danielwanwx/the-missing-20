@@ -27,6 +27,7 @@ function geometry(visible = true) {
     replaceChildren() { this.children = []; }, append(path) { this.children.push(path); },
   };
   const context = {
+    state: {agentPlatform: null},
     document: { querySelector: () => ({ offsetParent: {}, getBoundingClientRect: () => bounds }) },
     $: (id) => ({ "dashboard-evidence-map": map, "dashboard-evidence-links": svg,
       "flow-map": { querySelector: () => target } })[id],

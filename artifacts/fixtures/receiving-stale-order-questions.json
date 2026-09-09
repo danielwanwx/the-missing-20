@@ -1,0 +1,5 @@
+[
+  "Compare the two receiving arrivals against their current ERP order and receipts. Why is one arrival waiting for review? Read the retained evidence and distinguish photo observations, posted stock and the outstanding order balance. Do not write anything.",
+  "I decline inventory posting or bypassing confirmation. What must be checked before the blocked arrival can proceed? Can a Jira task or Slack message authorize stock movement? Verify which external task records actually exist; do not claim an unconfirmed handoff succeeded.",
+  "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain what actually changed and whether the still-unreceived order balance proves a loss or a revenue improvement."
+]

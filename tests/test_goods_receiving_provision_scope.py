@@ -78,7 +78,8 @@ class ActualSchemaERP:
             self.creates += 1
             stored = copy.deepcopy(payload)
             stored.setdefault("transaction_date", self.server_date)
-            stored.update(name="PO-REAL-SCHEMA", docstatus=0)
+            suffix = "" if self.creates == 1 else f"-{self.creates}"
+            stored.update(name="PO-REAL-SCHEMA" + suffix, docstatus=0)
             stored["items"][0]["name"] = "server-line"
             self.orders.append(stored)
             return {"data": stored}
@@ -252,4 +253,43 @@ def test_case_date_mismatch_stops_before_any_erp_access():
     client._request = forbidden
     with pytest.raises(ValueError, match="case date"):
         provision_order(client, business_date="2026-09-09", case_id="M20-GOODS-20260910-40")
+    assert client.creates == client.submits == 0
+
+
+def test_same_date_repeat_pilot_is_a_new_order_with_preplanned_disjoint_arrivals():
+    client = ActualSchemaERP()
+    client.server_date = "2026-09-09"
+    original = provision_order(client, business_date="2026-09-09",
+                               case_id="M20-GOODS-20260909-40", first_batch_size=1)
+    retained = copy.deepcopy(client.orders)
+    kwargs = dict(business_date="2026-09-09", case_id="M20-GOODS-20260909-40-R2",
+                  first_batch_size=1, additional_batch_sizes=(1,))
+    repeated = provision_order(client, **kwargs)
+    again = provision_order(client, **kwargs)
+    assert repeated["purchase_order"] == again["purchase_order"]
+    assert repeated["receiving_manifest"] == again["receiving_manifest"]
+    assert client.orders[0] == retained[0]
+    assert client.creates == client.submits == 2
+    assert repeated["purchase_order"] != original["purchase_order"]
+    arrivals = repeated["receiving_manifest"]["arrivals"]
+    assert [row["arrival_id"] for row in arrivals] == ["ARRIVAL-01", "ARRIVAL-02"]
+    assert [row["handling_unit_ids"] for row in arrivals] == [
+        ["M20-GOODS-20260909-40-R2-001"], ["M20-GOODS-20260909-40-R2-002"],
+    ]
+
+
+@pytest.mark.parametrize("sizes", [(0,), (True,), (21,), (20, 20), [1]])
+def test_invalid_or_overplanned_batches_stop_before_any_erp_access(sizes):
+    client = ActualSchemaERP()
+    client._document = lambda *args: pytest.fail("Invalid plan must not read or write ERP")
+    with pytest.raises(ValueError):
+        provision(client, first_batch_size=1, additional_batch_sizes=sizes)
+
+
+@pytest.mark.parametrize("suffix", ["-R0", "-R02", "-R100", "-R", "-r2"])
+def test_repeat_case_suffix_is_canonical_and_bounded(suffix):
+    client = ActualSchemaERP()
+    with pytest.raises(ValueError):
+        provision_order(client, business_date="2026-09-09",
+                        case_id="M20-GOODS-20260909-40" + suffix)
     assert client.creates == client.submits == 0

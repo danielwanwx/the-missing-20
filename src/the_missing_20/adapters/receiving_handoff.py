@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Protocol
+from urllib.error import HTTPError
 
 
 def receipt_event(state: dict[str, Any]) -> dict[str, Any] | None:
@@ -150,6 +151,8 @@ class HandoffJournal:
             if state["status"] == "VERIFIED":
                 return
             next_state = {**state, "status": status, **values}
+            if status == "VERIFIED" or next_state.get("last_failure") is None:
+                next_state.pop("last_failure", None)
             if next_state != state:
                 next_state["updated_at"] = datetime.now(UTC).isoformat()
                 self.db.execute(
@@ -192,11 +195,17 @@ class HandoffJournal:
                 raise ValueError("Receiving handoff payload changed for the same receipt")
         if self.current(key)["status"] == "VERIFIED":
             return self.current(key)
+        phase = "lookup"
         try:
             found = target.find(event, key)
             if found:
                 self._transition(key, "VERIFIED", evidence=found)
                 return self.current(key)
+            prior = self.current(key)
+            if (prior.get("last_failure") or {}).get("phase") == "lookup":
+                # Access recovered, but absence is NOT permission to resend an
+                # uncertain write. Remove only the obsolete lookup warning.
+                self._transition(key, prior["status"], last_failure=None)
             with self.lock:
                 state = self.current(key)
                 claimed = {
@@ -212,12 +221,24 @@ class HandoffJournal:
                 self.db.commit()  # Durable intent BEFORE contacting the provider.
             if not changed:
                 return self.current(key)  # Uncertain effect: lookup only, never a second send.
+            phase = "send"
             target.send(event, key)
+            phase = "readback"
             found = target.find(event, key)
             if found:
                 self._transition(key, "VERIFIED", evidence=found)
-        except (OSError, ValueError, TimeoutError):
+        except (OSError, ValueError, TimeoutError) as error:
             # Credentials and provider bodies are never persisted/displayed here.
             # PENDING remains resumable; UNKNOWN remains lookup-only.
-            pass
+            # Allowlisted diagnostics only: never retain response bodies, URLs or credentials.
+            failure: dict[str, Any] = {"phase": phase, "kind": "provider_unavailable"}
+            if isinstance(error, HTTPError):
+                failure["http_status"] = error.code
+                failure["kind"] = (
+                    "access_denied" if error.code in (401, 403) else "provider_rejected"
+                )
+            elif isinstance(error, ValueError):
+                failure["kind"] = "evidence_mismatch"
+            self._transition(key, self.current(key)["status"], last_failure=failure,
+                             **({"send_failure": failure} if phase == "send" else {}))
         return self.current(key)
