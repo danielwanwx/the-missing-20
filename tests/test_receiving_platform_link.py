@@ -70,9 +70,17 @@ def test_receiving_jira_projection_is_scoped_workflow_not_stock_authority(tmp_pa
     platform = AgentPlatform(source, EmptySaaS(), receiving=receiving)
     erp = source.current()
     erp["receiving_work"] = {"status": "CONFIGURED", "purchase_order": "PO-1"}
-    review = {"source_id": "jira-receiving", "case_id": source.case_id,
-              "purchase_order": "PO-1", "status": "UNKNOWN", "record_id": "", "url": "",
-              "arrival_id": "delivery-A", "capture_id": "capture-A", "operation": "create"}
+    review = {
+        "source_id": "jira-receiving",
+        "case_id": source.case_id,
+        "purchase_order": "PO-1",
+        "status": "UNKNOWN",
+        "record_id": "",
+        "url": "",
+        "arrival_id": "delivery-A",
+        "capture_id": "capture-A",
+        "operation": "create",
+    }
     systems = platform._systems(erp, {"sources": [review]})
     jira = next(row for row in systems if row["id"] == "jira")
     assert jira["write_state"] == "RECEIVING_REVIEW"
@@ -81,8 +89,9 @@ def test_receiving_jira_projection_is_scoped_workflow_not_stock_authority(tmp_pa
     assert jira["operation"] == "create" and "not QA" in jira["authority"]
     for key in ("case_id", "purchase_order"):
         wrong = {**review, key: "another-case"}
-        jira = next(row for row in platform._systems(erp, {"sources": [wrong]})
-                    if row["id"] == "jira")
+        jira = next(
+            row for row in platform._systems(erp, {"sources": [wrong]}) if row["id"] == "jira"
+        )
         assert jira["write_state"] != "RECEIVING_REVIEW"
 
 
@@ -126,8 +135,9 @@ def test_local_submit_cannot_publish_old_cached_erp_as_current(tmp_path):
     source = Source(transport)
     cached = source.current()
     source.current = lambda: deepcopy(cached)
-    platform = AgentPlatform(source, EmptySaaS(), receiving=receiving,
-                             state_path=tmp_path / "state.json")
+    platform = AgentPlatform(
+        source, EmptySaaS(), receiving=receiving, state_path=tmp_path / "state.json"
+    )
     platform.current()
     before = len(platform.operational_history()["points"])
     first = receiving.upload(receiving.create(arrival_id="delivery-A")["id"], photo())
@@ -155,8 +165,9 @@ def test_local_submit_invalidates_stale_erp_cache_before_projection(tmp_path):
         cached = Source(transport).current()
 
     source.invalidate_cache = refresh
-    platform = AgentPlatform(source, EmptySaaS(), receiving=receiving,
-                             state_path=tmp_path / "state.json")
+    platform = AgentPlatform(
+        source, EmptySaaS(), receiving=receiving, state_path=tmp_path / "state.json"
+    )
     platform.current()
     first = receiving.upload(receiving.create(arrival_id="delivery-A")["id"], photo())
     submit(receiving, receiving.draft(first["id"]))
@@ -178,8 +189,9 @@ def test_unavailable_receipt_readback_does_not_bypass_provider_cache_each_poll(
     source.invalidate_cache = lambda: invalidations.append(True)
     clock = [100.0]
     monkeypatch.setattr("the_missing_20.adapters.agent_platform.time.monotonic", lambda: clock[0])
-    platform = AgentPlatform(source, EmptySaaS(), receiving=receiving,
-                             state_path=tmp_path / "state.json")
+    platform = AgentPlatform(
+        source, EmptySaaS(), receiving=receiving, state_path=tmp_path / "state.json"
+    )
     first = receiving.upload(receiving.create(arrival_id="delivery-A")["id"], photo())
     submit(receiving, receiving.draft(first["id"]))
     for _ in range(3):

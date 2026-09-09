@@ -1,0 +1,11 @@
+.venv/bin/python -m ruff format --check src tests scripts
+233 files already formatted
+.venv/bin/python -m ruff check src tests scripts
+All checks passed!
+# Keep the strict static gate on the typed decision and safety core. Dynamic
+# SaaS/provider boundaries are contract-tested through pytest and browser smoke.
+.venv/bin/python -m mypy src/the_missing_20/domain src/the_missing_20/application src/the_missing_20/ports src/the_missing_20/authority_b src/the_missing_20/config.py src/the_missing_20/experiment src/the_missing_20/evaluation
+src/the_missing_20/agents/receiving_advisory.py:74: error: Argument 1 to "mentioned" has incompatible type "Any | None"; expected "str | float | int"  [arg-type]
+src/the_missing_20/agents/receiving_advisory.py:81: error: Argument 1 to "round" has incompatible type "Any | None"; expected "_SupportsRound2[Any]"  [arg-type]
+Found 2 errors in 1 file (checked 51 source files)
+make: *** [typecheck] Error 1

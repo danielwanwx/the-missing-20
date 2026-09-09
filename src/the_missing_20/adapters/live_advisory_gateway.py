@@ -287,7 +287,8 @@ class DashboardAdvisoryGateway:
                 }
             history = self._conversation_history(prior_projection)
             contextual_question = self._contextual_question(
-                history, clean_question,
+                history,
+                clean_question,
                 include_prior_answers=packet.get("case_class") != "receiving_operations",
             )
             if packet["read_only_requested"]:
@@ -356,12 +357,16 @@ class DashboardAdvisoryGateway:
             relations = receipt_relations(packet["tool_payload"]["sources"]["read_erp_evidence"])
             cited = set(result.get("evidence_ids", []))
             advisory["receiving_references"] = {
-                "case_id": packet["case_id"], "status": "COMPLETE",
+                "case_id": packet["case_id"],
+                "status": "COMPLETE",
                 "source_sequence": projection.get("case_projection", {}).get("source_sequence"),
-                "receipt_ids": sorted({
-                    row["receipt_id"] for row in relations
-                    if row["receipt_id"] in cited or row["evidence_id"] in cited
-                }),
+                "receipt_ids": sorted(
+                    {
+                        row["receipt_id"]
+                        for row in relations
+                        if row["receipt_id"] in cited or row["evidence_id"] in cited
+                    }
+                ),
             }
         record_turn = getattr(self._platform, "record_conversation_turn", None)
         if callable(record_turn):
@@ -404,7 +409,10 @@ class DashboardAdvisoryGateway:
 
     @staticmethod
     def _contextual_question(
-        history: list[dict[str, str]], question: str, *, include_prior_answers: bool = True,
+        history: list[dict[str, str]],
+        question: str,
+        *,
+        include_prior_answers: bool = True,
     ) -> str:
         if not history:
             return question

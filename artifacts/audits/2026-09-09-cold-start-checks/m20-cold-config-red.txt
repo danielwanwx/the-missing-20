@@ -1,0 +1,46 @@
+Captured pre-fix output; trailing line whitespace normalized.
+.FF.                                                                     [100%]
+=================================== FAILURES ===================================
+_______ test_optional_case_setting_retains_scoped_unavailable_history[] ________
+
+tmp_path = PosixPath('/private/var/folders/2j/cqqt4_3j51z2f5s1q0m9_8nw0000gn/T/pytest-of-danielwan/pytest-2259/test_optional_case_setting_ret1')
+setting = ''
+
+    @pytest.mark.parametrize("setting", [None, "", "   ", "M20-ISOLATED"])
+    def test_optional_case_setting_retains_scoped_unavailable_history(tmp_path, setting):
+        if setting is not None:
+            (tmp_path / ".env").write_text(f"MISSING20_CASE_ID={setting}\n")
+        with patch.dict(os.environ, {}, clear=True):
+            erp = ERPNextEvidenceSource.from_environment(repository_root=tmp_path)
+            saas = SaaSEvidenceSource.from_environment(repository_root=tmp_path)
+        expected = setting if setting and setting.strip() else DEFAULT_CASE_ID
+        source = erp.current()
+>       assert source["case_id"] == expected
+E       AssertionError: assert '' == 'M20-ECU-2026-00011-LOT-A'
+E
+E         - M20-ECU-2026-00011-LOT-A
+
+tests/test_cold_start_configuration.py:22: AssertionError
+______ test_optional_case_setting_retains_scoped_unavailable_history[   ] ______
+
+tmp_path = PosixPath('/private/var/folders/2j/cqqt4_3j51z2f5s1q0m9_8nw0000gn/T/pytest-of-danielwan/pytest-2259/test_optional_case_setting_ret2')
+setting = '   '
+
+    @pytest.mark.parametrize("setting", [None, "", "   ", "M20-ISOLATED"])
+    def test_optional_case_setting_retains_scoped_unavailable_history(tmp_path, setting):
+        if setting is not None:
+            (tmp_path / ".env").write_text(f"MISSING20_CASE_ID={setting}\n")
+        with patch.dict(os.environ, {}, clear=True):
+            erp = ERPNextEvidenceSource.from_environment(repository_root=tmp_path)
+            saas = SaaSEvidenceSource.from_environment(repository_root=tmp_path)
+        expected = setting if setting and setting.strip() else DEFAULT_CASE_ID
+        source = erp.current()
+>       assert source["case_id"] == expected
+E       AssertionError: assert '' == 'M20-ECU-2026-00011-LOT-A'
+E
+E         - M20-ECU-2026-00011-LOT-A
+
+tests/test_cold_start_configuration.py:22: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cold_start_configuration.py::test_optional_case_setting_retains_scoped_unavailable_history[]
+FAILED tests/test_cold_start_configuration.py::test_optional_case_setting_retains_scoped_unavailable_history[   ]

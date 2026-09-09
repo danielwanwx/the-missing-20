@@ -67,21 +67,28 @@ def test_partial_receipt_before_invoice_does_not_invent_invoice_or_shortage():
     assert "expected_disposition" not in str(sources)
 
 
-@pytest.mark.parametrize("status", ["NEEDS_REVIEW", "NEEDS_PHOTO", "UNAVAILABLE",
-                                    "DRAFT_UNKNOWN", "SUBMIT_UNKNOWN"])
+@pytest.mark.parametrize(
+    "status", ["NEEDS_REVIEW", "NEEDS_PHOTO", "UNAVAILABLE", "DRAFT_UNKNOWN", "SUBMIT_UNKNOWN"]
+)
 def test_unposted_arrival_review_is_not_cleared_by_other_posted_stock(status):
     payload = partial_receipt()
-    payload["receiving_work"]["arrivals"] = [{
-        "arrival_id": "A1", "status": status, "observed_quantity": 1,
-        "photo_evidence_id": "photo-A1-v1",
-        "events": [{"detail": "PO changed before draft"}],
-    }, {"arrival_id": "A2", "status": "RECEIPT_SUBMITTED", "posted_quantity": 1}]
+    payload["receiving_work"]["arrivals"] = [
+        {
+            "arrival_id": "A1",
+            "status": status,
+            "observed_quantity": 1,
+            "photo_evidence_id": "photo-A1-v1",
+            "events": [{"detail": "PO changed before draft"}],
+        },
+        {"arrival_id": "A2", "status": "RECEIPT_SUBMITTED", "posted_quantity": 1},
+    ]
     packet = live_recovery_packet(payload)
     assert packet["expected_disposition"] == "NEEDS_EVIDENCE"
     sources = model_source_payloads(packet)
     assert sources["read_erp_evidence"]["quantities"]["receipt_posted_quantity"] == 1
-    assert sources["read_collaboration_evidence"]["receiving_work"]["arrivals"][0][
-        "status"] == status
+    assert (
+        sources["read_collaboration_evidence"]["receiving_work"]["arrivals"][0]["status"] == status
+    )
     assert "photo-A1-v1" in sources["read_collaboration_evidence"]["evidence_ids"]
     assert sources["read_erp_evidence"]["quantities"]["receipt_unresolved"] == 0
 

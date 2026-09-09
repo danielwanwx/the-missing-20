@@ -24,9 +24,11 @@ def main() -> None:
     base = f"http://127.0.0.1:{args.port}"
 
     def request(path, payload=None):
-        req = Request(base + path,
-                      data=None if payload is None else json.dumps(payload).encode(),
-                      headers={"Content-Type": "application/json", "Origin": base})
+        req = Request(
+            base + path,
+            data=None if payload is None else json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json", "Origin": base},
+        )
         with urlopen(req, timeout=30) as response:
             return json.load(response)
 
@@ -35,23 +37,36 @@ def main() -> None:
     assert state["status"] == "RECEIPT_SUBMITTED" and state["stock_posted"] is True
     photo = args.photo.read_bytes()
     assert hashlib.sha256(normalize_photo(photo)).hexdigest() == state["digest"]
-    report = {"capture_id": args.capture_id, "checked_at": datetime.now(UTC).isoformat(),
-              "receipt": state["receipt"]["name"], "version_before": state["version"],
-              "scope": "Local replay assertions; pair with fresh external readback verifier.",
-              "submits": []}
+    report = {
+        "capture_id": args.capture_id,
+        "checked_at": datetime.now(UTC).isoformat(),
+        "receipt": state["receipt"]["name"],
+        "version_before": state["version"],
+        "scope": "Local replay assertions; pair with fresh external readback verifier.",
+        "submits": [],
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(3):
-        result = request(endpoint + "/submit", {
-            "id": args.capture_id, "receipt_name": state["receipt"]["name"],
-            "expected_version": state["version"], "confirm_received": True,
-        })
+        result = request(
+            endpoint + "/submit",
+            {
+                "id": args.capture_id,
+                "receipt_name": state["receipt"]["name"],
+                "expected_version": state["version"],
+                "confirm_received": True,
+            },
+        )
         assert result["receipt"] == state["receipt"] and result["version"] == state["version"]
         report["submits"].append({"attempt": attempt + 1, "same_receipt_and_version": True})
         args.output.write_text(json.dumps(report, indent=2) + "\n")
     try:
-        request(endpoint + "/upload", {
-            "id": args.capture_id, "image": base64.b64encode(photo).decode(),
-        })
+        request(
+            endpoint + "/upload",
+            {
+                "id": args.capture_id,
+                "image": base64.b64encode(photo).decode(),
+            },
+        )
         raise AssertionError("Posted receiving accepted another photo")
     except HTTPError as error:
         assert error.code == 400 and "draft" in error.read().decode().lower()

@@ -158,11 +158,14 @@ def test_optional_history_reader_is_not_required_for_current_case_diagnosis() ->
     )
 
 
-@pytest.mark.parametrize("reason", [
-    "Timed-out integration attempt for 12 units, but retrying is denied per policy.",
-    "The 12-unit receipt does not exist in ERP; 8 units remain held.",
-    "No receipt is posted in ERP for the 12-unit attempt. 8 units remain held.",
-])
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "Timed-out integration attempt for 12 units, but retrying is denied per policy.",
+        "The 12-unit receipt does not exist in ERP; 8 units remain held.",
+        "No receipt is posted in ERP for the 12-unit attempt. 8 units remain held.",
+    ],
+)
 def test_recorded_retry_needs_observed_effect_not_just_a_deny_label(reason) -> None:
     result = advisory.LiveAdvisoryResult(
         disposition=advisory.AdvisoryDisposition.DENY,

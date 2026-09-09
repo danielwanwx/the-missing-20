@@ -5,10 +5,13 @@ from the_missing_20.agents.live_advisory import LiveAdvisoryResult
 
 
 def test_explicit_chart_survives_model_omission_but_requires_actual_read():
-    history = {"case_id": "case", "points": [
-        {"case_id": "case", "id": 1, "metrics": {"received": 0}},
-        {"case_id": "case", "id": 2, "metrics": {"received": 1}},
-    ]}
+    history = {
+        "case_id": "case",
+        "points": [
+            {"case_id": "case", "id": 1, "metrics": {"received": 0}},
+            {"case_id": "case", "id": 2, "metrics": {"received": 1}},
+        ],
+    }
     packet = {"case_id": "case", "tool_payload": {"sources": {"read_operational_history": history}}}
     question = "Show the received quantity trend"
     calls = ("read_operational_history",)
@@ -17,9 +20,10 @@ def test_explicit_chart_survives_model_omission_but_requires_actual_read():
     assert views[0]["selection_basis"] == "explicit_human_request"
     assert views[0]["history"]["points"] == history["points"]
     assert history_attachment(packet, None, (), question=question) == []
-    assert history_attachment(
-        packet, None, calls, question="Show trend of received and recorded"
-    ) == []
+    assert (
+        history_attachment(packet, None, calls, question="Show trend of received and recorded")
+        == []
+    )
     assert history_attachment(packet, None, calls, question="Approve the receipt") == []
 
 

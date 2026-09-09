@@ -1060,7 +1060,9 @@ class AgentPlatform:
             "quality_hold"
         ):
             for index, source_id in (
-                (1, "airtable-receiving"), (2, "jira-receiving"), (3, "celigo-receiving")
+                (1, "airtable-receiving"),
+                (2, "jira-receiving"),
+                (3, "celigo-receiving"),
             ):
                 notification = by_source.get(source_id)
                 if (
@@ -1073,17 +1075,19 @@ class AgentPlatform:
                         {1: "Airtable Receiving", 2: "Jira Receiving", 3: "Celigo"}[index],
                         notification,
                         "Receiving review record; not QA, billing or stock authority"
-                        if index == 2 else
-                        "Receipt notification copy; not QA, billing or stock authority",
+                        if index == 2
+                        else "Receipt notification copy; not QA, billing or stock authority",
                     )
                     systems[index]["write_state"] = (
                         "RECEIVING_REVIEW" if index == 2 else "EVENT_DRIVEN_NOTIFICATION"
                     )
                     if index == 2:
-                        systems[index].update({
-                            key: notification.get(key)
-                            for key in ("arrival_id", "capture_id", "operation", "last_failure")
-                        })
+                        systems[index].update(
+                            {
+                                key: notification.get(key)
+                                for key in ("arrival_id", "capture_id", "operation", "last_failure")
+                            }
+                        )
         return systems
 
     def _correlation(
@@ -1791,8 +1795,11 @@ class AgentPlatform:
                 self._text(erp.get("case_id")), self._text(order.get("name"))
             )
             erp["receiving_work"] = work
-            if (operational_metrics.receiving_receipt_conflicts(erp) and not fresh
-                    and time.monotonic() >= self._receiving_refresh_after):
+            if (
+                operational_metrics.receiving_receipt_conflicts(erp)
+                and not fresh
+                and time.monotonic() >= self._receiving_refresh_after
+            ):
                 invalidate = getattr(self._erpnext, "invalidate_cache", None)
                 if callable(invalidate):
                     self._receiving_refresh_after = time.monotonic() + 30

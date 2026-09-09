@@ -94,11 +94,15 @@ def _same_projection_after_correction(previous: dict[str, Any], current: dict[st
 
 def _unreflected_receipts(point: dict[str, Any]) -> list[str]:
     posted = {doc["name"] for doc in posted_documents(point, "purchase_receipt")}
-    return sorted({
-        row["receipt_name"] for row in point.get("receiving_refs", [])
-        if row.get("receipt_name") and row.get("posted_quantity") is not None
-        and row["receipt_name"] not in posted
-    })
+    return sorted(
+        {
+            row["receipt_name"]
+            for row in point.get("receiving_refs", [])
+            if row.get("receipt_name")
+            and row.get("posted_quantity") is not None
+            and row["receipt_name"] not in posted
+        }
+    )
 
 
 def _label(value: object, field: str, *, required: bool = False) -> str | None:
@@ -495,10 +499,14 @@ class OperationalHistory:
             raw = json.loads(row["observation_json"])
             pending = _unreflected_receipts(raw)
             if pending:
-                excluded.append({
-                    "stored_record_id": row["id"], "observed_at": raw["observed_at"],
-                    "receipt_names": pending, "reason": "RECEIVING_RECEIPT_NOT_REFRESHED",
-                })
+                excluded.append(
+                    {
+                        "stored_record_id": row["id"],
+                        "observed_at": raw["observed_at"],
+                        "receipt_names": pending,
+                        "reason": "RECEIVING_RECEIPT_NOT_REFRESHED",
+                    }
+                )
                 continue  # Keep raw evidence; never chart or benchmark a mixed snapshot.
             previous = json.loads(row["previous_json"]) if row["previous_json"] else None
             if previous is not None and _same_projection_after_correction(previous, raw):
@@ -534,7 +542,9 @@ class OperationalHistory:
             "coverage": {
                 "status": "OBSERVED"
                 if points
-                else "INCONSISTENT_ONLY" if excluded else "REVISION_ONLY"
+                else "INCONSISTENT_ONLY"
+                if excluded
+                else "REVISION_ONLY"
                 if projection_revisions
                 else "EMPTY",
                 "since": start,

@@ -13,8 +13,11 @@ class ReceivingDraftWorker:
         self.thread: Thread | None = None
 
     def start(self) -> None:
-        if (not self.receiving.drafts_enabled or self.receiving.erp is None
-                or self.thread is not None):
+        if (
+            not self.receiving.drafts_enabled
+            or self.receiving.erp is None
+            or self.thread is not None
+        ):
             return
         self.thread = Thread(target=self._run, name="receiving-drafts", daemon=True)
         self.thread.start()

@@ -186,9 +186,7 @@ def test_expired_owner_cannot_overwrite_new_photo_evidence(
         new_reader_calls += 1
         return _reader(image)
 
-    monkeypatch.setattr(
-        "the_missing_20.adapters.photo_receiving.ANALYSIS_LEASE_SECONDS", 0
-    )
+    monkeypatch.setattr("the_missing_20.adapters.photo_receiving.ANALYSIS_LEASE_SECONDS", 0)
     first = PhotoReceiving(database, old_reader)
     capture_id = first.create()["id"]
     old_outcomes: list[dict[str, Any] | Exception] = []
@@ -273,9 +271,7 @@ def test_fresh_crash_claim_recovers_on_same_photo_retry_after_expiry(
         def now(cls, tz: Any = None) -> datetime:
             return cls.current
 
-    monkeypatch.setattr(
-        "the_missing_20.adapters.photo_receiving.datetime", ControlledDateTime
-    )
+    monkeypatch.setattr("the_missing_20.adapters.photo_receiving.datetime", ControlledDateTime)
     database = tmp_path / "photo-receiving.sqlite3"
     image = _photo("red")
     crashed_reader_calls = 0

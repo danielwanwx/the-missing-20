@@ -142,8 +142,11 @@ def test_unclear_photo_and_unbound_receiving_cannot_auto_draft(tmp_path):
     assert transport.writes == 0
     with pytest.raises(ValueError, match="manifest"):
         PhotoReceiving(
-            tmp_path / "other", lambda _: result(), erp=erp(transport),
-            drafts_enabled=True, auto_prepare=True,
+            tmp_path / "other",
+            lambda _: result(),
+            erp=erp(transport),
+            drafts_enabled=True,
+            auto_prepare=True,
         )
 
 
@@ -273,10 +276,15 @@ def test_worker_never_invents_a_first_receiving_confirmation(tmp_path):
     assert transport.submits == 0
 
 
-@pytest.mark.parametrize("field,value", [
-    ("physical_receiving_confirmation", None), ("draft", []),
-    ("candidate", None), ("work_item", "invalid"),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("physical_receiving_confirmation", None),
+        ("draft", []),
+        ("candidate", None),
+        ("work_item", "invalid"),
+    ],
+)
 def test_reconciliation_skips_malformed_intent_and_progresses_next_record(tmp_path, field, value):
     transport = MultiReceiptTransport()
     service = service_at(tmp_path / "db", transport)
@@ -368,12 +376,17 @@ def test_cross_case_conflict_response_does_not_return_original_case_payload(tmp_
     other_manifest["arrivals"][0]["handling_unit_ids"] = ["other-01", "other-02"]
     other_manifest["arrivals"] = other_manifest["arrivals"][:1]
     other = PhotoReceiving(
-        path, lambda _: result(), erp=erp(transport),
-        drafts_enabled=True, manifest=other_manifest,
+        path,
+        lambda _: result(),
+        erp=erp(transport),
+        drafts_enabled=True,
+        manifest=other_manifest,
     )
     response = other.scan(scan(arrival="other-arrival", unit="other-01"))
     assert response == {
-        "status": "CONFLICT", "source_event_id": "scan-1", "inventory_changed": False,
+        "status": "CONFLICT",
+        "source_event_id": "scan-1",
+        "inventory_changed": False,
     }
     assert original.current(capture["id"])["version"] == before + 1
     work = other.receiving_work("OTHER-CASE", "PO-1")["arrivals"][0]

@@ -17,7 +17,8 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8893)
     parser.add_argument("--enable-handoffs", action="store_true")
     parser.add_argument(
-        "--pause-auto-prepare", action="store_true",
+        "--pause-auto-prepare",
+        action="store_true",
         help="Require an explicit draft action; does not disable evidence or handoff processing",
     )
     args = parser.parse_args()

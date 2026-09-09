@@ -1,0 +1,27 @@
+.venv/bin/python -m ruff format --check src tests scripts
+233 files already formatted
+.venv/bin/python -m ruff check src tests scripts
+E501 Line too long (111 > 100)
+   --> scripts/decision_workspace_server.py:161:101
+    |
+159 |             # frames, and form submissions locked to this local origin.
+160 |             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+161 |             "connect-src 'self'; img-src 'self'; media-src 'self' blob:; base-uri 'none'; form-action 'none'; "
+    |                                                                                                     ^^^^^^^^^^^
+162 |             "frame-ancestors 'none'"
+163 |         ),
+    |
+
+E501 Line too long (102 > 100)
+  --> scripts/diagnostics/verify_receiving_jira.py:40:101
+   |
+38 |             (key, json.loads(payload), json.loads(raw))
+39 |             for key, payload, raw in db.execute(
+40 |                 "SELECT key,payload,state FROM handoffs WHERE json_extract(payload,'$.capture_id')=?",
+   |                                                                                                     ^^
+41 |                 (args.capture_id,),
+42 |             )
+   |
+
+Found 2 errors.
+make: *** [lint] Error 1

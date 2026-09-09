@@ -163,10 +163,14 @@ class JiraReceivingReview:
                 "receipt": verified_resolution["receipt"],
                 "receipt_evidence": verified_resolution,
             }
-            if any(row["route"] == self.route + ":resolve" and row["status"] == "UNKNOWN"
-                   for row in existing):
+            if any(
+                row["route"] == self.route + ":resolve" and row["status"] == "UNKNOWN"
+                for row in existing
+            ):
                 reconciled = self.journal.deliver(
-                    self.route + ":resolve", resolution, _JiraOperation(self),
+                    self.route + ":resolve",
+                    resolution,
+                    _JiraOperation(self),
                     business_key=marker + ":resolved",
                 )
                 if reconciled["status"] == "VERIFIED":
@@ -231,12 +235,16 @@ class _JiraOperation:
             if operation == "resolve":
                 # Reconcile old partial transitions too: add only the separately
                 # journaled missing proof, never resend an UNKNOWN transition.
-                bodies += [self.body({**event, "operation": "resolution_evidence"}, row["key"])
-                           for row in owner.journal.for_capture(event["capture_id"])
-                           if row["route"] == owner.route + ":resolution-evidence"
-                           and row["status"] == "VERIFIED"]
-            groups = [[row for row in _rows(page["comments"]) if row.get("body") == body]
-                      for body in bodies]
+                bodies += [
+                    self.body({**event, "operation": "resolution_evidence"}, row["key"])
+                    for row in owner.journal.for_capture(event["capture_id"])
+                    if row["route"] == owner.route + ":resolution-evidence"
+                    and row["status"] == "VERIFIED"
+                ]
+            groups = [
+                [row for row in _rows(page["comments"]) if row.get("body") == body]
+                for body in bodies
+            ]
             if any(len(matches) > 1 for matches in groups):
                 raise ValueError("Duplicate Jira operation evidence")
             if not any(groups):

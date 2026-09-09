@@ -254,8 +254,9 @@ def test_grounding_accepts_equivalent_numbers_but_not_boolean_or_string(tmp_path
             team._validate("quality", finding)
 
 
-@pytest.mark.parametrize("records,count,valid", [([], 0, True), ([{"id": "X"}], 1, True),
-                                                   ([{"id": "X"}], 0, False)])
+@pytest.mark.parametrize(
+    "records,count,valid", [([], 0, True), ([{"id": "X"}], 1, True), ([{"id": "X"}], 0, False)]
+)
 def test_collection_count_is_computed_against_the_original_source(tmp_path, records, count, valid):
     from the_missing_20.agents.role_delegation import SourceObservation
 
@@ -398,7 +399,8 @@ def test_specialist_validation_failure_is_not_misreported_as_provider_outage(tmp
     packet["run_id"] = "BAD-SPECIALIST"
     with pytest.raises(AdvisoryUnavailable) as caught:
         run_live_advisory(
-            packet, question="Investigate",
+            packet,
+            question="Investigate",
             delegation_journal=RoleTaskJournal(tmp_path / "failure.sqlite3"),
             factory=SimpleNamespace(
                 create=lambda **kw: None, ledger=SimpleNamespace(snapshot=lambda: {})
@@ -430,7 +432,8 @@ def test_sdk_wrapped_budget_failure_preserves_local_cause(monkeypatch):
     monkeypatch.setattr("strands.Agent", Root)
     with pytest.raises(AdvisoryUnavailable) as caught:
         run_live_advisory(
-            investigation_packet(), question="Investigate",
+            investigation_packet(),
+            question="Investigate",
             factory=SimpleNamespace(
                 create=lambda **kw: None, ledger=SimpleNamespace(snapshot=lambda: {})
             ),

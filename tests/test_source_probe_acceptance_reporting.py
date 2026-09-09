@@ -97,8 +97,15 @@ def test_program_with_a_failed_repetition_reports_failed_boundary(monkeypatch, t
         probe.sys,
         "argv",
         [
-            "probe", "--confirm", "1", "--variant", "lost_ack", "--repetitions", "2",
-            "--output", str(output),
+            "probe",
+            "--confirm",
+            "1",
+            "--variant",
+            "lost_ack",
+            "--repetitions",
+            "2",
+            "--output",
+            str(output),
         ],
     )
 

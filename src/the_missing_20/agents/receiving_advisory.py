@@ -9,13 +9,16 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from the_missing_20.adapters.conversation_views import requested_history_metric
 
 
 def receiving_answer_gaps(
-    question: str, reason: str, sources: Mapping[str, Any], metric: str | None,
+    question: str,
+    reason: str,
+    sources: Mapping[str, Any],
+    metric: str | None,
 ) -> list[str]:
     """Identify narrow, inspectable omissions; not a general semantic judge."""
     gaps: list[str] = []
@@ -23,32 +26,43 @@ def receiving_answer_gaps(
     def mentioned(value: str | float | int) -> bool:
         if isinstance(value, (int, float)):
             numbers = re.findall(r"(?<![\w.-])-?\d+(?:\.\d+)?(?![\w-]|\.\d)", reason)
-            return any(math.isclose(float(number), value, rel_tol=0, abs_tol=1e-6)
-                       for number in numbers)
+            return any(
+                math.isclose(float(number), value, rel_tol=0, abs_tol=1e-6) for number in numbers
+            )
         return bool(re.search(r"(?<![\w.-])" + re.escape(value) + r"(?![\w-]|\.\d)", reason))
 
     def asks(pattern: str) -> bool:
         return bool(re.search(pattern, question, re.I))
 
     erp = sources.get("read_erp_evidence", {})
-    if "invoice" in erp and erp["invoice"] is None and re.search(
-        r"\b(?:the )?invoice (?:is|remains|was) (?:open|paid|closed|held|on hold)\b",
-        reason, re.I,
+    if (
+        "invoice" in erp
+        and erp["invoice"] is None
+        and re.search(
+            r"\b(?:the )?invoice (?:is|remains|was) (?:open|paid|closed|held|on hold)\b",
+            reason,
+            re.I,
+        )
     ):
         gaps.append("source-grounded invoice lifecycle: no supplier invoice exists yet")
     quantities = erp.get("quantities", {})
     if asks(r"ordered|订购") and asks(r"receiv|收货") and asks(r"post|入账"):
-        values = [quantities.get(key) for key in (
-            "ordered", "physically_arrived", "receipt_posted_quantity")]
+        values = [
+            quantities.get(key)
+            for key in ("ordered", "physically_arrived", "receipt_posted_quantity")
+        ]
         if all(type(value) in (int, float) for value in values) and (
             not all(mentioned(value) for value in values)
             or not re.search(re.escape(erp.get("uom") or "UNKNOWN_UNIT"), reason, re.I)
         ):
             gaps.append("requested ordered/received/posted quantities with source UOM")
     if asks(r"records?|identif|\bIDs?\b|记录|单号") and asks(r"verif|ledger|receipt|验证|入账"):
-        pairs = [(row.get("voucher_no"), row.get("name"))
-                 for record in erp.get("records", []) for row in record.get("stock_entries", [])
-                 if row.get("voucher_no") and row.get("name")]
+        pairs = [
+            (row.get("voucher_no"), row.get("name"))
+            for record in erp.get("records", [])
+            for row in record.get("stock_entries", [])
+            if row.get("voucher_no") and row.get("name")
+        ]
         if pairs and not any(mentioned(receipt) and mentioned(ledger) for receipt, ledger in pairs):
             gaps.append("requested receipt and its stock-ledger identifier")
     history = sources.get("read_operational_history", {})
@@ -57,12 +71,16 @@ def receiving_answer_gaps(
     selected = baseline.get("metrics", {}).get(selected_metric, {}) if selected_metric else {}
     if asks(r"baseline|benchmark|基准") and selected.get("status") == "INSUFFICIENT_DATA":
         counts = (selected.get("sample_count"), baseline.get("minimum_samples"))
-        if all(type(value) is int for value in counts) and not all(mentioned(v) for v in counts):
+        if all(type(value) is int for value in counts) and not all(
+            mentioned(cast(int, v)) for v in counts
+        ):
             gaps.append("requested baseline comparable sample count and required minimum")
     if asks(r"baseline|benchmark|基准") and selected.get("status") == "AVAILABLE":
         count, mean = selected.get("sample_count"), selected.get("previous_mean")
-        if type(count) is int and type(mean) in (float, int) and (
-            not mentioned(count) or not mentioned(round(mean, 2))
+        if (
+            type(count) is int
+            and type(mean) in (float, int)
+            and (not mentioned(count) or not mentioned(round(cast(float, mean), 2)))
         ):
             gaps.append("requested baseline prior-observation mean and comparable sample count")
     return gaps
@@ -171,11 +189,21 @@ def receiving_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
         )
 
     arrivals = [row for row in work.get("arrivals", []) if isinstance(row, Mapping)]
-    attention_states = {"NEEDS_REVIEW", "NEEDS_PHOTO", "UNAVAILABLE",
-                        "DRAFT_UNKNOWN", "SUBMIT_UNKNOWN"}
+    attention_states = {
+        "NEEDS_REVIEW",
+        "NEEDS_PHOTO",
+        "UNAVAILABLE",
+        "DRAFT_UNKNOWN",
+        "SUBMIT_UNKNOWN",
+    }
     known_states = attention_states | {
-        "AWAITING_PHOTO", "ANALYZING", "COUNT_CANDIDATE", "RECEIPT_PREPARED",
-        "DRAFT_VERIFIED", "DUPLICATE_EVIDENCE", "RECEIPT_SUBMITTED",
+        "AWAITING_PHOTO",
+        "ANALYZING",
+        "COUNT_CANDIDATE",
+        "RECEIPT_PREPARED",
+        "DRAFT_VERIFIED",
+        "DUPLICATE_EVIDENCE",
+        "RECEIPT_SUBMITTED",
     }
     if any(row.get("status") not in known_states for row in arrivals):
         raise ValueError("Receiving arrival has an unknown state; inspect the source version")
@@ -192,7 +220,9 @@ def receiving_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
     ]
     collaboration = source(
         photos + [match for row in arrivals for match in row.get("barcode_matches", [])],
-        receiving_work=dict(work), slack=provider("slack"), jira=provider("jira")
+        receiving_work=dict(work),
+        slack=provider("slack"),
+        jira=provider("jira"),
     )
     collaboration["evidence_ids"] += (
         collaboration["slack"]["evidence_ids"] + collaboration["jira"]["evidence_ids"]

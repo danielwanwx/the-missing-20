@@ -45,7 +45,10 @@ def _batch_plan(first: int, additional: tuple[int, ...]) -> tuple[int, ...]:
 
 
 def first_receiving_manifest(
-    order: Mapping[str, Any], *, first_batch_size: int = 10, case_id: str = CASE_ID,
+    order: Mapping[str, Any],
+    *,
+    first_batch_size: int = 10,
+    case_id: str = CASE_ID,
     additional_batch_sizes: tuple[int, ...] = (),
 ) -> dict[str, Any]:
     """Bind the first normal batch to actual ERP line identity, never a guessed row.
@@ -80,18 +83,20 @@ def first_receiving_manifest(
     arrivals = []
     offset = 0
     for index, size in enumerate(sizes, start=1):
-        arrivals.append({
-            "arrival_id": f"ARRIVAL-{index:02}",
-            "purchase_order_item": line["name"],
-            "item_code": ITEM,
-            "uom": "Box",
-            "warehouse": line["warehouse"],
-            "handling_unit_ids": [
-                f"{'M20-CARTON' if case_id == CASE_ID else case_id}-{n:03}"
-                for n in range(offset + 1, offset + size + 1)
-            ],
-            "origin": "demo_scan",
-        })
+        arrivals.append(
+            {
+                "arrival_id": f"ARRIVAL-{index:02}",
+                "purchase_order_item": line["name"],
+                "item_code": ITEM,
+                "uom": "Box",
+                "warehouse": line["warehouse"],
+                "handling_unit_ids": [
+                    f"{'M20-CARTON' if case_id == CASE_ID else case_id}-{n:03}"
+                    for n in range(offset + 1, offset + size + 1)
+                ],
+                "origin": "demo_scan",
+            }
+        )
         offset += size
     return {
         "case_id": case_id,
@@ -101,7 +106,10 @@ def first_receiving_manifest(
 
 
 def provision(
-    client: ERPNextDemoExecutor, *, business_date: str, first_batch_size: int = 10,
+    client: ERPNextDemoExecutor,
+    *,
+    business_date: str,
+    first_batch_size: int = 10,
     case_id: str = CASE_ID,
     additional_batch_sizes: tuple[int, ...] = (),
 ) -> dict[str, Any]:
@@ -182,7 +190,8 @@ def provision(
                 # amend, resubmit or reuse their receipts for this case.
                 known_other = description == MARKER
                 if (
-                    not known_other and isinstance(description, str)
+                    not known_other
+                    and isinstance(description, str)
                     and description.endswith(" - SYNTHETIC TEST ORDER")
                 ):
                     try:
@@ -279,7 +288,9 @@ def provision(
         "physical_goods": "public photo stand-in until operator supplies physical holdout",
         "verified_at": datetime.now(UTC).isoformat(),
         "receiving_manifest": first_receiving_manifest(
-            reread, first_batch_size=first_batch_size, case_id=case_id,
+            reread,
+            first_batch_size=first_batch_size,
+            case_id=case_id,
             additional_batch_sizes=additional_batch_sizes,
         ),
     }
@@ -291,8 +302,14 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest-output", type=Path)
     parser.add_argument("--first-batch-size", type=int, required=True, choices=range(1, 21))
-    parser.add_argument("--next-batch-size", action="append", type=int, default=[],
-                        choices=range(1, 21), help="Preplan another arrival before runtime starts")
+    parser.add_argument(
+        "--next-batch-size",
+        action="append",
+        type=int,
+        default=[],
+        choices=range(1, 21),
+        help="Preplan another arrival before runtime starts",
+    )
     parser.add_argument("--case-id", default=CASE_ID)
     parser.add_argument("--business-date", required=True, help="Verified ERP site date, YYYY-MM-DD")
     args = parser.parse_args()
@@ -300,7 +317,9 @@ def main() -> int:
     if client is None:
         raise ValueError("Demo ERP credentials are not configured.")
     result = provision(
-        client, business_date=args.business_date, first_batch_size=args.first_batch_size,
+        client,
+        business_date=args.business_date,
+        first_batch_size=args.first_batch_size,
         case_id=args.case_id,
         additional_batch_sizes=tuple(args.next_batch_size),
     )

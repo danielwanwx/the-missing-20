@@ -105,10 +105,16 @@ def main():
             await testCapture.start(new File(chunks,'synthetic-qr.webm',{type:'video/webm'}));
             })()""")
         try:
-            _wait_ui(browser, "videoTest.states.includes('Video finished')", "video EOF", timeout=15)
+            _wait_ui(
+                browser, "videoTest.states.includes('Video finished')", "video EOF", timeout=15
+            )
         except AssertionError:
-            print(browser.evaluate("({result:videoTest,time:testVideo.currentTime,"
-                                   "duration:testVideo.duration,error:testVideo.error?.message})"))
+            print(
+                browser.evaluate(
+                    "({result:videoTest,time:testVideo.currentTime,"
+                    "duration:testVideo.duration,error:testVideo.error?.message})"
+                )
+            )
             raise
         video_result = browser.evaluate("videoTest")
         assert video_result["codes"] == [
@@ -124,8 +130,11 @@ def main():
             "!document.querySelector('.receiving-scan').hidden",
             "scan drawer",
         )
-        _wait_ui(browser, "!document.querySelector('.receiving-scan-controls button').disabled",
-                 "receiving task ready")
+        _wait_ui(
+            browser,
+            "!document.querySelector('.receiving-scan-controls button').disabled",
+            "receiving task ready",
+        )
         browser.evaluate(
             "document.querySelector('.receiving-scan').open=true; "
             "document.querySelector('.receiving-scan input[type=text]').value='M20-CARTON-001';"

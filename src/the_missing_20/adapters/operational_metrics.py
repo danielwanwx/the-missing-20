@@ -147,9 +147,9 @@ def source_freshness(erp: Document) -> dict[str, object]:
         "pending_document_kinds": pending,
         "document_lifecycle": erp.get("document_lifecycle", {}),
         "observed_at": erp.get("received_at"),
-        "error_code": "RECEIVING_RECEIPT_NOT_REFRESHED" if conflicts else (
-            read_error.get("code", "") if isinstance(read_error, Mapping) else ""
-        ),
+        "error_code": "RECEIVING_RECEIPT_NOT_REFRESHED"
+        if conflicts
+        else (read_error.get("code", "") if isinstance(read_error, Mapping) else ""),
         **({"pending_receipt_readbacks": conflicts} if conflicts else {}),
     }
 

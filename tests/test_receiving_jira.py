@@ -161,29 +161,43 @@ def test_legacy_done_reconciles_only_missing_effects_after_restart(tmp_path, ign
     jira.sync(state)
     resolution = posted(state)
     marker = jira.marker(state)
-    event = {"tenant": state["tenant"], "case_id": state["work_item"]["case_id"],
-             "arrival_id": state["work_item"]["arrival_id"], "capture_id": state["id"],
-             "purchase_order": state["purchase_order"], "marker": marker,
-             "operation": "resolve", "issue": api.issue["key"],
-             "receipt": resolution["receipt"], "receipt_evidence": resolution}
+    event = {
+        "tenant": state["tenant"],
+        "case_id": state["work_item"]["case_id"],
+        "arrival_id": state["work_item"]["arrival_id"],
+        "capture_id": state["id"],
+        "purchase_order": state["purchase_order"],
+        "marker": marker,
+        "operation": "resolve",
+        "issue": api.issue["key"],
+        "receipt": resolution["receipt"],
+        "receipt_evidence": resolution,
+    }
 
     class LegacyTransition(_JiraOperation):
         def send(self, event, key):
-            api.request("jira", "/rest/api/3/issue/QRC-22/transitions", payload={
-                "transition": {"id": "31"}, "update": {"comment": [{"add": {
-                    "body": self.body(event, key)}}]}})
+            api.request(
+                "jira",
+                "/rest/api/3/issue/QRC-22/transitions",
+                payload={
+                    "transition": {"id": "31"},
+                    "update": {"comment": [{"add": {"body": self.body(event, key)}}]},
+                },
+            )
             raise TimeoutError("Legacy transition committed; response lost")
 
     api.ignore_transition_comment = ignore_comment
-    original = journal.deliver(jira.route + ":resolve", event, LegacyTransition(jira),
-                               business_key=marker + ":resolved")
+    original = journal.deliver(
+        jira.route + ":resolve", event, LegacyTransition(jira), business_key=marker + ":resolved"
+    )
     assert original["status"] == "UNKNOWN"
     jira = JiraReceivingReview(api, HandoffJournal(tmp_path / "journal.db"), "QRC")
     jira.sync(state, verified_resolution=resolution)
     assert journal.current(original["key"])["status"] == "VERIFIED"
     assert sum(path.endswith("/transitions") for path in api.writes) == 1
-    assert sum(row["route"].endswith(":resolution-evidence")
-               for row in journal.for_capture(state["id"])) == int(ignore_comment)
+    assert sum(
+        row["route"].endswith(":resolution-evidence") for row in journal.for_capture(state["id"])
+    ) == int(ignore_comment)
     writes = list(api.writes)
     jira.sync(state, verified_resolution=resolution)
     assert api.writes == writes

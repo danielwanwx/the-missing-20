@@ -158,7 +158,8 @@ def _headers(content_type: str, content_length: int | None = None) -> dict[str, 
             # style attributes while keeping scripts, connections, images,
             # frames, and form submissions locked to this local origin.
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "connect-src 'self'; img-src 'self'; media-src 'self' blob:; base-uri 'none'; form-action 'none'; "
+            "connect-src 'self'; img-src 'self'; media-src 'self' blob:; "
+            "base-uri 'none'; form-action 'none'; "
             "frame-ancestors 'none'"
         ),
     }
@@ -1425,9 +1426,12 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         self.receiving_draft_worker = ReceivingDraftWorker(self.photo_receiving)
         self.receiving_handoff_worker = (
             ReceivingHandoffWorker(
-                self.photo_receiving, runtime_directory or repository_root / ".missing20-runtime",
+                self.photo_receiving,
+                runtime_directory or repository_root / ".missing20-runtime",
                 self.saas_evidence._config,
-            ) if photo_values.get("MISSING20_RECEIVING_HANDOFF_ENABLED", "0") == "1" else None
+            )
+            if photo_values.get("MISSING20_RECEIVING_HANDOFF_ENABLED", "0") == "1"
+            else None
         )
         if self.receiving_handoff_worker is not None:
             self.saas_evidence.receiving_notifications = self.receiving_handoff_worker.sources
@@ -1496,8 +1500,11 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             AutomaticInvestigation(
                 (runtime_directory or repository_root / ".missing20-runtime")
                 / "automatic-investigation.sqlite3",
-                self.agent_platform, self.agent_advisory,
-            ) if isinstance(self.agent_platform, AgentPlatform) else None
+                self.agent_platform,
+                self.agent_advisory,
+            )
+            if isinstance(self.agent_platform, AgentPlatform)
+            else None
         )
         self.live_source_poller = LiveSourcePoller(self.live_sources)
         configured_autostart = os.environ.get("MISSING20_LIVE_SOURCES_AUTOSTART", "0")

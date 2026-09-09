@@ -233,8 +233,13 @@ class AmbiguousCasePlatform:
         )
 
     def _append(
-        self, event_type: str, status: str, label: str, detail: str,
-        *, task_identity: Mapping[str, object] | None = None,
+        self,
+        event_type: str,
+        status: str,
+        label: str,
+        detail: str,
+        *,
+        task_identity: Mapping[str, object] | None = None,
     ) -> None:
         quantities = self._case.evidence_projection()["quantities"]
         assert isinstance(quantities, Mapping)
@@ -295,9 +300,11 @@ class AmbiguousCasePlatform:
         }
         if task_identity is not None:
             event["task"] = {
-                key: value for key, value in task_identity.items()
+                key: value
+                for key, value in task_identity.items()
                 if key in {"task_id", "role", "case_scope", "tool"}
-                and isinstance(value, str) and len(value) <= 240
+                and isinstance(value, str)
+                and len(value) <= 240
             }
         self._events.append(event)
         self._persist(event=event)
@@ -1273,7 +1280,10 @@ class AmbiguousCasePlatform:
             self._record_agent_tool_progress_locked(tool_name, phase, run_id)
 
     def _record_agent_tool_progress_locked(
-        self, tool_name: str, phase: str, run_id: str | None,
+        self,
+        tool_name: str,
+        phase: str,
+        run_id: str | None,
     ) -> None:
         """Publish each real model tool call while the HTTP request is still running."""
 
@@ -1294,7 +1304,8 @@ class AmbiguousCasePlatform:
         }
         if phase == "failed":
             self._append(
-                "agent.strands.tool.failed", "FAILED",
+                "agent.strands.tool.failed",
+                "FAILED",
                 source_labels.get(tool_name, tool_name),
                 "Evidence task failed; no recovery was authorized.",
             )
@@ -1330,7 +1341,9 @@ class AmbiguousCasePlatform:
             self._record_agent_runtime_progress_locked(runtime_event, run_id)
 
     def _record_agent_runtime_progress_locked(
-        self, runtime_event: Mapping[str, object], run_id: str | None,
+        self,
+        runtime_event: Mapping[str, object],
+        run_id: str | None,
     ) -> None:
         """Project genuine SDK model-call hooks into the live event ledger.
 
@@ -1348,7 +1361,10 @@ class AmbiguousCasePlatform:
         if activity is not None:
             status, label, detail = activity
             self._append(
-                f"agent.{runtime_event['type']}", status, label, detail,
+                f"agent.{runtime_event['type']}",
+                status,
+                label,
+                detail,
                 task_identity=runtime_event,
             )
             return
@@ -1401,16 +1417,25 @@ class AmbiguousCasePlatform:
 
     def agent_run_is_active(self, run_id: str) -> bool:
         with self._run_lock:
-            return bool(run_id) and run_id == self._run_id and self._agent_state in {
-                "GATHERING", "REASONING", "SYNTHESIZING", "OBSERVING",
-            }
+            return (
+                bool(run_id)
+                and run_id == self._run_id
+                and self._agent_state
+                in {
+                    "GATHERING",
+                    "REASONING",
+                    "SYNTHESIZING",
+                    "OBSERVING",
+                }
+            )
 
     def record_strands_investigation(self, advisory: Mapping[str, object]) -> dict[str, object]:
         with self._run_lock:
             return self._record_strands_investigation_locked(advisory)
 
     def _record_strands_investigation_locked(
-        self, advisory: Mapping[str, object],
+        self,
+        advisory: Mapping[str, object],
     ) -> dict[str, object]:
         """Persist a real Strands trace without granting it control-plane authority."""
 

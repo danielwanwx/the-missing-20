@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
 import threading
 from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -224,21 +227,26 @@ def test_question_answer_is_read_only_and_does_not_claim_release() -> None:
 def test_server_live_case_console_mode_selects_authorized_read_adapter(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("MISSING20_CASE_CONSOLE_SOURCE", "live")
-    monkeypatch.delenv("MISSING20_ENVIRONMENT", raising=False)
-    try:
-        server = DecisionWorkspaceServer(
-            ("127.0.0.1", 0), ROOT, runtime_directory=tmp_path / "runtime"
-        )
-    except PermissionError:
-        pytest.skip("the managed test sandbox disallows loopback sockets")
-    try:
-        assert isinstance(server.agent_platform, AgentPlatform)
-        projection = server.agent_platform.current()
-        assert projection["mode"]["provenance"] == "live-read"
-        assert projection["mode"]["provider_writes"] == "DISABLED"
-    finally:
-        server.server_close()
+    (tmp_path / ".env").write_text((ROOT / ".env.example").read_text())
+
+    def forbid_network(*args, **kwargs):
+        pytest.fail("Adapter selection must not call an external provider")
+
+    monkeypatch.setattr(socket.socket, "connect", forbid_network)
+    with patch.dict(os.environ, {"MISSING20_CASE_CONSOLE_SOURCE": "live"}, clear=True):
+        try:
+            server = DecisionWorkspaceServer(
+                ("127.0.0.1", 0), tmp_path, runtime_directory=tmp_path / "runtime"
+            )
+        except PermissionError:
+            pytest.skip("the managed test sandbox disallows loopback sockets")
+        try:
+            assert isinstance(server.agent_platform, AgentPlatform)
+            projection = server.agent_platform.current()
+            assert projection["mode"]["provenance"] == "live-read"
+            assert projection["mode"]["provider_writes"] == "DISABLED"
+        finally:
+            server.server_close()
 
 
 def test_server_exposes_only_read_only_agent_platform_commands(tmp_path: Path) -> None:

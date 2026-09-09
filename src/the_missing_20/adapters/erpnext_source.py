@@ -147,7 +147,7 @@ class ERPNextEvidenceSource:
             purchase_order=values.get("MISSING20_ERPNEXT_PURCHASE_ORDER", DEFAULT_PO),
             purchase_receipt=values.get("MISSING20_ERPNEXT_PURCHASE_RECEIPT", DEFAULT_RECEIPT),
             purchase_invoice=values.get("MISSING20_ERPNEXT_PURCHASE_INVOICE", DEFAULT_INVOICE),
-            case_id=values.get("MISSING20_CASE_ID", DEFAULT_CASE_ID),
+            case_id=values.get("MISSING20_CASE_ID", "").strip() or DEFAULT_CASE_ID,
             customer_purchase_order=values.get(
                 "MISSING20_ERPNEXT_CUSTOMER_PO", DEFAULT_CUSTOMER_PO
             ),

@@ -239,6 +239,10 @@ class HandoffJournal:
                 )
             elif isinstance(error, ValueError):
                 failure["kind"] = "evidence_mismatch"
-            self._transition(key, self.current(key)["status"], last_failure=failure,
-                             **({"send_failure": failure} if phase == "send" else {}))
+            self._transition(
+                key,
+                self.current(key)["status"],
+                last_failure=failure,
+                **({"send_failure": failure} if phase == "send" else {}),
+            )
         return self.current(key)

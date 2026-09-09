@@ -26,8 +26,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-directory", type=Path, required=True)
     parser.add_argument("--capture-id", required=True)
-    parser.add_argument("--phase", choices=("before_restart", "after_restart", "after_replay"),
-                        required=True)
+    parser.add_argument(
+        "--phase", choices=("before_restart", "after_restart", "after_replay"), required=True
+    )
     parser.add_argument("--port", type=int, default=8893)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -153,10 +154,19 @@ def main() -> None:
         "history_metric_corrections": history.get("metric_corrections", []),
         "conversation_turns": len(projection.get("conversation", [])),
         "conversation": [
-            {key: turn.get(key) for key in (
-                "question", "answer", "evidence_ids", "tool_calls", "provider",
-                "latency_ms", "usage", "context_turns",
-            )}
+            {
+                key: turn.get(key)
+                for key in (
+                    "question",
+                    "answer",
+                    "evidence_ids",
+                    "tool_calls",
+                    "provider",
+                    "latency_ms",
+                    "usage",
+                    "context_turns",
+                )
+            }
             for turn in projection.get("conversation", [])
         ],
         "passed": False,
@@ -201,8 +211,11 @@ def main() -> None:
         ) == sorted(tuple(row[key] for key in stable) for row in ledger), (
             "Stock effects changed after restart"
         )
-        report["restart_no_duplicate_effects" if args.phase == "after_restart"
-               else "replay_no_duplicate_external_effects"] = True
+        report[
+            "restart_no_duplicate_effects"
+            if args.phase == "after_restart"
+            else "replay_no_duplicate_external_effects"
+        ] = True
     snapshot["passed"] = True
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(snapshot, indent=2))

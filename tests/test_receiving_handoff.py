@@ -84,7 +84,9 @@ def test_access_failure_is_visible_without_secrets_or_unsafe_retry(tmp_path):
     journal = HandoffJournal(tmp_path / "outbox.sqlite3")
     state = journal.deliver("jira:case", event(), target)
     assert state["last_failure"] == {
-        "phase": "send", "kind": "access_denied", "http_status": 401,
+        "phase": "send",
+        "kind": "access_denied",
+        "http_status": 401,
     }
     assert "secret" not in str(state) and "private" not in str(state)
     assert journal.deliver("jira:case", event(), target)["status"] == "UNKNOWN"

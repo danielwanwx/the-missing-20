@@ -41,24 +41,41 @@ def main() -> None:
     if args.questions_file:
         questions = json.loads(args.questions_file.read_text())
         assert isinstance(questions, list) and 1 <= len(questions) <= 10
-        assert all(isinstance(question, str) and 1 <= len(question) <= 2000
-                   for question in questions)
-    report = {"case_id": args.case_id, "started_at": datetime.now(UTC).isoformat(),
-              "source": "real local HTTP gateway to Strands/Bedrock",
-              "acceptance_scope": "runtime_contract_only",
-              "independent_answer_quality_review_required": True, "turns": []}
+        assert all(
+            isinstance(question, str) and 1 <= len(question) <= 2000 for question in questions
+        )
+    report = {
+        "case_id": args.case_id,
+        "started_at": datetime.now(UTC).isoformat(),
+        "source": "real local HTTP gateway to Strands/Bedrock",
+        "acceptance_scope": "runtime_contract_only",
+        "independent_answer_quality_review_required": True,
+        "turns": [],
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     for question in questions:
         response = request("/api/v1/agent-platform/ask", {"question": question})
         advisory = response.get("agent_advisory", {})
-        turn = {"question": question, "answer": response.get("answer"),
-                "advisory": advisory,
-                "validation_diagnostics": response.get("validation_diagnostics", [])}
+        turn = {
+            "question": question,
+            "answer": response.get("answer"),
+            "advisory": advisory,
+            "validation_diagnostics": response.get("validation_diagnostics", []),
+        }
         report["turns"].append(turn)
         args.output.write_text(json.dumps(report, indent=2) + "\n")
-        print(json.dumps({"turn": len(report["turns"]), "status": advisory.get("status"),
-                          "answer": turn["answer"], "usage": advisory.get("usage"),
-                          "diagnostics": turn["validation_diagnostics"]}), flush=True)
+        print(
+            json.dumps(
+                {
+                    "turn": len(report["turns"]),
+                    "status": advisory.get("status"),
+                    "answer": turn["answer"],
+                    "usage": advisory.get("usage"),
+                    "diagnostics": turn["validation_diagnostics"],
+                }
+            ),
+            flush=True,
+        )
         assert advisory.get("status") == "COMPLETE", "Real model turn did not pass"
         assert advisory["mode"] == "real_strands"
         assert advisory["result"]["write_performed"] is False
@@ -70,8 +87,9 @@ def main() -> None:
     # The gateway intentionally retains at most three prior turns, including
     # failed human requests. A saturated window must not be mistaken for lost context.
     assert contexts == [min(3, contexts[0] + index) for index in range(len(questions))]
-    report.update(passed=True, quantities_unchanged=True,
-                  completed_at=datetime.now(UTC).isoformat())
+    report.update(
+        passed=True, quantities_unchanged=True, completed_at=datetime.now(UTC).isoformat()
+    )
     args.output.write_text(json.dumps(report, indent=2) + "\n")
 
 

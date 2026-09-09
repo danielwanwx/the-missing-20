@@ -19,11 +19,14 @@ HISTORY_METRICS = (
 
 def requests_history(question: str) -> bool:
     """Select the optional history reader from the current request, not old turns."""
-    return bool(re.search(
-        r"\b(?:histor\w*|trends?|baselines?|benchmarks?|averages?|means?|charts?|"
-        r"increas\w*|decreas\w*|over time|net change)\b|历史|趋势|基准|平均|图表|增长|变化",
-        question, re.I,
-    ))
+    return bool(
+        re.search(
+            r"\b(?:histor\w*|trends?|baselines?|benchmarks?|averages?|means?|charts?|"
+            r"increas\w*|decreas\w*|over time|net change)\b|历史|趋势|基准|平均|图表|增长|变化",
+            question,
+            re.I,
+        )
+    )
 
 
 def requested_history_metric(question: str) -> str | None:
@@ -41,7 +44,8 @@ def requested_history_metric(question: str) -> str | None:
 
 
 def retained_history_view(
-    projection: Mapping[str, Any], question: str,
+    projection: Mapping[str, Any],
+    question: str,
 ) -> list[dict[str, Any]]:
     """Offer an existing chart beside a blocked answer, not an inferred answer.
 
@@ -69,8 +73,11 @@ def retained_history_view(
 
 
 def history_attachment(
-    packet: Mapping[str, Any], metric: str | None, tool_calls: tuple[str, ...],
-    *, question: str = "",
+    packet: Mapping[str, Any],
+    metric: str | None,
+    tool_calls: tuple[str, ...],
+    *,
+    question: str = "",
 ) -> list[dict[str, Any]]:
     """Use the exact case-scoped snapshot read in this turn, not a later projection."""
     if "read_operational_history" not in tool_calls:

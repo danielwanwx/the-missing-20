@@ -56,10 +56,15 @@ def test_gateway_model_budget_matches_structured_investigation_output_limit() ->
 
 
 def test_native_sdk_stop_reason_is_visible_without_rejected_prose() -> None:
-    assert public_validation_diagnostics([{
-        "stage": "structured_output", "stop_reason": "limit_total_tokens",
-        "candidate": {"reason": "rejected private prose"},
-    }]) == [{"stage": "structured_output", "stop_reason": "limit_total_tokens"}]
+    assert public_validation_diagnostics(
+        [
+            {
+                "stage": "structured_output",
+                "stop_reason": "limit_total_tokens",
+                "candidate": {"reason": "rejected private prose"},
+            }
+        ]
+    ) == [{"stage": "structured_output", "stop_reason": "limit_total_tokens"}]
 
 
 def test_retained_history_is_not_a_queue_of_old_questions() -> None:
@@ -72,7 +77,8 @@ def test_retained_history_is_not_a_queue_of_old_questions() -> None:
     assert prompt.endswith("Newest human question: Should we retry this receipt?")
     receiving = DashboardAdvisoryGateway._contextual_question(
         [{"human": "Show revenue trends", "agent": "STALE_REVENUE_600_PERCENT"}],
-        "Should we retry this receipt?", include_prior_answers=False,
+        "Should we retry this receipt?",
+        include_prior_answers=False,
     )
     assert "STALE_REVENUE" not in receiving
     assert "Human: Show revenue trends" in receiving
@@ -82,10 +88,13 @@ def test_retained_history_is_not_a_queue_of_old_questions() -> None:
 def test_sdk_error_result_is_failure_even_without_exception() -> None:
     progress = []
     hooks = advisory_module._RuntimeTelemetryHooks(lambda name, phase: progress.append(phase))
-    hooks.after_tool(SimpleNamespace(
-        tool_use={"name": "consult_quality", "toolUseId": "t1"},
-        result={"status": "error"}, exception=None,
-    ))
+    hooks.after_tool(
+        SimpleNamespace(
+            tool_use={"name": "consult_quality", "toolUseId": "t1"},
+            result={"status": "error"},
+            exception=None,
+        )
+    )
     assert progress == ["failed"]
     assert hooks.events[-1]["type"] == "tool.failed"
 
@@ -206,8 +215,7 @@ def test_outage_history_question_can_inspect_retained_data_without_faking_an_age
                 "source_freshness": {"status": "UNAVAILABLE"},
                 "operational_history": {
                     "case_id": "case-history",
-                    "points": [{"case_id": "case-history", "id": 1,
-                                "metrics": {"received": 10}}],
+                    "points": [{"case_id": "case-history", "id": 1, "metrics": {"received": 10}}],
                     "baseline": {"status": "INSUFFICIENT_DATA"},
                 },
             }
@@ -216,7 +224,9 @@ def test_outage_history_question_can_inspect_retained_data_without_faking_an_age
         raise AssertionError("historical data display must not claim a model invocation")
 
     gateway = DashboardAdvisoryGateway(
-        Platform(), settings=_settings(AgentProvider.BEDROCK), runner=runner,
+        Platform(),
+        settings=_settings(AgentProvider.BEDROCK),
+        runner=runner,
     )
     response = gateway.ask("Show the receiving trend and its historical baseline.")
     advisory = response["agent_advisory"]
@@ -324,17 +334,22 @@ def test_repair_feedback_does_not_invent_transfer_or_force_completed_case_approv
 
 
 @pytest.mark.parametrize(
-    "next_step", ["Verify the existing receipt.", "Observe incoming receipts."])
+    "next_step", ["Verify the existing receipt.", "Observe incoming receipts."]
+)
 def test_read_only_boundary_accepts_prompt_supported_source_verification(next_step):
     advisory_module.validate_advisory(
         LiveAdvisoryResult(
             disposition=AdvisoryDisposition.SAFE_NOOP,
-            evidence_ids=("receipt",), reason="Existing stock is consistent.",
-            safe_next_step=next_step, write_performed=False,
+            evidence_ids=("receipt",),
+            reason="Existing stock is consistent.",
+            safe_next_step=next_step,
+            write_performed=False,
         ),
-        calls=("read_control_context", "read_erp_evidence"), evidence_ids=("receipt",),
+        calls=("read_control_context", "read_erp_evidence"),
+        evidence_ids=("receipt",),
         expected_disposition=AdvisoryDisposition.SAFE_NOOP,
-        expected_safe_next_step="Inspect only.", read_only_requested=True,
+        expected_safe_next_step="Inspect only.",
+        read_only_requested=True,
     )
 
 

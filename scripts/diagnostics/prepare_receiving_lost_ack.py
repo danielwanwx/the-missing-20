@@ -29,8 +29,7 @@ def main() -> None:
     parser.add_argument("--runtime-directory", required=True, type=Path)
     parser.add_argument("--photo", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--confirm-demo-receipt", required=True,
-                        choices=["one-synthetic-carton"])
+    parser.add_argument("--confirm-demo-receipt", required=True, choices=["one-synthetic-carton"])
     args = parser.parse_args()
     runtime = args.runtime_directory.resolve()
     manifest = json.loads((runtime / "receiving-manifest.json").read_text())
@@ -47,18 +46,32 @@ def main() -> None:
     erp = PhotoReceiptERP(client, manifest["purchase_order"])
     service = PhotoReceiving(
         runtime / "photo-receiving.sqlite3",
-        StrandsPhotoReader(Settings(environment="demo", aws_profile="missing20-sandbox",
-                                    agent_provider=AgentProvider.BEDROCK)),
-        erp=erp, drafts_enabled=True, manifest=manifest, auto_prepare=False,
+        StrandsPhotoReader(
+            Settings(
+                environment="demo",
+                aws_profile="missing20-sandbox",
+                agent_provider=AgentProvider.BEDROCK,
+            )
+        ),
+        erp=erp,
+        drafts_enabled=True,
+        manifest=manifest,
+        auto_prepare=False,
     )
-    report = {"case_id": manifest["case_id"], "purchase_order": manifest["purchase_order"],
-              "scope": "Real ERP receipt; public photo + typed demo scan, not shipment proof.",
-              "fault": "Discard successful ERP submit response at application boundary once.",
-              "steps": [], "submit_calls": 0, "payment_calls": 0}
+    report = {
+        "case_id": manifest["case_id"],
+        "purchase_order": manifest["purchase_order"],
+        "scope": "Real ERP receipt; public photo + typed demo scan, not shipment proof.",
+        "fault": "Discard successful ERP submit response at application boundary once.",
+        "steps": [],
+        "submit_calls": 0,
+        "payment_calls": 0,
+    }
 
     def checkpoint(stage, state):
-        report["steps"].append({"stage": stage, "at": datetime.now(UTC).isoformat(),
-                                "state": state})
+        report["steps"].append(
+            {"stage": stage, "at": datetime.now(UTC).isoformat(), "state": state}
+        )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2) + "\n")
 
@@ -69,12 +82,20 @@ def main() -> None:
         checkpoint("real-strands-photo", state)
         assert state["analysis"]["assessment"]["countable"] is True
         assert len(state["analysis"]["assessment"]["objects"]) == 1
-        binding = service.barcode({"arrival_id": arrival["arrival_id"],
-                                   "code": arrival["handling_unit_ids"][0], "format": "qr_code"})
+        binding = service.barcode(
+            {
+                "arrival_id": arrival["arrival_id"],
+                "code": arrival["handling_unit_ids"][0],
+                "format": "qr_code",
+            }
+        )
         state = service.current(state["id"])
         state = service.confirm_identity(
-            state["id"], item_code=arrival["item_code"], expected_version=state["version"],
-            confirm_match=True, barcode_evidence_id=binding["evidence_id"],
+            state["id"],
+            item_code=arrival["item_code"],
+            expected_version=state["version"],
+            confirm_match=True,
+            barcode_evidence_id=binding["evidence_id"],
         )
         checkpoint("operator-confirms-demo-photo-binding", state)
         state = service.draft(state["id"])
@@ -90,12 +111,24 @@ def main() -> None:
             raise TimeoutError("Diagnostic injected: real submit completed, ACK discarded.")
 
         erp.submit = drop_ack
-        state = service.submit(state["id"], receipt_name=state["draft"]["name"],
-                               expected_version=state["version"], confirm_received=True)
+        state = service.submit(
+            state["id"],
+            receipt_name=state["draft"]["name"],
+            expected_version=state["version"],
+            confirm_received=True,
+        )
         checkpoint("lost-ack-durable-intent", state)
         assert state["status"] == "SUBMIT_UNKNOWN" and report["submit_calls"] == 1
-        print(json.dumps({"capture_id": state["id"], "status": state["status"],
-                          "receipt": state["draft"]["name"], "submit_calls": 1}))
+        print(
+            json.dumps(
+                {
+                    "capture_id": state["id"],
+                    "status": state["status"],
+                    "receipt": state["draft"]["name"],
+                    "submit_calls": 1,
+                }
+            )
+        )
     finally:
         service.db.close()
 

@@ -37,7 +37,9 @@ def task_activity(event: Mapping[str, Any]) -> tuple[str, str, str] | None:
         "task.started": ("RUNNING", "Checking evidence", "Read-only specialist started."),
         "task.source_read": ("RUNNING", "Evidence read", "Reading the admitted source snapshot."),
         "task.source_cached": (
-            "RUNNING", "Evidence reused", "Reusing this task's source snapshot."
+            "RUNNING",
+            "Evidence reused",
+            "Reusing this task's source snapshot.",
         ),
         "task.completed": (
             "COMPLETE",
@@ -59,7 +61,9 @@ def task_activity(event: Mapping[str, Any]) -> tuple[str, str, str] | None:
 class SourceObservation(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     source: Literal[
-        "read_erp_evidence", "read_celigo_evidence", "read_airtable_evidence",
+        "read_erp_evidence",
+        "read_celigo_evidence",
+        "read_airtable_evidence",
         "read_collaboration_evidence",
     ]
     pointer: str = Field(pattern=r"^/", max_length=240)
@@ -260,9 +264,7 @@ class RoleDelegation:
                         else:
                             self.emit(f"task.{status.lower()}", **event, **failure)
                 raise
-            return {
-                "status": "COMPLETED", **self._coordinator_finding(finding), "task_id": task_id
-            }
+            return {"status": "COMPLETED", **self._coordinator_finding(finding), "task_id": task_id}
 
     async def _investigate(
         self, role: str, question: str, event: dict[str, Any]
@@ -302,7 +304,8 @@ class RoleDelegation:
                         completed.add(name)
                 self.emit(
                     "task.source_cached" if cached else "task.source_read",
-                    **event, tool=name,
+                    **event,
+                    tool=name,
                     read_basis="TASK_CACHE" if cached else "ADMITTED_SNAPSHOT",
                 )
                 return value

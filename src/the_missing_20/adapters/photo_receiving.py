@@ -994,26 +994,36 @@ class PhotoReceiving:
             return
         with self.lock:
             query = "SELECT id FROM captures WHERE json_extract(state,'$.status')='SUBMIT_UNKNOWN' "
-            row = (self.db.execute(query + "AND id>? ORDER BY id LIMIT 1",
-                                   (self._submit_cursor,)).fetchone()
-                   or self.db.execute(query + "ORDER BY id LIMIT 1").fetchone())
+            row = (
+                self.db.execute(
+                    query + "AND id>? ORDER BY id LIMIT 1", (self._submit_cursor,)
+                ).fetchone()
+                or self.db.execute(query + "ORDER BY id LIMIT 1").fetchone()
+            )
         if not row:
             return
         self._submit_cursor = row[0]
         state = self.current(row[0])
         confirmation = state.get("physical_receiving_confirmation", {})
         draft = state.get("draft", {})
-        if not all(isinstance(value, dict) for value in (
-            confirmation, draft, state.get("candidate"),
-        )):
+        if not all(
+            isinstance(value, dict)
+            for value in (
+                confirmation,
+                draft,
+                state.get("candidate"),
+            )
+        ):
             return
         if not (
             state.get("submit_attempted") is True
             and type(state.get("submit_confirmation_version")) is int
             and confirmation.get("receipt_name") == draft.get("name")
             and draft.get("name")
-            and isinstance(state.get("digest"), str) and len(state["digest"]) == 64
-            and type(state.get("image_version")) is int and state["image_version"] > 0
+            and isinstance(state.get("digest"), str)
+            and len(state["digest"]) == 64
+            and type(state.get("image_version")) is int
+            and state["image_version"] > 0
             and isinstance(confirmation.get("confirmed_at"), str)
             and confirmation["confirmed_at"]
             and confirmation.get("digest") == state.get("digest")
@@ -1023,8 +1033,10 @@ class PhotoReceiving:
             return
         try:
             self.submit(
-                state["id"], receipt_name=draft["name"],
-                expected_version=state["submit_confirmation_version"], confirm_received=True,
+                state["id"],
+                receipt_name=draft["name"],
+                expected_version=state["submit_confirmation_version"],
+                confirm_received=True,
             )  # submit_attempted forces lookup-only, including after restart.
         except (KeyError, TypeError):
             # A malformed legacy scope is not authority. Leave its intent untouched;

@@ -179,3 +179,21 @@ Visible Chrome mouse/keyboard inspection through CUA covered:
 A separate local Node VM/minimal DOM fixture executed the actual candidate renderer and mocked only DOM/fetch. Nine checks passed: synthetic empty; real one; real multiple; radio keyboard selection; real→synthetic clearing details; unavailable source; successful retry; synthetic status with actual points preserved; real history outside the selected window remaining non-synthetic. Eight mocked requests occurred. These are isolated software fixtures, not business observations or real-browser state-switch coverage. Fixture script `/private/tmp/m20-history-candidate-fixture.cjs` SHA-256 `0a0993a2b73160f70de4893a951f346c116d3431b6e1188bc6dac3498d017e11`; result `/private/tmp/m20-history-candidate-fixture.json` SHA-256 `bc096bb032380723d336296c1d3de8209b901f240c5721cfb97ee98cfd48d38e`.
 
 **Approve the scoped synthetic-history empty-state implementation.** It removes misleading nonexistent baselines without hiding real points or raising the existing threshold. Current whole-dashboard visual acceptance, browser outage/case-switch testing, the later incident-transition failure and complete smoke remain open. The separate isolated 8919 server was stopped via its own session; R4 service was left running. No model call, confirmation, external record mutation or real payment was performed by this acceptance.
+
+## Final independent no-credential quality-gate retest
+
+Fetched public commit `0c01eaa1e9189cfc8b75328804549c3811ac3e6e` and reused the isolated checkout, its example-only `.env` and locked dependencies. The previously reviewed history file exactly matched this public commit (same SHA above). Ordinary checkout nevertheless rejected the local change; preserved it in a path-specific local stash, then performed an ordinary detached checkout successfully. The generated dashboard screenshot was separately copied to `/private/tmp/m20-cold-candidate-dashboard-preserved.png` and retained. No forced checkout/reset, private config or runtime import occurred. Initial sandbox DNS and checkout/old-base patch refusals were not product defects; patch application only proceeded after successful `git apply --check` on the correct public base.
+
+Applied only the primary agent's reviewed Python diff, saved as `/private/tmp/m20-finalization-python-candidate.patch` (SHA-256 `3c738106aad32b31bbd365e30affb9ff9ff10473a3c27851cf22542bf856636f`), plus new `tests/test_cold_start_configuration.py` (SHA-256 `c1d6b5e3406a80f6c02a47cccb3dc14db80eade6b76ba5e1d1ebc1f56ed2d91b`). All 42 candidate Python files were byte-compared to the primary working tree: zero mismatches. The reviewer made no candidate corrections.
+
+Independently ran the original complete `make check`, with inherited runtime credentials cleared and local test-socket permissions allowed. **Exit 0**:
+
+- Ruff format: **233 files already formatted**.
+- Ruff lint: **all checks passed**.
+- Mypy: **51 source files, no issues**.
+- Python: **1566 passed in 60.82 seconds**, no failures/skips.
+- JavaScript: **98 passed**, no failures/skips.
+
+Raw log: `/private/tmp/m20-finalization-cold-candidate-make-check.log`; SHA-256 `53c07f42944abecaae51ad8c9bd01da8fc945acbc28ec112f6cec0e63afe3040`. `git diff --check` also passed in this candidate checkout.
+
+**The formatting and no-credential test failures are closed for this exact candidate. Approve its cold-start quality-gate acceptance.** This run does not close the separately retained later full-browser-smoke incident-transition failure, real-model semantics, full current UI or downstream business-chain gates. Prior failed runs remain above. Commit/push and remote SHA proof belong to the primary delivery step after this review; no reviewer commit was made.
