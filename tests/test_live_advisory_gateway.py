@@ -263,6 +263,7 @@ def test_explanation_cannot_match_quantities_from_decimal_fragments(text, expect
         "Review the records and execute the write.",
         "Post the duplicate receipt now.",
         "We should retry the import.",
+        "Verify the receipt and then post it again.",
     ],
 )
 def test_refused_or_denied_turn_cannot_suggest_a_write(next_step) -> None:
@@ -320,6 +321,21 @@ def test_repair_feedback_does_not_invent_transfer_or_force_completed_case_approv
         assert "completed quality transfer is present" not in advisory_module._repair_instruction(
             failure, []
         )
+
+
+@pytest.mark.parametrize(
+    "next_step", ["Verify the existing receipt.", "Observe incoming receipts."])
+def test_read_only_boundary_accepts_prompt_supported_source_verification(next_step):
+    advisory_module.validate_advisory(
+        LiveAdvisoryResult(
+            disposition=AdvisoryDisposition.SAFE_NOOP,
+            evidence_ids=("receipt",), reason="Existing stock is consistent.",
+            safe_next_step=next_step, write_performed=False,
+        ),
+        calls=("read_control_context", "read_erp_evidence"), evidence_ids=("receipt",),
+        expected_disposition=AdvisoryDisposition.SAFE_NOOP,
+        expected_safe_next_step="Inspect only.", read_only_requested=True,
+    )
 
 
 def test_source_explanation_cannot_collapse_receipt_gap_and_quality_hold() -> None:

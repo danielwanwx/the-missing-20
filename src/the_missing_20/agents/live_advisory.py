@@ -23,7 +23,11 @@ from the_missing_20.adapters.investigation_case_sources import (
 )
 from the_missing_20.adapters.role_task_journal import RoleTaskJournal
 from the_missing_20.adapters.strands_models import BedrockNovaProFactory
-from the_missing_20.agents.receiving_advisory import receiving_packet, receiving_prompt
+from the_missing_20.agents.receiving_advisory import (
+    receiving_answer_gaps,
+    receiving_packet,
+    receiving_prompt,
+)
 from the_missing_20.domain.models import ContractModel, NonEmptyStr
 from the_missing_20.ports.agent_model import (
     MAX_OUTPUT_TOKENS_PER_REQUEST,
@@ -64,14 +68,15 @@ class LiveAdvisoryResult(ContractModel):
     )
     evidence_ids: tuple[NonEmptyStr, ...] = Field(min_length=1, max_length=8)
     reason: NonEmptyStr = Field(
-        max_length=800,
+        max_length=1400,
         description=(
             "Answer the user's question using the observed source facts. State the relevant "
             "quantities explicitly and explain each outstanding component separately. "
             "Distinguish the supported explanation from alternatives. For a resolved case, "
             "state final quantities, invoice status and whether effects were synthetic or live. "
             "Do not substitute a disposition label or a proposed next step for the explanation. "
-            "Keep this explanation under 80 words."
+            "Be concise: normally under 80 words; compound receiving questions may use up to "
+            "160 words to cover requested facts, identifiers and decisions."
         ),
     )
     safe_next_step: NonEmptyStr = Field(
@@ -131,6 +136,10 @@ class LiveAdvisoryResult(ContractModel):
     def unique_evidence_ids(self) -> LiveAdvisoryResult:
         if len(self.evidence_ids) != len(set(self.evidence_ids)):
             raise ValueError("advisory evidence IDs must be unique")
+        questions = [re.sub(r"\W+", " ", str(q)).strip().casefold()
+                     for q in self.follow_up_questions]
+        if len(questions) != len(set(questions)):
+            raise ValueError("follow-up questions must be distinct")
         return self
 
 
@@ -1034,7 +1043,10 @@ def validate_advisory(
                 "real advisory safe next step conflicts with recovery approval control"
             )
         if read_only_requested and (
-            not re.search(r"\b(?:read|inspect|review|stop|hold|preserve|monitor)\w*\b", next_step)
+            not re.search(
+                r"\b(?:read|inspect|review|verify|observe|stop|hold|preserve|monitor)\w*\b",
+                next_step,
+            )
             or _suggests_write(next_step)
         ):
             raise AdvisoryValidationError(
@@ -1090,6 +1102,20 @@ def _contains_quantity(text: str, quantity: float) -> bool:
 
 def _repair_instruction(failure: str, missing_tools: list[str]) -> str:
     """Describe the failed constraint, never manufacture case facts or a next action."""
+    if "baseline prior-observation mean" in failure:
+        return (
+            "Answer the requested baseline explicitly using the already-read history "
+            "baseline.metrics for the requested metric: previous_mean (rounded to two "
+            "decimals) and sample_count. Explain how this prior-observation average differs "
+            "from latest minus first; do not substitute only net change or status. "
+        )
+    if "receipt and its stock-ledger identifier" in failure:
+        return (
+            "In reason name the exact linked voucher_no and name fields from one of the "
+            "already-read read_erp_evidence.records[].stock_entries[] rows. "
+            "The enclosing evidence_id (receipt:ledger) is a citation, not that row's name. "
+            "Keep evidence_ids restricted to the permitted enclosing evidence IDs. "
+        )
     if "required source" in failure and missing_tools:
         return (
             "Call each still-missing required source once: " + ", ".join(missing_tools) + ". "
@@ -1536,6 +1562,10 @@ async def _invoke(
         ])
         receiving_focus += (
             " Classify the case using all arrivals, not merely the history chart. "
+            "This receiving packet has no supplier invoice yet. Do not call its invoice "
+            "open, paid, closed or held. No customer-order/billing lookup is included here; "
+            "do not assert absence of customer issues or billing problems. Omit unrelated "
+            "status claims instead of filling gaps from earlier conversation. "
             "Keep safe_next_step read-only: inspect/read/verify records without executing "
             "or suggesting an inventory write. Answer the history question as a separate "
             "explanation; a stable chart does not close an unresolved receiving review."
@@ -1779,8 +1809,10 @@ async def _invoke(
                     },
                     structured_output_model=LiveAdvisoryResult,
                     structured_output_prompt=(
-                        "Return the complete LiveAdvisoryResult now. Keep reason under 80 words "
-                        "and safe_next_step to one sentence."
+                        "Return the complete LiveAdvisoryResult now. "
+                        + ("Use up to 160 words for reason " if receiving
+                           else "Keep reason under 80 words ")
+                        + "and safe_next_step to one sentence."
                         + (
                             " Answer every part of the newest human question, not just the "
                             "quantity/status. If asked what an average means or why it differs, "
@@ -1968,6 +2000,12 @@ async def _invoke(
                     == "full_investigation",
                 )
             if receiving:
+                gaps = receiving_answer_gaps(
+                    newest_question, candidate.reason,
+                    {name: payloads[name] for name in calls}, candidate.chart_metric,
+                )
+                if gaps:
+                    raise AdvisoryValidationError("Answer omitted " + "; ".join(gaps))
                 # Named notification systems cannot be presented as independent
                 # inventory verification. This is a narrow explanation guard,
                 # not a substitute for source-ID and stock-effect validation.

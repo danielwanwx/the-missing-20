@@ -1,0 +1,350 @@
+{
+  "scope": "Actual external GET readbacks; demo public photo is not real shipment proof.",
+  "business_writes_in_verifier": 0,
+  "before_restart": {
+    "checked_at": "2026-09-09T19:39:05.547418+00:00",
+    "case_id": "M20-GOODS-20260909-40-R3",
+    "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+    "purchase_order": "PUR-ORD-2026-00015",
+    "receipt": "MAT-PRE-2026-00006",
+    "quantity": 1,
+    "case_posted_receipts": [
+      "MAT-PRE-2026-00005",
+      "MAT-PRE-2026-00006"
+    ],
+    "case_posted_quantity": 2,
+    "uom": "Box",
+    "matching_receipts": [
+      {
+        "name": "MAT-PRE-2026-00006",
+        "docstatus": 1
+      }
+    ],
+    "stock_ledger": [
+      {
+        "name": "MAT-SLE-2026-00026",
+        "actual_qty": 1.0,
+        "item_code": "M20-DEMO-CARTON",
+        "warehouse": "Stores - M20",
+        "voucher_detail_no": "5qstrsgo0t",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "MAT-PRE-2026-00006",
+        "company": "Missing 20 Automotive Demo",
+        "is_cancelled": 0
+      }
+    ],
+    "ledger_ids_at_posting": [
+      "c6baa76467"
+    ],
+    "ledger_ids_current": [
+      "MAT-SLE-2026-00026"
+    ],
+    "same_stock_effects": true,
+    "destinations": [
+      {
+        "key": "m20-receipt-0cbee5f2549ca1d01ba26da7f02a3c0e",
+        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
+        "provider": "Slack via Celigo",
+        "record_id": "1788981560.785039",
+        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788981560785039",
+        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
+      },
+      {
+        "key": "m20-receipt-3fb6f8cde782286868456e9190ea2f5e",
+        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
+        "provider": "Airtable",
+        "record_id": "recNxXXm8qdqULms1",
+        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/recNxXXm8qdqULms1"
+      }
+    ],
+    "quantities": {
+      "accepted_cumulative": 2.0,
+      "available": 2.0,
+      "available_to_promise": null,
+      "case_balance": 2.0,
+      "delivered_quantity": 0,
+      "invoice_count": 0.0,
+      "ordered": 40.0,
+      "outstanding_order_quantity": 38.0,
+      "physically_arrived": 2.0,
+      "quality_hold": 0.0,
+      "receipt_posted_quantity": 2.0,
+      "receipt_unresolved": 0.0,
+      "received": 2.0,
+      "received_cumulative": 2.0,
+      "released_quantity": 0
+    },
+    "history_points": 4,
+    "history_retained_records": 4,
+    "history_projection_revisions": [],
+    "history_metric_corrections": [],
+    "conversation_turns": 7,
+    "conversation": [
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: NEEDS_EVIDENCE. Outstanding balance is not evidence of missing stock. ARRIVAL-01 needs review, ARRIVAL-02 is submitted and verified. Next: Inspect ARRIVAL-01 for review completion and posting.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00015",
+          "MAT-PRE-2026-00005",
+          "MAT-PRE-2026-00005:ledger",
+          "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+          "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+          "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e",
+          "barcode:d061f34e8e10be567f367ea5709747cb3d5afc4fc6c14d1cd8aaf01287d6760a",
+          "1788981280.909619"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 15783,
+        "usage": {
+          "incremental_cost_usd": 0.0473032,
+          "input_tokens": 52889,
+          "output_tokens": 1560,
+          "request_count": 5,
+          "source_cache_hits": 1,
+          "validation_retries": 0
+        },
+        "context_turns": 0
+      },
+      {
+        "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+        "answer": "Disposition: NEEDS_EVIDENCE. ARRIVAL-01 requires further review as it is marked as 'NEEDS_REVIEW' and has a null posted quantity. ARRIVAL-02 has been successfully posted with a quantity of 1 Box. There is no need to retry the verified receipt. The outstanding order balance does not prove loss, as it has not necessarily arrived. Next: Inspect and verify the records without executing or suggesting an inventory write.",
+        "evidence_ids": [
+          "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+          "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+          "MAT-PRE-2026-00005",
+          "MAT-PRE-2026-00005:ledger"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 12194,
+        "usage": {
+          "incremental_cost_usd": 0.0354464,
+          "input_tokens": 39772,
+          "output_tokens": 1134,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 1
+        },
+        "context_turns": 1
+      },
+      {
+        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain net change versus the prior-observation average; is this proof of revenue gain?",
+        "answer": "Disposition: NEEDS_EVIDENCE. The receiving trend shows a net change of 1.0 Box from the first to the latest observation. The prior-observation average is not available due to insufficient data (only 1 sample). This net change does not prove revenue gain as billed revenue and counterfactual evidence are missing. The case classification is NEEDS_EVIDENCE due to the unresolved arrival (ARRIVAL-01) with status NEEDS_REVIEW and null posted quantity. Next: Inspect the unresolved arrival (ARRIVAL-01) and verify the posted quantity.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00015",
+          "MAT-PRE-2026-00005",
+          "MAT-PRE-2026-00005:ledger",
+          "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+          "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+          "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e",
+          "barcode:d061f34e8e10be567f367ea5709747cb3d5afc4fc6c14d1cd8aaf01287d6760a",
+          "1788981280.909619"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 15963,
+        "usage": {
+          "incremental_cost_usd": 0.055876,
+          "input_tokens": 63769,
+          "output_tokens": 1519,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 2
+      },
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: SAFE_NOOP. The ordered quantity for purchase order PUR-ORD-2026-00015 is 40 boxes. The physically received quantity, as per the collaboration source, is 2 boxes (1 box for ARRIVAL-01 and 1 box for ARRIVAL-02). The posted quantity in the ERP stock ledger is also 2 boxes. The outstanding order balance of 38 boxes does not necessarily indicate missing stock; it simply means that the remaining quantity has not yet arrived. The current balance after issues is 2 boxes, which matches the accepted and released quantities. There is no quality-held stock, and the unposted physical receipts are 0. The accepted + released - issued does equal the current case balance, and the accepted + released + current quality hold does equal the posted receipts. Therefore, the current receiving stage is consistent, and no recovery is indicated. Next: Monitor the arrival of the remaining ordered quantity.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00015",
+          "MAT-PRE-2026-00005",
+          "MAT-PRE-2026-00006",
+          "MAT-PRE-2026-00005:ledger",
+          "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+          "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+          "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+          "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 19257,
+        "usage": {
+          "incremental_cost_usd": 0.0599064,
+          "input_tokens": 67559,
+          "output_tokens": 1831,
+          "request_count": 5,
+          "source_cache_hits": 1,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: SAFE_NOOP. The ordered quantity is 40 boxes, physically received and posted quantities are 2 boxes each, verified by ERP receipts MAT-PRE-2026-00005 and MAT-PRE-2026-00006 and stock ledger entries MAT-SLE-2026-00025 and MAT-SLE-2026-00026. The outstanding order balance of 38 boxes does not indicate missing stock but represents the remaining quantity yet to be received. Next: Inspect the expected delivery schedule for the remaining 38 boxes, check for any quality issues or holds on the received stock, and verify the current inventory level of M20-DEMO-CARTON in the warehouse.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00015",
+          "MAT-PRE-2026-00005",
+          "MAT-PRE-2026-00006",
+          "MAT-PRE-2026-00005:ledger",
+          "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+          "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+          "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+          "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 15846,
+        "usage": {
+          "incremental_cost_usd": 0.0450232,
+          "input_tokens": 50215,
+          "output_tokens": 1516,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+        "answer": "Disposition: SAFE_NOOP. The records that independently verify the receipt are the ERPNext purchase receipt documents 'MAT-PRE-2026-00005' and 'MAT-PRE-2026-00006,' along with their corresponding stock ledger entries 'MAT-SLE-2026-00025' and 'MAT-SLE-2026-00026.' These records confirm that the receipt was successfully posted and the stock was updated accordingly. The receipt should not be retried as it has already been successfully submitted and verified. Next: Inspect the stock ledger entries and ERP purchase receipt documents to ensure they match the posted quantities and there are no discrepancies.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00015",
+          "MAT-PRE-2026-00005",
+          "MAT-PRE-2026-00006",
+          "MAT-PRE-2026-00005:ledger",
+          "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+          "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+          "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+          "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 15789,
+        "usage": {
+          "incremental_cost_usd": 0.0586368,
+          "input_tokens": 66944,
+          "output_tokens": 1588,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain net change versus the prior-observation average; is this proof of revenue gain?",
+        "answer": "Disposition: SAFE_NOOP. The receiving trend shows that 2 boxes have been received, which is an increase of 2 boxes from the first observation. The historical baseline shows that the average number of boxes received in the prior observations was 0.67 boxes. However, this does not prove a revenue gain, as the baseline is only an average of prior observations and does not represent a delivery count or a causal revenue uplift. The net change from the first to the latest observation is 2 boxes, but this does not establish a financial outcome. The current case classification is SAFE_NOOP, as the receipts have been fully accounted for, there is no held stock, the invoice is open, and there are no outstanding customer issues or billing problems. Next: Continue inspecting and verifying the records without executing or suggesting an inventory write.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00015",
+          "MAT-PRE-2026-00005",
+          "MAT-PRE-2026-00006",
+          "MAT-PRE-2026-00005:ledger",
+          "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+          "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+          "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+          "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 25273,
+        "usage": {
+          "incremental_cost_usd": 0.074116,
+          "input_tokens": 83201,
+          "output_tokens": 2361,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      }
+    ],
+    "passed": true
+  }
+}

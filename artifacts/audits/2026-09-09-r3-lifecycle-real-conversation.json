@@ -1,0 +1,895 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R3",
+  "started_at": "2026-09-09T19:40:14.201162+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "acceptance_scope": "runtime_contract_only",
+  "independent_answer_quality_review_required": true,
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "Disposition: SAFE_NOOP. The ordered quantity is 40 boxes, the physically received and cumulatively posted quantities are 2 boxes, and the current balance after issues is 2 boxes. The outstanding order balance of 38 boxes does not indicate missing stock, as it has not yet arrived. The accepted + released - issued quantity equals the current case balance, and the accepted + released + current quality hold equals the posted receipts. There are no issues exceeding the accepted + released quantity. Therefore, no recovery is indicated for the current receiving stage. Next: Inspect and verify the records for any further discrepancies or issues without executing or suggesting an inventory write.",
+      "advisory": {
+        "attachments": [],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [],
+        "latency_ms": 14408,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "SAFE_NOOP",
+          "evidence_ids": [
+            "PUR-ORD-2026-00015",
+            "MAT-PRE-2026-00005",
+            "MAT-PRE-2026-00006",
+            "MAT-PRE-2026-00005:ledger",
+            "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+            "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+            "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+            "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+          ],
+          "follow_up_questions": [],
+          "reason": "The ordered quantity is 40 boxes, the physically received and cumulatively posted quantities are 2 boxes, and the current balance after issues is 2 boxes. The outstanding order balance of 38 boxes does not indicate missing stock, as it has not yet arrived. The accepted + released - issued quantity equals the current case balance, and the accepted + released + current quality hold equals the posted receipts. There are no issues exceeding the accepted + released quantity. Therefore, no recovery is indicated for the current receiving stage.",
+          "safe_next_step": "Inspect and verify the records for any further discrepancies or issues without executing or suggesting an inventory write.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2247,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 1936,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_Tr4VUUkD2FITTK8NQtbMyd",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_c7OM7uDE8S2LLdT6OMVzy7",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_4GC6PnMU6vUjx8MY3xQB7h",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_ro0ehykOs1jigj9Yl6ABon",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_JdZ5skQ5FvOy8YBeLoaDP1",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 8,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_1yD03NUL95P61qQgzzfHqD",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 9,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_Tr4VUUkD2FITTK8NQtbMyd",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 10,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_c7OM7uDE8S2LLdT6OMVzy7",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 11,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_4GC6PnMU6vUjx8MY3xQB7h",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 12,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_ro0ehykOs1jigj9Yl6ABon",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 13,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_JdZ5skQ5FvOy8YBeLoaDP1",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 14,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_1yD03NUL95P61qQgzzfHqD",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 9550,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3163,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 15601,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 4821,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 17389,
+            "sequence": 19,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 4466,
+            "sequence": 20,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 21,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_nbMyyV8aWj1N4uDNMsSRZD",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 22,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_nbMyyV8aWj1N4uDNMsSRZD",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.0447728,
+          "input_tokens": 50566,
+          "output_tokens": 1350,
+          "request_count": 4,
+          "source_cache_hits": 1,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    },
+    {
+      "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+      "answer": "Disposition: SAFE_NOOP. The ERPNext purchase receipt documents 'MAT-PRE-2026-00005' and 'MAT-PRE-2026-00006', along with their corresponding stock ledger entries 'MAT-SLE-2026-00025' and 'MAT-SLE-2026-00026', independently verify the receipt. The receipt should not be retried as it has already been submitted and verified. The current balance after issues is 2.0 units, which matches the cumulatively posted receipts. There is no quality-held stock, and the accepted + released - issued equals the current case balance. The accepted + released + current quality hold also equals the posted receipts. There are no issues exceeding the accepted + released. Next: Verify the integrity of the stock ledger entries and general ledger entries to ensure they align with the purchase receipts.",
+      "advisory": {
+        "attachments": [],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [
+          "Are there any discrepancies between the stock ledger entries and the general ledger entries?",
+          "Has the supplier invoice been received and matched to the purchase receipts?",
+          "Are there any quality hold records or incident work orders that need to be reviewed?"
+        ],
+        "latency_ms": 20247,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "SAFE_NOOP",
+          "evidence_ids": [
+            "PUR-ORD-2026-00015",
+            "MAT-PRE-2026-00005",
+            "MAT-PRE-2026-00006",
+            "MAT-PRE-2026-00005:ledger",
+            "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+            "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+            "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+            "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+          ],
+          "follow_up_questions": [
+            "Are there any discrepancies between the stock ledger entries and the general ledger entries?",
+            "Has the supplier invoice been received and matched to the purchase receipts?",
+            "Are there any quality hold records or incident work orders that need to be reviewed?"
+          ],
+          "reason": "The ERPNext purchase receipt documents 'MAT-PRE-2026-00005' and 'MAT-PRE-2026-00006', along with their corresponding stock ledger entries 'MAT-SLE-2026-00025' and 'MAT-SLE-2026-00026', independently verify the receipt. The receipt should not be retried as it has already been submitted and verified. The current balance after issues is 2.0 units, which matches the cumulatively posted receipts. There is no quality-held stock, and the accepted + released - issued equals the current case balance. The accepted + released + current quality hold also equals the posted receipts. There are no issues exceeding the accepted + released.",
+          "safe_next_step": "Verify the integrity of the stock ledger entries and general ledger entries to ensure they align with the purchase receipts.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2241,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2254,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_X9aGiD659Y5lxGfCGeeqMH",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_dpc6JGt63S4Oq9fmZWAP1Z",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_B9SrVeQXJHR6LeBtzJx5Bg",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_WbAmgc7YwD6zwVuXurHTXV",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_VOQ55RjRe21ftSo6M7e8q7",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 8,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_sT0hQfmfbzbZKAYbvWr5qi",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 8,
+            "sequence": 9,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_X9aGiD659Y5lxGfCGeeqMH",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 10,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_dpc6JGt63S4Oq9fmZWAP1Z",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 11,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_B9SrVeQXJHR6LeBtzJx5Bg",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 12,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_WbAmgc7YwD6zwVuXurHTXV",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 13,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_VOQ55RjRe21ftSo6M7e8q7",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 14,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_sT0hQfmfbzbZKAYbvWr5qi",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 9569,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3406,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 15702,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3921,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 17349,
+            "sequence": 19,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 6132,
+            "sequence": 20,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 21,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_wP8JI6SOZ6Agt4K3506Z00",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 22,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_wP8JI6SOZ6Agt4K3506Z00",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 17966,
+            "sequence": 23,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 4508,
+            "sequence": 24,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 25,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_Fq7hV7RH9bKzjwxbwCX4vp",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 26,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_Fq7hV7RH9bKzjwxbwCX4vp",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.0616088,
+          "input_tokens": 68643,
+          "output_tokens": 2092,
+          "request_count": 5,
+          "source_cache_hits": 1,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    },
+    {
+      "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain net change versus the prior-observation average; is this proof of revenue gain?",
+      "answer": "Disposition: SAFE_NOOP. The receiving trend shows a net change of 2.0 boxes from the first observation, but this does not prove revenue gain as the operational history data does not provide information on net billed sales or revenue uplift. The current arrival facts show that both arrivals have been receipted and posted, with a posted quantity of 1 box each. The case can be classified as SAFE_NOOP, as the receipts have been fully accounted for and there is no held stock. However, the case remains open due to the absence of a supplier invoice. Next: Inspect/read/verify records without executing or suggesting an inventory write.",
+      "advisory": {
+        "attachments": [
+          {
+            "history": {
+              "baseline": {
+                "calculation": "arithmetic_mean_of_prior_comparable_observations",
+                "cohort": {
+                  "case_id": "M20-GOODS-20260909-40-R3",
+                  "currency": "USD",
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "observation_kind": "live_observation",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "uom": "Box"
+                },
+                "industry_benchmark": false,
+                "kind": "internal_observation_baseline",
+                "metrics": {
+                  "invoice_hold_value": {
+                    "change": 0.0,
+                    "change_percent": null,
+                    "current": 0.0,
+                    "previous_mean": 0.0,
+                    "sample_count": 3,
+                    "status": "AVAILABLE"
+                  },
+                  "net_billed_sales": {
+                    "change": null,
+                    "change_percent": null,
+                    "current": null,
+                    "previous_mean": null,
+                    "sample_count": 0,
+                    "status": "UNAVAILABLE"
+                  },
+                  "outstanding_order_quantity": {
+                    "change": -1.3333333333333357,
+                    "change_percent": -3.389830508474582,
+                    "current": 38.0,
+                    "previous_mean": 39.333333333333336,
+                    "sample_count": 3,
+                    "status": "AVAILABLE"
+                  },
+                  "quality_hold": {
+                    "change": 0.0,
+                    "change_percent": null,
+                    "current": 0.0,
+                    "previous_mean": 0.0,
+                    "sample_count": 3,
+                    "status": "AVAILABLE"
+                  },
+                  "received": {
+                    "change": 1.3333333333333335,
+                    "change_percent": 200.00000000000006,
+                    "current": 2.0,
+                    "previous_mean": 0.6666666666666666,
+                    "sample_count": 3,
+                    "status": "AVAILABLE"
+                  },
+                  "recorded": {
+                    "change": 1.3333333333333335,
+                    "change_percent": 200.00000000000006,
+                    "current": 2.0,
+                    "previous_mean": 0.6666666666666666,
+                    "sample_count": 3,
+                    "status": "AVAILABLE"
+                  }
+                },
+                "minimum_samples": 3,
+                "sample_count": 3,
+                "status": "AVAILABLE",
+                "time_weighted": false
+              },
+              "case_id": "M20-GOODS-20260909-40-R3",
+              "coverage": {
+                "business_history_complete": false,
+                "first_observed_at": "2026-09-09T19:13:53.926785+00:00",
+                "first_retained_at": "2026-09-09T19:13:53.926785+00:00",
+                "last_observed_at": "2026-09-09T19:19:07.797225+00:00",
+                "last_retained_at": "2026-09-09T19:19:07.797225+00:00",
+                "returned_points": 4,
+                "since": null,
+                "status": "OBSERVED",
+                "time_basis": "observed_at",
+                "total_points": 4,
+                "total_points_basis": "RETAINED_RECORDS_INCLUDING_PROJECTION_REVISIONS",
+                "truncated": false
+              },
+              "evidence_ids": [
+                "operational-history:M20-GOODS-20260909-40-R3:1",
+                "operational-history:M20-GOODS-20260909-40-R3:2",
+                "operational-history:M20-GOODS-20260909-40-R3:3",
+                "operational-history:M20-GOODS-20260909-40-R3:4"
+              ],
+              "freshness": "HISTORICAL_OBSERVATIONS",
+              "limitations": "Observation-time history, not a complete business ledger, industry benchmark, cash receipt, or causal revenue uplift. Baseline uses the parent query window.",
+              "points": [
+                {
+                  "case_id": "M20-GOODS-20260909-40-R3",
+                  "currency": "USD",
+                  "documents": [
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_order",
+                      "name": "PUR-ORD-2026-00015",
+                      "status": "SUBMITTED",
+                      "version": "2026-09-09 12:12:43.860762"
+                    }
+                  ],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R3:1",
+                  "id": 1,
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "metrics": {
+                    "invoice_hold_value": 0.0,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": 40.0,
+                    "quality_hold": 0.0,
+                    "received": 0.0,
+                    "recorded": 0.0
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T19:13:53.926785+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "CONNECTED",
+                  "time_basis": "observed_at",
+                  "uom": "Box"
+                },
+                {
+                  "case_id": "M20-GOODS-20260909-40-R3",
+                  "currency": "USD",
+                  "documents": [
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_order",
+                      "name": "PUR-ORD-2026-00015",
+                      "status": "SUBMITTED",
+                      "version": "2026-09-09 12:14:12.823261"
+                    },
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_receipt",
+                      "name": "MAT-PRE-2026-00005",
+                      "status": "RECEIVED",
+                      "version": "2026-09-09 12:14:12.763099"
+                    }
+                  ],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R3:2",
+                  "id": 2,
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "metrics": {
+                    "invoice_hold_value": 0.0,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": 39.0,
+                    "quality_hold": 0.0,
+                    "received": 1.0,
+                    "recorded": 1.0
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T19:14:13.978561+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "CONNECTED",
+                  "time_basis": "observed_at",
+                  "uom": "Box"
+                },
+                {
+                  "case_id": "M20-GOODS-20260909-40-R3",
+                  "currency": "USD",
+                  "documents": [
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_order",
+                      "name": "PUR-ORD-2026-00015",
+                      "status": "SUBMITTED",
+                      "version": "2026-09-09 12:14:12.823261"
+                    },
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_receipt",
+                      "name": "MAT-PRE-2026-00005",
+                      "status": "RECEIVED",
+                      "version": "2026-09-09 12:14:12.763099"
+                    }
+                  ],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R3:3",
+                  "id": 3,
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "metrics": {
+                    "invoice_hold_value": 0.0,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": 39.0,
+                    "quality_hold": 0.0,
+                    "received": 1.0,
+                    "recorded": 1.0
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T19:17:58.895014+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "CONNECTED",
+                  "time_basis": "observed_at",
+                  "uom": "Box"
+                },
+                {
+                  "case_id": "M20-GOODS-20260909-40-R3",
+                  "currency": "USD",
+                  "documents": [
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_order",
+                      "name": "PUR-ORD-2026-00015",
+                      "status": "SUBMITTED",
+                      "version": "2026-09-09 12:19:06.795375"
+                    },
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_receipt",
+                      "name": "MAT-PRE-2026-00005",
+                      "status": "RECEIVED",
+                      "version": "2026-09-09 12:14:12.763099"
+                    },
+                    {
+                      "effective_at": null,
+                      "kind": "purchase_receipt",
+                      "name": "MAT-PRE-2026-00006",
+                      "status": "RECEIVED",
+                      "version": "2026-09-09 12:19:06.739138"
+                    }
+                  ],
+                  "effective_at": null,
+                  "evidence_id": "operational-history:M20-GOODS-20260909-40-R3:4",
+                  "id": 4,
+                  "item_code": "M20-DEMO-CARTON",
+                  "metric_version": "operational-facts.v1",
+                  "metrics": {
+                    "invoice_hold_value": 0.0,
+                    "net_billed_sales": null,
+                    "outstanding_order_quantity": 38.0,
+                    "quality_hold": 0.0,
+                    "received": 2.0,
+                    "recorded": 2.0
+                  },
+                  "observation_kind": "live_observation",
+                  "observed_at": "2026-09-09T19:19:07.797225+00:00",
+                  "provenance": "external-observation",
+                  "source_id": "erpnext-missing20",
+                  "source_status": "CONNECTED",
+                  "time_basis": "observed_at",
+                  "uom": "Box"
+                }
+              ],
+              "selection": {
+                "available_in_query": 4,
+                "kind": "latest_observations",
+                "returned": 4,
+                "truncated": false
+              }
+            },
+            "kind": "history",
+            "metric": "received"
+          }
+        ],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [],
+        "latency_ms": 21743,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": "received",
+          "disposition": "SAFE_NOOP",
+          "evidence_ids": [
+            "PUR-ORD-2026-00015",
+            "MAT-PRE-2026-00005",
+            "MAT-PRE-2026-00006",
+            "MAT-PRE-2026-00005:ledger",
+            "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+            "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+            "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+            "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+          ],
+          "follow_up_questions": [],
+          "reason": "The receiving trend shows a net change of 2.0 boxes from the first observation, but this does not prove revenue gain as the operational history data does not provide information on net billed sales or revenue uplift. The current arrival facts show that both arrivals have been receipted and posted, with a posted quantity of 1 box each. The case can be classified as SAFE_NOOP, as the receipts have been fully accounted for and there is no held stock. However, the case remains open due to the absence of a supplier invoice.",
+          "safe_next_step": "Inspect/read/verify records without executing or suggesting an inventory write.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2393,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2086,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_uJscqLE4RliaySTRAjtcOY",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_A2h5FP1uJyEF3Io2IDIVSp",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_x13rLXN9pDvClSElRQA2Wp",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_o9X1rhui9KHvZXy4VyWsPz",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_QXRzNyLc6UVKk28eTfZyBj",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 8,
+            "tool": "read_operational_history",
+            "tool_use_id": "tooluse_DHgY5qry3BWWHQJzu9RA6V",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 8,
+            "sequence": 9,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_uJscqLE4RliaySTRAjtcOY",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 10,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_A2h5FP1uJyEF3Io2IDIVSp",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 11,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_x13rLXN9pDvClSElRQA2Wp",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 12,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_o9X1rhui9KHvZXy4VyWsPz",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 13,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_QXRzNyLc6UVKk28eTfZyBj",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 14,
+            "tool": "read_operational_history",
+            "tool_use_id": "tooluse_DHgY5qry3BWWHQJzu9RA6V",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 11782,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2337,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 19138,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 7250,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 21232,
+            "sequence": 19,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 6110,
+            "sequence": 20,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 21,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_83Y8ALt1sZ4wD27rppWTKG",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 22,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_83Y8ALt1sZ4wD27rppWTKG",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 21848,
+            "sequence": 23,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3931,
+            "sequence": 24,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 25,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_1sukq7R014kCjaQAKfASPP",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 26,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_1sukq7R014kCjaQAKfASPP",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_control_context",
+          "read_erp_evidence",
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_operational_history"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.073988,
+          "input_tokens": 83457,
+          "output_tokens": 2257,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    }
+  ],
+  "passed": true,
+  "quantities_unchanged": true,
+  "completed_at": "2026-09-09T19:41:13.148402+00:00"
+}

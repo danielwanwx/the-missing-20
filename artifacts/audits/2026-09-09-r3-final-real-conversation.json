@@ -1,0 +1,279 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R3",
+  "started_at": "2026-09-09T19:30:18.675654+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "acceptance_scope": "runtime_contract_only",
+  "independent_answer_quality_review_required": true,
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "Disposition: SAFE_NOOP. The ordered quantity for purchase order PUR-ORD-2026-00015 is 40 boxes. The physically received quantity, as per the collaboration source, is 2 boxes (1 box for ARRIVAL-01 and 1 box for ARRIVAL-02). The posted quantity in the ERP stock ledger is also 2 boxes. The outstanding order balance of 38 boxes does not necessarily indicate missing stock; it simply means that the remaining quantity has not yet arrived. The current balance after issues is 2 boxes, which matches the accepted and released quantities. There is no quality-held stock, and the unposted physical receipts are 0. The accepted + released - issued does equal the current case balance, and the accepted + released + current quality hold does equal the posted receipts. Therefore, the current receiving stage is consistent, and no recovery is indicated. Next: Monitor the arrival of the remaining ordered quantity.",
+      "advisory": {
+        "attachments": [],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [],
+        "latency_ms": 19257,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "SAFE_NOOP",
+          "evidence_ids": [
+            "PUR-ORD-2026-00015",
+            "MAT-PRE-2026-00005",
+            "MAT-PRE-2026-00006",
+            "MAT-PRE-2026-00005:ledger",
+            "c7621f9ed5265bc43dee7a610b1e8bdc:photo:1:2dc3d1ef5b4d",
+            "67c37a39feb313d928f41c090586c5d5:photo:1:b34d390f0b03",
+            "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+            "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e"
+          ],
+          "follow_up_questions": [],
+          "reason": "The ordered quantity for purchase order PUR-ORD-2026-00015 is 40 boxes. The physically received quantity, as per the collaboration source, is 2 boxes (1 box for ARRIVAL-01 and 1 box for ARRIVAL-02). The posted quantity in the ERP stock ledger is also 2 boxes. The outstanding order balance of 38 boxes does not necessarily indicate missing stock; it simply means that the remaining quantity has not yet arrived. The current balance after issues is 2 boxes, which matches the accepted and released quantities. There is no quality-held stock, and the unposted physical receipts are 0. The accepted + released - issued does equal the current case balance, and the accepted + released + current quality hold does equal the posted receipts. Therefore, the current receiving stage is consistent, and no recovery is indicated.",
+          "safe_next_step": "Monitor the arrival of the remaining ordered quantity.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2168,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2024,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_RO4hN25WKRUyjyISdO600i",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_TbOS1SxMyMSO4LtIYZW8m1",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_GLSpYf3oFTy8O7PuHGkrsH",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_a5PzqvKw2Jg3MkBFX4I2dr",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_mLTN2b3nLMkaFV2VGmNItK",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 8,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_xtnjvERcYPysmBsJ4K0Heb",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 7,
+            "sequence": 9,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_RO4hN25WKRUyjyISdO600i",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 10,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_TbOS1SxMyMSO4LtIYZW8m1",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 11,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_GLSpYf3oFTy8O7PuHGkrsH",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 6,
+            "sequence": 12,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_a5PzqvKw2Jg3MkBFX4I2dr",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 5,
+            "sequence": 13,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_mLTN2b3nLMkaFV2VGmNItK",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 5,
+            "sequence": 14,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_xtnjvERcYPysmBsJ4K0Heb",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 9482,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2521,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 15463,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3785,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 17034,
+            "sequence": 19,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 5461,
+            "sequence": 20,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 21,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_F76j8M6VOKkxTdC8hZ9gxl",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 22,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_F76j8M6VOKkxTdC8hZ9gxl",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 17599,
+            "sequence": 23,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 5438,
+            "sequence": 24,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 25,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_R0I1L7SfNfdJtnZ1xaztoH",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 26,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_R0I1L7SfNfdJtnZ1xaztoH",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.0599064,
+          "input_tokens": 67559,
+          "output_tokens": 1831,
+          "request_count": 5,
+          "source_cache_hits": 1,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    },
+    {
+      "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+      "answer": "The real Agent response failed safety validation; no conclusion was shown.",
+      "advisory": {
+        "mode": "real_strands",
+        "result": null,
+        "status": "VALIDATION_FAILED",
+        "tool_calls": [],
+        "usage": {
+          "incremental_cost_usd": 0.0948032,
+          "input_tokens": 107156,
+          "output_tokens": 2837,
+          "request_count": 7
+        }
+      },
+      "validation_diagnostics": [
+        {
+          "attempt": 1,
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "disposition": "SAFE_NOOP",
+          "failure": "Answer omitted requested receipt and its stock-ledger identifier",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        },
+        {
+          "attempt": 2,
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "disposition": "SAFE_NOOP",
+          "failure": "Answer omitted requested receipt and its stock-ledger identifier",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        },
+        {
+          "attempt": 3,
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "disposition": "SAFE_NOOP",
+          "failure": "Answer omitted requested receipt and its stock-ledger identifier",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2034 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R3",
+  "scope": "staged concurrent receipt changes the same PO",
+  "source": "Original public photographs; real Strands/Bedrock and demo SaaS effects",
+  "captures": {
+    "ARRIVAL-01": "c7621f9ed5265bc43dee7a610b1e8bdc",
+    "ARRIVAL-02": "67c37a39feb313d928f41c090586c5d5"
+  },
+  "steps": [
+    {
+      "step": "create-ARRIVAL-01",
+      "at": "2026-09-09T19:13:27.203348+00:00",
+      "state": {
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:27.202319+00:00",
+        "drafts_enabled": true,
+        "events": [],
+        "id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+        "image_version": 0,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "AWAITING_PHOTO",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "version": 0,
+        "work_item": {
+          "arrival_id": "ARRIVAL-01",
+          "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-001"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "photo-ARRIVAL-01",
+      "at": "2026-09-09T19:13:31.817232+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.51,
+                "y": 0.5
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 4533,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 2480,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2424,
+                "outputTokens": 128,
+                "totalTokens": 2552
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.51,
+                    "y": 0.5
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 2052,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 2898,
+                "outputTokens": 161,
+                "totalTokens": 3059
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5322,
+            "outputTokens": 289,
+            "totalTokens": 5611
+          }
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:27.202319+00:00",
+        "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:27.225286+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:31.814265+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          }
+        ],
+        "id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "COUNT_CANDIDATE",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:13:31.814265+00:00",
+        "version": 2,
+        "work_item": {
+          "arrival_id": "ARRIVAL-01",
+          "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-001"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "barcode-ARRIVAL-01",
+      "at": "2026-09-09T19:13:32.633130+00:00",
+      "state": {
+        "arrival_id": "ARRIVAL-01",
+        "case_id": "M20-GOODS-20260909-40-R3",
+        "code": "M20-CARTON-BOX",
+        "currency": "USD",
+        "evidence_id": "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e",
+        "format": "code_128",
+        "inventory_changed": false,
+        "item_code": "M20-DEMO-CARTON",
+        "item_group": "Demo Item Group",
+        "item_name": "Demo shipping carton",
+        "item_url": "https://missing20.v.frappe.cloud/app/item/M20-DEMO-CARTON",
+        "item_version": "2026-09-09 12:12:43.925523",
+        "kind": "product",
+        "observed_at": "2026-09-09T19:13:32.632228+00:00",
+        "order_url": "https://missing20.v.frappe.cloud/app/purchase-order/PUR-ORD-2026-00015",
+        "po_version": "2026-09-09 12:12:43.860762",
+        "price_basis": "PURCHASE_ORDER_LINE",
+        "purchase_order": "PUR-ORD-2026-00015",
+        "purchase_order_item": "bn4t0atcri",
+        "quantity_basis": "REQUIRES_PHYSICAL_QUANTITY",
+        "unit_price": 50.0,
+        "uom": "Box"
+      }
+    },
+    {
+      "step": "confirm-ARRIVAL-01",
+      "at": "2026-09-09T19:13:33.754284+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.51,
+                "y": 0.5
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 4533,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 2480,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2424,
+                "outputTokens": 128,
+                "totalTokens": 2552
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.51,
+                    "y": 0.5
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 2052,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 2898,
+                "outputTokens": 161,
+                "totalTokens": 3059
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5322,
+            "outputTokens": 289,
+            "totalTokens": 5611
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:12:43.860762",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:27.202319+00:00",
+        "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:27.225286+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:31.814265+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:33.751406+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          }
+        ],
+        "id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e",
+          "barcode_item_version": "2026-09-09 12:12:43.925523",
+          "barcode_observed_at": "2026-09-09T19:13:32.632228+00:00",
+          "confirmed_at": "2026-09-09T19:13:33.751338+00:00",
+          "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:12:43.860762",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "RECEIPT_PREPARED",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:13:33.751406+00:00",
+        "version": 3,
+        "work_item": {
+          "arrival_id": "ARRIVAL-01",
+          "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-001"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "create-ARRIVAL-02",
+      "at": "2026-09-09T19:13:33.756280+00:00",
+      "state": {
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:33.755476+00:00",
+        "drafts_enabled": true,
+        "events": [],
+        "id": "67c37a39feb313d928f41c090586c5d5",
+        "image_version": 0,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "AWAITING_PHOTO",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "version": 0,
+        "work_item": {
+          "arrival_id": "ARRIVAL-02",
+          "capture_id": "67c37a39feb313d928f41c090586c5d5",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-002"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "photo-ARRIVAL-02",
+      "at": "2026-09-09T19:13:37.846465+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.43,
+                "y": 0.41
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 3891,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no edge clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 1908,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2531,
+                "outputTokens": 102,
+                "totalTokens": 2633
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.43,
+                    "y": 0.41
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 1983,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 3005,
+                "outputTokens": 170,
+                "totalTokens": 3175
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5536,
+            "outputTokens": 272,
+            "totalTokens": 5808
+          }
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:33.755476+00:00",
+        "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:33.911032+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:37.841617+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          }
+        ],
+        "id": "67c37a39feb313d928f41c090586c5d5",
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "COUNT_CANDIDATE",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:13:37.841617+00:00",
+        "version": 2,
+        "work_item": {
+          "arrival_id": "ARRIVAL-02",
+          "capture_id": "67c37a39feb313d928f41c090586c5d5",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-002"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "barcode-ARRIVAL-02",
+      "at": "2026-09-09T19:13:38.656423+00:00",
+      "state": {
+        "arrival_id": "ARRIVAL-02",
+        "case_id": "M20-GOODS-20260909-40-R3",
+        "code": "M20-CARTON-BOX",
+        "currency": "USD",
+        "evidence_id": "barcode:d061f34e8e10be567f367ea5709747cb3d5afc4fc6c14d1cd8aaf01287d6760a",
+        "format": "code_128",
+        "inventory_changed": false,
+        "item_code": "M20-DEMO-CARTON",
+        "item_group": "Demo Item Group",
+        "item_name": "Demo shipping carton",
+        "item_url": "https://missing20.v.frappe.cloud/app/item/M20-DEMO-CARTON",
+        "item_version": "2026-09-09 12:12:43.925523",
+        "kind": "product",
+        "observed_at": "2026-09-09T19:13:38.655173+00:00",
+        "order_url": "https://missing20.v.frappe.cloud/app/purchase-order/PUR-ORD-2026-00015",
+        "po_version": "2026-09-09 12:12:43.860762",
+        "price_basis": "PURCHASE_ORDER_LINE",
+        "purchase_order": "PUR-ORD-2026-00015",
+        "purchase_order_item": "bn4t0atcri",
+        "quantity_basis": "REQUIRES_PHYSICAL_QUANTITY",
+        "unit_price": 50.0,
+        "uom": "Box"
+      }
+    },
+    {
+      "step": "confirm-ARRIVAL-02",
+      "at": "2026-09-09T19:13:39.724813+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.43,
+                "y": 0.41
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 3891,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no edge clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 1908,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2531,
+                "outputTokens": 102,
+                "totalTokens": 2633
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.43,
+                    "y": 0.41
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 1983,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 3005,
+                "outputTokens": 170,
+                "totalTokens": 3175
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5536,
+            "outputTokens": 272,
+            "totalTokens": 5808
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:12:43.860762",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:33.755476+00:00",
+        "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:33.911032+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:37.841617+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:39.721207+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          }
+        ],
+        "id": "67c37a39feb313d928f41c090586c5d5",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:d061f34e8e10be567f367ea5709747cb3d5afc4fc6c14d1cd8aaf01287d6760a",
+          "barcode_item_version": "2026-09-09 12:12:43.925523",
+          "barcode_observed_at": "2026-09-09T19:13:38.655173+00:00",
+          "confirmed_at": "2026-09-09T19:13:39.721118+00:00",
+          "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:12:43.860762",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "RECEIPT_PREPARED",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:13:39.721207+00:00",
+        "version": 3,
+        "work_item": {
+          "arrival_id": "ARRIVAL-02",
+          "capture_id": "67c37a39feb313d928f41c090586c5d5",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-002"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "draft-ARRIVAL-02",
+      "at": "2026-09-09T19:14:11.907952+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.43,
+                "y": 0.41
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 3891,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no edge clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 1908,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2531,
+                "outputTokens": 102,
+                "totalTokens": 2633
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.43,
+                    "y": 0.41
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 1983,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 3005,
+                "outputTokens": 170,
+                "totalTokens": 3175
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5536,
+            "outputTokens": 272,
+            "totalTokens": 5808
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:12:43.860762",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:33.755476+00:00",
+        "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+        "draft": {
+          "docstatus": 0,
+          "modified": "2026-09-09 12:14:11.197786",
+          "name": "MAT-PRE-2026-00005",
+          "stock_posted": false,
+          "url": "https://missing20.v.frappe.cloud/app/purchase-receipt/MAT-PRE-2026-00005",
+          "verified_draft": true
+        },
+        "draft_attempted": true,
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:33.911032+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:37.841617+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:39.721207+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:14:10.684068+00:00",
+            "detail": "ERP draft requested; waiting for authoritative reread.",
+            "status": "DRAFT_UNKNOWN"
+          },
+          {
+            "at": "2026-09-09T19:14:11.903586+00:00",
+            "detail": "ERP draft reread verified. Inventory is unchanged.",
+            "status": "DRAFT_VERIFIED"
+          }
+        ],
+        "id": "67c37a39feb313d928f41c090586c5d5",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:d061f34e8e10be567f367ea5709747cb3d5afc4fc6c14d1cd8aaf01287d6760a",
+          "barcode_item_version": "2026-09-09 12:12:43.925523",
+          "barcode_observed_at": "2026-09-09T19:13:38.655173+00:00",
+          "confirmed_at": "2026-09-09T19:13:39.721118+00:00",
+          "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:12:43.860762",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "DRAFT_VERIFIED",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:14:11.903586+00:00",
+        "version": 5,
+        "work_item": {
+          "arrival_id": "ARRIVAL-02",
+          "capture_id": "67c37a39feb313d928f41c090586c5d5",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-002"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "submit-ARRIVAL-02",
+      "at": "2026-09-09T19:14:13.469742+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.43,
+                "y": 0.41
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 3891,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no edge clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 1908,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2531,
+                "outputTokens": 102,
+                "totalTokens": 2633
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.43,
+                    "y": 0.41
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 1983,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 3005,
+                "outputTokens": 170,
+                "totalTokens": 3175
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5536,
+            "outputTokens": 272,
+            "totalTokens": 5808
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:12:43.860762",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:33.755476+00:00",
+        "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+        "draft": {
+          "docstatus": 0,
+          "modified": "2026-09-09 12:14:11.197786",
+          "name": "MAT-PRE-2026-00005",
+          "stock_posted": false,
+          "url": "https://missing20.v.frappe.cloud/app/purchase-receipt/MAT-PRE-2026-00005",
+          "verified_draft": true
+        },
+        "draft_attempted": true,
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:33.911032+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:37.841617+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:39.721207+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:14:10.684068+00:00",
+            "detail": "ERP draft requested; waiting for authoritative reread.",
+            "status": "DRAFT_UNKNOWN"
+          },
+          {
+            "at": "2026-09-09T19:14:11.903586+00:00",
+            "detail": "ERP draft reread verified. Inventory is unchanged.",
+            "status": "DRAFT_VERIFIED"
+          },
+          {
+            "at": "2026-09-09T19:14:12.445769+00:00",
+            "detail": "Confirmed receipt submission requested; waiting for submitted document and stock ledger reread.",
+            "status": "SUBMIT_UNKNOWN"
+          },
+          {
+            "at": "2026-09-09T19:14:13.465164+00:00",
+            "detail": "Existing receipt submitted and exact stock ledger quantity verified. This is not a quality release or payment.",
+            "status": "RECEIPT_SUBMITTED"
+          }
+        ],
+        "id": "67c37a39feb313d928f41c090586c5d5",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:d061f34e8e10be567f367ea5709747cb3d5afc4fc6c14d1cd8aaf01287d6760a",
+          "barcode_item_version": "2026-09-09 12:12:43.925523",
+          "barcode_observed_at": "2026-09-09T19:13:38.655173+00:00",
+          "confirmed_at": "2026-09-09T19:13:39.721118+00:00",
+          "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:12:43.860762",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "physical_receiving_confirmation": {
+          "candidate": {
+            "additional_discount_percentage": 0.0,
+            "apply_discount_on": "Grand Total",
+            "buying_price_list": "Standard Buying",
+            "company": "Missing 20 Automotive Demo",
+            "conversion_rate": 1.0,
+            "currency": "USD",
+            "doctype": "Purchase Receipt",
+            "items": [
+              {
+                "conversion_factor": 1,
+                "cost_center": "Main - M20",
+                "expense_account": "Cost of Goods Sold - M20",
+                "item_code": "M20-DEMO-CARTON",
+                "item_tax_rate": "{}",
+                "purchase_order": "PUR-ORD-2026-00015",
+                "purchase_order_item": "bn4t0atcri",
+                "qty": 1,
+                "rate": 50.0,
+                "stock_uom": "Box",
+                "uom": "Box",
+                "warehouse": "Stores - M20"
+              }
+            ],
+            "plc_conversion_rate": 1.0,
+            "po_version": "2026-09-09 12:12:43.860762",
+            "price_list_currency": "USD",
+            "purchase_order": "PUR-ORD-2026-00015",
+            "quantity": 1,
+            "supplier": "M20 Controller Systems Ltd."
+          },
+          "confirmed_at": "2026-09-09T19:14:12.445661+00:00",
+          "digest": "b34d390f0b038b5361bd4f0e79563b009925745c7fa2b09f47d7f5d83b668b11",
+          "image_version": 1,
+          "meaning": "Human confirmed this exact physical receiving, not another view of previously received goods. Not a quality release or payment approval.",
+          "receipt_name": "MAT-PRE-2026-00005"
+        },
+        "purchase_order": "PUR-ORD-2026-00015",
+        "receipt": {
+          "docstatus": 1,
+          "modified": "2026-09-09 12:14:12.763099",
+          "name": "MAT-PRE-2026-00005",
+          "quantity": 1,
+          "stock_ledger": [
+            {
+              "actual_qty": 1.0,
+              "company": "Missing 20 Automotive Demo",
+              "is_cancelled": 0,
+              "item_code": "M20-DEMO-CARTON",
+              "name": "48cf6169f9",
+              "voucher_detail_no": "8o10m7fv50",
+              "voucher_no": "MAT-PRE-2026-00005",
+              "voucher_type": "Purchase Receipt",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "stock_posted": true,
+          "stock_uom": "Box",
+          "url": "https://missing20.v.frappe.cloud/app/purchase-receipt/MAT-PRE-2026-00005",
+          "verified_at": "2026-09-09T19:14:13.464928+00:00",
+          "verified_receipt": true
+        },
+        "status": "RECEIPT_SUBMITTED",
+        "stock_posted": true,
+        "submit_attempted": true,
+        "submit_confirmation_version": 5,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:14:13.465164+00:00",
+        "version": 7,
+        "work_item": {
+          "arrival_id": "ARRIVAL-02",
+          "capture_id": "67c37a39feb313d928f41c090586c5d5",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-002"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "stale-plan-blocked",
+      "at": "2026-09-09T19:14:40.087332+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.51,
+                "y": 0.5
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 4533,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 2480,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2424,
+                "outputTokens": 128,
+                "totalTokens": 2552
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.51,
+                    "y": 0.5
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 2052,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 2898,
+                "outputTokens": 161,
+                "totalTokens": 3059
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5322,
+            "outputTokens": 289,
+            "totalTokens": 5611
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:12:43.860762",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:27.202319+00:00",
+        "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:27.225286+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:31.814265+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:33.751406+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:14:40.084612+00:00",
+            "detail": "PO changed; refresh receiving evidence before a draft.",
+            "status": "NEEDS_REVIEW"
+          }
+        ],
+        "id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:8909810544f4e2cbf44d445972de36d26ab3b517840efe5ef7a31c436fb8a00e",
+          "barcode_item_version": "2026-09-09 12:12:43.925523",
+          "barcode_observed_at": "2026-09-09T19:13:32.632228+00:00",
+          "confirmed_at": "2026-09-09T19:13:33.751338+00:00",
+          "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:12:43.860762",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "NEEDS_REVIEW",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:14:40.084612+00:00",
+        "version": 4,
+        "work_item": {
+          "arrival_id": "ARRIVAL-01",
+          "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-001"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "barcode-ARRIVAL-01",
+      "at": "2026-09-09T19:17:57.826201+00:00",
+      "state": {
+        "arrival_id": "ARRIVAL-01",
+        "case_id": "M20-GOODS-20260909-40-R3",
+        "code": "M20-CARTON-BOX",
+        "currency": "USD",
+        "evidence_id": "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+        "format": "code_128",
+        "inventory_changed": false,
+        "item_code": "M20-DEMO-CARTON",
+        "item_group": "Demo Item Group",
+        "item_name": "Demo shipping carton",
+        "item_url": "https://missing20.v.frappe.cloud/app/item/M20-DEMO-CARTON",
+        "item_version": "2026-09-09 12:14:12.816342",
+        "kind": "product",
+        "observed_at": "2026-09-09T19:17:57.824910+00:00",
+        "order_url": "https://missing20.v.frappe.cloud/app/purchase-order/PUR-ORD-2026-00015",
+        "po_version": "2026-09-09 12:14:12.823261",
+        "price_basis": "PURCHASE_ORDER_LINE",
+        "purchase_order": "PUR-ORD-2026-00015",
+        "purchase_order_item": "bn4t0atcri",
+        "quantity_basis": "REQUIRES_PHYSICAL_QUANTITY",
+        "unit_price": 50.0,
+        "uom": "Box"
+      }
+    },
+    {
+      "step": "confirm-ARRIVAL-01",
+      "at": "2026-09-09T19:17:58.898335+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.51,
+                "y": 0.5
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 4533,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 2480,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2424,
+                "outputTokens": 128,
+                "totalTokens": 2552
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.51,
+                    "y": 0.5
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 2052,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 2898,
+                "outputTokens": 161,
+                "totalTokens": 3059
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5322,
+            "outputTokens": 289,
+            "totalTokens": 5611
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:14:12.823261",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:27.202319+00:00",
+        "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:27.225286+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:31.814265+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:33.751406+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:14:40.084612+00:00",
+            "detail": "PO changed; refresh receiving evidence before a draft.",
+            "status": "NEEDS_REVIEW"
+          },
+          {
+            "at": "2026-09-09T19:17:58.895014+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          }
+        ],
+        "id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+          "barcode_item_version": "2026-09-09 12:14:12.816342",
+          "barcode_observed_at": "2026-09-09T19:17:57.824910+00:00",
+          "confirmed_at": "2026-09-09T19:17:58.894931+00:00",
+          "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:14:12.823261",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "RECEIPT_PREPARED",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:17:58.895014+00:00",
+        "version": 5,
+        "work_item": {
+          "arrival_id": "ARRIVAL-01",
+          "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-001"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "draft-ARRIVAL-01",
+      "at": "2026-09-09T19:19:05.969246+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.51,
+                "y": 0.5
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 4533,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 2480,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2424,
+                "outputTokens": 128,
+                "totalTokens": 2552
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.51,
+                    "y": 0.5
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 2052,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 2898,
+                "outputTokens": 161,
+                "totalTokens": 3059
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5322,
+            "outputTokens": 289,
+            "totalTokens": 5611
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:14:12.823261",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:27.202319+00:00",
+        "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+        "draft": {
+          "docstatus": 0,
+          "modified": "2026-09-09 12:19:05.342998",
+          "name": "MAT-PRE-2026-00006",
+          "stock_posted": false,
+          "url": "https://missing20.v.frappe.cloud/app/purchase-receipt/MAT-PRE-2026-00006",
+          "verified_draft": true
+        },
+        "draft_attempted": true,
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:27.225286+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:31.814265+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:33.751406+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:14:40.084612+00:00",
+            "detail": "PO changed; refresh receiving evidence before a draft.",
+            "status": "NEEDS_REVIEW"
+          },
+          {
+            "at": "2026-09-09T19:17:58.895014+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:19:04.829770+00:00",
+            "detail": "ERP draft requested; waiting for authoritative reread.",
+            "status": "DRAFT_UNKNOWN"
+          },
+          {
+            "at": "2026-09-09T19:19:05.966429+00:00",
+            "detail": "ERP draft reread verified. Inventory is unchanged.",
+            "status": "DRAFT_VERIFIED"
+          }
+        ],
+        "id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+          "barcode_item_version": "2026-09-09 12:14:12.816342",
+          "barcode_observed_at": "2026-09-09T19:17:57.824910+00:00",
+          "confirmed_at": "2026-09-09T19:17:58.894931+00:00",
+          "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:14:12.823261",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "purchase_order": "PUR-ORD-2026-00015",
+        "status": "DRAFT_VERIFIED",
+        "stock_posted": false,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:19:05.966429+00:00",
+        "version": 7,
+        "work_item": {
+          "arrival_id": "ARRIVAL-01",
+          "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-001"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    },
+    {
+      "step": "submit-ARRIVAL-01",
+      "at": "2026-09-09T19:19:07.440392+00:00",
+      "state": {
+        "analysis": {
+          "assessment": {
+            "countable": true,
+            "issues": [],
+            "item_code": "",
+            "label_declared_quantity": null,
+            "next_photo": "",
+            "objects": [
+              {
+                "description": "cardboard box",
+                "x": 0.51,
+                "y": 0.5
+              }
+            ],
+            "receiving_unit": "carton",
+            "supplier_lot": "",
+            "visibility": "clear",
+            "visible_condition": "no_visible_damage"
+          },
+          "latency_ms": 4533,
+          "model": "us.amazon.nova-pro-v1:0",
+          "next_photo_source": "model",
+          "provenance": "model_inferred",
+          "provider": "bedrock",
+          "stages": [
+            {
+              "assessment": {
+                "next_photo": "No further photos are needed.",
+                "observations": [
+                  "The cardboard box is fully visible within the frame with no clipping or overlap."
+                ],
+                "visibility": "clear"
+              },
+              "latency_ms": 2480,
+              "stage": "visibility",
+              "usage": {
+                "inputTokens": 2424,
+                "outputTokens": 128,
+                "totalTokens": 2552
+              }
+            },
+            {
+              "assessment": {
+                "countable": true,
+                "issues": [],
+                "item_code": "",
+                "label_declared_quantity": null,
+                "next_photo": "",
+                "objects": [
+                  {
+                    "description": "cardboard box",
+                    "x": 0.51,
+                    "y": 0.5
+                  }
+                ],
+                "receiving_unit": "carton",
+                "supplier_lot": "",
+                "visibility": "clear",
+                "visible_condition": "no_visible_damage"
+              },
+              "latency_ms": 2052,
+              "stage": "count",
+              "usage": {
+                "inputTokens": 2898,
+                "outputTokens": 161,
+                "totalTokens": 3059
+              }
+            }
+          ],
+          "transport": "strands_multimodal",
+          "usage": {
+            "inputTokens": 5322,
+            "outputTokens": 289,
+            "totalTokens": 5611
+          }
+        },
+        "candidate": {
+          "additional_discount_percentage": 0.0,
+          "apply_discount_on": "Grand Total",
+          "buying_price_list": "Standard Buying",
+          "company": "Missing 20 Automotive Demo",
+          "conversion_rate": 1.0,
+          "currency": "USD",
+          "doctype": "Purchase Receipt",
+          "items": [
+            {
+              "conversion_factor": 1,
+              "cost_center": "Main - M20",
+              "expense_account": "Cost of Goods Sold - M20",
+              "item_code": "M20-DEMO-CARTON",
+              "item_tax_rate": "{}",
+              "purchase_order": "PUR-ORD-2026-00015",
+              "purchase_order_item": "bn4t0atcri",
+              "qty": 1,
+              "rate": 50.0,
+              "stock_uom": "Box",
+              "uom": "Box",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "plc_conversion_rate": 1.0,
+          "po_version": "2026-09-09 12:14:12.823261",
+          "price_list_currency": "USD",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "quantity": 1,
+          "supplier": "M20 Controller Systems Ltd."
+        },
+        "count": 1,
+        "count_semantics": "Each capture is a replacement observation, never an additive batch.",
+        "created_at": "2026-09-09T19:13:27.202319+00:00",
+        "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+        "draft": {
+          "docstatus": 0,
+          "modified": "2026-09-09 12:19:05.342998",
+          "name": "MAT-PRE-2026-00006",
+          "stock_posted": false,
+          "url": "https://missing20.v.frappe.cloud/app/purchase-receipt/MAT-PRE-2026-00006",
+          "verified_draft": true
+        },
+        "draft_attempted": true,
+        "drafts_enabled": true,
+        "events": [
+          {
+            "at": "2026-09-09T19:13:27.225286+00:00",
+            "detail": "Photo received; requesting real Strands analysis.",
+            "status": "ANALYZING"
+          },
+          {
+            "at": "2026-09-09T19:13:31.814265+00:00",
+            "detail": "Visible count candidate only; SKU/ERP matching is pending.",
+            "status": "COUNT_CANDIDATE"
+          },
+          {
+            "at": "2026-09-09T19:13:33.751406+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:14:40.084612+00:00",
+            "detail": "PO changed; refresh receiving evidence before a draft.",
+            "status": "NEEDS_REVIEW"
+          },
+          {
+            "at": "2026-09-09T19:17:58.895014+00:00",
+            "detail": "Operator confirmed the missing SKU against the configured PO. Original model evidence is retained; no stock posted.",
+            "status": "RECEIPT_PREPARED"
+          },
+          {
+            "at": "2026-09-09T19:19:04.829770+00:00",
+            "detail": "ERP draft requested; waiting for authoritative reread.",
+            "status": "DRAFT_UNKNOWN"
+          },
+          {
+            "at": "2026-09-09T19:19:05.966429+00:00",
+            "detail": "ERP draft reread verified. Inventory is unchanged.",
+            "status": "DRAFT_VERIFIED"
+          },
+          {
+            "at": "2026-09-09T19:19:06.502849+00:00",
+            "detail": "Confirmed receipt submission requested; waiting for submitted document and stock ledger reread.",
+            "status": "SUBMIT_UNKNOWN"
+          },
+          {
+            "at": "2026-09-09T19:19:07.437404+00:00",
+            "detail": "Existing receipt submitted and exact stock ledger quantity verified. This is not a quality release or payment.",
+            "status": "RECEIPT_SUBMITTED"
+          }
+        ],
+        "id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+        "identity_confirmation": {
+          "barcode_evidence_id": "barcode:158ee5734570a0dff98abe5353258a39a554eaaa152f8d3738dbf9f2ffc704f4",
+          "barcode_item_version": "2026-09-09 12:14:12.816342",
+          "barcode_observed_at": "2026-09-09T19:17:57.824910+00:00",
+          "confirmed_at": "2026-09-09T19:17:58.894931+00:00",
+          "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+          "image_version": 1,
+          "item_code": "M20-DEMO-CARTON",
+          "po_version": "2026-09-09 12:14:12.823261",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "source": "operator_confirmed_barcode_photo"
+        },
+        "image_version": 1,
+        "physical_receiving_confirmation": {
+          "candidate": {
+            "additional_discount_percentage": 0.0,
+            "apply_discount_on": "Grand Total",
+            "buying_price_list": "Standard Buying",
+            "company": "Missing 20 Automotive Demo",
+            "conversion_rate": 1.0,
+            "currency": "USD",
+            "doctype": "Purchase Receipt",
+            "items": [
+              {
+                "conversion_factor": 1,
+                "cost_center": "Main - M20",
+                "expense_account": "Cost of Goods Sold - M20",
+                "item_code": "M20-DEMO-CARTON",
+                "item_tax_rate": "{}",
+                "purchase_order": "PUR-ORD-2026-00015",
+                "purchase_order_item": "bn4t0atcri",
+                "qty": 1,
+                "rate": 50.0,
+                "stock_uom": "Box",
+                "uom": "Box",
+                "warehouse": "Stores - M20"
+              }
+            ],
+            "plc_conversion_rate": 1.0,
+            "po_version": "2026-09-09 12:14:12.823261",
+            "price_list_currency": "USD",
+            "purchase_order": "PUR-ORD-2026-00015",
+            "quantity": 1,
+            "supplier": "M20 Controller Systems Ltd."
+          },
+          "confirmed_at": "2026-09-09T19:19:06.502727+00:00",
+          "digest": "2dc3d1ef5b4d18e22b95f85b71188b5d6b8fa377f0d94a64d857d74b8a2b077b",
+          "image_version": 1,
+          "meaning": "Human confirmed this exact physical receiving, not another view of previously received goods. Not a quality release or payment approval.",
+          "receipt_name": "MAT-PRE-2026-00006"
+        },
+        "purchase_order": "PUR-ORD-2026-00015",
+        "receipt": {
+          "docstatus": 1,
+          "modified": "2026-09-09 12:19:06.739138",
+          "name": "MAT-PRE-2026-00006",
+          "quantity": 1,
+          "stock_ledger": [
+            {
+              "actual_qty": 1.0,
+              "company": "Missing 20 Automotive Demo",
+              "is_cancelled": 0,
+              "item_code": "M20-DEMO-CARTON",
+              "name": "c6baa76467",
+              "voucher_detail_no": "5qstrsgo0t",
+              "voucher_no": "MAT-PRE-2026-00006",
+              "voucher_type": "Purchase Receipt",
+              "warehouse": "Stores - M20"
+            }
+          ],
+          "stock_posted": true,
+          "stock_uom": "Box",
+          "url": "https://missing20.v.frappe.cloud/app/purchase-receipt/MAT-PRE-2026-00006",
+          "verified_at": "2026-09-09T19:19:07.437018+00:00",
+          "verified_receipt": true
+        },
+        "status": "RECEIPT_SUBMITTED",
+        "stock_posted": true,
+        "submit_attempted": true,
+        "submit_confirmation_version": 7,
+        "tenant": "https://missing20.v.frappe.cloud",
+        "updated_at": "2026-09-09T19:19:07.437404+00:00",
+        "version": 9,
+        "work_item": {
+          "arrival_id": "ARRIVAL-01",
+          "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "handling_unit_ids": [
+            "M20-GOODS-20260909-40-R3-001"
+          ],
+          "item_code": "M20-DEMO-CARTON",
+          "operation": "receive",
+          "origin": "demo_scan",
+          "purchase_order": "PUR-ORD-2026-00015",
+          "purchase_order_item": "bn4t0atcri",
+          "tenant": "https://missing20.v.frappe.cloud",
+          "uom": "Box",
+          "warehouse": "Stores - M20"
+        }
+      }
+    }
+  ]
+}

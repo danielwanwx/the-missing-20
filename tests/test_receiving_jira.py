@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from the_missing_20.adapters.receiving_handoff import HandoffJournal, receipt_event
-from the_missing_20.adapters.receiving_jira import JiraReceivingReview
+from the_missing_20.adapters.receiving_jira import JiraReceivingReview, _JiraOperation
 
 
 class API:
@@ -21,6 +21,7 @@ class API:
         self.lose_ack = False
         self.outage = False
         self.extra_issue = False
+        self.ignore_transition_comment = False
         self.transitions = [{"id": "31", "to": {"statusCategory": {"key": "done"}}}]
 
     def request(self, provider, path, *, payload=None):
@@ -36,7 +37,8 @@ class API:
             elif path.endswith("/comment"):
                 self.comments.append({"body": payload["body"]})
             elif path.endswith("/transitions"):
-                self.comments.append({"body": payload["update"]["comment"][0]["add"]["body"]})
+                if payload.get("update") and not self.ignore_transition_comment:
+                    self.comments.append({"body": payload["update"]["comment"][0]["add"]["body"]})
                 self.issue["fields"]["status"] = {"name": "Done", "statusCategory": {"key": "done"}}
             else:
                 raise AssertionError(path)
@@ -122,10 +124,10 @@ def test_exception_create_update_resolve_and_restart_are_idempotent(tmp_path: Pa
     assert len(api.writes) == 2
     resolution = posted(state)
     jira.sync(state, verified_resolution=resolution)
-    assert len(api.writes) == 4
+    assert len(api.writes) == 5
     assert api.issue["fields"]["status"]["name"] == "Done"
     jira.sync(state, verified_resolution=resolution)
-    assert len(api.writes) == 4
+    assert len(api.writes) == 5
 
 
 def test_lost_ack_reconciles_without_resending(tmp_path: Path):
@@ -137,6 +139,54 @@ def test_lost_ack_reconciles_without_resending(tmp_path: Path):
     jira.sync(capture())  # creation found; comment commits but ACK is lost too
     jira.sync(capture())
     assert len(api.writes) == 2
+
+
+def test_transition_without_embedded_comment_still_has_verified_separate_proof(tmp_path):
+    api, journal, jira = setup(tmp_path)
+    api.ignore_transition_comment = True
+    state = capture()
+    jira.sync(state)
+    jira.sync(state, verified_resolution=posted(state))
+    assert api.issue["fields"]["status"]["name"] == "Done"
+    assert all(row["status"] == "VERIFIED" for row in journal.for_capture(state["id"]))
+    writes = list(api.writes)
+    jira.sync(state, verified_resolution=receipt_event(state))
+    assert api.writes == writes
+
+
+@pytest.mark.parametrize("ignore_comment", [True, False])
+def test_legacy_done_reconciles_only_missing_effects_after_restart(tmp_path, ignore_comment):
+    api, journal, jira = setup(tmp_path)
+    state = capture()
+    jira.sync(state)
+    resolution = posted(state)
+    marker = jira.marker(state)
+    event = {"tenant": state["tenant"], "case_id": state["work_item"]["case_id"],
+             "arrival_id": state["work_item"]["arrival_id"], "capture_id": state["id"],
+             "purchase_order": state["purchase_order"], "marker": marker,
+             "operation": "resolve", "issue": api.issue["key"],
+             "receipt": resolution["receipt"], "receipt_evidence": resolution}
+
+    class LegacyTransition(_JiraOperation):
+        def send(self, event, key):
+            api.request("jira", "/rest/api/3/issue/QRC-22/transitions", payload={
+                "transition": {"id": "31"}, "update": {"comment": [{"add": {
+                    "body": self.body(event, key)}}]}})
+            raise TimeoutError("Legacy transition committed; response lost")
+
+    api.ignore_transition_comment = ignore_comment
+    original = journal.deliver(jira.route + ":resolve", event, LegacyTransition(jira),
+                               business_key=marker + ":resolved")
+    assert original["status"] == "UNKNOWN"
+    jira = JiraReceivingReview(api, HandoffJournal(tmp_path / "journal.db"), "QRC")
+    jira.sync(state, verified_resolution=resolution)
+    assert journal.current(original["key"])["status"] == "VERIFIED"
+    assert sum(path.endswith("/transitions") for path in api.writes) == 1
+    assert sum(row["route"].endswith(":resolution-evidence")
+               for row in journal.for_capture(state["id"])) == int(ignore_comment)
+    writes = list(api.writes)
+    jira.sync(state, verified_resolution=resolution)
+    assert api.writes == writes
 
 
 def test_duplicate_issue_or_changed_marker_blocks_further_writes(tmp_path: Path):

@@ -1,0 +1,259 @@
+{
+  "scope": "Jira GET readback only; pair with independent ERP and SaaS receipt readback",
+  "external_writes": 0,
+  "resolved": {
+    "snapshot": {
+      "case_id": "M20-GOODS-20260909-40-R3",
+      "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+      "issue": "QRC-2",
+      "status": "Done",
+      "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+      "proofs": [
+        {
+          "key": "m20-receipt-a76ed497bccf92f12e180392c6c91e9e",
+          "operation": "create",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-b7f3b4eb14b3d289100d9e2af4adb4fb",
+          "operation": "comment",
+          "version": 4,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-dab0a2f8cdd51f7a4496a2f58bc46c56",
+          "operation": "comment",
+          "version": 5,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-be02bd9a0b06d5c68a8e70765b847d2a",
+          "operation": "comment",
+          "version": 9,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-8a10447baa7e3ba8370e74e6ca6843cf",
+          "operation": "resolve",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-74d7ed56b7b0683b59a099c5e186b752",
+          "operation": "resolution_evidence",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        }
+      ],
+      "comment_identity": [
+        {
+          "id": "10000",
+          "body_sha256": "a029357abfc7bba69b6f8cea2ec0bceb1b86062b736fcb01a117928ce9c0f0a3"
+        },
+        {
+          "id": "10001",
+          "body_sha256": "5012a2d912e302b30b7e46de9fabc1d3c24f94ccae2f571f8b5cd805b0c6444a"
+        },
+        {
+          "id": "10002",
+          "body_sha256": "ceec8af0f06446c5c0cbb3524ea543fe02c73a7706df9931ab1bcd845b6663d9"
+        },
+        {
+          "id": "10003",
+          "body_sha256": "a8f9fce8896e548d9dd67e2a9a453da7bfbd370a51ac0930e3b5758e38874446"
+        }
+      ]
+    },
+    "passed": true,
+    "checked_at": "2026-09-09T19:29:23.100093+00:00"
+  },
+  "after_restart": {
+    "snapshot": {
+      "case_id": "M20-GOODS-20260909-40-R3",
+      "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+      "issue": "QRC-2",
+      "status": "Done",
+      "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+      "proofs": [
+        {
+          "key": "m20-receipt-a76ed497bccf92f12e180392c6c91e9e",
+          "operation": "create",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-b7f3b4eb14b3d289100d9e2af4adb4fb",
+          "operation": "comment",
+          "version": 4,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-dab0a2f8cdd51f7a4496a2f58bc46c56",
+          "operation": "comment",
+          "version": 5,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-be02bd9a0b06d5c68a8e70765b847d2a",
+          "operation": "comment",
+          "version": 9,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-8a10447baa7e3ba8370e74e6ca6843cf",
+          "operation": "resolve",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-74d7ed56b7b0683b59a099c5e186b752",
+          "operation": "resolution_evidence",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        }
+      ],
+      "comment_identity": [
+        {
+          "id": "10000",
+          "body_sha256": "a029357abfc7bba69b6f8cea2ec0bceb1b86062b736fcb01a117928ce9c0f0a3"
+        },
+        {
+          "id": "10001",
+          "body_sha256": "5012a2d912e302b30b7e46de9fabc1d3c24f94ccae2f571f8b5cd805b0c6444a"
+        },
+        {
+          "id": "10002",
+          "body_sha256": "ceec8af0f06446c5c0cbb3524ea543fe02c73a7706df9931ab1bcd845b6663d9"
+        },
+        {
+          "id": "10003",
+          "body_sha256": "a8f9fce8896e548d9dd67e2a9a453da7bfbd370a51ac0930e3b5758e38874446"
+        }
+      ]
+    },
+    "passed": true,
+    "checked_at": "2026-09-09T19:31:09.415784+00:00"
+  },
+  "after_replay": {
+    "snapshot": {
+      "case_id": "M20-GOODS-20260909-40-R3",
+      "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+      "issue": "QRC-2",
+      "status": "Done",
+      "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+      "proofs": [
+        {
+          "key": "m20-receipt-a76ed497bccf92f12e180392c6c91e9e",
+          "operation": "create",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-b7f3b4eb14b3d289100d9e2af4adb4fb",
+          "operation": "comment",
+          "version": 4,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-dab0a2f8cdd51f7a4496a2f58bc46c56",
+          "operation": "comment",
+          "version": 5,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-be02bd9a0b06d5c68a8e70765b847d2a",
+          "operation": "comment",
+          "version": 9,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-8a10447baa7e3ba8370e74e6ca6843cf",
+          "operation": "resolve",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-74d7ed56b7b0683b59a099c5e186b752",
+          "operation": "resolution_evidence",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        }
+      ],
+      "comment_identity": [
+        {
+          "id": "10000",
+          "body_sha256": "a029357abfc7bba69b6f8cea2ec0bceb1b86062b736fcb01a117928ce9c0f0a3"
+        },
+        {
+          "id": "10001",
+          "body_sha256": "5012a2d912e302b30b7e46de9fabc1d3c24f94ccae2f571f8b5cd805b0c6444a"
+        },
+        {
+          "id": "10002",
+          "body_sha256": "ceec8af0f06446c5c0cbb3524ea543fe02c73a7706df9931ab1bcd845b6663d9"
+        },
+        {
+          "id": "10003",
+          "body_sha256": "a8f9fce8896e548d9dd67e2a9a453da7bfbd370a51ac0930e3b5758e38874446"
+        }
+      ]
+    },
+    "passed": true,
+    "checked_at": "2026-09-09T19:31:14.208074+00:00"
+  }
+}

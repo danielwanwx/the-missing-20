@@ -118,6 +118,11 @@ class JiraReceivingReview:
         # Count candidates, partial POs and ordinary photo retakes are not incidents.
         if not existing and state.get("status") != "NEEDS_REVIEW":
             return []
+        if verified_resolution is not None and any(
+            row["route"] == self.route + ":resolve" and row["status"] == "VERIFIED"
+            for row in existing
+        ):
+            return existing
         work = state["work_item"]
         base = {
             "tenant": state["tenant"],
@@ -158,6 +163,24 @@ class JiraReceivingReview:
                 "receipt": verified_resolution["receipt"],
                 "receipt_evidence": verified_resolution,
             }
+            if any(row["route"] == self.route + ":resolve" and row["status"] == "UNKNOWN"
+                   for row in existing):
+                reconciled = self.journal.deliver(
+                    self.route + ":resolve", resolution, _JiraOperation(self),
+                    business_key=marker + ":resolved",
+                )
+                if reconciled["status"] == "VERIFIED":
+                    return self.journal.for_capture(state["id"])
+            # A successful transition did not persist its embedded comment in
+            # the live demo workflow. Verify each effect independently instead.
+            proof = self.journal.deliver(
+                self.route + ":resolution-evidence",
+                {**resolution, "operation": "resolution_evidence"},
+                _JiraOperation(self),
+                business_key=marker + ":resolution-evidence",
+            )
+            if proof["status"] != "VERIFIED":
+                return self.journal.for_capture(state["id"])
             self.journal.deliver(
                 self.route + ":resolve",
                 resolution,
@@ -204,12 +227,19 @@ class _JiraOperation:
                 or page["total"] != len(page["comments"])
             ):
                 raise ValueError("Jira comment reconciliation is incomplete")
-            matches = [
-                row for row in _rows(page["comments"]) if row.get("body") == self.body(event, key)
-            ]
-            if len(matches) > 1:
+            bodies = [self.body(event, key)]
+            if operation == "resolve":
+                # Reconcile old partial transitions too: add only the separately
+                # journaled missing proof, never resend an UNKNOWN transition.
+                bodies += [self.body({**event, "operation": "resolution_evidence"}, row["key"])
+                           for row in owner.journal.for_capture(event["capture_id"])
+                           if row["route"] == owner.route + ":resolution-evidence"
+                           and row["status"] == "VERIFIED"]
+            groups = [[row for row in _rows(page["comments"]) if row.get("body") == body]
+                      for body in bodies]
+            if any(len(matches) > 1 for matches in groups):
                 raise ValueError("Duplicate Jira operation evidence")
-            if not matches:
+            if not any(groups):
                 return None
             if (
                 operation == "resolve"
@@ -252,7 +282,7 @@ class _JiraOperation:
             return
         issue = owner._issue(event["issue"], event["marker"])
         path = f"/rest/api/3/issue/{issue['key']}"
-        if operation == "comment":
+        if operation in {"comment", "resolution_evidence"}:
             owner.api.request("jira", path + "/comment", payload={"body": self.body(event, key)})
             return
         transitions = owner.api.request("jira", path + "/transitions")
@@ -263,12 +293,12 @@ class _JiraOperation:
         ]
         if len(done) != 1:
             raise ValueError("Jira resolution needs a human-selected legal transition")
-        # One provider operation atomically records the proof comment and transition.
+        # Evidence is already independently posted and read back before this
+        # transition. Never assume a transition response proves a comment exists.
         owner.api.request(
             "jira",
             path + "/transitions",
             payload={
                 "transition": {"id": done[0]["id"]},
-                "update": {"comment": [{"add": {"body": self.body(event, key)}}]},
             },
         )

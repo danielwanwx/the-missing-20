@@ -1,0 +1,71 @@
+{
+  "scope": "Jira GET readback only; pair with independent ERP and SaaS receipt readback",
+  "external_writes": 0,
+  "resolved": {
+    "snapshot": {
+      "case_id": "M20-GOODS-20260909-40-R3",
+      "capture_id": "c7621f9ed5265bc43dee7a610b1e8bdc",
+      "issue": "QRC-2",
+      "status": "Done",
+      "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+      "proofs": [
+        {
+          "key": "m20-receipt-a76ed497bccf92f12e180392c6c91e9e",
+          "operation": "create",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-b7f3b4eb14b3d289100d9e2af4adb4fb",
+          "operation": "comment",
+          "version": 4,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-dab0a2f8cdd51f7a4496a2f58bc46c56",
+          "operation": "comment",
+          "version": 5,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-be02bd9a0b06d5c68a8e70765b847d2a",
+          "operation": "comment",
+          "version": 9,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-8a10447baa7e3ba8370e74e6ca6843cf",
+          "operation": "resolve",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        },
+        {
+          "key": "m20-receipt-74d7ed56b7b0683b59a099c5e186b752",
+          "operation": "resolution_evidence",
+          "version": null,
+          "provider": "Jira",
+          "record_id": "QRC-2",
+          "url": "https://shrikisgood.atlassian.net/browse/QRC-2",
+          "status": "Done"
+        }
+      ]
+    },
+    "passed": true,
+    "checked_at": "2026-09-09T19:26:39.933603+00:00"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "case_id": "M20-GOODS-20260909-40-R3",
+  "started_at": "2026-09-09T19:35:55.231468+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "acceptance_scope": "runtime_contract_only",
+  "independent_answer_quality_review_required": true,
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "The real Agent response failed safety validation; no conclusion was shown.",
+      "advisory": {
+        "mode": "real_strands",
+        "result": null,
+        "status": "VALIDATION_FAILED",
+        "tool_calls": [],
+        "usage": {
+          "incremental_cost_usd": 0.0963328,
+          "input_tokens": 108444,
+          "output_tokens": 2993,
+          "request_count": 7
+        }
+      },
+      "validation_diagnostics": [
+        {
+          "attempt": 1,
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "disposition": "SAFE_NOOP",
+          "failure": "real advisory did not preserve the requested read-only boundary",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        },
+        {
+          "attempt": 2,
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "disposition": "SAFE_NOOP",
+          "failure": "real advisory did not preserve the requested read-only boundary",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        },
+        {
+          "attempt": 3,
+          "case_id": "M20-GOODS-20260909-40-R3",
+          "disposition": "SAFE_NOOP",
+          "failure": "real advisory did not preserve the requested read-only boundary",
+          "stage": "validation",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence"
+          ]
+        }
+      ]
+    }
+  ]
+}

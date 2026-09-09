@@ -36,6 +36,7 @@ def main() -> None:
         state = json.loads(
             db.execute("SELECT state FROM captures WHERE id=?", (args.capture_id,)).fetchone()[0]
         )
+        captures = [json.loads(row[0]) for row in db.execute("SELECT state FROM captures")]
     event = receipt_event(state)
     assert event and event["quantity"] > 0
     client = ERPNextDemoExecutor.from_environment(ROOT)
@@ -114,8 +115,21 @@ def main() -> None:
     history = local("/api/v1/agent-platform/history")
     assert projection["case_id"] == event["case_id"]
     quantities = projection["case_projection"]["case"]["quantities"]
-    assert quantities["receipt_posted_quantity"] == event["quantity"]
-    assert quantities["outstanding_order_quantity"] == quantities["ordered"] - event["quantity"]
+    posted = [receipt_event(capture) for capture in captures]
+    events = [row for row in posted if row is not None]
+    assert events and all(
+        all(row[key] == event[key] for key in ("tenant", "case_id", "purchase_order", "uom"))
+        for row in events
+    )
+    assert len({row["receipt"] for row in events}) == len(events)
+    # This verifier still checks one capture's external effects per invocation.
+    # Case totals must include every posted arrival, not just the selected receipt.
+    case_total = sum(row["quantity"] for row in events)
+    po = client._document("Purchase Order", event["purchase_order"])
+    assert po["docstatus"] == 1 and len(po["items"]) == 1
+    assert po["items"][0]["received_qty"] == case_total
+    assert quantities["receipt_posted_quantity"] == case_total
+    assert quantities["outstanding_order_quantity"] == quantities["ordered"] - case_total
     snapshot = {
         "checked_at": datetime.now(UTC).isoformat(),
         "case_id": event["case_id"],
@@ -123,6 +137,8 @@ def main() -> None:
         "purchase_order": event["purchase_order"],
         "receipt": event["receipt"],
         "quantity": event["quantity"],
+        "case_posted_receipts": sorted(row["receipt"] for row in events),
+        "case_posted_quantity": case_total,
         "uom": event["uom"],
         "matching_receipts": matches,
         "stock_ledger": ledger,

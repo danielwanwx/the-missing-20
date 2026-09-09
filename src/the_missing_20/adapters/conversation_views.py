@@ -26,6 +26,20 @@ def requests_history(question: str) -> bool:
     ))
 
 
+def requested_history_metric(question: str) -> str | None:
+    """Resolve only an unambiguous human-named metric, never a model guess."""
+    aliases = {
+        "received": r"\b(?:receiving|received)\b|收货",
+        "recorded": r"\b(?:recorded|posted receipts?)\b|入账",
+        "quality_hold": r"\bquality hold\b|质量冻结",
+        "invoice_hold_value": r"\binvoice hold\b|发票冻结",
+        "outstanding_order_quantity": r"\boutstanding order\b|待交付",
+        "net_billed_sales": r"\b(?:net billed sales|billed revenue)\b|已开票",
+    }
+    selected = [key for key, pattern in aliases.items() if re.search(pattern, question, re.I)]
+    return selected[0] if len(selected) == 1 else None
+
+
 def retained_history_view(
     projection: Mapping[str, Any], question: str,
 ) -> list[dict[str, Any]]:
@@ -38,18 +52,10 @@ def retained_history_view(
     history_intent = r"\b(?:histor\w*|trends?|baselines?|benchmarks?)\b|历史|趋势|基准"
     if not re.search(history_intent, question, re.I):
         return []
-    aliases = {
-        "received": r"\b(?:receiving|received)\b|收货",
-        "recorded": r"\b(?:recorded|posted receipts?)\b|入账",
-        "quality_hold": r"\bquality hold\b|质量冻结",
-        "invoice_hold_value": r"\binvoice hold\b|发票冻结",
-        "outstanding_order_quantity": r"\boutstanding order\b|待交付",
-        "net_billed_sales": r"\b(?:net billed sales|billed revenue)\b|已开票",
-    }
-    selected = [key for key, pattern in aliases.items() if re.search(pattern, question, re.I)]
+    selected = requested_history_metric(question)
     history = projection.get("operational_history")
     case_id = projection.get("case_id")
-    if len(selected) != 1 or not case_id or not isinstance(history, Mapping):
+    if selected is None or not case_id or not isinstance(history, Mapping):
         return []
     points = history.get("points")
     if history.get("case_id") != case_id or not isinstance(points, list) or not points:
@@ -59,7 +65,7 @@ def retained_history_view(
     snapshot = deepcopy(dict(history))
     snapshot["points"] = snapshot["points"][-32:]
     snapshot["selection"] = {"returned": len(snapshot["points"]), "truncated": len(points) > 32}
-    return [{"kind": "history", "metric": selected[0], "history": snapshot}]
+    return [{"kind": "history", "metric": selected, "history": snapshot}]
 
 
 def history_attachment(
