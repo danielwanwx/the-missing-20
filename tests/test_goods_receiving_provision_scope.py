@@ -200,3 +200,56 @@ def test_ambiguous_discovery_never_creates_or_submits(case):
     with pytest.raises(ValueError):
         provision(client)
     assert client.creates == client.submits == 0
+
+
+def test_new_pilot_preserves_old_order_and_has_disjoint_physical_ids():
+    client = ActualSchemaERP()
+    old = order()
+    old.update(supplier="M20 Supplier")
+    client.orders = [copy.deepcopy(old)]
+    client.server_date = "2026-09-09"
+    kwargs = dict(business_date="2026-09-09", first_batch_size=1, case_id="M20-GOODS-20260909-40")
+    first = provision_order(client, **kwargs)
+    second = provision_order(client, **kwargs)
+    assert client.orders[0] == old
+    assert first["purchase_order"] == second["purchase_order"] != old["name"]
+    assert client.creates == client.submits == 1
+    old_units = first_receiving_manifest(old)["arrivals"][0]["handling_unit_ids"]
+    new_units = first["receiving_manifest"]["arrivals"][0]["handling_unit_ids"]
+    assert new_units == ["M20-GOODS-20260909-40-001"]
+    assert not set(old_units).intersection(new_units)
+
+
+@pytest.mark.parametrize(
+    "case_id", ["other", "M20-GOODS-20260230-40", "M20-GOODS-20260909-400", None]
+)
+def test_invalid_new_case_cannot_touch_erp(case_id):
+    client = ActualSchemaERP()
+    with pytest.raises(ValueError):
+        provision_order(client, business_date="2026-09-09", case_id=case_id)
+    assert client.creates == client.submits == 0
+
+
+def test_new_case_cannot_bind_old_order_or_unrecognized_marker():
+    with pytest.raises(ValueError):
+        first_receiving_manifest(order(), case_id="M20-GOODS-20260909-40")
+    client = ActualSchemaERP()
+    invalid = order()
+    invalid["items"][0]["description"] = "M20-GOODS-20260230-40 - SYNTHETIC TEST ORDER"
+    client.orders = [invalid]
+    with pytest.raises(ValueError):
+        provision_order(client, business_date="2026-09-09", case_id="M20-GOODS-20260909-40")
+    assert client.creates == client.submits == 0
+
+
+def test_case_date_mismatch_stops_before_any_erp_access():
+    client = ActualSchemaERP()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Mismatched dates must not reach the ERP")
+
+    client._document = forbidden
+    client._request = forbidden
+    with pytest.raises(ValueError, match="case date"):
+        provision_order(client, business_date="2026-09-09", case_id="M20-GOODS-20260910-40")
+    assert client.creates == client.submits == 0

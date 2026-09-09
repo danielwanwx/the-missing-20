@@ -26,7 +26,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-directory", type=Path, required=True)
     parser.add_argument("--capture-id", required=True)
-    parser.add_argument("--phase", choices=("before_restart", "after_restart"), required=True)
+    parser.add_argument("--phase", choices=("before_restart", "after_restart", "after_replay"),
+                        required=True)
     parser.add_argument("--port", type=int, default=8893)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -142,7 +143,7 @@ def main() -> None:
             )}
             for turn in projection.get("conversation", [])
         ],
-        "passed": True,
+        "passed": False,
     }
     report = (
         json.loads(args.output.read_text())
@@ -153,7 +154,9 @@ def main() -> None:
         }
     )
     report[args.phase] = snapshot
-    if args.phase == "after_restart":
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report, indent=2) + "\n")
+    if args.phase in {"after_restart", "after_replay"}:
         before = report["before_restart"]
         fields = (
             "receipt",
@@ -162,8 +165,15 @@ def main() -> None:
             "matching_receipts",
             "destinations",
             "quantities",
-            "history_points",
         )
+        if args.phase == "after_restart":
+            fields += ("history_points",)
+        else:
+            # Replay may follow additional legitimate source/outage observations.
+            # Check external effects, without claiming the history stayed frozen.
+            snapshot["history_changed_since_initial_restart"] = (
+                before["history_points"] != snapshot["history_points"]
+            )
         assert all(before[name] == snapshot[name] for name in fields), (
             "Unexpected effect or fabricated history after restart"
         )
@@ -175,8 +185,9 @@ def main() -> None:
         ) == sorted(tuple(row[key] for key in stable) for row in ledger), (
             "Stock effects changed after restart"
         )
-        report["restart_no_duplicate_effects"] = True
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+        report["restart_no_duplicate_effects" if args.phase == "after_restart"
+               else "replay_no_duplicate_external_effects"] = True
+    snapshot["passed"] = True
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(snapshot, indent=2))
 

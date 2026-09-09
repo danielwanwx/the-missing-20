@@ -175,7 +175,7 @@
       } else if (alreadyReceived) {
         scanStatus.textContent = "This batch is already received. Identity checked; no second receipt or carton observation created.";
       } else {
-        scanStatus.textContent = "Item and order price verified. Photograph the delivery to establish its quantity. Stock unchanged.";
+        scanStatus.textContent = "Item and order price verified. Lookup only; receipt status is shown separately.";
       }
       window.dispatchEvent(new CustomEvent("missing20:receipt-changed"));
     } catch (error) {

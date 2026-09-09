@@ -1,0 +1,44 @@
+{
+  "case_id": "M20-GOODS-20260909-40",
+  "started_at": "2026-09-09T14:10:12.983870+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "The real Agent response failed safety validation; no conclusion was shown.",
+      "advisory": {
+        "mode": "real_strands",
+        "result": null,
+        "status": "VALIDATION_FAILED",
+        "tool_calls": [],
+        "usage": {
+          "incremental_cost_usd": 0.0729272,
+          "input_tokens": 80515,
+          "output_tokens": 2661,
+          "request_count": 6
+        }
+      },
+      "validation_diagnostics": [
+        {
+          "attempt": 1,
+          "case_id": "M20-GOODS-20260909-40",
+          "disposition": "SAFE_NOOP",
+          "failure": "real advisory cited evidence outside the admitted set",
+          "stage": "validation",
+          "tool_calls": [
+            "read_control_context",
+            "read_erp_evidence",
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_operational_history"
+          ]
+        },
+        {
+          "failure": "invalid structured output",
+          "stage": "repair"
+        }
+      ]
+    }
+  ]
+}

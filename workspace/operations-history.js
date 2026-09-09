@@ -96,6 +96,9 @@
         : point.id !== payload.points?.at(-1)?.id ? "Baseline comparisons are shown for the latest observation."
           : "Still accumulating comparable observations."],
     ];
+    const excluded = payload.excluded_observations || [];
+    if (excluded.length) rows.push(["Excluded observations",
+      `${excluded.length} transitional receipt snapshots; retained for audit, not used in this chart or baseline.`]);
     definitions.replaceChildren(...rows.flatMap(([label, value]) => [el("dt", label), el("dd", value)]));
   }
   function render() {

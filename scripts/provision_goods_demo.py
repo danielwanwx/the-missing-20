@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -20,16 +21,25 @@ ROOT = Path(__file__).resolve().parents[1]
 ITEM = "M20-DEMO-CARTON"
 MARKER = "M20 GOODS DEMO 20260908 40 CARTONS - SYNTHETIC TEST ORDER"
 REFERENCE_PO = "PUR-ORD-2026-00011"
+CASE_ID = "M20-GOODS-20260908-40"
+
+
+def case_marker(case_id: str) -> str:
+    if not isinstance(case_id, str) or not re.fullmatch(r"M20-GOODS-\d{8}-40", case_id):
+        raise ValueError("A pilot case requires M20-GOODS-YYYYMMDD-40.")
+    date.fromisoformat(case_id[10:18])
+    return MARKER if case_id == CASE_ID else f"{case_id} - SYNTHETIC TEST ORDER"
 
 
 def first_receiving_manifest(
-    order: Mapping[str, Any], *, first_batch_size: int = 10
+    order: Mapping[str, Any], *, first_batch_size: int = 10, case_id: str = CASE_ID
 ) -> dict[str, Any]:
     """Bind the first normal batch to actual ERP line identity, never a guessed row.
 
     Later quality/exception batches need their own validated disposition/location.
     This does not mark any handling unit as scanned, delivered or posted.
     """
+    marker = case_marker(case_id)
     if type(first_batch_size) is not int or not 1 <= first_batch_size <= 20:
         raise ValueError("First batch requires 1..20 planned cartons.")
     lines = order.get("items", [])
@@ -50,12 +60,12 @@ def first_receiving_manifest(
         "stock_uom": "Box",
         "conversion_factor": 1,
         "warehouse": "Stores - M20",
-        "description": MARKER,
+        "description": marker,
     }
     if not line.get("name") or any(line.get(key) != value for key, value in expected.items()):
         raise ValueError("Receiving scope requires exact ERP row, unit, conversion and warehouse.")
     return {
-        "case_id": "M20-GOODS-20260908-40",
+        "case_id": case_id,
         "purchase_order": order["name"],
         "arrivals": [
             {
@@ -64,7 +74,10 @@ def first_receiving_manifest(
                 "item_code": ITEM,
                 "uom": "Box",
                 "warehouse": line["warehouse"],
-                "handling_unit_ids": [f"M20-CARTON-{n:03}" for n in range(1, first_batch_size + 1)],
+                "handling_unit_ids": [
+                    f"{'M20-CARTON' if case_id == CASE_ID else case_id}-{n:03}"
+                    for n in range(1, first_batch_size + 1)
+                ],
                 "origin": "demo_scan",
             }
         ],
@@ -72,11 +85,15 @@ def first_receiving_manifest(
 
 
 def provision(
-    client: ERPNextDemoExecutor, *, business_date: str, first_batch_size: int = 10
+    client: ERPNextDemoExecutor, *, business_date: str, first_batch_size: int = 10,
+    case_id: str = CASE_ID,
 ) -> dict[str, Any]:
+    marker = case_marker(case_id)
     # Explicit site business date, not the workstation's UTC calendar day.
     if date.fromisoformat(business_date).isoformat() != business_date:
         raise ValueError("Business date must use YYYY-MM-DD.")
+    if date.fromisoformat(case_id[10:18]).isoformat() != business_date:
+        raise ValueError("Pilot case date must match the ERP business date.")
     if type(first_batch_size) is not int or not 1 <= first_batch_size <= 20:
         raise ValueError("First batch requires 1..20 planned cartons.")
     if client._environment != "demo":
@@ -144,7 +161,22 @@ def provision(
             document = client._document("Purchase Order", row["name"])
             lines = document.get("items", [])
             if any(line.get("item_code") == ITEM for line in lines):
-                if len(lines) != 1 or lines[0].get("description") != MARKER:
+                description = lines[0].get("description") if len(lines) == 1 else None
+                # Other explicitly marked pilot orders are independent work. Never
+                # amend, resubmit or reuse their receipts for this case.
+                known_other = description == MARKER
+                if (
+                    not known_other and isinstance(description, str)
+                    and description.endswith(" - SYNTHETIC TEST ORDER")
+                ):
+                    try:
+                        other_case = description.removesuffix(" - SYNTHETIC TEST ORDER")
+                        known_other = case_marker(other_case) == description
+                    except ValueError:
+                        known_other = False
+                if description != marker and known_other:
+                    continue
+                if len(lines) != 1 or description != marker:
                     raise ValueError("Dedicated demo item already belongs to unverified work.")
                 matches.append(dict(document))
         active = [doc for doc in matches if doc.get("docstatus") != 2]
@@ -173,7 +205,7 @@ def provision(
                 "items": [
                     {
                         "item_code": ITEM,
-                        "description": MARKER,
+                        "description": marker,
                         "qty": 40,
                         "uom": "Box",
                         "stock_uom": "Box",
@@ -194,7 +226,7 @@ def provision(
         len(lines) != 1
         or order.get("company") != reference["company"]
         or order.get("supplier") != reference["supplier"]
-        or lines[0].get("description") != MARKER
+        or lines[0].get("description") != marker
         or lines[0].get("item_code") != ITEM
         or lines[0].get("qty") != 40
         or lines[0].get("rate") != 50
@@ -217,7 +249,7 @@ def provision(
     ):
         raise ValueError("Demo order submission is not verified.")
     return {
-        "case_id": "M20-GOODS-20260908-40",
+        "case_id": case_id,
         "purchase_order": reread["name"],
         "item_code": ITEM,
         "quantity": 40,
@@ -230,7 +262,9 @@ def provision(
         "inventory_writes": 0,
         "physical_goods": "public photo stand-in until operator supplies physical holdout",
         "verified_at": datetime.now(UTC).isoformat(),
-        "receiving_manifest": first_receiving_manifest(reread, first_batch_size=first_batch_size),
+        "receiving_manifest": first_receiving_manifest(
+            reread, first_batch_size=first_batch_size, case_id=case_id
+        ),
     }
 
 
@@ -240,13 +274,15 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest-output", type=Path)
     parser.add_argument("--first-batch-size", type=int, required=True, choices=range(1, 21))
+    parser.add_argument("--case-id", default=CASE_ID)
     parser.add_argument("--business-date", required=True, help="Verified ERP site date, YYYY-MM-DD")
     args = parser.parse_args()
     client = ERPNextDemoExecutor.from_environment(ROOT)
     if client is None:
         raise ValueError("Demo ERP credentials are not configured.")
     result = provision(
-        client, business_date=args.business_date, first_batch_size=args.first_batch_size
+        client, business_date=args.business_date, first_batch_size=args.first_batch_size,
+        case_id=args.case_id,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")

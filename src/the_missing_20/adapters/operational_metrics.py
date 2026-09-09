@@ -95,6 +95,25 @@ def _percent(numerator: object, denominator: object) -> float | None:
     return top / bottom * 100 if top is not None and bottom is not None and bottom > 0 else None
 
 
+def receiving_receipt_conflicts(erp: Document) -> list[str]:
+    """Local submission proof must be reflected by the aggregate ERP snapshot."""
+    work = erp.get("receiving_work")
+    if not isinstance(work, Mapping) or work.get("case_id") != erp.get("case_id"):
+        return []
+    posted = {row["name"]: row for row in documents(erp, "purchase_receipt")}
+    conflicts = []
+    for arrival in work.get("arrivals", []):
+        receipt = arrival.get("receipt") or {}
+        name = receipt.get("name")
+        if not name:
+            continue
+        doc = posted.get(name)
+        quantity = _number(arrival.get("posted_quantity"))
+        if doc is None or quantity is None or _number(doc.get("received")) != quantity:
+            conflicts.append(str(name))
+    return sorted(set(conflicts))
+
+
 def source_freshness(erp: Document) -> dict[str, object]:
     status = str(erp.get("status", "UNAVAILABLE"))
     present = {
@@ -117,9 +136,10 @@ def source_freshness(erp: Document) -> dict[str, object]:
     required_missing = [kind for kind in missing if kind == "purchase_order" or kind not in pending]
     errors = erp.get("read_errors", [])
     read_error = erp.get("read_error")
+    conflicts = receiving_receipt_conflicts(erp)
     return {
         "status": "CURRENT"
-        if status == "CONNECTED" and not required_missing and not errors
+        if status == "CONNECTED" and not required_missing and not errors and not conflicts
         else "UNAVAILABLE",
         "scope": "erp_case_documents",
         "erp_status": status,
@@ -127,7 +147,10 @@ def source_freshness(erp: Document) -> dict[str, object]:
         "pending_document_kinds": pending,
         "document_lifecycle": erp.get("document_lifecycle", {}),
         "observed_at": erp.get("received_at"),
-        "error_code": read_error.get("code", "") if isinstance(read_error, Mapping) else "",
+        "error_code": "RECEIVING_RECEIPT_NOT_REFRESHED" if conflicts else (
+            read_error.get("code", "") if isinstance(read_error, Mapping) else ""
+        ),
+        **({"pending_receipt_readbacks": conflicts} if conflicts else {}),
     }
 
 

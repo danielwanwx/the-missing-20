@@ -18,7 +18,7 @@ from pathlib import Path
 from statistics import fmean
 from typing import Any
 
-from .operational_metrics import _posted
+from .operational_metrics import _posted, receiving_receipt_conflicts
 from .operational_metrics import documents as posted_documents
 
 SCHEMA_VERSION = "operational-history.v1"
@@ -90,6 +90,15 @@ def _same_projection_after_correction(previous: dict[str, Any], current: dict[st
     return {key: value for key, value in corrected.items() if key not in ignored} == {
         key: value for key, value in current.items() if key not in ignored
     }
+
+
+def _unreflected_receipts(point: dict[str, Any]) -> list[str]:
+    posted = {doc["name"] for doc in posted_documents(point, "purchase_receipt")}
+    return sorted({
+        row["receipt_name"] for row in point.get("receiving_refs", [])
+        if row.get("receipt_name") and row.get("posted_quantity") is not None
+        and row["receipt_name"] not in posted
+    })
 
 
 def _label(value: object, field: str, *, required: bool = False) -> str | None:
@@ -398,6 +407,8 @@ class OperationalHistory:
 
     def record(self, erp: Mapping[str, object], metrics: Mapping[str, object]) -> bool:
         """Append a changed normalized observation; reject malformed scope/time input."""
+        if receiving_receipt_conflicts(erp):
+            return False
         point = _observation(erp, metrics)
         semantic = {key: value for key, value in point.items() if key != "observed_at"}
         fingerprint = hashlib.sha256(
@@ -479,9 +490,16 @@ class OperationalHistory:
                 f"WHERE {clause} ORDER BY o.observed_at DESC, o.id DESC LIMIT ?",
                 [*params, limit],
             ).fetchall()
-        points, projection_revisions, metric_corrections = [], [], []
+        points, projection_revisions, metric_corrections, excluded = [], [], [], []
         for row in reversed(rows):
             raw = json.loads(row["observation_json"])
+            pending = _unreflected_receipts(raw)
+            if pending:
+                excluded.append({
+                    "stored_record_id": row["id"], "observed_at": raw["observed_at"],
+                    "receipt_names": pending, "reason": "RECEIVING_RECEIPT_NOT_REFRESHED",
+                })
+                continue  # Keep raw evidence; never chart or benchmark a mixed snapshot.
             previous = json.loads(row["previous_json"]) if row["previous_json"] else None
             if previous is not None and _same_projection_after_correction(previous, raw):
                 projection_revisions.append(
@@ -512,10 +530,11 @@ class OperationalHistory:
             "points": points,
             "projection_revisions": projection_revisions,
             "metric_corrections": metric_corrections,
+            "excluded_observations": excluded,
             "coverage": {
                 "status": "OBSERVED"
                 if points
-                else "REVISION_ONLY"
+                else "INCONSISTENT_ONLY" if excluded else "REVISION_ONLY"
                 if projection_revisions
                 else "EMPTY",
                 "since": start,

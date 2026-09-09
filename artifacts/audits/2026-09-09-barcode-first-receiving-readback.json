@@ -1,0 +1,693 @@
+{
+  "scope": "Actual external GET readbacks; demo public photo is not real shipment proof.",
+  "business_writes_in_verifier": 0,
+  "before_restart": {
+    "checked_at": "2026-09-09T13:50:55.452114+00:00",
+    "case_id": "M20-GOODS-20260909-40",
+    "capture_id": "eab22f28333d9dbc7a4473a8fd4fb330",
+    "purchase_order": "PUR-ORD-2026-00013",
+    "receipt": "MAT-PRE-2026-00003",
+    "quantity": 1,
+    "uom": "Box",
+    "matching_receipts": [
+      {
+        "name": "MAT-PRE-2026-00003",
+        "docstatus": 1
+      }
+    ],
+    "stock_ledger": [
+      {
+        "name": "9c6b6a6b13",
+        "actual_qty": 1.0,
+        "item_code": "M20-DEMO-CARTON",
+        "warehouse": "Stores - M20",
+        "voucher_detail_no": "am30b7vr50",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "MAT-PRE-2026-00003",
+        "company": "Missing 20 Automotive Demo",
+        "is_cancelled": 0
+      }
+    ],
+    "ledger_ids_at_posting": [
+      "9c6b6a6b13"
+    ],
+    "ledger_ids_current": [
+      "9c6b6a6b13"
+    ],
+    "same_stock_effects": true,
+    "destinations": [
+      {
+        "key": "m20-receipt-42b87a8719e4c77712bb7433e1810e24",
+        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
+        "provider": "Slack via Celigo",
+        "record_id": "1788961453.294629",
+        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788961453294629",
+        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
+      },
+      {
+        "key": "m20-receipt-f93494eb50693519f25231aba766ae08",
+        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
+        "provider": "Airtable",
+        "record_id": "recyfnB1E4OlEqRp5",
+        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/recyfnB1E4OlEqRp5"
+      }
+    ],
+    "quantities": {
+      "accepted_cumulative": 1.0,
+      "available": 1.0,
+      "available_to_promise": null,
+      "case_balance": 1.0,
+      "delivered_quantity": 0,
+      "invoice_count": 0.0,
+      "ordered": 40.0,
+      "outstanding_order_quantity": 39.0,
+      "physically_arrived": 1.0,
+      "quality_hold": 0.0,
+      "receipt_posted_quantity": 1.0,
+      "receipt_unresolved": 0.0,
+      "received": 1.0,
+      "received_cumulative": 1.0,
+      "released_quantity": 0
+    },
+    "history_points": 7,
+    "history_retained_records": 8,
+    "history_projection_revisions": [],
+    "history_metric_corrections": [],
+    "conversation_turns": 0,
+    "conversation": [],
+    "passed": true
+  },
+  "after_restart": {
+    "checked_at": "2026-09-09T13:55:53.909337+00:00",
+    "case_id": "M20-GOODS-20260909-40",
+    "capture_id": "eab22f28333d9dbc7a4473a8fd4fb330",
+    "purchase_order": "PUR-ORD-2026-00013",
+    "receipt": "MAT-PRE-2026-00003",
+    "quantity": 1,
+    "uom": "Box",
+    "matching_receipts": [
+      {
+        "name": "MAT-PRE-2026-00003",
+        "docstatus": 1
+      }
+    ],
+    "stock_ledger": [
+      {
+        "name": "9c6b6a6b13",
+        "actual_qty": 1.0,
+        "item_code": "M20-DEMO-CARTON",
+        "warehouse": "Stores - M20",
+        "voucher_detail_no": "am30b7vr50",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "MAT-PRE-2026-00003",
+        "company": "Missing 20 Automotive Demo",
+        "is_cancelled": 0
+      }
+    ],
+    "ledger_ids_at_posting": [
+      "9c6b6a6b13"
+    ],
+    "ledger_ids_current": [
+      "9c6b6a6b13"
+    ],
+    "same_stock_effects": true,
+    "destinations": [
+      {
+        "key": "m20-receipt-42b87a8719e4c77712bb7433e1810e24",
+        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
+        "provider": "Slack via Celigo",
+        "record_id": "1788961453.294629",
+        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788961453294629",
+        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
+      },
+      {
+        "key": "m20-receipt-f93494eb50693519f25231aba766ae08",
+        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
+        "provider": "Airtable",
+        "record_id": "recyfnB1E4OlEqRp5",
+        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/recyfnB1E4OlEqRp5"
+      }
+    ],
+    "quantities": {
+      "accepted_cumulative": 1.0,
+      "available": 1.0,
+      "available_to_promise": null,
+      "case_balance": 1.0,
+      "delivered_quantity": 0,
+      "invoice_count": 0.0,
+      "ordered": 40.0,
+      "outstanding_order_quantity": 39.0,
+      "physically_arrived": 1.0,
+      "quality_hold": 0.0,
+      "receipt_posted_quantity": 1.0,
+      "receipt_unresolved": 0.0,
+      "received": 1.0,
+      "received_cumulative": 1.0,
+      "released_quantity": 0
+    },
+    "history_points": 7,
+    "history_retained_records": 8,
+    "history_projection_revisions": [],
+    "history_metric_corrections": [],
+    "conversation_turns": 0,
+    "conversation": [],
+    "passed": true
+  },
+  "restart_no_duplicate_effects": true,
+  "after_replay": {
+    "checked_at": "2026-09-09T14:29:24.598189+00:00",
+    "case_id": "M20-GOODS-20260909-40",
+    "capture_id": "eab22f28333d9dbc7a4473a8fd4fb330",
+    "purchase_order": "PUR-ORD-2026-00013",
+    "receipt": "MAT-PRE-2026-00003",
+    "quantity": 1,
+    "uom": "Box",
+    "matching_receipts": [
+      {
+        "name": "MAT-PRE-2026-00003",
+        "docstatus": 1
+      }
+    ],
+    "stock_ledger": [
+      {
+        "name": "9c6b6a6b13",
+        "actual_qty": 1.0,
+        "item_code": "M20-DEMO-CARTON",
+        "warehouse": "Stores - M20",
+        "voucher_detail_no": "am30b7vr50",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "MAT-PRE-2026-00003",
+        "company": "Missing 20 Automotive Demo",
+        "is_cancelled": 0
+      }
+    ],
+    "ledger_ids_at_posting": [
+      "9c6b6a6b13"
+    ],
+    "ledger_ids_current": [
+      "9c6b6a6b13"
+    ],
+    "same_stock_effects": true,
+    "destinations": [
+      {
+        "key": "m20-receipt-42b87a8719e4c77712bb7433e1810e24",
+        "route": "celigo-slack:6aa0d6e4ae4b1f48af9f3c20:C0BUNV20J6Q",
+        "provider": "Slack via Celigo",
+        "record_id": "1788961453.294629",
+        "url": "https://miss-20.slack.com/archives/C0BUNV20J6Q/p1788961453294629",
+        "celigo_import_id": "6aa0d6e4ae4b1f48af9f3c20"
+      },
+      {
+        "key": "m20-receipt-f93494eb50693519f25231aba766ae08",
+        "route": "airtable-receiving:appcV7IwCbuWs8X39:tblaXVUbx1qoRTQv5",
+        "provider": "Airtable",
+        "record_id": "recyfnB1E4OlEqRp5",
+        "url": "https://airtable.com/appcV7IwCbuWs8X39/tblaXVUbx1qoRTQv5/recyfnB1E4OlEqRp5"
+      }
+    ],
+    "quantities": {
+      "accepted_cumulative": 1.0,
+      "available": 1.0,
+      "available_to_promise": null,
+      "case_balance": 1.0,
+      "delivered_quantity": 0,
+      "invoice_count": 0.0,
+      "ordered": 40.0,
+      "outstanding_order_quantity": 39.0,
+      "physically_arrived": 1.0,
+      "quality_hold": 0.0,
+      "receipt_posted_quantity": 1.0,
+      "receipt_unresolved": 0.0,
+      "received": 1.0,
+      "received_cumulative": 1.0,
+      "released_quantity": 0
+    },
+    "history_points": 9,
+    "history_retained_records": 10,
+    "history_projection_revisions": [],
+    "history_metric_corrections": [],
+    "conversation_turns": 12,
+    "conversation": [
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: SAFE_NOOP. Ordered: 40 boxes. Received and posted: 1 box. Outstanding: 39 boxes. No missing stock indicated. Next: Monitor expected delivery date and check for quality holds or incidents.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "operational-history:M20-GOODS-20260909-40:1",
+          "operational-history:M20-GOODS-20260909-40:2",
+          "operational-history:M20-GOODS-20260909-40:3",
+          "operational-history:M20-GOODS-20260909-40:4",
+          "operational-history:M20-GOODS-20260909-40:5"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 18339,
+        "usage": {
+          "incremental_cost_usd": 0.0510328,
+          "input_tokens": 56863,
+          "output_tokens": 1732,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 2
+      },
+      {
+        "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+        "answer": "Disposition: SAFE_NOOP. Receipt of 1 box verified by multiple sources and posted in ERP. No need to retry. Outstanding balance of 39 boxes is unarrived order, not missing stock. Next: Monitor expected delivery date for remaining 39 boxes.",
+        "evidence_ids": [
+          "recyfnB1E4OlEqRp5",
+          "1788961453.294629",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 11021,
+        "usage": {
+          "incremental_cost_usd": 0.0274616,
+          "input_tokens": 30127,
+          "output_tokens": 1050,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain net change versus the prior-observation average; is this proof of revenue gain?",
+        "answer": "Disposition: SAFE_NOOP. The receiving trend shows an increase of 1.00 box from the first to the latest observation. The historical baseline shows a difference of 1.00 box from the previous mean. However, this difference does not indicate a revenue gain, as the baseline is only a prior observation average and not a measure of receipts added or growth over time. Next: Continue to monitor the expected delivery date for the remaining 39.00 boxes and check for any quality holds or incidents.",
+        "evidence_ids": [
+          "operational-history:M20-GOODS-20260909-40:1",
+          "operational-history:M20-GOODS-20260909-40:2",
+          "operational-history:M20-GOODS-20260909-40:3",
+          "operational-history:M20-GOODS-20260909-40:4",
+          "operational-history:M20-GOODS-20260909-40:5",
+          "operational-history:M20-GOODS-20260909-40:6",
+          "operational-history:M20-GOODS-20260909-40:8"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 12775,
+        "usage": {
+          "incremental_cost_usd": 0.038176,
+          "input_tokens": 42988,
+          "output_tokens": 1183,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: SAFE_NOOP. Ordered: 40 boxes. Received and posted: 1 box. Outstanding: 39 boxes. No missing stock indicated. Receiving trend: +1.00 box. Historical baseline: +1.00 box. Not a revenue gain. Next: Continue to monitor the expected delivery date for the remaining 39.00 boxes and check for any quality holds or incidents.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5",
+          "operational-history:M20-GOODS-20260909-40:10"
+        ],
+        "tool_calls": [
+          "read_control_context",
+          "read_erp_evidence",
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 17475,
+        "usage": {
+          "incremental_cost_usd": 0.0559896,
+          "input_tokens": 63015,
+          "output_tokens": 1743,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: SAFE_NOOP. Ordered: 40.00 boxes. Received and posted: 1.00 box. Outstanding: 39.00 boxes. No missing stock indicated. Next: Continue to monitor the expected delivery date for the remaining 39.00 boxes.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 11288,
+        "usage": {
+          "incremental_cost_usd": 0.0286128,
+          "input_tokens": 31566,
+          "output_tokens": 1050,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+        "answer": "Disposition: SAFE_NOOP. Receipt verified by ERP, Airtable, Celigo, and collaboration tools. No need to retry. Next: Monitor expected delivery date for remaining 39 boxes.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5",
+          "operational-history:M20-GOODS-20260909-40:10"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 15847,
+        "usage": {
+          "incremental_cost_usd": 0.0548584,
+          "input_tokens": 62325,
+          "output_tokens": 1562,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: SAFE_NOOP. Ordered: 40.00 boxes. Received and posted: 1.00 box. Outstanding: 39.00 boxes. No missing stock indicated. Historical baseline: Current received quantity is 1.00 box, a 600.00% increase from the previous observation mean of 0.14285714285714285 boxes. This does not prove a revenue gain, as the baseline is only a prior observation average and not a complete business ledger or industry benchmark. Next: Continue to monitor the expected delivery date for the remaining 39 boxes.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5",
+          "operational-history:M20-GOODS-20260909-40:10"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 21830,
+        "usage": {
+          "incremental_cost_usd": 0.0571904,
+          "input_tokens": 62864,
+          "output_tokens": 2156,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+        "answer": "Disposition: SAFE_NOOP. Receipt verified by ERP, Airtable, Celigo, and collaboration tools. No need to retry. Next: Monitor expected delivery date for remaining 39 boxes.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 11274,
+        "usage": {
+          "incremental_cost_usd": 0.0284776,
+          "input_tokens": 31273,
+          "output_tokens": 1081,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain net change versus the prior-observation average; is this proof of revenue gain?",
+        "answer": "Disposition: SAFE_NOOP. The receiving trend shows a 600.00% increase from the previous observation mean, but this does not prove a revenue gain. The net change from the first to the latest observation is 1.0 box. The outstanding order quantity has decreased by 1.0 box. There are no quality holds. The current case balance matches the accepted and recorded quantities. Next: Continue to monitor the expected delivery date for the remaining 39 boxes.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5",
+          "operational-history:M20-GOODS-20260909-40:10"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 18554,
+        "usage": {
+          "incremental_cost_usd": 0.056828,
+          "input_tokens": 63423,
+          "output_tokens": 1903,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+        "answer": "Disposition: SAFE_NOOP. Ordered: 40.00 boxes. Received and posted: 1.00 box. Outstanding: 39.00 boxes. No missing stock indicated. Current case balance matches accepted and recorded quantities. No quality holds. Net change from first to latest observation: 1.0 box. Outstanding order quantity decrease: 1.0 box. Current receiving trend: 600.00% increase from previous observation mean, but this does not prove a revenue gain. Next: Continue to monitor the expected delivery date for the remaining 39 boxes.",
+        "evidence_ids": [
+          "recyfnB1E4OlEqRp5",
+          "1788961453.294629",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 23031,
+        "usage": {
+          "incremental_cost_usd": 0.0571184,
+          "input_tokens": 62622,
+          "output_tokens": 2194,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+        "answer": "Disposition: SAFE_NOOP. Receipt verified by ERP, Airtable, Celigo, and collaboration tools. No need to retry. Next: Continue to monitor the expected delivery date for the remaining 39 boxes.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 11268,
+        "usage": {
+          "incremental_cost_usd": 0.027924,
+          "input_tokens": 30557,
+          "output_tokens": 1087,
+          "request_count": 4,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      },
+      {
+        "question": "Keep that read-only constraint. Show the receiving trend and historical baseline. Explain net change versus the prior-observation average; is this proof of revenue gain?",
+        "answer": "Disposition: SAFE_NOOP. The receiving trend shows a 600.00% increase from the previous observation mean, but this does not prove a revenue gain. The net change from the first to the latest observation is 1.0 box. The outstanding order quantity has decreased by 1.0 box. There are no quality holds. The current case balance matches the accepted and recorded quantities. Next: Continue monitoring the expected delivery date for the remaining 39 boxes.",
+        "evidence_ids": [
+          "PUR-ORD-2026-00013",
+          "MAT-PRE-2026-00003",
+          "MAT-PRE-2026-00003:ledger",
+          "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+          "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+          "1788961453.294629",
+          "recyfnB1E4OlEqRp5",
+          "operational-history:M20-GOODS-20260909-40:10"
+        ],
+        "tool_calls": [
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_control_context",
+          "read_erp_evidence",
+          "read_operational_history"
+        ],
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "latency_ms": 21131,
+        "usage": {
+          "incremental_cost_usd": 0.0573432,
+          "input_tokens": 63119,
+          "output_tokens": 2140,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        },
+        "context_turns": 3
+      }
+    ],
+    "passed": true,
+    "history_changed_since_initial_restart": true
+  },
+  "replay_no_duplicate_external_effects": true
+}

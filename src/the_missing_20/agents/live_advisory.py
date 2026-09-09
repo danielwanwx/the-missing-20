@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
-from the_missing_20.adapters.conversation_views import HISTORY_METRICS
+from the_missing_20.adapters.conversation_views import HISTORY_METRICS, requests_history
 from the_missing_20.adapters.investigation_case_sources import (
     correlate_investigation_sources,
     evaluate_investigation_policy,
@@ -318,6 +318,12 @@ class _RuntimeTelemetryHooks:
 
 ADVISORY_OUTPUT_TOKENS = MAX_OUTPUT_TOKENS_PER_REQUEST
 ADVISORY_TOTAL_TOKENS = 32_000
+# Native Limits count every call's full history, unlike the provider max_tokens.
+# Measured receiving + history synthesis crossed 32k before the final tool call.
+# These bounded per-invocation limits remain inside the factory's shared request,
+# input/output, time and USD budget ledger; they do not increase that ledger.
+RECEIVING_LOOP_TOTAL_TOKENS = 80_000
+RECEIVING_LOOP_OUTPUT_TOKENS = 4 * ADVISORY_OUTPUT_TOKENS
 ADVISORY_WALL_TIMEOUT_SECONDS = 90
 
 SOURCE_TOOL_NAMES = (
@@ -1515,6 +1521,10 @@ async def _invoke(
         raise AdvisoryUnavailable("strands-agents is unavailable") from exc
 
     payloads = model_source_payloads(packet)
+    receiving = packet.get("case_class") == "receiving_operations"
+    current_question = question.rsplit("Newest human question:", 1)[-1]
+    if receiving and not requests_history(current_question):
+        payloads.pop(HISTORY_TOOL_NAME, None)
     source_investigation = packet.get("case_class") == "source_investigation"
     correlated_findings = (
         correlate_investigation_sources({name: payloads[name] for name in SOURCE_TOOL_NAMES})
@@ -1590,7 +1600,9 @@ async def _invoke(
             # escape that scope or suppress the authoritative batch needed for
             # cross-source joins.
             source_payload = {**payloads[tool_name], "query_received": query}
-            payload = json.dumps(source_payload, ensure_ascii=False, sort_keys=True)
+            payload = json.dumps(
+                source_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
             return payload
 
         return reader
@@ -1650,11 +1662,15 @@ async def _invoke(
     started = time.perf_counter()
     try:
         with contextlib.redirect_stdout(io.StringIO()):
-            if source_investigation:
+            if source_investigation or packet.get("case_class") == "receiving_operations":
                 # Strands forced structured-output mode removes ordinary tools.
                 # Keep acquisition untyped until coverage is complete, so a model
                 # ending early can still read missing sources on the next turn.
-                required = (*SOURCE_TOOL_NAMES, CORRELATION_TOOL_NAME)
+                required = (
+                    (*SOURCE_TOOL_NAMES, CORRELATION_TOOL_NAME)
+                    if source_investigation
+                    else tuple(packet["required_tools"])
+                )
                 for _ in range(2):
                     missing = sorted(set(required).difference(calls))
                     if not missing:
@@ -1717,7 +1733,7 @@ async def _invoke(
                 raise AdvisoryUnavailable("Specialist evidence validation did not complete.")
             response = await asyncio.wait_for(
                 agent.invoke_async(
-                    question
+                    (question.rsplit("Newest human question:", 1)[-1] if receiving else question)
                     + (
                         "\nSource acquisition is complete. Use the returned records "
                         "to independently answer this request, not merely summarize tools. "
@@ -1725,6 +1741,11 @@ async def _invoke(
                         "(not a suggested verdict): "
                         + json.dumps(correlated_findings, ensure_ascii=False, sort_keys=True)
                         if source_investigation
+                        else "\nSource acquisition is complete for this receiving request. "
+                        "Use the records already returned to answer; do not reread completed "
+                        "source tools. Only read operational history if requested and not "
+                        "already read. Produce the typed conclusion now."
+                        if packet.get("case_class") == "receiving_operations"
                         else ""
                     ),
                     invocation_state={
@@ -1743,14 +1764,29 @@ async def _invoke(
                             "observations, whereas net change subtracts first from latest. "
                             "Use the actual tool values, rounded to two decimals in prose; "
                             "do not copy unrounded numbers or earlier assistant errors. "
-                            "For a requested history chart set chart_metric."
+                            "When explaining receipt verification, name actual ERP receipt "
+                            "and stock-ledger records as stock authority. Distinguish photo "
+                            "observations and Slack/Airtable/Celigo notification copies; "
+                            "those copies do not independently prove posted stock. "
+                            "For a requested history chart set chart_metric. "
+                            "For evidence_ids copy 1 to 8 exact IDs from these already-read "
+                            "sources; never substitute a tool name, URL or shortened ID: "
+                            + json.dumps([
+                                identifier for identifier in evidence_ids
+                                if any(
+                                    identifier in payloads[name].get("evidence_ids", ())
+                                    for name in calls
+                                )
+                            ])
                             if packet.get("case_class") == "receiving_operations" else ""
                         )
                     ),
                     limits=Limits(
                         turns=16,
-                        output_tokens=ADVISORY_OUTPUT_TOKENS,
-                        total_tokens=ADVISORY_TOTAL_TOKENS,
+                        output_tokens=(RECEIVING_LOOP_OUTPUT_TOKENS if receiving
+                                       else ADVISORY_OUTPUT_TOKENS),
+                        total_tokens=(RECEIVING_LOOP_TOTAL_TOKENS if receiving
+                                      else ADVISORY_TOTAL_TOKENS),
                     ),
                 ),
                 timeout=max(0.01, ADVISORY_WALL_TIMEOUT_SECONDS - (time.perf_counter() - started)),
@@ -1780,6 +1816,13 @@ async def _invoke(
         if delegation is not None:
             delegation.close()
     raw_result = getattr(response, "structured_output", None)
+    stop_reason = str(getattr(response, "stop_reason", "unknown"))
+    if raw_result is None and stop_reason.startswith("limit_"):
+        limited = AdvisoryUnavailable("The Agent reached its bounded SDK invocation limit.")
+        limited.diagnostics = [{"stage": "budget", "stop_reason": stop_reason,
+                                "failure": "SdkInvocationLimit"}]
+        limited.usage = _usage_delta(before, factory.ledger.snapshot())
+        raise limited
     if delegation is not None and (delegation.failed or not continue_requested()):
         stopped = AdvisoryUnavailable("specialist task failed or parent investigation stopped")
         stopped.usage = _usage_delta(before, factory.ledger.snapshot())
@@ -1895,6 +1938,19 @@ async def _invoke(
                     require_full_explanation=packet.get("explanation_scope")
                     == "full_investigation",
                 )
+            if receiving:
+                # Named notification systems cannot be presented as independent
+                # inventory verification. This is a narrow explanation guard,
+                # not a substitute for source-ID and stock-effect validation.
+                prose = candidate.reason + " " + candidate.safe_next_step
+                if re.search(r"Airtable|Celigo|Slack|collaboration tools", prose, re.I) and not (
+                    re.search(r"cop(?:y|ies)|notification|corroborat|副本|通知|佐证", prose, re.I)
+                ):
+                    raise AdvisoryValidationError(
+                        "Explain the authority boundary: ERP receipt and stock ledger "
+                        "prove posted stock; notification systems are copies, not "
+                        "independent stock verification."
+                    )
         except AdvisoryValidationError as error:
             attempts.append(
                 {

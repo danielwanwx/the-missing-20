@@ -14,6 +14,7 @@ from the_missing_20.adapters.live_advisory_gateway import (
     DashboardAdvisoryGateway,
     competition_investigation_packet,
     connected_competition_investigation_packet,
+    public_validation_diagnostics,
 )
 from the_missing_20.agents.live_advisory import (
     AdvisoryDisposition,
@@ -47,6 +48,35 @@ def test_gateway_model_budget_matches_structured_investigation_output_limit() ->
     factory = DashboardAdvisoryGateway(AmbiguousCasePlatform())._factory()
     assert factory.config.max_tokens == advisory_module.ADVISORY_OUTPUT_TOKENS
     assert factory.config.budget.max_output_tokens_per_request == factory.config.max_tokens
+    assert float(factory.config.budget.incremental_cost_cap_usd) == 0.16
+    assert float(factory.config.budget.cumulative_cost_cap_usd) == 0.16
+    assert factory.config.budget.max_requests == 16
+    assert factory.config.budget.max_input_tokens == 250_000
+    assert factory.config.budget.whole_run_timeout_seconds == 120
+
+
+def test_native_sdk_stop_reason_is_visible_without_rejected_prose() -> None:
+    assert public_validation_diagnostics([{
+        "stage": "structured_output", "stop_reason": "limit_total_tokens",
+        "candidate": {"reason": "rejected private prose"},
+    }]) == [{"stage": "structured_output", "stop_reason": "limit_total_tokens"}]
+
+
+def test_retained_history_is_not_a_queue_of_old_questions() -> None:
+    prompt = DashboardAdvisoryGateway._contextual_question(
+        [{"human": "Show revenue trends", "agent": "A prior answer"}],
+        "Should we retry this receipt?",
+    )
+    assert "answer ONLY the newest question" in prompt
+    assert "Do not add old trend" in prompt
+    assert prompt.endswith("Newest human question: Should we retry this receipt?")
+    receiving = DashboardAdvisoryGateway._contextual_question(
+        [{"human": "Show revenue trends", "agent": "STALE_REVENUE_600_PERCENT"}],
+        "Should we retry this receipt?", include_prior_answers=False,
+    )
+    assert "STALE_REVENUE" not in receiving
+    assert "Human: Show revenue trends" in receiving
+    assert receiving.endswith("Newest human question: Should we retry this receipt?")
 
 
 def test_sdk_error_result_is_failure_even_without_exception() -> None:

@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 import threading
+import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -55,6 +56,7 @@ class AgentPlatform:
         self._saas = saas
         self._executor = executor
         self._receiving = receiving
+        self._receiving_refresh_after = 0.0
         self._state_path = state_path
         self._history = (
             OperationalHistory(state_path.with_suffix(".history.sqlite3"))
@@ -1778,6 +1780,13 @@ class AgentPlatform:
                 self._text(erp.get("case_id")), self._text(order.get("name"))
             )
             erp["receiving_work"] = work
+            if (operational_metrics.receiving_receipt_conflicts(erp) and not fresh
+                    and time.monotonic() >= self._receiving_refresh_after):
+                invalidate = getattr(self._erpnext, "invalidate_cache", None)
+                if callable(invalidate):
+                    self._receiving_refresh_after = time.monotonic() + 30
+                    invalidate()
+                    erp = {**self._erpnext.current(), "receiving_work": work}
             rows = work.get("arrivals", [])
             if not isinstance(rows, list):
                 raise ValueError("Receiving arrival projection must be a list")
@@ -1847,7 +1856,7 @@ class AgentPlatform:
         )
         self._admit_source_activity(erp.get("activity"), metrics=metrics)
         self._admit_source_activity(saas.get("activity"))
-        if self._history is not None:
+        if self._history is not None and not operational_metrics.receiving_receipt_conflicts(erp):
             self._history.record(
                 {"case_id": "M20-ERP-LIVE", "source_id": "erpnext-missing20", **erp},
                 metrics or {},

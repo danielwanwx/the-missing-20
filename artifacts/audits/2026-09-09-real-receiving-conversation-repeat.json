@@ -1,0 +1,29 @@
+{
+  "case_id": "M20-GOODS-20260909-40",
+  "started_at": "2026-09-09T14:07:13.459601+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "The real Strands Agent is unavailable; no fallback answer was generated.",
+      "advisory": {
+        "mode": "real_strands",
+        "result": null,
+        "status": "AGENT_UNAVAILABLE",
+        "tool_calls": [],
+        "usage": {
+          "incremental_cost_usd": 0.0402088,
+          "input_tokens": 44093,
+          "output_tokens": 1542,
+          "request_count": 4
+        }
+      },
+      "validation_diagnostics": [
+        {
+          "failure": "AgentBudgetExceeded",
+          "stage": "budget"
+        }
+      ]
+    }
+  ]
+}

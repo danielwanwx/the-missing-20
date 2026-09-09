@@ -1,0 +1,256 @@
+{
+  "case_id": "M20-GOODS-20260909-40",
+  "started_at": "2026-09-09T14:13:32.250899+00:00",
+  "source": "real local HTTP gateway to Strands/Bedrock",
+  "turns": [
+    {
+      "question": "Compare ordered, physically received and posted quantities. Is the outstanding balance evidence of missing stock? Check the source records and explain.",
+      "answer": "Disposition: SAFE_NOOP. Ordered: 40 boxes. Received and posted: 1 box. Outstanding: 39 boxes. No missing stock indicated. Receiving trend: +1.00 box. Historical baseline: +1.00 box. Not a revenue gain. Next: Continue to monitor the expected delivery date for the remaining 39.00 boxes and check for any quality holds or incidents.",
+      "advisory": {
+        "attachments": [],
+        "context_turns": 3,
+        "evidence_findings": {},
+        "follow_up_questions": [
+          "What is the expected delivery date for the remaining 39 boxes?",
+          "Are there any quality holds or incidents reported for the received box?",
+          "Has the supplier provided any updates on the delivery of the outstanding order quantity?"
+        ],
+        "latency_ms": 17475,
+        "mode": "real_strands",
+        "provider": {
+          "mode": "bedrock",
+          "model": "us.amazon.nova-pro-v1:0",
+          "provider": "bedrock",
+          "region": "us-west-2",
+          "transport": "strands_bedrock_model"
+        },
+        "result": {
+          "chart_metric": null,
+          "disposition": "SAFE_NOOP",
+          "evidence_ids": [
+            "PUR-ORD-2026-00013",
+            "MAT-PRE-2026-00003",
+            "MAT-PRE-2026-00003:ledger",
+            "eab22f28333d9dbc7a4473a8fd4fb330:photo:1:2dc3d1ef5b4d",
+            "barcode:6972280664b2bbd26f212043479dec1119f97a74385660ca0729d36a97e06b5a",
+            "1788961453.294629",
+            "recyfnB1E4OlEqRp5",
+            "operational-history:M20-GOODS-20260909-40:10"
+          ],
+          "follow_up_questions": [
+            "What is the expected delivery date for the remaining 39 boxes?",
+            "Are there any quality holds or incidents reported for the received box?",
+            "Has the supplier provided any updates on the delivery of the outstanding order quantity?"
+          ],
+          "reason": "Ordered: 40 boxes. Received and posted: 1 box. Outstanding: 39 boxes. No missing stock indicated. Receiving trend: +1.00 box. Historical baseline: +1.00 box. Not a revenue gain.",
+          "safe_next_step": "Continue to monitor the expected delivery date for the remaining 39.00 boxes and check for any quality holds or incidents.",
+          "write_performed": false
+        },
+        "runtime_events": [
+          {
+            "projected_input_tokens": 2181,
+            "sequence": 1,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2885,
+            "sequence": 2,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 3,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_Cp4eFVLYEweVO0XX62TuOg",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 4,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_e99qJgToVPMvZNJ2OAZXJU",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 5,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_hd8qtLM8JhwztgG5eoGcME",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 6,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_TsTsuyvKP5j9tdUX5OqJxV",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 7,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_cw1gR2D89Lt4yuoA1rAHQE",
+            "type": "tool.started"
+          },
+          {
+            "sequence": 8,
+            "tool": "read_operational_history",
+            "tool_use_id": "tooluse_cpcYEceQMop2k4uFgpFAu9",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 12,
+            "sequence": 9,
+            "tool": "read_control_context",
+            "tool_use_id": "tooluse_Cp4eFVLYEweVO0XX62TuOg",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 12,
+            "sequence": 10,
+            "tool": "read_erp_evidence",
+            "tool_use_id": "tooluse_e99qJgToVPMvZNJ2OAZXJU",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 11,
+            "sequence": 11,
+            "tool": "read_airtable_evidence",
+            "tool_use_id": "tooluse_hd8qtLM8JhwztgG5eoGcME",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 10,
+            "sequence": 12,
+            "tool": "read_celigo_evidence",
+            "tool_use_id": "tooluse_TsTsuyvKP5j9tdUX5OqJxV",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 9,
+            "sequence": 13,
+            "tool": "read_collaboration_evidence",
+            "tool_use_id": "tooluse_cw1gR2D89Lt4yuoA1rAHQE",
+            "type": "tool.succeeded"
+          },
+          {
+            "duration_ms": 8,
+            "sequence": 14,
+            "tool": "read_operational_history",
+            "tool_use_id": "tooluse_cpcYEceQMop2k4uFgpFAu9",
+            "type": "tool.succeeded"
+          },
+          {
+            "projected_input_tokens": 9097,
+            "sequence": 15,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 2739,
+            "sequence": 16,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 14612,
+            "sequence": 17,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3294,
+            "sequence": 18,
+            "type": "model.succeeded"
+          },
+          {
+            "projected_input_tokens": 15918,
+            "sequence": 19,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 5210,
+            "sequence": 20,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 21,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_aG2o6N2rw6I0JuzO2xqmmX",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 22,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_aG2o6N2rw6I0JuzO2xqmmX",
+            "type": "tool.failed"
+          },
+          {
+            "projected_input_tokens": 16438,
+            "sequence": 23,
+            "type": "model.started"
+          },
+          {
+            "duration_ms": 3307,
+            "sequence": 24,
+            "type": "model.succeeded"
+          },
+          {
+            "sequence": 25,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_UqW1pvCPgxQsvyfRBbbUC4",
+            "type": "tool.started"
+          },
+          {
+            "duration_ms": 0,
+            "sequence": 26,
+            "tool": "LiveAdvisoryResult",
+            "tool_use_id": "tooluse_UqW1pvCPgxQsvyfRBbbUC4",
+            "type": "tool.succeeded"
+          }
+        ],
+        "status": "COMPLETE",
+        "tool_calls": [
+          "read_control_context",
+          "read_erp_evidence",
+          "read_airtable_evidence",
+          "read_celigo_evidence",
+          "read_collaboration_evidence",
+          "read_operational_history"
+        ],
+        "usage": {
+          "incremental_cost_usd": 0.0559896,
+          "input_tokens": 63015,
+          "output_tokens": 1743,
+          "request_count": 5,
+          "source_cache_hits": 0,
+          "validation_retries": 0
+        }
+      },
+      "validation_diagnostics": []
+    },
+    {
+      "question": "I decline any inventory change. Do not approve or execute anything. Which records independently verify that receipt, and should we retry it?",
+      "answer": "The real Agent response failed safety validation; no conclusion was shown.",
+      "advisory": {
+        "mode": "real_strands",
+        "result": null,
+        "status": "VALIDATION_FAILED",
+        "tool_calls": [],
+        "usage": {
+          "incremental_cost_usd": 0.04378,
+          "input_tokens": 47281,
+          "output_tokens": 1861,
+          "request_count": 4
+        }
+      },
+      "validation_diagnostics": [
+        {
+          "case_id": "M20-GOODS-20260909-40",
+          "stage": "structured_output",
+          "tool_calls": [
+            "read_airtable_evidence",
+            "read_celigo_evidence",
+            "read_collaboration_evidence",
+            "read_control_context",
+            "read_erp_evidence",
+            "read_operational_history"
+          ]
+        }
+      ]
+    }
+  ]
+}

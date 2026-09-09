@@ -97,6 +97,79 @@ def test_receipt_photo_and_history_share_case_after_restart(tmp_path: Path):
     assert restarted.current()["receiving_work"]["arrivals"] == []
 
 
+def test_local_submit_cannot_publish_old_cached_erp_as_current(tmp_path):
+    transport = MultiReceiptTransport()
+    receiving = service_at(tmp_path / "photos.db", transport)
+    source = Source(transport)
+    cached = source.current()
+    source.current = lambda: deepcopy(cached)
+    platform = AgentPlatform(source, EmptySaaS(), receiving=receiving,
+                             state_path=tmp_path / "state.json")
+    platform.current()
+    before = len(platform.operational_history()["points"])
+    first = receiving.upload(receiving.create(arrival_id="delivery-A")["id"], photo())
+    submit(receiving, receiving.draft(first["id"]))
+    pending = platform.current()
+    assert pending["source_freshness"]["status"] != "CURRENT"
+    assert len(platform.operational_history()["points"]) == before
+    cached = Source(transport).current()
+    restored = platform.current()
+    assert restored["source_freshness"]["status"] == "CURRENT"
+    assert platform.operational_history()["points"][-1]["metrics"]["received"] == 2
+
+
+def test_local_submit_invalidates_stale_erp_cache_before_projection(tmp_path):
+    transport = MultiReceiptTransport()
+    receiving = service_at(tmp_path / "photos.db", transport)
+    source = Source(transport)
+    cached = source.current()
+    source.current = lambda: deepcopy(cached)
+    invalidations = []
+
+    def refresh():
+        nonlocal cached
+        invalidations.append(True)
+        cached = Source(transport).current()
+
+    source.invalidate_cache = refresh
+    platform = AgentPlatform(source, EmptySaaS(), receiving=receiving,
+                             state_path=tmp_path / "state.json")
+    platform.current()
+    first = receiving.upload(receiving.create(arrival_id="delivery-A")["id"], photo())
+    submit(receiving, receiving.draft(first["id"]))
+    projected = platform.current()
+    assert invalidations == [True]
+    assert projected["source_freshness"]["status"] == "CURRENT"
+    assert platform.operational_history()["points"][-1]["metrics"]["received"] == 2
+
+
+def test_unavailable_receipt_readback_does_not_bypass_provider_cache_each_poll(
+    tmp_path, monkeypatch
+):
+    transport = MultiReceiptTransport()
+    receiving = service_at(tmp_path / "photos.db", transport)
+    source = Source(transport)
+    cached = source.current()
+    source.current = lambda: deepcopy(cached)
+    invalidations = []
+    source.invalidate_cache = lambda: invalidations.append(True)
+    clock = [100.0]
+    monkeypatch.setattr("the_missing_20.adapters.agent_platform.time.monotonic", lambda: clock[0])
+    platform = AgentPlatform(source, EmptySaaS(), receiving=receiving,
+                             state_path=tmp_path / "state.json")
+    first = receiving.upload(receiving.create(arrival_id="delivery-A")["id"], photo())
+    submit(receiving, receiving.draft(first["id"]))
+    for _ in range(3):
+        assert platform.current()["source_freshness"]["status"] == "UNAVAILABLE"
+    assert invalidations == [True]
+    clock[0] = 131
+    assert platform.current()["source_freshness"]["status"] == "UNAVAILABLE"
+    assert invalidations == [True, True]
+    cached = Source(transport).current()
+    assert platform.current()["source_freshness"]["status"] == "CURRENT"
+    assert invalidations == [True, True]
+
+
 def test_scan_progress_and_conflict_are_history_but_replay_is_not(tmp_path):
     transport = MultiReceiptTransport()
     receiving = service_at(tmp_path / "photos.db", transport)

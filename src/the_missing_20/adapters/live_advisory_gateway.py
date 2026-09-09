@@ -28,7 +28,7 @@ PacketFactory = Callable[[Mapping[str, object]], Mapping[str, Any]]
 
 def public_validation_diagnostics(diagnostics: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep rejected model prose in private audit artifacts, never in the browser response."""
-    allowed = {"stage", "case_id", "attempt", "disposition", "tool_calls", "failure"}
+    allowed = {"stage", "case_id", "attempt", "disposition", "tool_calls", "failure", "stop_reason"}
     return [
         {key: value for key, value in attempt.items() if key in allowed} for attempt in diagnostics
     ]
@@ -269,14 +269,15 @@ class DashboardAdvisoryGateway:
             else:
                 packet["expected_reason_quantities"] = ()
             history = self._conversation_history(prior_projection)
-            contextual_question = self._contextual_question(history, clean_question)
+            contextual_question = self._contextual_question(
+                history, clean_question,
+                include_prior_answers=packet.get("case_class") != "receiving_operations",
+            )
             if packet["read_only_requested"]:
                 contextual_question += (
-                    "\nRetained human constraint (not execution authorization): "
-                    + str(intent.get("constraint_question", "Read-only investigation requested."))
-                    + "\nAcknowledge the retained refusal/read-only boundary. "
-                    "Continue investigation "
-                    "does not authorize a write."
+                    "\nRetained human constraint: decline/refusal/read-only remains active. "
+                    "Acknowledge it; continuing investigation does not authorize a write. "
+                    "This preserves the authority constraint, not earlier question topics."
                 )
             if "read_operational_history" in packet.get("tool_payload", {}).get("sources", {}):
                 contextual_question += (
@@ -284,6 +285,11 @@ class DashboardAdvisoryGateway:
                     "chart_metric; the server will render its actual source data. Never invent "
                     "history. Offer up to three useful read-only follow_up_questions."
                 )
+            # Keep the actual current request last, after context and retained
+            # authority. Repeating the entire old refusal message here used to
+            # accidentally reactivate its unrelated history/revenue questions.
+            if contextual_question != clean_question:
+                contextual_question += "\nNewest human question: " + clean_question
             run = self._run(packet, question=contextual_question, conversation_id=uuid4().hex)
         except AdvisoryValidationError as error:
             failed = self._unavailable(
@@ -369,16 +375,22 @@ class DashboardAdvisoryGateway:
         return history[-3:]
 
     @staticmethod
-    def _contextual_question(history: list[dict[str, str]], question: str) -> str:
+    def _contextual_question(
+        history: list[dict[str, str]], question: str, *, include_prior_answers: bool = True,
+    ) -> str:
         if not history:
             return question
         transcript = "\n".join(
-            f"Human: {turn['human']}\nEvidence Agent: {turn['agent']}" for turn in history
+            f"Human: {turn['human']}"
+            + (f"\nEvidence Agent: {turn['agent']}" if include_prior_answers else "")
+            for turn in history
         )
         return (
             "Continue the evidence conversation below. Treat prior dialogue only as context, "
-            "not as current evidence. Resolve references in the new question. Before answering "
-            "this turn, you MUST call read_control_context, read_erp_evidence, "
+            "not as current evidence or a list of questions to answer again. Resolve references "
+            "in the new question, but answer ONLY the newest question. Do not add old trend, "
+            "baseline or revenue topics unless this newest question asks for them. "
+            "Before answering this turn, you MUST call read_control_context, read_erp_evidence, "
             "read_airtable_evidence, read_celigo_evidence, read_collaboration_evidence exactly "
             "once. If reconcile_source_records is available for this lifecycle, use it after "
             "those reads. Do not request tools absent from this lifecycle. "
@@ -457,7 +469,7 @@ class DashboardAdvisoryGateway:
     def _factory(self) -> BedrockNovaProFactory:
         budget = AgentBudget(
             # A team can consume several bounded expert turns in addition to
-            # the coordinator. Keep the same token/cost/time ceilings.
+            # the coordinator. Token/request/time ceilings remain independent.
             max_requests=32 if self._delegation_journal is not None else 16,
             max_input_tokens=250_000,
             # A source investigation uses six tool/model turns and may need up to
@@ -469,8 +481,13 @@ class DashboardAdvisoryGateway:
             max_output_tokens=12_000,
             max_output_tokens_per_request=ADVISORY_OUTPUT_TOKENS,
             prior_cost_usd=Decimal("0"),
-            incremental_cost_cap_usd=Decimal("0.08"),
-            cumulative_cost_cap_usd=Decimal("0.08"),
+            # Real three-turn receiving/history acceptance reached ~USD 0.04
+            # before the conservative byte-as-token reservation for synthesis.
+            # USD 0.08 could reject that final request despite low actual use.
+            # Reserve room for the bounded evidence + synthesis workflow; never
+            # relax pre-request accounting or turn an exhausted run into a fallback.
+            incremental_cost_cap_usd=Decimal("0.16"),
+            cumulative_cost_cap_usd=Decimal("0.16"),
             per_call_timeout_seconds=90,
             whole_run_timeout_seconds=120,
         )

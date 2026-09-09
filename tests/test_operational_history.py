@@ -100,6 +100,37 @@ def test_other_case_physical_evidence_does_not_shift_observation_time(tmp_path: 
     assert store.query("M20-history")["points"][0]["observed_at"].startswith("2026-09-01")
 
 
+def test_pre_fix_mixed_receipt_snapshot_is_retained_but_not_charted(tmp_path):
+    path = tmp_path / "history.db"
+    store = OperationalHistory(path)
+    erp = packet()
+    erp["documents"][0]["received"] = 1
+    erp["receiving_work"] = {"case_id": "M20-history", "arrivals": [{
+        "arrival_id": "arrival-1", "origin": "demo_scan", "capture_id": "capture-1",
+        "receipt": {"name": "M20-PR-1"}, "posted_quantity": 1,
+    }]}
+    assert store.record(erp, values(1))
+    # Reproduce the exact persisted pre-fix mixed snapshot, without rewriting
+    # production history or relying on the newly guarded writer to create it.
+    with sqlite3.connect(path) as db:
+        raw = json.loads(db.execute(
+            "SELECT observation_json FROM operational_observations"
+        ).fetchone()[0])
+        raw["documents"][0]["status"] = "DRAFT"
+        raw["metrics"]["received_cumulative"] = 0
+        db.execute("UPDATE operational_observations SET observation_json=?", (json.dumps(raw),))
+    result = store.query("M20-history")
+    assert result["points"] == []
+    assert result["baseline"]["sample_count"] == 0
+    assert result["excluded_observations"][0]["reason"] == "RECEIVING_RECEIPT_NOT_REFRESHED"
+    assert result["coverage"]["status"] == "INCONSISTENT_ONLY"
+    assert result["coverage"]["total_points"] == 1
+    with sqlite3.connect(path) as db:
+        assert json.loads(db.execute(
+            "SELECT observation_json FROM operational_observations"
+        ).fetchone()[0]) == raw
+
+
 def test_restart_poll_dedup_and_reversion_are_append_only(tmp_path: Path) -> None:
     path = tmp_path / "history.db"
     store = OperationalHistory(path)
