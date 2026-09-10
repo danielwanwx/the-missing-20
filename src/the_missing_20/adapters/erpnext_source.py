@@ -302,8 +302,24 @@ class ERPNextEvidenceSource:
             "is_return",
             "return_against",
             "case_scope_complete",
+            # Preserve the current Purchase Invoice's own financial/lifecycle
+            # fields for the read-only receiving dialogue.  They are source
+            # facts, never a substitute for ordered receipt quantities.
+            "bill_no",
+            "on_hold",
+            "hold_comment",
+            "outstanding_amount",
+            "is_paid",
+            "update_stock",
+            "supplier",
+            "supplier_name",
         )
         metadata: dict[str, object] = {key: document[key] for key in fields if key in document}
+        if "status" in document:
+            # Keep the provider's document status beside this adapter's
+            # normalized lifecycle label (for example, ERPNext `Unpaid`
+            # versus the projection's `OPEN`).
+            metadata["source_status"] = document["status"]
         item_fields = (
             "name",
             "item_code",
@@ -319,7 +335,7 @@ class ERPNextEvidenceSource:
             "po_detail",
             "purchase_order_item",
             "purchase_receipt",
-            "purchase_receipt_item",
+            "pr_detail",
             "warehouse",
             "batch_no",
             "received_qty",

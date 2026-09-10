@@ -1954,6 +1954,7 @@ class AgentPlatform:
                 }
             )
         live_case = self._case_projection(erp)
+        current_purchase_invoice = self._documents_by_kind(erp).get("purchase_invoice")
         strands = self._mapping(diagnosis.get("strands_investigation"))
         runtime_events = strands.get("runtime_events")
         tool_calls = strands.get("tool_calls")
@@ -1983,6 +1984,15 @@ class AgentPlatform:
             "case_id": self._text(erp.get("case_id"), "M20-ERP-LIVE"),
             "receiving_work": erp.get("receiving_work"),
             "case_projection": live_case,
+            # This is the already-read, case-selected ERP document.  The
+            # native receiving dialogue needs its actual draft/submitted and
+            # line facts after a supplier invoice exists; it must not infer
+            # them from the purchase order projection.
+            "purchase_invoice_source": (
+                dict(current_purchase_invoice)
+                if isinstance(current_purchase_invoice, Mapping)
+                else None
+            ),
             # Compatibility alias for the current browser; provenance remains
             # explicitly live and never claims a synthetic fixture is authoritative.
             "demo_case": live_case,

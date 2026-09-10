@@ -17,6 +17,11 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8893)
     parser.add_argument("--enable-handoffs", action="store_true")
     parser.add_argument(
+        "--enable-normal-billing",
+        action="store_true",
+        help="enable the separately guarded R4 synthetic supplier-bill console action",
+    )
+    parser.add_argument(
         "--pause-auto-prepare",
         action="store_true",
         help="Require an explicit draft action; does not disable evidence or handoff processing",
@@ -46,6 +51,11 @@ def main() -> int:
             "MISSING20_RECEIVING_MANIFEST": str(manifest_path),
         }
     )
+    if args.enable_normal_billing:
+        os.environ.setdefault(
+            "MISSING20_NORMAL_BILLING_SOURCE_READ",
+            "/private/tmp/m20-r4-billing-source-current-read-02.json",
+        )
     sys.path[:0] = [str(ROOT), str(ROOT / "src")]
     from scripts.decision_workspace_server import main as serve
 
@@ -58,6 +68,8 @@ def main() -> int:
         "--port",
         str(args.port),
     ]
+    if args.enable_normal_billing:
+        sys.argv.append("--enable-normal-billing")
     return serve()
 
 

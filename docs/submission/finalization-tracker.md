@@ -1,39 +1,43 @@
 # Finalization tracker — authoritative current ledger
 
-Updated 2026-09-09. **NOT READY.** This ledger supersedes older overall readiness wording; historical audits remain evidence for their named case/version only. Initial repository and remote main: `be419eab1d5faedfecb140fde7112a5443f9cedc` (fresh `git ls-remote`). Product baseline: `aa4966e`; subsequent commit is handoff documentation. Tracked working tree initially clean; unrelated untracked research/runtime artifacts preserved.
+Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger supersedes older overall readiness wording; historical audits remain evidence for their named case/version only. Initial repository and remote main: `be419eab1d5faedfecb140fde7112a5443f9cedc` (fresh `git ls-remote`). Product baseline: `aa4966e`; subsequent commit is handoff documentation. Tracked working tree initially clean; unrelated untracked research/runtime artifacts preserved.
 
-## Current snapshot — September 9, 23:30 PDT
+## Current snapshot — September 10
 
-- Latest delivered product correction: `aea8180e653b629d79aac2d15dd95e306ed43795`,
-  exact local/remote main verified. Successful repeated invoice readback now
-  retains its audit atomically and keeps SUBMITTED status across restart;
-  independent review and 228 related tests passed. No actual invoice was created.
-- Invoice inspector no longer labels aggregate receipt accounting as verified
-  invoice posting. Delivered `e47a61f`; independent review and an actual R4
-  browser reload/click passed. Full page/action acceptance remains open.
-- Native Strands v2 completed six fresh-process turns for each of two scripted
-  candidates. Standards and specification/mechanics independent reviews passed.
-  This proves the tested restoration mechanism only; no paid v2 sequence or
-  product conversation promotion yet.
-- R4 remains PO16 / PR7: 40 Box ordered, 1 Box posted, 39 outstanding, no
-  invoice. A new complete source read produced a READY synthetic USD50 bill
-  preview; UI approval/execution and exact invoice GL/SLE verification are not
-  integrated or accepted. Customer fulfillment is also still open.
-- F03 real reasoning, F05 same-order downstream closure and F06 repeated complex
-  matrix remain open. The latest bounded full Python regression timed out;
-  targeted passes do not replace it. Video and final submission are not ready.
+- **The same R4 receiving → supplier billing path is verified in the demo.**
+  PO16 / PR7 now links submitted PI8 (`ACC-PINV-2026-00008`), 1 Box / USD50.
+  Exact ERP reads and the native ledger UI confirm debit/credit USD50, no new
+  invoice stock entries, unchanged PR7 stock, and USD50 still unpaid.
+  The remaining 39 Box are outstanding, not proved lost or completed.
+- Final read-only reconciliation exposed a retained metadata/digest conflict.
+  PI8 still passes the submitted business validator; the journal's later review
+  hold is not an invoice or accounting rollback. Preserve this known defect,
+  show the completed submission and subsequent review requirement accurately,
+  and defer repeat-read recovery under the user's demo-first scope.
+- **Six actual R4 UI conversation turns passed independent semantic review.**
+  Native Strands snapshot history keeps prior instructions and references;
+  the invoice's own quantity/status/payment fields replace the legacy packet's
+  erroneous use of ordered quantity. Ten requests cost an estimated USD0.0821152.
+- The first post-invoice UI call used the legacy route and failed validation;
+  it remains preserved. Earlier R3 failures and the separate captured-source
+  native experiment are not reclassified or spliced into the R4 result.
+- Billing renewal/ACK corrections passed 58 focused tests and independent code
+  review. Native integration and related source/platform suites passed, with
+  two socket skips. No current full-suite pass is claimed; the earlier bounded
+  full run timed out and imported-module type errors remain.
+- The complete slice was implemented on base `4bd0eef`; exact executed source
+  hashes are retained with private acceptance artifacts. The corresponding
+  code/audit commit and remote verification are recorded by the delivery step.
+- Remaining submission work: final story/video, current diagram and saved
+  Devpost text, judge access/reproducibility, and proportionate complex-case
+  coverage. Customer fulfillment and production hardening are separate scope.
 
-The delivery log below preserves earlier states and failures; the snapshot and
-named acceptance scopes take precedence over historical progress wording.
-
-User steering at this stage prioritizes a complete competition demo over further
-bottom-layer reliability work. Backend and UI are now assigned as one normal
-billing vertical slice using the accepted coordinator. Minor UI and rare recovery
-limitations may be deferred. Use focused slice verification, real operator flow
-and actual external evidence; do not expand another proof framework or make each
-small accessor wait for a full regression. The real-model v2 comparison is the
-next conversation gate; [offline review](../audits/2026-09-09-native-session-v2-offline-review.md)
-is accepted only in its stated mechanism scope.
+See the [same-order business and six-turn audit](../audits/2026-09-10-r4-billing-native-dialogue-review.md)
+and [captured-source native experiment](../audits/2026-09-10-native-session-v2-real-model-review.md).
+The app still labels its separate financial badge `NOT VERIFIED`; the actual
+GL/SLE evidence above is an external acceptance check, not an automated badge.
+Minor citation wording/structured-attachment gaps are retained under the user's
+competition-demo priority. Full repeated/held-out acceptance remains open.
 
 ## Schedule and official gates
 
@@ -61,17 +65,17 @@ Process arguments verified directly: 8893 uses `.missing20-goods-date-fixed`; 88
 |---|---|---|---|---|
 | F01 P0 | Official requirements: VERIFIED_IN_DEMO (document/account inspection only) | September 9 direct sources and form observation above | Video absent; eligibility attestation and final release/access still open. Recheck rules and final form at submission | Release reviewer / 1h / Sep14 |
 | F02 P0 | Competition/industry comparison: VERIFIED_IN_DEMO (research only) | Current research reports linked below | Five source-labelled comparisons and industry protocol independently reviewed; no comparative performance or measured ROI claimed | Research + impact/product reviewers / 2h / Sep9 |
-| F03 P0 | Real multi-turn receiving: FAILED | R3; R4 audit and rejected raw artifacts; backend baseline below | Missing retry answer, faulty financial explanation, implicit referents. Frozen C1–C11 + held-out variants, each critical conversation repeated 3 real runs, every attempt independently reviewed | Contract design before implementation; backend reviewer / 1–2d / Sep11 |
+| F03 P0 | Real multi-turn receiving: VERIFIED_IN_DEMO (one six-turn UI sequence) | R4 PO16/PR7/PI8; September 10 same-order audit | Prior refusal, receipt referents, 40/39 quantities, physical-proof limits and invoice/payment/stock explanation passed independent review. Broad repeated/held-out scenarios remain open | Native Strands integration delivered with this slice; broader coverage after core demo / Sep12 |
 | F04 P0 | R4 lost-ACK recovery: VERIFIED_IN_DEMO (limited slice) | R4 PO16/PR7, aa4966e; R4 audit | Keep receipt and stock/destination identity across restart/replay; must not transfer result to unknown/not-committed branch | Existing preserved runtime; backend / retain / Sep9 |
-| F05 P0 | Same new-order downstream chain: NOT_STARTED (acceptance) | R4 has PR7 only; no new invoice/customer chain | Obtain explicit synthetic supplier invoice or authorized SO/fulfillment basis before relevant documents. Verify exact line/UOM/amount and external readbacks; no real payment, no fabricated supplier issuance | Scenario design + admitted business evidence; warehouse/backend / 1d / Sep11 |
-| F06 P0 | Full complex matrix: NOT_STARTED (consolidated acceptance) | R3 interleaving and R4 ACK are separate slices | Cover normal partial, identity/UOM, multiview duplicate, unknown/not-submitted, stale approval, QA/refusal/resume, concurrency and partial destination failure; zero unjustified effects | Frozen spec, isolated cases; warehouse/backend / 1–2d / Sep12 |
-| F07 P0 | Current pages/external UX: NOT_STARTED (full acceptance) | R4 gallery links previously checked; no full current click matrix | Mouse-test all menus/actions/approval/error states and exact ERP/Airtable/Celigo/Jira/Slack records; screenshots with no secrets | Stable business path; product reviewer / 0.5d / Sep12 |
+| F05 P0 | Same-order supplier-billing chain: VERIFIED_IN_DEMO | R4 PR7 → PI8, 1 Box / USD50; exact GL/SLE and native ERP UI | Submitted/unpaid, no duplicate stock. Synthetic supplier bill disclosed. Customer fulfillment remains separate and deferred; no payment or revenue uplift | Core supplier chain complete / warehouse/backend / Sep10 |
+| F06 P0 | Full complex matrix: DEFERRED (consolidated acceptance) | R3 historical failures, R4 ACK recovery and September 10 actual conversation are bounded slices | User prioritizes the working competition path. Preserve prior cases; add targeted complex cases when a concrete demo gap warrants it. No repeated-matrix/global pass claim | Core demo first; scoped coverage / Sep12 |
+| F07 P0 | Current pages/external UX: VERIFIED_IN_DEMO (core R4 path only) | Actual prepare/approve/execute/renewal, six chat turns, native PI8 and Accounting Ledger | Full page/menu matrix remains open. Financial badge automation and structured native citation attachments are deferred minor gaps | Product/release reviewer / core verified Sep10; remaining Sep12 |
 | F08 P0 | Claim consistency: VERIFIED_IN_DEMO (local text correction only) | README/submission/as-built text still old-case-wide claims | Historical 8/8/15/15 and 42k scoped, receiving writers disclosed. Local text independently approved; saved Devpost update/current diagram still pending | Research and baseline; release reviewer / 2h / Sep9 |
 | F09 P0 | Clean checkout/start: VERIFIED_IN_DEMO (credential-free quality gate only) | Independent public clone 0c01eaa plus exact reviewed Python candidate; cold-start review | make check: 1,566 Python / 98 JS, formatting/lint/types pass. Startup and historical judge-demo verified. Full browser smoke still fails at obsolete/mixed authority contract; tracked under F07, not covered by this pass | Release reviewer / retain exact release check / Sep12 |
 | F10 P0 | Final video/materials: BLOCKED | Devpost video empty; previous architecture attached | Record only frozen same-case working path, English ≤5 min, playable public link; final preview gate before publishing/submitting | F03–F09 and user physical input for final physical claim; primary/user / 0.5d / Sep13 |
 | F11 P1 | Business efficiency: NOT_STARTED (measurement) | No matched human control or production pilot | Same workload active time/touches/fields, all failures, wall time/token/cost; label unavailable ROI and sample limits; formulas in impact research | Frozen tasks + actual operator; impact reviewer / 0.5d / Sep12 |
 | F12 P1 | Physical final trial: BLOCKED (human evidence only) | Public p05 + typed QR are test substitutes | User's staged garage photos/label interaction remain needed for final physical claim; continue public-fixture code/tests independently | Actual user input; operator / 1h / Sep12 |
-| F13 P1 | Production suitability: NOT_STARTED (complete audit) | Demo persona/loopback, no pilot | Auth roles, durable deployment, quotas/expiry, webhook/source freshness, retention, independent controls and operator training before pilot; no production-ready claim | Release/security/operations reviewer / scoped report / Sep12 |
+| F13 P1 | Production suitability: DEFERRED | Single-operator local demo; no enterprise pilot | Organization authentication, durable hosting, scale, retention and operations remain pre-pilot work; user explicitly prioritizes competition delivery | Separate post-demo scope |
 | F14 P2 | Optional hosted UI/AgentCore/blog: DEFERRED pending core path | Separate historical Runtime proof | Do not migrate just for score; new public exposure/publication has final approval gate; optional work cannot displace P0 | Core freeze; primary/user / TBD |
 
 ## Frozen verification and review contract
@@ -259,3 +263,11 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   This is one page interaction, not full F07 or same-order billing acceptance.
   A separately frozen diagnostic regression continues; transport and real R4
   invoice/GL/SLE effects remain unverified.
+
+- September 10 complete R4 slice: UI created and submitted PI8 after retaining and
+  fixing the actual midnight/ACK/approval-expiry failures. Exact GL/SLE reads and
+  the ERP accounting page passed; six corrected native R4 UI turns passed Luna's
+  independent semantic/financial review. Terra independently approved the native
+  post-invoice source mapping; Luna approved billing/renewal. See the linked current
+  audit for test scope, costs, preserved failures and limitations. Precise staging,
+  commit, push and remote-SHA verification apply to this accepted slice.

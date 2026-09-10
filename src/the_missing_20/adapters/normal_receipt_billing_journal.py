@@ -601,7 +601,16 @@ class BillingIntentJournal:
             if current.source_changed:
                 return self._approval_denial(current, manager_id, "COMMERCIAL_SOURCE_CHANGED")
             if current.insert_attempted:
-                return self._approval_denial(current, manager_id, "INSERT_ALREADY_ATTEMPTED")
+                if current.authority_status != "EXPIRED":
+                    return self._approval_denial(current, manager_id, "INSERT_ALREADY_ATTEMPTED")
+                return self._renew_submit_approval(
+                    connection,
+                    row,
+                    current,
+                    manager_id=manager_id,
+                    expiry=expiry,
+                    recorded_at=recorded_at,
+                )
             try:
                 _stored_insert_binding(row)
             except _AdmissionError as error:
@@ -643,6 +652,79 @@ class BillingIntentJournal:
                 manager,
                 current.intent_version,
             )
+
+    def _renew_submit_approval(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        current: IntentSnapshot,
+        *,
+        manager_id: str,
+        expiry: str,
+        recorded_at: str,
+    ) -> ApprovalResult:
+        """Renew only an expired approval for the already acknowledged draft submit."""
+
+        if current.submit_attempted:
+            return self._approval_denial(current, manager_id, "SUBMIT_ALREADY_ATTEMPTED")
+        if current.phase != "DRAFT_READBACK_ADMITTED":
+            return self._approval_denial(current, manager_id, "DRAFT_ACKNOWLEDGEMENT_REQUIRED")
+        try:
+            _, _, acknowledgement = _stored_draft_acknowledgement(row)
+        except _AdmissionError as error:
+            return self._approval_denial(current, manager_id, error.code)
+
+        manager = _text(manager_id, "manager_id")
+        prior_manager = row["approval_manager_id"]
+        prior_token_hash = row["approval_token_hash"]
+        prior_issued_at = row["approval_token_issued_at"]
+        prior_expires_at = row["approval_expires_at"]
+        if not all(
+            isinstance(value, str) and value
+            for value in (prior_manager, prior_token_hash, prior_issued_at, prior_expires_at)
+        ):
+            return self._approval_denial(current, manager_id, "APPROVAL_REQUIRED")
+        if manager != prior_manager:
+            return self._approval_denial(current, manager_id, "MANAGER_MISMATCH")
+
+        token = secrets.token_urlsafe(32)
+        token_hash = _digest({"approval_token": token})
+        connection.execute(
+            """
+            UPDATE normal_receipt_billing_intents
+            SET approval_token_hash = ?, approval_token_issued_at = ?, approval_expires_at = ?,
+                updated_at = ?
+            WHERE intent_id = ?
+            """,
+            (token_hash, recorded_at, expiry, recorded_at, current.intent_id),
+        )
+        self._event(
+            connection,
+            current.intent_id,
+            "APPROVAL_RENEWED_FOR_SUBMIT",
+            {
+                "action": ACTION_NORMAL_RECEIPT_BILLING,
+                "case_id": current.case_id,
+                "manager_id": manager,
+                "intent_version": current.intent_version,
+                "draft_name": acknowledgement.draft_name,
+                "expires_at": expiry,
+                "token_hash": token_hash,
+                "prior_approval_issued_at": prior_issued_at,
+                "prior_approval_expires_at": prior_expires_at,
+                "prior_token_hash": prior_token_hash,
+            },
+            recorded_at,
+        )
+        return ApprovalResult(
+            True,
+            None,
+            token,
+            ACTION_NORMAL_RECEIPT_BILLING,
+            current.case_id,
+            manager,
+            current.intent_version,
+        )
 
     def refuse(
         self,
@@ -1127,6 +1209,31 @@ class BillingIntentJournal:
     def get(self, intent_id: str) -> IntentSnapshot:
         with self._connect() as connection:
             return self._snapshot(connection, self._intent(connection, intent_id))
+
+    def current_for_case(self, case_id: str) -> IntentSnapshot | None:
+        """Read the sole current intent for a configured single-bill case.
+
+        The Case Console uses this only for its fixed R4 pilot case.  Returning
+        an ambiguity instead of selecting an arbitrary billing intent preserves
+        the journal's identity boundary for future multi-bill cases.
+        """
+
+        configured_case = _text(case_id, "case_id")
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM normal_receipt_billing_intents
+                WHERE case_id = ?
+                ORDER BY created_at DESC, intent_id DESC
+                LIMIT 2
+                """,
+                (configured_case,),
+            ).fetchall()
+            if not rows:
+                return None
+            if len(rows) != 1:
+                raise ValueError("CASE_INTENT_AMBIGUOUS")
+            return self._snapshot(connection, rows[0])
 
     def bound_insert_request(self, intent_id: str) -> NativeInsertRequest | None:
         """Return the immutable journal-bound insert request without reconstructing history."""

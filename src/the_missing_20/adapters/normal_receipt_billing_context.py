@@ -235,6 +235,63 @@ def _requests_match(stored: NativeInsertRequest, current: NativeInsertRequest) -
     return old_projection == new_projection
 
 
+def _acknowledged_draft_documents_match(
+    acknowledged: NativeDraftAcknowledgement,
+    observed: NativeDraftAcknowledgement,
+) -> bool:
+    """Compare full validated draft records with the captured Frappe read projection.
+
+    The journal retains each original full document and digest.  This comparison
+    admits only the observed representation delta between Frappe's POST insert
+    response and its later GET: root ``__onload``, ``__unsaved`` on item and
+    payment-schedule children, and ``posting_time`` while both documents have
+    the native ``set_posting_time == 0`` flag.  Every other field remains exact.
+    """
+
+    acknowledged_projection = _draft_readback_projection(acknowledged.document)
+    observed_projection = _draft_readback_projection(observed.document)
+    if acknowledged_projection is None or observed_projection is None:
+        return False
+    if acknowledged_projection == observed_projection:
+        return True
+    if (
+        type(acknowledged_projection.get("set_posting_time")) is not int
+        or acknowledged_projection.get("set_posting_time") != 0
+        or type(observed_projection.get("set_posting_time")) is not int
+        or observed_projection.get("set_posting_time") != 0
+        or "posting_time" not in acknowledged_projection
+        or "posting_time" not in observed_projection
+    ):
+        return False
+    del acknowledged_projection["posting_time"]
+    del observed_projection["posting_time"]
+    return acknowledged_projection == observed_projection
+
+
+def _draft_readback_projection(document: Mapping[str, object]) -> dict[str, object] | None:
+    """Remove only the captured Frappe runtime metadata from a readback comparison."""
+
+    projection = _mapping(document, "acknowledged draft document")
+    if "__onload" in projection:
+        if not isinstance(projection["__onload"], dict):
+            return None
+        del projection["__onload"]
+    for table_name in ("items", "payment_schedule"):
+        rows = projection.get(table_name)
+        if rows is None:
+            continue
+        if not isinstance(rows, list):
+            return None
+        for row in rows:
+            if not isinstance(row, dict):
+                return None
+            if "__unsaved" in row:
+                if type(row["__unsaved"]) is not int or row["__unsaved"] != 1:
+                    return None
+                del row["__unsaved"]
+    return projection
+
+
 def _ordered_documents(value: object) -> list[object]:
     if not isinstance(value, list):
         raise ValueError("related documents must be a list")
@@ -415,8 +472,8 @@ def build_normal_receipt_billing_context(
             acknowledgement.insert_body_digest != stored_insert_request.body_digest
             or source_acknowledgement.draft_name != acknowledgement.draft_name
             or direct_acknowledgement.draft_name != acknowledgement.draft_name
-            or source_acknowledgement.document_digest != acknowledgement.document_digest
-            or direct_acknowledgement.document_digest != acknowledgement.document_digest
+            or not _acknowledged_draft_documents_match(acknowledgement, source_acknowledgement)
+            or not _acknowledged_draft_documents_match(acknowledgement, direct_acknowledgement)
         ):
             return _held(raw_preview, audit, "ACKNOWLEDGED_DRAFT_MISMATCH")
         comparison_related = cast(Mapping[str, Any], _thaw(related))

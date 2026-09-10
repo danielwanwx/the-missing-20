@@ -1090,6 +1090,89 @@ def test_expiry_and_invalid_draft_proof_never_authorize_a_repeat_attempt(tmp_pat
     assert submit.reason == "DRAFT_ACKNOWLEDGEMENT_REQUIRED"
 
 
+def test_expired_acknowledged_draft_renews_submit_only_for_the_original_manager(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
+    original_token = _approve(
+        journal,
+        prepared.intent_id,
+        basis=basis,
+        expires_at=NOW + timedelta(seconds=1),
+    )
+    assert _claim_insert(journal, prepared.intent_id, basis, original_token).granted is True
+    assert (
+        journal.admit_insert_acknowledgement(
+            prepared.intent_id, _acknowledged_draft(_insert_request(basis))
+        ).admitted
+        is True
+    )
+
+    wrong_manager = journal.approve(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id="other-manager",
+        expires_at=NOW + timedelta(minutes=10),
+        now=NOW + timedelta(seconds=2),
+    )
+    assert wrong_manager.granted is False
+    assert wrong_manager.reason == "MANAGER_MISMATCH"
+
+    renewed = journal.approve(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        expires_at=NOW + timedelta(seconds=4),
+        now=NOW + timedelta(seconds=2),
+    )
+    assert renewed.granted is True
+    assert renewed.token is not None
+    assert renewed.token != original_token
+
+    repeated_insert = journal.claim_insert(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        approval_token=renewed.token,
+        worker_id="worker-renewed-insert",
+        now=NOW + timedelta(seconds=3),
+    )
+    submit = journal.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-renewed-submit",
+        now=NOW + timedelta(seconds=3),
+    )
+    assert repeated_insert.granted is False
+    assert repeated_insert.reason == "INSERT_ALREADY_ATTEMPTED"
+    assert submit.granted is True
+
+    after_submit = journal.approve(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        expires_at=NOW + timedelta(minutes=10),
+        now=NOW + timedelta(seconds=5),
+    )
+    assert after_submit.granted is False
+    assert after_submit.reason == "SUBMIT_ALREADY_ATTEMPTED"
+    events = journal.history(prepared.intent_id)
+    assert [event.kind for event in events] == [
+        "PREPARED",
+        "APPROVED",
+        "INSERT_ATTEMPT_MARKED",
+        "INSERT_ACKNOWLEDGEMENT_ADMITTED",
+        "APPROVAL_RENEWED_FOR_SUBMIT",
+        "SUBMIT_ATTEMPT_MARKED",
+    ]
+    assert events[4].payload["prior_approval_expires_at"] == "2026-09-09T22:00:01+00:00"
+
+
 def test_explicit_reprepare_versions_unattempted_intent_and_invalidates_old_token(
     tmp_path: Path,
 ) -> None:

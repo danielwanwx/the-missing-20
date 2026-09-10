@@ -262,6 +262,59 @@ def _acknowledged_draft(
     return draft, acknowledgement
 
 
+def _observed_frappe_post_and_get_draft(
+    request: NativeInsertRequest,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Return the reduced PI8 POST/GET shape captured from the configured R4 tenant.
+
+    Frappe v15 creates with ``Document.insert()`` and reads a newly loaded document.
+    The captured POST acknowledgement retained ``__onload`` and child ``__unsaved``
+    markers, while both fresh GET views omitted them and rendered the same time with
+    one rather than two hour digits.  The frozen request and all business fields stay
+    identical in this fixture.
+    """
+
+    acknowledged = _draft(request)
+    acknowledged.update(
+        {
+            "posting_time": "00:13:39.907451",
+            "set_posting_time": 0,
+            "__onload": {
+                "apply_tds": None,
+                "backflush_based_on": "BOM",
+                "load_after_mapping": True,
+                "make_payment_via_journal_entry": 0,
+            },
+            "payment_schedule": [
+                {
+                    "doctype": "Payment Schedule",
+                    "docstatus": 0,
+                    "payment_amount": 50,
+                    "__unsaved": 1,
+                }
+            ],
+        }
+    )
+    items = acknowledged["items"]
+    assert isinstance(items, list)
+    assert len(items) == 1
+    assert isinstance(items[0], dict)
+    items[0]["__unsaved"] = 1
+
+    direct = deepcopy(acknowledged)
+    del direct["__onload"]
+    direct["posting_time"] = "0:13:39.907451"
+    direct_items = direct["items"]
+    direct_schedule = direct["payment_schedule"]
+    assert isinstance(direct_items, list)
+    assert isinstance(direct_schedule, list)
+    assert isinstance(direct_items[0], dict)
+    assert isinstance(direct_schedule[0], dict)
+    del direct_items[0]["__unsaved"]
+    del direct_schedule[0]["__unsaved"]
+    return acknowledged, direct
+
+
 def _unrelated_invoice(request: NativeInsertRequest, *, name: str) -> dict[str, object]:
     document = _draft(request, name=name)
     document["bill_no"] = "OTHER-SUPPLIER-BILL"
@@ -318,6 +371,81 @@ def test_proven_own_draft_is_temporary_context_only_after_raw_source_reports_dra
     assert isinstance(audit_documents[0], dict)
     assert audit_documents[0]["name"] == acknowledgement.draft_name
     assert audit_direct["name"] == acknowledgement.draft_name
+
+
+def test_observed_frappe_post_metadata_and_zeroed_posting_time_admit_the_owned_draft() -> None:
+    """The actual POST/GET representation mismatch must not mask the exact R4 draft."""
+
+    request = _request()
+    post_document, direct_document = _observed_frappe_post_and_get_draft(request)
+    acknowledgement = validate_native_draft_acknowledgement(
+        _basis(),
+        purchase_order=_purchase_order(),
+        purchase_receipt=_purchase_receipt(),
+        insert_request=request,
+        document=post_document,
+    )
+    direct_acknowledgement = validate_native_draft_acknowledgement(
+        _basis(),
+        purchase_order=_purchase_order(),
+        purchase_receipt=_purchase_receipt(),
+        insert_request=request,
+        document=direct_document,
+    )
+    assert acknowledgement.document_digest != direct_acknowledgement.document_digest
+
+    context = _context_with_ack(
+        _source_read([deepcopy(direct_document)]),
+        request,
+        acknowledgement,
+        direct_document,
+    )
+
+    assert context.ready is True
+    assert context.hold_reason is None
+    raw_audit = context.audit.record()
+    direct_audit = raw_audit["direct_known_document"]
+    assert isinstance(direct_audit, dict)
+    assert "__onload" not in direct_audit
+    assert direct_audit["posting_time"] == "0:13:39.907451"
+    assert acknowledgement.document["__onload"] == post_document["__onload"]
+
+
+def test_frappe_projection_keeps_unobserved_root_metadata_and_payment_drift_fenced() -> None:
+    request = _request()
+    post_document, direct_document = _observed_frappe_post_and_get_draft(request)
+    acknowledgement = validate_native_draft_acknowledgement(
+        _basis(),
+        purchase_order=_purchase_order(),
+        purchase_receipt=_purchase_receipt(),
+        insert_request=request,
+        document=post_document,
+    )
+    root_unsaved = deepcopy(direct_document)
+    root_unsaved["__unsaved"] = 1
+    changed_payment = deepcopy(direct_document)
+    schedule = changed_payment["payment_schedule"]
+    assert isinstance(schedule, list)
+    assert isinstance(schedule[0], dict)
+    schedule[0]["payment_amount"] = 51
+
+    root_metadata_context = _context_with_ack(
+        _source_read([deepcopy(direct_document)]),
+        request,
+        acknowledgement,
+        root_unsaved,
+    )
+    payment_context = _context_with_ack(
+        _source_read([changed_payment]),
+        request,
+        acknowledgement,
+        changed_payment,
+    )
+
+    assert root_metadata_context.ready is False
+    assert root_metadata_context.hold_reason == "ACKNOWLEDGED_DRAFT_MISMATCH"
+    assert payment_context.ready is False
+    assert payment_context.hold_reason == "ACKNOWLEDGED_DRAFT_MISMATCH"
 
 
 def test_foreign_same_bill_is_not_excluded_with_the_proven_own_draft() -> None:

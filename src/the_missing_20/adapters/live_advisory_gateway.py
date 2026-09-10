@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from decimal import Decimal
+from pathlib import Path
 from threading import RLock
 from typing import Any, Protocol
 from uuid import uuid4
@@ -11,6 +12,11 @@ from uuid import uuid4
 from the_missing_20.adapters import dialogue_intent
 from the_missing_20.adapters.conversation_views import history_attachment, retained_history_view
 from the_missing_20.adapters.investigation_case_sources import investigation_packet
+from the_missing_20.adapters.native_receiving_dialogue import (
+    NATIVE_RECEIVING_SCHEMA_VERSION,
+    NativeReceivingRun,
+    run_native_receiving_turn,
+)
 from the_missing_20.adapters.role_task_journal import RoleTaskJournal
 from the_missing_20.adapters.strands_models import BedrockNovaProConfig, BedrockNovaProFactory
 from the_missing_20.agents.live_advisory import (
@@ -21,6 +27,7 @@ from the_missing_20.agents.live_advisory import (
     live_recovery_packet,
     run_live_advisory,
 )
+from the_missing_20.agents.receiving_advisory import post_invoice_receiving_packet
 from the_missing_20.agents.receiving_facts import receipt_relations
 from the_missing_20.config import Settings
 from the_missing_20.ports.agent_model import AgentBudget, AgentBudgetLedger, AgentProvider
@@ -148,12 +155,14 @@ class DashboardAdvisoryGateway:
         runner: AdvisoryRunner = run_live_advisory,
         packet_factory: PacketFactory = live_recovery_packet,
         delegation_journal: RoleTaskJournal | None = None,
+        native_receiving_session_root: Path | None = None,
     ) -> None:
         self._platform = platform
         self._settings = settings or Settings.from_env()
         self._runner = runner
         self._packet_factory = packet_factory
         self._delegation_journal = delegation_journal
+        self._native_receiving_session_root = native_receiving_session_root
         # This serializes one gateway instance only. The supported boundary is
         # one local operator/runtime, not a distributed multi-process lock.
         self._ask_lock = RLock()
@@ -285,6 +294,46 @@ class DashboardAdvisoryGateway:
             raw_intent = projection.get("human_intent", {})
             intent = raw_intent if isinstance(raw_intent, Mapping) else {}
             packet["read_only_requested"] = bool(intent.get("read_only_requested"))
+            native_session_root = self._native_receiving_session_root
+            if native_session_root is None:
+                native_packet = None
+            else:
+                try:
+                    native_packet = self._native_receiving_packet(packet, projection)
+                except ValueError:
+                    failed = self._unavailable(
+                        projection,
+                        code="SOURCE_UNAVAILABLE",
+                        detail=(
+                            "Current supplier-invoice evidence is unavailable or does not match "
+                            "this receiving workspace; no model request was started."
+                        ),
+                    )
+                    failed_advisory = failed["agent_advisory"]
+                    if isinstance(failed_advisory, dict):
+                        failed_advisory["mode"] = "not_invoked"
+                    return failed
+            if native_packet is not None and native_session_root is not None:
+                runtime_instance_id = context_state.get("runtime_instance_id")
+                if not isinstance(runtime_instance_id, str):
+                    raise RuntimeError("native receiving requires a persisted runtime identity")
+                native_run = run_native_receiving_turn(
+                    session_root=native_session_root,
+                    runtime_instance_id=runtime_instance_id,
+                    case_id=case_id,
+                    conversation_id=conversation_id,
+                    packet=native_packet,
+                    question=current_question,
+                    factory=self._factory(),
+                )
+                return self._complete_native_receiving(
+                    projection=projection,
+                    case_id=case_id,
+                    conversation_id=conversation_id,
+                    current_question=current_question,
+                    context_state=context_state,
+                    native_run=native_run,
+                )
             # Broad diagnosis requires the complete discrepancy partition. A
             # focused dialogue turn must answer its actual question; safety and
             # contradiction checks still use the unchanged current-case facts.
@@ -441,6 +490,62 @@ class DashboardAdvisoryGateway:
             "agent_advisory": advisory,
         }
 
+    def _complete_native_receiving(
+        self,
+        *,
+        projection: Mapping[str, object],
+        case_id: str,
+        conversation_id: str,
+        current_question: str,
+        context_state: Mapping[str, object],
+        native_run: NativeReceivingRun,
+    ) -> dict[str, object]:
+        """Persist an N1 answer without inventing advisory-policy fields or citations."""
+
+        completion_projection = self._platform.current()
+        if not self._scope_matches(completion_projection, case_id, conversation_id):
+            return self._scope_changed(completion_projection)
+        projection = completion_projection
+        advisory: dict[str, Any] = {
+            "status": "COMPLETE",
+            "mode": "native_receiving_n1",
+            "provider": native_run.provider,
+            "tool_calls": list(native_run.tool_calls),
+            "latency_ms": native_run.latency_ms,
+            "usage": native_run.usage,
+            "result": {
+                "answer": native_run.answer,
+                "semantic_status": "NOT_EVALUATED",
+                "session_id": native_run.session_id,
+                "session_schema_version": NATIVE_RECEIVING_SCHEMA_VERSION,
+            },
+            "semantic_status": "NOT_EVALUATED",
+            "runtime_events": list(native_run.runtime_events),
+            "conversation_id": conversation_id,
+            "context_turns": native_run.context_turns,
+            "omitted_turns": self._stored_omissions(context_state),
+            "attachments": [],
+            "follow_up_questions": [],
+        }
+        record_turn = getattr(self._platform, "record_conversation_turn", None)
+        if callable(record_turn):
+            recorded_turn = record_turn(
+                current_question,
+                native_run.answer,
+                {**advisory, "evidence_ids": []},
+                expected_case_id=case_id,
+                expected_conversation_id=conversation_id,
+            )
+            if isinstance(recorded_turn, Mapping):
+                projection = dict(recorded_turn)
+            if not self._scope_matches(projection, case_id, conversation_id):
+                return self._scope_changed(projection)
+        return {
+            **projection,
+            "answer": native_run.answer,
+            "agent_advisory": advisory,
+        }
+
     def _record_human_request(
         self, question: str, case_id: str, *, new_conversation: bool
     ) -> dict[str, object]:
@@ -528,6 +633,43 @@ class DashboardAdvisoryGateway:
     def _stored_omissions(context_state: Mapping[str, object]) -> int:
         omitted = context_state.get("requests_omitted")
         return omitted if isinstance(omitted, int) and not isinstance(omitted, bool) else 0
+
+    @staticmethod
+    def _native_receiving_packet(
+        packet: Mapping[str, Any], projection: Mapping[str, object]
+    ) -> dict[str, Any] | None:
+        """Choose the native receiving contract without changing legacy routing.
+
+        Before an invoice exists, the established receiving packet is already
+        complete.  Once a current supplier invoice exists, the legacy generic
+        investigation packet deliberately has a different invoice summary;
+        native N1 instead requires the current, case-scoped receiving packet.
+        """
+
+        if packet.get("case_class") == "receiving_operations":
+            return dict(packet)
+        if not (
+            packet.get("case_class") == "source_investigation"
+            and packet.get("source") == "live-external-read"
+        ):
+            return None
+        work = projection.get("receiving_work")
+        case_projection = projection.get("case_projection")
+        case = case_projection.get("case") if isinstance(case_projection, Mapping) else None
+        if not (
+            isinstance(work, Mapping)
+            and isinstance(case, Mapping)
+            and work.get("status") == "CONFIGURED"
+            and work.get("case_id") == case.get("case_id")
+            and work.get("purchase_order") == case.get("purchase_order")
+            and packet.get("case_id") == case.get("case_id")
+        ):
+            return None
+        # A matching current receiving workspace is an opt-in native case.
+        # Let missing or mismatched PI source facts fail closed through the
+        # gateway's existing unavailable path rather than returning to the
+        # known-inapplicable generic invoice summary.
+        return post_invoice_receiving_packet(projection)
 
     @staticmethod
     def _context_prefix(packet: Mapping[str, Any]) -> str:

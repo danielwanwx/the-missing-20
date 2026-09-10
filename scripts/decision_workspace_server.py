@@ -15,11 +15,15 @@ import os
 import sys
 import time
 from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import RLock
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
+from uuid import uuid4
 
 if __package__ in {None, ""}:
     _root = Path(__file__).resolve().parents[1]
@@ -42,6 +46,17 @@ from the_missing_20.adapters.external_source_change import (  # noqa: E402
 from the_missing_20.adapters.live_advisory_gateway import (  # noqa: E402
     DashboardAdvisoryGateway,
     connected_competition_investigation_packet,
+)
+from the_missing_20.adapters.normal_receipt_billing_coordinator import (  # noqa: E402
+    CoordinatorOperationResult,
+    NormalReceiptBillingCoordinator,
+)
+from the_missing_20.adapters.normal_receipt_billing_journal import (  # noqa: E402
+    BillingIntentJournal,
+    IntentSnapshot,
+)
+from the_missing_20.adapters.normal_receipt_billing_preview import (  # noqa: E402
+    SyntheticBillingBasis,
 )
 from the_missing_20.adapters.photo_receiving import (  # noqa: E402
     PhotoReceiptERP,
@@ -74,6 +89,10 @@ from the_missing_20.ports.agent_model import AgentProvider  # noqa: E402
 from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
+NORMAL_BILLING_R4_CASE_ID = "M20-GOODS-20260909-40-R4"
+NORMAL_BILLING_R4_SOURCE = Path("/private/tmp/m20-r4-billing-source-current-read-02.json")
+NORMAL_BILLING_OPERATOR_ID = "M20 Demo Manager"
+NORMAL_BILLING_APPROVAL_TTL = timedelta(minutes=10)
 STATIC_ROOT = ROOT / "workspace"
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -245,6 +264,471 @@ def _error_status(exc: Exception) -> tuple[HTTPStatus, str]:
     return HTTPStatus.INTERNAL_SERVER_ERROR, "experiment_unavailable"
 
 
+class NormalBillingConsole:
+    """Small server-held composition for the one approved R4 supplier-bill demo.
+
+    The journal remains the durable state/fence.  This adapter retains the raw
+    approval token only in its process memory, so a restarted server can show
+    the durable status but cannot create a first insert from an unrecoverable
+    token.  The browser receives neither that token nor a native request body.
+    """
+
+    def __init__(
+        self,
+        journal: BillingIntentJournal,
+        coordinator: NormalReceiptBillingCoordinator,
+        basis: SyntheticBillingBasis,
+        *,
+        operator_id: str = NORMAL_BILLING_OPERATOR_ID,
+        invoice_base_url: str,
+    ) -> None:
+        if not isinstance(basis, SyntheticBillingBasis):
+            raise TypeError("normal billing requires a synthetic billing basis")
+        if basis.case_id != NORMAL_BILLING_R4_CASE_ID:
+            raise ValueError("normal billing is configured only for the R4 demo case")
+        cleaned_operator = " ".join(operator_id.split())
+        if not cleaned_operator:
+            raise ValueError("normal billing requires a configured demo operator")
+        parsed_invoice_base = urlsplit(invoice_base_url)
+        if parsed_invoice_base.scheme not in {"http", "https"} or not parsed_invoice_base.netloc:
+            raise ValueError("normal billing requires the configured ERP base URL")
+        self._journal = journal
+        self._coordinator = coordinator
+        self._basis = basis
+        self._operator_id = cleaned_operator
+        self._invoice_base_url = invoice_base_url.rstrip("/")
+        self._approval_tokens: dict[tuple[str, int], str] = {}
+        self._token_lock = RLock()
+
+    @classmethod
+    def from_r4_demo(
+        cls,
+        *,
+        runtime_directory: Path,
+        source_path: Path,
+        receiving_manifest: Path,
+        executor: ERPNextDemoExecutor,
+        operator_id: str = NORMAL_BILLING_OPERATOR_ID,
+    ) -> NormalBillingConsole:
+        """Bind the exact retained R4 input to one configured demo transport."""
+
+        basis = cls._basis_from_retained_source(source_path)
+        cls._require_runtime_manifest(receiving_manifest, basis)
+        journal = BillingIntentJournal(runtime_directory / "normal-receipt-billing.sqlite3")
+
+        def resolve_basis(case_id: str) -> SyntheticBillingBasis:
+            if case_id != basis.case_id:
+                raise ValueError("normal billing case is not configured")
+            return basis
+
+        coordinator = NormalReceiptBillingCoordinator(journal, resolve_basis, executor._request)
+        return cls(
+            journal,
+            coordinator,
+            basis,
+            operator_id=operator_id,
+            invoice_base_url=executor._credentials.base_url,
+        )
+
+    @staticmethod
+    def _basis_from_retained_source(source_path: Path) -> SyntheticBillingBasis:
+        try:
+            payload = json.loads(source_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("normal billing retained R4 source is unavailable") from error
+        if not isinstance(payload, Mapping):
+            raise ValueError("normal billing retained R4 source is malformed")
+        raw_basis = payload.get("basis")
+        preview = payload.get("preview")
+        if not isinstance(raw_basis, Mapping) or not isinstance(preview, Mapping):
+            raise ValueError("normal billing retained R4 source is malformed")
+        if preview.get("status") != "READY":
+            raise ValueError("normal billing retained R4 source is not preview-ready")
+
+        def text(name: str) -> str:
+            value = raw_basis.get(name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("normal billing retained R4 basis is malformed")
+            return value
+
+        def number(name: str) -> Decimal:
+            value = raw_basis.get(name)
+            if isinstance(value, bool) or value is None:
+                raise ValueError("normal billing retained R4 basis is malformed")
+            try:
+                return Decimal(str(value))
+            except ValueError as error:
+                raise ValueError("normal billing retained R4 basis is malformed") from error
+
+        if raw_basis.get("synthetic_only") is not True:
+            raise ValueError("normal billing retained R4 basis is not synthetic")
+        try:
+            basis = SyntheticBillingBasis(
+                case_id=text("case_id"),
+                company=text("company"),
+                supplier=text("supplier"),
+                bill_reference=text("bill_reference"),
+                bill_date=text("bill_date"),
+                purchase_order=text("purchase_order"),
+                purchase_order_item=text("purchase_order_item"),
+                purchase_receipt=text("purchase_receipt"),
+                purchase_receipt_item=text("purchase_receipt_item"),
+                item_code=text("item_code"),
+                source_revision=text("source_revision"),
+                posting_date=text("posting_date"),
+                credit_to=text("credit_to"),
+                expense_account=text("expense_account"),
+                ordered_quantity=number("ordered_quantity"),
+                quantity=number("quantity"),
+                uom=text("uom"),
+                stock_uom=text("stock_uom"),
+                conversion_factor=number("conversion_factor"),
+                net_rate=number("net_rate"),
+                currency=text("currency"),
+                tax_amount=number("tax_amount"),
+                discount_amount=number("discount_amount"),
+                gross_amount=number("gross_amount"),
+                synthetic_only=True,
+            )
+        except (ArithmeticError, ValueError) as error:
+            raise ValueError("normal billing retained R4 basis is malformed") from error
+        if (
+            basis.case_id != NORMAL_BILLING_R4_CASE_ID
+            or basis.purchase_order != "PUR-ORD-2026-00016"
+            or basis.purchase_receipt != "MAT-PRE-2026-00007"
+            or basis.bill_reference != "SUP-BILL-R4-0001"
+        ):
+            raise ValueError("normal billing retained source is not the approved R4 pilot")
+        return basis
+
+    @staticmethod
+    def _require_runtime_manifest(manifest_path: Path, basis: SyntheticBillingBasis) -> None:
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("normal billing receiving manifest is unavailable") from error
+        if not isinstance(manifest, Mapping) or (
+            manifest.get("case_id") != basis.case_id
+            or manifest.get("purchase_order") != basis.purchase_order
+        ):
+            raise ValueError("normal billing receiving manifest does not match the R4 basis")
+
+    def current(self) -> dict[str, object]:
+        return self._projection(self._journal.current_for_case(self._basis.case_id))
+
+    def prepare(self, case_id: str) -> dict[str, object]:
+        self._require_case(case_id)
+        result = self._coordinator.prepare(case_id)
+        if result.prepared is None:
+            return self._projection(
+                self._journal.current_for_case(case_id),
+                reason=result.reason or "PREPARE_NOT_READY",
+            )
+        return self._projection(result.prepared.snapshot, reason=result.reason)
+
+    def approve(self, *, case_id: str, intent_id: str, version: int) -> dict[str, object]:
+        snapshot = self._intent(case_id, intent_id, version)
+        approval = self._journal.approve(
+            intent_id,
+            case_id=case_id,
+            manager_id=self._operator_id,
+            expires_at=datetime.now(UTC) + NORMAL_BILLING_APPROVAL_TTL,
+        )
+        if approval.granted and approval.token is not None:
+            with self._token_lock:
+                self._approval_tokens[(intent_id, snapshot.intent_version)] = approval.token
+        return self._projection(self._journal.get(intent_id), reason=approval.reason)
+
+    def execute(self, *, case_id: str, intent_id: str, version: int) -> dict[str, object]:
+        snapshot = self._intent(case_id, intent_id, version)
+        if snapshot.submit_attempted:
+            return self._operation_projection(
+                self._coordinator.reconcile(intent_id, case_id=case_id)
+            )
+        if snapshot.insert_attempted:
+            try:
+                acknowledgement = self._journal.acknowledged_draft(intent_id)
+            except ValueError:
+                return self._projection(snapshot, reason="JOURNAL_EVIDENCE_INVALID")
+            if acknowledgement is None:
+                return self._projection(snapshot, reason="INSERT_ACKNOWLEDGEMENT_REQUIRED")
+            return self._operation_projection(
+                self._coordinator.submit(
+                    intent_id,
+                    case_id=case_id,
+                    manager_id=self._operator_id,
+                    worker_id=self._worker_id("submit"),
+                )
+            )
+        if not snapshot.approval_granted:
+            return self._projection(snapshot, reason="APPROVAL_REQUIRED")
+        with self._token_lock:
+            token = self._approval_tokens.get((intent_id, snapshot.intent_version))
+        if token is None:
+            return self._projection(snapshot, reason="APPROVAL_TOKEN_UNAVAILABLE_AFTER_RESTART")
+        inserted = self._coordinator.insert(
+            intent_id,
+            case_id=case_id,
+            manager_id=self._operator_id,
+            approval_token=token,
+            worker_id=self._worker_id("insert"),
+        )
+        current = self._journal.get(intent_id)
+        if current.insert_attempted:
+            with self._token_lock:
+                self._approval_tokens.pop((intent_id, current.intent_version), None)
+        if not current.insert_attempted:
+            return self._operation_projection(inserted)
+        try:
+            acknowledgement = self._journal.acknowledged_draft(intent_id)
+        except ValueError:
+            return self._projection(current, reason="JOURNAL_EVIDENCE_INVALID")
+        if acknowledgement is None:
+            return self._operation_projection(inserted)
+        return self._operation_projection(
+            self._coordinator.submit(
+                intent_id,
+                case_id=case_id,
+                manager_id=self._operator_id,
+                worker_id=self._worker_id("submit"),
+            )
+        )
+
+    def reconcile(self, *, case_id: str, intent_id: str, version: int) -> dict[str, object]:
+        self._intent(case_id, intent_id, version)
+        return self._operation_projection(self._coordinator.reconcile(intent_id, case_id=case_id))
+
+    def _intent(self, case_id: str, intent_id: str, version: int) -> IntentSnapshot:
+        self._require_case(case_id)
+        if not isinstance(intent_id, str) or not intent_id:
+            raise ValueError("normal billing intent is required")
+        if type(version) is not int or version < 1:
+            raise ValueError("normal billing intent version is invalid")
+        snapshot = self._journal.get(intent_id)
+        if (
+            snapshot.case_id != self._basis.case_id
+            or snapshot.intent_version != version
+            or snapshot.frozen_basis != self._basis.record()
+        ):
+            raise ValueError("normal billing intent does not match the configured R4 basis")
+        return snapshot
+
+    def _require_case(self, case_id: str) -> None:
+        if case_id != self._basis.case_id:
+            raise ValueError("normal billing case is not configured")
+
+    def _operation_projection(self, result: CoordinatorOperationResult) -> dict[str, object]:
+        return self._projection(self._journal.get(result.snapshot.intent_id), reason=result.reason)
+
+    def _projection(
+        self, snapshot: IntentSnapshot | None, *, reason: str | None = None
+    ) -> dict[str, object]:
+        if snapshot is None:
+            return {
+                "available": True,
+                "case_id": self._basis.case_id,
+                "intent_id": None,
+                "version": None,
+                "phase": "NOT_PREPARED",
+                "status": "READY_TO_PREPARE",
+                "message": self._message("READY_TO_PREPARE", reason),
+                "invoice_name": None,
+                "invoice_url": None,
+                "available_actions": ["prepare"],
+                "supplier_bill": self._supplier_bill(),
+                "financial_verification": "NOT_VERIFIED",
+            }
+        if snapshot.phase == "SUBMITTED_READBACK_ADMITTED" and snapshot.effect_conflict:
+            reason = "SUBMITTED_READBACK_MISMATCH"
+        elif (
+            reason is None
+            and snapshot.phase == "DRAFT_READBACK_ADMITTED"
+            and snapshot.authority_status == "EXPIRED"
+            and not snapshot.effect_conflict
+            and not snapshot.source_changed
+        ):
+            reason = "SUBMIT_APPROVAL_EXPIRED"
+        invoice_name = snapshot.submitted_invoice_name or snapshot.draft_name
+        status = self._status(snapshot, reason)
+        return {
+            "available": True,
+            "case_id": snapshot.case_id,
+            "intent_id": snapshot.intent_id,
+            "version": snapshot.intent_version,
+            "phase": snapshot.phase,
+            "status": status,
+            "message": self._message(status, reason),
+            "invoice_name": invoice_name,
+            "invoice_url": (
+                None
+                if invoice_name is None
+                else f"{self._invoice_base_url}/app/purchase-invoice/{quote(invoice_name, safe='')}"
+            ),
+            "available_actions": self._available_actions(snapshot),
+            "supplier_bill": self._supplier_bill(),
+            "financial_verification": "NOT_VERIFIED",
+        }
+
+    def _available_actions(self, snapshot: IntentSnapshot) -> list[str]:
+        if (
+            snapshot.effect_conflict
+            or snapshot.source_changed
+            or snapshot.authority_status
+            in {
+                "REFUSED",
+                "CONFLICT_HOLD",
+                "STALE_SOURCE",
+            }
+        ):
+            return []
+        if snapshot.phase == "SUBMITTED_READBACK_ADMITTED":
+            return ["reconcile"]
+        if snapshot.phase == "DRAFT_READBACK_ADMITTED" and snapshot.authority_status == "EXPIRED":
+            return ["approve"]
+        if snapshot.authority_status == "EXPIRED":
+            return []
+        if snapshot.phase == "PREPARED":
+            return ["approve"]
+        if snapshot.authority_status != "APPROVED":
+            return []
+        if snapshot.phase == "APPROVED":
+            with self._token_lock:
+                has_token = (snapshot.intent_id, snapshot.intent_version) in self._approval_tokens
+            return ["execute"] if has_token else []
+        if snapshot.phase == "DRAFT_READBACK_ADMITTED":
+            return ["execute"]
+        if snapshot.phase in {"SUBMIT_ATTEMPTED", "SUBMITTED_READBACK_ADMITTED"}:
+            return ["reconcile"]
+        return []
+
+    @staticmethod
+    def _status(snapshot: IntentSnapshot, reason: str | None) -> str:
+        if (
+            snapshot.phase == "SUBMITTED_READBACK_ADMITTED"
+            and snapshot.authority_status == "EXPIRED"
+            and reason is None
+        ):
+            return snapshot.phase
+        if (
+            snapshot.effect_conflict
+            or snapshot.source_changed
+            or snapshot.authority_status
+            in {
+                "REFUSED",
+                "EXPIRED",
+                "CONFLICT_HOLD",
+                "STALE_SOURCE",
+            }
+        ):
+            return "HOLD"
+        if reason is not None:
+            return "HOLD"
+        return snapshot.phase
+
+    @staticmethod
+    def _message(status: str, reason: str | None) -> str:
+        if reason is not None:
+            reason_messages = {
+                "APPROVAL_REQUIRED": "A manager approval is required before invoice creation.",
+                "APPROVAL_TOKEN_UNAVAILABLE_AFTER_RESTART": (
+                    "The server restarted before invoice creation. The existing approval is "
+                    "preserved for review but cannot be used to create an invoice."
+                ),
+                "INSERT_ACKNOWLEDGEMENT_REQUIRED": (
+                    "Invoice creation was attempted without a usable invoice acknowledgement. "
+                    "No further invoice creation will be attempted."
+                ),
+                "COMMERCIAL_SOURCE_CHANGED": (
+                    "The purchase order or receipt changed after preparation. Billing is paused."
+                ),
+                "FROZEN_BASIS_MISMATCH": (
+                    "The configured R4 bill no longer matches the prepared billing record."
+                ),
+                "SUBMIT_APPROVAL_EXPIRED": (
+                    "The manager approval expired after invoice creation. Renew it to submit "
+                    "the existing named draft; no new invoice will be created."
+                ),
+                "SUBMITTED_READBACK_MISMATCH": (
+                    "The invoice was already submitted. A subsequent read-only reconciliation "
+                    "found a mismatch that needs review. Use the invoice link to inspect it."
+                ),
+            }
+            return reason_messages.get(
+                reason,
+                "This billing step is paused. Review the current order and invoice evidence "
+                "before acting.",
+            )
+        messages = {
+            "READY_TO_PREPARE": ("The configured synthetic R4 bill is ready for a fresh preview."),
+            "PREPARED": ("The current R4 supplier-bill preview is ready for manager approval."),
+            "APPROVED": "Manager approval is active for the single invoice creation.",
+            "DRAFT_READBACK_ADMITTED": (
+                "The named draft invoice is ready for the single submit action."
+            ),
+            "SUBMIT_ATTEMPTED": (
+                "Invoice submission was attempted. The system is reading back the named invoice."
+            ),
+            "SUBMITTED_READBACK_ADMITTED": (
+                "The submitted Purchase Invoice was read back. Financial verification is "
+                "still pending."
+            ),
+            "HOLD": (
+                "Billing is paused. Review the current order and invoice evidence before acting."
+            ),
+        }
+        return messages.get(status, "Normal billing status is available for review.")
+
+    def _supplier_bill(self) -> dict[str, object]:
+        return {
+            "bill_no": self._basis.bill_reference,
+            "bill_date": self._basis.bill_date,
+            "supplier": self._basis.supplier,
+            "purchase_order": self._basis.purchase_order,
+            "purchase_receipt": self._basis.purchase_receipt,
+            "quantity": float(self._basis.quantity),
+            "uom": self._basis.uom,
+            "unit_price": float(self._basis.net_rate),
+            "amount": float(self._basis.net_amount),
+            "currency": self._basis.currency,
+            "synthetic": True,
+        }
+
+    @staticmethod
+    def _worker_id(phase: str) -> str:
+        return f"normal-billing-{phase}-{uuid4().hex}"
+
+
+def _normal_billing_disabled_projection() -> dict[str, object]:
+    """Return the stable shape when the explicit demo flag is absent."""
+
+    return {
+        "available": False,
+        "case_id": NORMAL_BILLING_R4_CASE_ID,
+        "intent_id": None,
+        "version": None,
+        "phase": "DISABLED",
+        "status": "DISABLED",
+        "message": "Normal billing is disabled until the explicit R4 demo flag is enabled.",
+        "invoice_name": None,
+        "invoice_url": None,
+        "available_actions": [],
+        "supplier_bill": {
+            "bill_no": "SUP-BILL-R4-0001",
+            "bill_date": "2026-09-09",
+            "supplier": "M20 Controller Systems Ltd.",
+            "purchase_order": "PUR-ORD-2026-00016",
+            "purchase_receipt": "MAT-PRE-2026-00007",
+            "quantity": 1.0,
+            "uom": "Box",
+            "unit_price": 50.0,
+            "amount": 50.0,
+            "currency": "USD",
+            "synthetic": True,
+        },
+        "financial_verification": "NOT_VERIFIED",
+    }
+
+
 class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     """Read-only legacy adapter plus the local experiment API."""
 
@@ -281,6 +765,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     @property
     def agent_advisory(self) -> DashboardAdvisoryGateway:
         return self.server.agent_advisory  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def normal_billing(self) -> NormalBillingConsole | None:
+        return self.server.normal_billing  # type: ignore[attr-defined,no-any-return]
 
     @property
     def case_console_source_mode(self) -> str:
@@ -391,6 +879,20 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         return sequence
 
     def _v1_get(self, route: str, query: dict[str, list[str]]) -> None:
+        if route == "/api/v1/agent-platform/normal-billing":
+            if query:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "unexpected_query",
+                    "normal billing status accepts no query parameters",
+                )
+            projection = (
+                _normal_billing_disabled_projection()
+                if self.normal_billing is None
+                else self.normal_billing.current()
+            )
+            self._send_json(HTTPStatus.OK, {"normal_billing": projection})
+            return
         if route == "/api/v1/agent-platform/history":
             if not self._photo_host_allowed():
                 raise APIRequestError(
@@ -812,6 +1314,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             return
         if (
             route == "/api/v1/agent-platform"
+            or route == "/api/v1/agent-platform/normal-billing"
             or route == "/api/v1/agent-platform/history"
             or route == "/api/v1/agent-platform/events"
             or route == "/api/v1/ambiguous-receipt-case"
@@ -869,6 +1372,65 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def _v1_post(self, route: str, payload: dict[str, object]) -> None:
+        normal_billing_prefix = "/api/v1/agent-platform/normal-billing/"
+        if route.startswith(normal_billing_prefix):
+            if self.normal_billing is None:
+                raise APIRequestError(
+                    HTTPStatus.CONFLICT,
+                    "normal_billing_disabled",
+                    "normal billing requires the explicit R4 demo flag",
+                )
+            action = route.removeprefix(normal_billing_prefix)
+            if action == "prepare":
+                case_id = payload.get("case_id")
+                if set(payload) != {"case_id"} or not isinstance(case_id, str):
+                    raise APIRequestError(
+                        HTTPStatus.BAD_REQUEST,
+                        "invalid_normal_billing_request",
+                        "prepare accepts only the configured case_id",
+                    )
+                result = self.normal_billing.prepare(case_id)
+            elif action in {"approve", "execute", "reconcile"}:
+                case_id = payload.get("case_id")
+                intent_id = payload.get("intent_id")
+                version = payload.get("version")
+                if (
+                    set(payload) != {"case_id", "intent_id", "version"}
+                    or not isinstance(case_id, str)
+                    or not isinstance(intent_id, str)
+                    or type(version) is not int
+                ):
+                    raise APIRequestError(
+                        HTTPStatus.BAD_REQUEST,
+                        "invalid_normal_billing_request",
+                        f"{action} accepts only case_id, intent_id, and version",
+                    )
+                if action == "approve":
+                    result = self.normal_billing.approve(
+                        case_id=case_id,
+                        intent_id=intent_id,
+                        version=version,
+                    )
+                elif action == "execute":
+                    result = self.normal_billing.execute(
+                        case_id=case_id,
+                        intent_id=intent_id,
+                        version=version,
+                    )
+                else:
+                    result = self.normal_billing.reconcile(
+                        case_id=case_id,
+                        intent_id=intent_id,
+                        version=version,
+                    )
+            else:
+                raise APIRequestError(
+                    HTTPStatus.NOT_FOUND,
+                    "not_found",
+                    "normal billing action was not found",
+                )
+            self._send_json(HTTPStatus.OK, {"normal_billing": result})
+            return
         if route.startswith("/api/v1/photo-receiving"):
             receiving = self.server.photo_receiving  # type: ignore[attr-defined]
             if route == "/api/v1/photo-receiving":
@@ -1248,6 +1810,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             "/api/v1/agent-platform/approve-and-execute",
             "/api/v1/agent-platform/execute",
             "/api/v1/agent-platform/verify",
+            "/api/v1/agent-platform/normal-billing/prepare",
+            "/api/v1/agent-platform/normal-billing/approve",
+            "/api/v1/agent-platform/normal-billing/execute",
+            "/api/v1/agent-platform/normal-billing/reconcile",
         }
         if route not in allowed_routes and not route.startswith("/api/v1/incidents/"):
             self._method_not_allowed("GET")
@@ -1377,6 +1943,9 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         agent_platform: AgentPlatform | AmbiguousCasePlatform | None = None,
         agent_advisory: DashboardAdvisoryGateway | None = None,
         live_sources_autostart: bool | None = None,
+        normal_billing: NormalBillingConsole | None = None,
+        enable_normal_billing: bool = False,
+        normal_billing_source: Path | None = None,
     ) -> None:
         if address[0] not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("decision workspace server must bind to loopback")
@@ -1414,6 +1983,35 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             raise ValueError(
                 "Photo and platform case/PO configuration must match the receiving manifest."
             )
+        normal_billing_runtime = runtime_directory or repository_root / ".missing20-runtime"
+        self.normal_billing: NormalBillingConsole | None
+        if normal_billing is not None:
+            self.normal_billing = normal_billing
+        elif enable_normal_billing:
+            if photo_values.get("MISSING20_ENVIRONMENT", "").strip().lower() != "demo":
+                raise ValueError(
+                    "normal billing requires the explicitly configured demo environment"
+                )
+            if photo_client is None:
+                raise ValueError("normal billing requires configured ERPNext demo credentials")
+            if not manifest_path:
+                raise ValueError("normal billing requires the existing receiving manifest")
+            configured_source = normal_billing_source or Path(
+                photo_values.get(
+                    "MISSING20_NORMAL_BILLING_SOURCE_READ", str(NORMAL_BILLING_R4_SOURCE)
+                )
+            )
+            self.normal_billing = NormalBillingConsole.from_r4_demo(
+                runtime_directory=normal_billing_runtime,
+                source_path=configured_source,
+                receiving_manifest=Path(manifest_path),
+                executor=photo_client,
+                operator_id=photo_values.get(
+                    "MISSING20_NORMAL_BILLING_OPERATOR", NORMAL_BILLING_OPERATOR_ID
+                ),
+            )
+        else:
+            self.normal_billing = None
         self.photo_receiving = PhotoReceiving(
             (runtime_directory or repository_root / ".missing20-runtime")
             / "photo-receiving.sqlite3",
@@ -1494,7 +2092,14 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             )
         else:
             self.agent_advisory = DashboardAdvisoryGateway(
-                self.agent_platform, delegation_journal=delegation_journal
+                self.agent_platform,
+                delegation_journal=delegation_journal,
+                native_receiving_session_root=(
+                    (runtime_directory or repository_root / ".missing20-runtime")
+                    / "native-receiving-sessions"
+                    if photo_values.get("MISSING20_NATIVE_RECEIVING_DIALOGUE") == "1"
+                    else None
+                ),
             )
         self.automatic_investigation = (
             AutomaticInvestigation(
@@ -1571,6 +2176,16 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument(
+        "--enable-normal-billing",
+        action="store_true",
+        help="enable the configured R4 synthetic supplier-bill demo boundary",
+    )
+    parser.add_argument(
+        "--normal-billing-source",
+        type=Path,
+        help="retained R4 read-only source JSON required only with --enable-normal-billing",
+    )
+    parser.add_argument(
         "--runtime-directory",
         type=Path,
         default=ROOT / ".missing20-runtime",
@@ -1582,6 +2197,8 @@ def main() -> int:
             (args.host, args.port),
             ROOT,
             runtime_directory=args.runtime_directory,
+            enable_normal_billing=args.enable_normal_billing,
+            normal_billing_source=args.normal_billing_source,
         )
     except OSError as exc:
         print(f"Decision Workspace server: BLOCKED ({exc})", file=sys.stderr)

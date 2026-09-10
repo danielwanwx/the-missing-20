@@ -1,13 +1,14 @@
 # Judging Map
 
-> **September 9 finalization status: NOT READY.** The 20-unit / USD 42,000
-> evidence below belongs to the historical September 7 scenario. The separate
-> R4 photo-receiving case (PO16/PR7) proves one Box posted and recovered after a
-> lost acknowledgement, with verified Airtable/Slack handoffs. It has no linked
-> invoice or customer fulfillment. R3 real multi-turn receiving remains FAILED;
-> the September 6 8/8 and 15/15 results do not cover that path.
+> **September 10 finalization status: core R4 demo verified; submission NOT READY.**
+> The same PO16/PR7 receiving case now has a submitted supplier invoice, PI8:
+> 1 Box / USD 50, balanced ERP accounting, unchanged stock and no payment.
+> Six actual UI turns using native Strands history passed independent semantic
+> review. This is one bounded demo, not the full repeated complex-case matrix.
+> Customer fulfillment, final video/materials and judge-access packaging remain open.
+> Historical 20-unit / USD 42,000 and September 6 results below retain their own scope.
 > See the [current finalization ledger](finalization-tracker.md) and
-> [R4 scope audit](../audits/2026-09-09-r4-automatic-receiving-recovery-review.md).
+> [R4 business and conversation audit](../audits/2026-09-10-r4-billing-native-dialogue-review.md).
 
 
 This is an evidence map, not a submitted score claim. The five dimensions match the

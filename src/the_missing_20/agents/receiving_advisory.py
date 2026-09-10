@@ -87,17 +87,158 @@ def receiving_answer_gaps(
 
 
 def receiving_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the established before-invoice receiving packet unchanged."""
+
+    return _receiving_packet(payload, invoice=None)
+
+
+def post_invoice_receiving_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Build native-only receiving evidence after an ERP supplier invoice exists.
+
+    The source document is the current, case-selected ERP projection.  It is
+    deliberately distinct from the legacy source-investigation invoice summary,
+    which combines invoice and purchase-order facts for a different workflow.
+    """
+
+    case_projection = payload.get("case_projection")
+    case = case_projection.get("case") if isinstance(case_projection, Mapping) else None
+    source = payload.get("purchase_invoice_source")
+    if not isinstance(case, Mapping) or not isinstance(source, Mapping):
+        raise ValueError("Post-invoice receiving dialogue lacks the current ERP invoice source")
+    invoice_name = case.get("purchase_invoice")
+    if not isinstance(invoice_name, str) or not invoice_name or source.get("name") != invoice_name:
+        raise ValueError("Current ERP invoice source does not match the receiving case")
+    return _receiving_packet(
+        payload,
+        invoice=_qualified_invoice_source(
+            source,
+            case_id=case.get("case_id"),
+            purchase_order=case.get("purchase_order"),
+            purchase_receipt=case.get("purchase_receipt"),
+        ),
+    )
+
+
+def _qualified_invoice_source(
+    source: Mapping[str, Any],
+    *,
+    case_id: object,
+    purchase_order: object,
+    purchase_receipt: object,
+) -> dict[str, Any]:
+    """Copy only current Purchase Invoice facts and state every absent field."""
+
+    if not all(isinstance(value, str) and value for value in (case_id, purchase_order)):
+        raise ValueError("Post-invoice receiving dialogue lacks a scoped case and purchase order")
+    raw_items = source.get("items")
+    if not isinstance(raw_items, list):
+        raise ValueError("Current ERP invoice source lacks its item rows")
+    items = [item for item in raw_items if isinstance(item, Mapping)]
+    if not items or not any(item.get("purchase_order") == purchase_order for item in items):
+        raise ValueError("Current ERP invoice has no line linked to the receiving purchase order")
+    if source.get("case_scope_complete") is False or any(
+        item.get("purchase_order") not in {purchase_order, None, ""} for item in items
+    ):
+        raise ValueError("Current ERP invoice is not confined to the receiving purchase order")
+
+    fields = (
+        "docstatus",
+        "status",
+        "bill_no",
+        "supplier",
+        "supplier_name",
+        "currency",
+        "grand_total",
+        "net_total",
+        "outstanding_amount",
+        "is_paid",
+        "update_stock",
+        "on_hold",
+        "case_scope_complete",
+    )
+    item_fields = (
+        "item_code",
+        "qty",
+        "uom",
+        "stock_uom",
+        "conversion_factor",
+        "rate",
+        "amount",
+        "net_rate",
+        "net_amount",
+        "purchase_order",
+        "purchase_receipt",
+        "name",
+        "po_detail",
+        "pr_detail",
+    )
+    linked_receipts = sorted(
+        {
+            str(item["purchase_receipt"])
+            for item in items
+            if isinstance(item.get("purchase_receipt"), str) and item["purchase_receipt"]
+        }
+    )
+    if (
+        isinstance(purchase_receipt, str)
+        and purchase_receipt
+        and purchase_receipt not in linked_receipts
+    ):
+        raise ValueError("Current ERP invoice has no line linked to the receiving purchase receipt")
+    status_available = "source_status" in source or "status" in source
+    status = source.get("source_status") if "source_status" in source else source.get("status")
+    return {
+        "id": source["name"],
+        **{
+            field: (
+                status if field == "status" else (source.get(field) if field in source else None)
+            )
+            for field in fields
+        },
+        "items": [
+            {field: item.get(field) if field in item else None for field in item_fields}
+            for item in items
+        ],
+        "linked_purchase_receipts": linked_receipts,
+        "scope": {
+            "case_id": case_id,
+            "purchase_order": purchase_order,
+            "purchase_receipt": purchase_receipt if isinstance(purchase_receipt, str) else None,
+        },
+        "field_availability": {
+            field: status_available if field == "status" else field in source for field in fields
+        },
+        "item_field_availability": [
+            {field: field in item for field in item_fields} for item in items
+        ],
+    }
+
+
+def _receiving_packet(
+    payload: Mapping[str, Any], *, invoice: Mapping[str, Any] | None
+) -> dict[str, Any]:
     case = payload["case_projection"]["case"]
     work = payload.get("receiving_work")
     lifecycle = payload.get("document_lifecycle", {})
+    invoice_name = case.get("purchase_invoice")
+    invoice_stage_is_current = (
+        invoice is None
+        and not invoice_name
+        and lifecycle.get("purchase_invoice") == "AWAITING_INVOICE"
+    ) or (
+        invoice is not None
+        and isinstance(invoice_name, str)
+        and bool(invoice_name)
+        and invoice.get("id") == invoice_name
+        and lifecycle.get("purchase_invoice") == "PRESENT"
+    )
     if not (
         isinstance(work, Mapping)
         and work.get("status") == "CONFIGURED"
         and work.get("case_id") == case.get("case_id")
         and work.get("purchase_order") == case.get("purchase_order")
         and case.get("purchase_order")
-        and not case.get("purchase_invoice")
-        and lifecycle.get("purchase_invoice") == "AWAITING_INVOICE"
+        and invoice_stage_is_current
         and lifecycle.get("purchase_receipt")
         == ("PRESENT" if case.get("purchase_receipt") else "AWAITING_RECEIPT")
         and payload.get("purchase_scope") == "ALL_LINKED_DOCUMENTS"
@@ -165,6 +306,8 @@ def receiving_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
         row.get("evidence_id") for row in erp_records
     }:
         raise ValueError("Posted receipt evidence is not available")
+    if invoice is not None and invoice_name not in {row.get("evidence_id") for row in erp_records}:
+        raise ValueError("Current purchase-invoice evidence is not available")
 
     def source(rows: list[dict[str, Any]], **facts: Any) -> dict[str, Any]:
         return {
@@ -239,7 +382,7 @@ def receiving_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
             erp_records,
             purchase_order=case["purchase_order"],
             purchase_receipt=case.get("purchase_receipt") or None,
-            invoice=None,
+            invoice=(dict(invoice) if invoice is not None else None),
             document_lifecycle=dict(lifecycle),
             purchase_scope=payload["purchase_scope"],
             quantities=dict(quantities),

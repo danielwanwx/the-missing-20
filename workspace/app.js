@@ -171,6 +171,14 @@
       kind: "decision",
     },
   };
+  const NORMAL_BILLING_PATH = "/api/v1/agent-platform/normal-billing";
+  const NORMAL_BILLING_ACTION_LABELS = Object.freeze({
+    prepare: "Prepare bill",
+    approve: "Approve bill",
+    execute: "Execute billing",
+    reconcile: "Reconcile",
+  });
+  const NORMAL_BILLING_ACTION_ORDER = Object.freeze(Object.keys(NORMAL_BILLING_ACTION_LABELS));
 
   const state = {
     view: new URLSearchParams(window.location.search).get("view") === "agent" ? "agent" : "dashboard",
@@ -239,6 +247,13 @@
     agentPlatformAdvisory: null,
     agentPlatformQuestionBusy: false,
     agentPlatformPulseAfter: 0,
+    normalBilling: null,
+    normalBillingError: "",
+    normalBillingBusy: false,
+    normalBillingAction: "",
+    normalBillingScopeCaseId: "",
+    normalBillingAttemptedCaseId: "",
+    normalBillingRequestToken: 0,
     graphEventSequence: 0,
     latestActivitySequence: 0,
     activitySource: "Current stream",
@@ -1597,6 +1612,282 @@
     }
   }
 
+  function normalBillingCurrentCaseId() {
+    if (!isNormalScenario()) return "";
+    return value(state.agentPlatform?.case_id).trim();
+  }
+
+  function clearNormalBilling() {
+    state.normalBilling = null;
+    state.normalBillingError = "";
+    state.normalBillingBusy = false;
+    state.normalBillingAction = "";
+    state.normalBillingScopeCaseId = "";
+    state.normalBillingAttemptedCaseId = "";
+    state.normalBillingRequestToken += 1;
+  }
+
+  function normalBillingAvailableActions(projection) {
+    const available = Array.isArray(projection?.available_actions)
+      ? projection.available_actions
+      : [];
+    return NORMAL_BILLING_ACTION_ORDER.filter((action) => available.some((candidate) => (
+      value(candidate).trim().toLowerCase() === action
+    )));
+  }
+
+  function setNormalBillingProjection(response, expectedCaseId = "") {
+    const projection = response && response.normal_billing;
+    if (!projection || typeof projection !== "object" || Array.isArray(projection)) {
+      throw new Error("Supplier bill status is unavailable.");
+    }
+    const projectionCaseId = value(projection.case_id).trim();
+    if (!projectionCaseId || (expectedCaseId && projectionCaseId !== expectedCaseId)) {
+      throw new Error("Supplier bill status is for a different case.");
+    }
+    state.normalBilling = projection;
+    state.normalBillingScopeCaseId = expectedCaseId || projectionCaseId;
+    state.normalBillingError = "";
+    return projection;
+  }
+
+  function normalBillingErrorMessage(error, prefix = "Supplier bill demo unavailable") {
+    const detail = value(error && error.message).trim();
+    return detail ? `${prefix}: ${detail}` : `${prefix}.`;
+  }
+
+  async function refreshNormalBilling(force = false) {
+    const expectedCaseId = normalBillingCurrentCaseId();
+    if (!expectedCaseId || state.view !== "agent") return;
+    if (state.normalBillingBusy || state.normalBillingAction) return;
+    if (!force && state.normalBillingAttemptedCaseId === expectedCaseId) return;
+    if (state.normalBillingScopeCaseId !== expectedCaseId) {
+      clearNormalBilling();
+      state.normalBillingScopeCaseId = expectedCaseId;
+    }
+    const requestToken = ++state.normalBillingRequestToken;
+    state.normalBillingAttemptedCaseId = expectedCaseId;
+    state.normalBillingBusy = true;
+    state.normalBillingError = "";
+    scheduleRender();
+    try {
+      const response = await requestJSON(NORMAL_BILLING_PATH);
+      if (requestToken !== state.normalBillingRequestToken
+        || normalBillingCurrentCaseId() !== expectedCaseId) return;
+      setNormalBillingProjection(response, expectedCaseId);
+    } catch (error) {
+      if (requestToken !== state.normalBillingRequestToken
+      || normalBillingCurrentCaseId() !== expectedCaseId) return;
+      state.normalBilling = null;
+      state.normalBillingError = normalBillingErrorMessage(error);
+    } finally {
+      if (requestToken === state.normalBillingRequestToken) state.normalBillingBusy = false;
+      scheduleRender();
+    }
+  }
+
+  function ensureNormalBillingLoaded() {
+    const expectedCaseId = normalBillingCurrentCaseId();
+    if (state.normalBillingScopeCaseId !== expectedCaseId) {
+      clearNormalBilling();
+      state.normalBillingScopeCaseId = expectedCaseId;
+    }
+    if (state.view !== "agent" || !expectedCaseId || state.normalBillingBusy || state.normalBillingAction) return;
+    if (state.normalBillingAttemptedCaseId === expectedCaseId) return;
+    void refreshNormalBilling();
+  }
+
+  function normalBillingActionBody(action, projection) {
+    const caseId = value(projection?.case_id).trim();
+    if (!caseId) throw new Error("The current supplier bill case is unavailable.");
+    const body = { case_id: caseId };
+    if (action !== "prepare") {
+      const intentId = value(projection?.intent_id).trim();
+      if (!intentId || projection?.version == null) {
+        throw new Error("This billing step is waiting for the current bill plan.");
+      }
+      body.intent_id = intentId;
+      body.version = projection.version;
+    }
+    return body;
+  }
+
+  async function runNormalBillingAction(action) {
+    const normalizedAction = value(action).trim().toLowerCase();
+    const projection = state.normalBilling;
+    if (!NORMAL_BILLING_ACTION_ORDER.includes(normalizedAction)
+      || !normalBillingAvailableActions(projection).includes(normalizedAction)
+      || projection?.available === false
+      || state.normalBillingBusy || state.normalBillingAction) return;
+    const expectedCaseId = normalBillingCurrentCaseId();
+    if (!expectedCaseId || value(projection?.case_id).trim() !== expectedCaseId) return;
+    let body;
+    try {
+      body = normalBillingActionBody(normalizedAction, projection);
+    } catch (error) {
+      state.normalBillingError = normalBillingErrorMessage(error);
+      scheduleRender();
+      return;
+    }
+    const requestToken = ++state.normalBillingRequestToken;
+    state.normalBillingAction = normalizedAction;
+    state.normalBillingError = "";
+    scheduleRender();
+    try {
+      const response = await requestJSON(`${NORMAL_BILLING_PATH}/${normalizedAction}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (requestToken !== state.normalBillingRequestToken
+        || normalBillingCurrentCaseId() !== expectedCaseId) return;
+      setNormalBillingProjection(response, expectedCaseId);
+      state.normalBillingAttemptedCaseId = expectedCaseId;
+      if (["execute", "reconcile"].includes(normalizedAction)) await refreshAgentPlatform(true);
+    } catch (error) {
+      if (requestToken !== state.normalBillingRequestToken
+        || normalBillingCurrentCaseId() !== expectedCaseId) return;
+      state.normalBillingError = normalBillingErrorMessage(error, "Billing action stopped");
+    } finally {
+      if (requestToken === state.normalBillingRequestToken) state.normalBillingAction = "";
+      scheduleRender();
+    }
+  }
+
+  function renderNormalBilling() {
+    const consoleNode = $("agent-platform-console");
+    const consoleCard = consoleNode?.querySelector(".platform-console-card")
+      || document.querySelector("dialog .platform-console-card");
+    if (!consoleCard) return;
+    let panel = $("normal-billing-panel");
+    if (!panel) {
+      panel = create("section", "normal-billing-panel");
+      panel.id = "normal-billing-panel";
+      panel.setAttribute("aria-labelledby", "normal-billing-title");
+      panel.setAttribute("aria-live", "polite");
+      const activityHead = consoleCard.querySelector(".platform-activity-head");
+      if (activityHead) consoleCard.insertBefore(panel, activityHead);
+      else consoleCard.append(panel);
+    }
+    const expectedCaseId = normalBillingCurrentCaseId();
+    const projection = state.normalBilling;
+    const inScope = state.view === "agent"
+      && Boolean(projection)
+      && state.normalBillingScopeCaseId === expectedCaseId
+      && value(projection?.case_id).trim() === expectedCaseId;
+    panel.hidden = !inScope;
+    if (!inScope) {
+      panel.replaceChildren();
+      panel.dataset.caseId = "";
+      return;
+    }
+
+    const bill = projection.supplier_bill && typeof projection.supplier_bill === "object"
+      ? projection.supplier_bill
+      : {};
+    const status = value(projection.status || "UNAVAILABLE").trim() || "UNAVAILABLE";
+    const statusLabel = status.replaceAll("_", " ");
+    const phase = value(projection.phase).trim() || "—";
+    const phaseLabel = phase.replaceAll("_", " ");
+    const financialVerification = value(projection.financial_verification).trim() || "NOT_VERIFIED";
+    const financialLabel = financialVerification.replaceAll("_", " ");
+    const currency = value(bill.currency).trim();
+    const money = (amount) => amount == null || amount === ""
+      ? "—"
+      : currency ? formatCurrency(amount, currency) : value(amount);
+    const quantity = bill.quantity == null || bill.quantity === ""
+      ? "—"
+      : `${value(bill.quantity)}${value(bill.uom).trim() ? ` ${value(bill.uom).trim()}` : ""}`;
+    const field = (label, fieldValue) => {
+      const row = create("div", "platform-scope-row");
+      row.append(create("span", null, label), create("strong", null, value(fieldValue) || "—"));
+      return row;
+    };
+    const title = create("div");
+    const titleHeading = create("h2", null, "Supplier bill");
+    titleHeading.id = "normal-billing-title";
+    title.append(
+      create("span", "platform-module-kicker", "BILLING DEMO"),
+      titleHeading,
+    );
+    const header = create("header", "platform-module-header");
+    header.append(title, create("span", `state-badge ${stateClass(status)}`, statusLabel));
+    const details = create("div", "normal-billing-details");
+    details.append(
+      field("Current status", statusLabel),
+      field("Lifecycle phase", phaseLabel),
+      field("Financial verification", financialLabel),
+      field("Bill number", bill.bill_no),
+      field("Bill date", bill.bill_date),
+      field("Supplier", bill.supplier),
+      field("Quantity", quantity),
+      field("Unit price", money(bill.unit_price)),
+      field("Amount", money(bill.amount)),
+      field("Purchase order", bill.purchase_order),
+      field("Purchase receipt", bill.purchase_receipt),
+    );
+    const content = [
+      header,
+      create("p", "normal-billing-note", "Demo synthetic supplier bill · no payment"),
+      details,
+    ];
+    const invoiceName = value(projection.invoice_name).trim();
+    const invoiceUrl = value(projection.invoice_url).trim();
+    if (invoiceUrl || invoiceName) {
+      const invoice = create("div", "normal-billing-invoice");
+      if (invoiceUrl) {
+        const link = create("a", "component-external-link");
+        link.href = invoiceUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.append(
+          create("i", "ph ph-arrow-square-out", ""),
+          create("span", null, invoiceName ? `Open invoice ${invoiceName}` : "Open invoice"),
+        );
+        invoice.append(link);
+      } else {
+        invoice.append(create("span", null, `Invoice ${invoiceName}`));
+      }
+      content.push(invoice);
+    }
+    const actions = create("div", "platform-control-actions normal-billing-actions");
+    const availableActions = normalBillingAvailableActions(projection);
+    if (availableActions.length) {
+      availableActions.forEach((action, index) => {
+        const button = create(
+          "button",
+          `button ${index === 0 ? "button-primary" : "button-quiet"}`,
+          NORMAL_BILLING_ACTION_LABELS[action],
+        );
+        button.type = "button";
+        button.dataset.normalBillingAction = action;
+        button.disabled = projection.available === false
+          || Boolean(state.normalBillingBusy || state.normalBillingAction);
+        button.setAttribute("aria-label", `${NORMAL_BILLING_ACTION_LABELS[action]} for this supplier bill`);
+        button.addEventListener("click", () => runNormalBillingAction(action));
+        actions.append(button);
+      });
+    } else {
+      actions.append(create("span", "normal-billing-empty", "No billing step is available right now."));
+    }
+    content.push(actions);
+    if (state.normalBillingBusy || state.normalBillingAction) {
+      const busyLabel = state.normalBillingAction
+        ? `${NORMAL_BILLING_ACTION_LABELS[state.normalBillingAction] || "Billing update"}…`
+        : "Loading supplier bill…";
+      content.push(create("p", "normal-billing-feedback", busyLabel));
+    }
+    if (value(projection.message).trim()) {
+      content.push(create("p", "normal-billing-message", value(projection.message).trim()));
+    }
+    if (state.normalBillingError) {
+      content.push(create("p", "normal-billing-error", state.normalBillingError));
+    }
+    panel.replaceChildren(...content);
+    panel.dataset.caseId = expectedCaseId;
+    panel.dataset.phase = phase;
+  }
+
   function renderAgentPlatform() {
     const consoleNode = $("agent-platform-console");
     if (!consoleNode) return;
@@ -1616,12 +1907,20 @@
       || platform?.execution?.status === "VERIFIED"
       || platform?.judge_proof?.verified === true
     );
-    const enabled = Boolean(platform) && (!normalScenario || verifiedHistory);
+    ensureNormalBillingLoaded();
+    const billingCaseId = normalBillingCurrentCaseId();
+    const normalBillingVisible = Boolean(
+      state.normalBilling
+      && billingCaseId
+      && state.normalBillingScopeCaseId === billingCaseId
+      && value(state.normalBilling.case_id).trim() === billingCaseId
+    );
+    const enabled = Boolean(platform) && (!normalScenario || verifiedHistory || normalBillingVisible);
     const agentView = $("agent-view");
     if (agentView && consoleNode.parentElement !== agentView) agentView.prepend(consoleNode);
     consoleNode.hidden = !enabled;
     const normalState = $("agent-normal-state");
-    if (normalState) normalState.hidden = !Boolean(platform) || !normalScenario || verifiedHistory;
+    if (normalState) normalState.hidden = !Boolean(platform) || !normalScenario || verifiedHistory || normalBillingVisible;
     const normalSequence = $("agent-normal-sequence");
     if (normalSequence) normalSequence.textContent = String(number(platform?.latest_sequence, state.lastSequence));
     const legacyDashboard = document.querySelector("#dashboard-view .dashboard-grid");
@@ -1631,7 +1930,10 @@
     // user-visible Agent state now uses the same light command-system shell.
     if (legacyWorkspace) legacyWorkspace.hidden = Boolean(platform) && !smokeCapture;
     document.body.dataset.agentPlatform = platform ? "ready" : "pending";
-    if (!enabled) return;
+    if (!enabled) {
+      renderNormalBilling();
+      return;
+    }
 
     const correlation = platform.correlation && typeof platform.correlation === "object"
       ? platform.correlation
@@ -2352,6 +2654,7 @@
     // the queued passes remain as protection for ordinary view transitions.
     renderPlatformInvestigationLinks();
     schedulePlatformInvestigationLinks();
+    renderNormalBilling();
   }
 
   async function runPlatformDiagnosis() {
