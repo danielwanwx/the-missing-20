@@ -3,13 +3,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import replace
+from typing import cast
 
 import pytest
 
 from the_missing_20.adapters.normal_receipt_billing_native_request import (
     INSERT_PATH,
+    SUBMIT_PATH,
+    NativeDraftAcknowledgement,
     NativeInsertRequest,
+    NativeSubmitRequest,
     bind_native_insert_request,
+    validate_native_draft_acknowledgement,
+    validate_native_submitted_readback,
 )
 from the_missing_20.adapters.normal_receipt_billing_preview import (
     BillingPreview,
@@ -458,3 +464,166 @@ def test_request_rejects_an_unallowlisted_method_or_path() -> None:
             body=request.body,
             bill_digest=request.bill_digest,
         )
+
+
+def _captured_shape_draft() -> dict[str, object]:
+    """Representative frozen shape of the saved native Purchase Invoice response."""
+
+    request = _bound_request()
+    request_body = request.record()["body"]
+    assert isinstance(request_body, Mapping)
+    document: dict[str, object] = deepcopy(dict(cast(Mapping[str, object], request_body)))
+    document.update(
+        {
+            "name": "ACC-PINV-2026-00008",
+            "docstatus": 0,
+            "owner": "demo@example.test",
+            "creation": "2026-09-09 22:00:00.000000",
+            "modified": "2026-09-09 22:00:00.000000",
+            "modified_by": "demo@example.test",
+            "idx": 0,
+            "status": "Draft",
+            "posting_time": "18:50:44.851612",
+            "set_posting_time": 0,
+            "outstanding_amount": 50,
+            "total_advance": 0,
+            "advances": [],
+            "payment_schedule": [],
+            "__islocal": 0,
+            "__unsaved": 0,
+            "__onload": {"can_submit": 1},
+        }
+    )
+    items = document["items"]
+    assert isinstance(items, list)
+    assert len(items) == 1
+    assert isinstance(items[0], dict)
+    items[0].update(
+        {
+            "name": "pi-item-native-00008",
+            "doctype": "Purchase Invoice Item",
+            "parent": "ACC-PINV-2026-00008",
+            "parenttype": "Purchase Invoice",
+            "parentfield": "items",
+            "idx": 1,
+            "docstatus": 0,
+            "owner": "demo@example.test",
+            "creation": "2026-09-09 22:00:00.000000",
+            "modified": "2026-09-09 22:00:00.000000",
+            "modified_by": "demo@example.test",
+        }
+    )
+    return document
+
+
+def test_native_acknowledgement_and_submit_records_preserve_the_full_response_shape() -> None:
+    basis = _basis()
+    request = _bound_request()
+    draft = _captured_shape_draft()
+
+    acknowledgement = validate_native_draft_acknowledgement(
+        basis,
+        purchase_order=_purchase_order(),
+        purchase_receipt=_purchase_receipt(),
+        insert_request=request,
+        document=draft,
+    )
+    assert acknowledgement.draft_name == "ACC-PINV-2026-00008"
+    assert acknowledgement.insert_body_digest == request.body_digest
+    assert acknowledgement.document["__onload"] == {"can_submit": 1}
+    acknowledgement_items = acknowledgement.document["items"]
+    assert isinstance(acknowledgement_items, tuple)
+    assert len(acknowledgement_items) == 1
+    assert isinstance(acknowledgement_items[0], Mapping)
+    assert acknowledgement_items[0]["parent"] == acknowledgement.draft_name
+
+    recovered_acknowledgement = NativeDraftAcknowledgement.from_record(acknowledgement.record())
+    assert recovered_acknowledgement.document_digest == acknowledgement.document_digest
+
+    submit = NativeSubmitRequest.from_draft(acknowledgement)
+    assert submit.method == "POST"
+    assert submit.path == SUBMIT_PATH
+    assert submit.body == {"doc": acknowledgement.document}
+    assert submit.document_digest == acknowledgement.document_digest
+
+    submitted_document = deepcopy(draft)
+    submitted_document["docstatus"] = 1
+    submitted_document["status"] = "Submitted"
+    submitted = validate_native_submitted_readback(
+        basis,
+        purchase_order=_purchase_order(),
+        purchase_receipt=_purchase_receipt(),
+        draft=acknowledgement,
+        document=submitted_document,
+    )
+    assert submitted.draft_name == acknowledgement.draft_name
+    assert submitted.draft_document_digest == acknowledgement.document_digest
+    assert submitted.document_digest
+
+
+@pytest.mark.parametrize("mismatch", ("bill_digest", "bill_no"))
+def test_draft_acknowledgement_revalidates_the_frozen_insert_request_against_its_basis(
+    mismatch: str,
+) -> None:
+    basis = _basis()
+    request = _bound_request()
+    draft = _captured_shape_draft()
+    if mismatch == "bill_digest":
+        request = replace(request, bill_digest="0" * 64)
+    else:
+        body = dict(request.body)
+        body["bill_no"] = "OTHER-BILL"
+        request = NativeInsertRequest(
+            method=request.method,
+            path=request.path,
+            body=body,
+            bill_digest=request.bill_digest,
+        )
+
+    with pytest.raises(ValueError):
+        validate_native_draft_acknowledgement(
+            basis,
+            purchase_order=_purchase_order(),
+            purchase_receipt=_purchase_receipt(),
+            insert_request=request,
+            document=draft,
+        )
+
+
+def test_submitted_readback_revalidates_the_acknowledged_draft_against_its_basis() -> None:
+    basis = _basis()
+    request = _bound_request()
+    invalid_draft = _captured_shape_draft()
+    invalid_draft["bill_no"] = "OTHER-BILL"
+    acknowledgement = NativeDraftAcknowledgement(
+        insert_body_digest=request.body_digest,
+        draft_name="ACC-PINV-2026-00008",
+        document=invalid_draft,
+    )
+    submitted_document = _captured_shape_draft()
+    submitted_document["docstatus"] = 1
+    submitted_document["status"] = "Submitted"
+
+    with pytest.raises(ValueError):
+        validate_native_submitted_readback(
+            basis,
+            purchase_order=_purchase_order(),
+            purchase_receipt=_purchase_receipt(),
+            draft=acknowledgement,
+            document=submitted_document,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda record: record.__setitem__("body_digest", "0" * 64),
+        lambda record: record.__setitem__("path", "/api/resource/Purchase%20Invoice/OTHER"),
+    ),
+)
+def test_persisted_insert_request_record_rejects_tampering(mutation: object) -> None:
+    record = _bound_request().record()
+    assert callable(mutation)
+    mutation(record)
+    with pytest.raises(ValueError):
+        NativeInsertRequest.from_record(record)

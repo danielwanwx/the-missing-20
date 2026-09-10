@@ -23,6 +23,7 @@ from the_missing_20.adapters.normal_receipt_billing_preview import (
 )
 
 INSERT_PATH = "/api/resource/Purchase%20Invoice"
+SUBMIT_PATH = "/api/method/frappe.client.submit"
 
 
 def _canonical(value: object) -> object:
@@ -74,6 +75,12 @@ def _digest_text(value: object, label: str) -> str:
     return value
 
 
+def _required_text(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} is required")
+    return value
+
+
 def _require_ready_preview(
     preview: BillingPreview,
     basis: SyntheticBillingBasis,
@@ -117,6 +124,179 @@ class NativeInsertRequest:
             "body": _canonical(self.body),
             "bill_digest": self.bill_digest,
             "body_digest": self.body_digest,
+        }
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, object]) -> NativeInsertRequest:
+        expected_fields = {"method", "path", "body", "bill_digest", "body_digest"}
+        if set(record) != expected_fields:
+            raise ValueError("native insert request record fields are invalid")
+        method = record["method"]
+        path = record["path"]
+        body = record["body"]
+        bill_digest = record["bill_digest"]
+        body_digest = record["body_digest"]
+        if (
+            not isinstance(method, str)
+            or not isinstance(path, str)
+            or not isinstance(body, Mapping)
+            or not isinstance(bill_digest, str)
+            or not isinstance(body_digest, str)
+        ):
+            raise ValueError("native insert request record values are invalid")
+        request = cls(
+            method=method,
+            path=path,
+            body=cast(Mapping[str, object], body),
+            bill_digest=bill_digest,
+        )
+        if request.body_digest != body_digest:
+            raise ValueError("native insert request record digest does not match body")
+        return request
+
+
+@dataclass(frozen=True, slots=True)
+class NativeDraftAcknowledgement:
+    """A complete native draft response tied to one frozen insert body.
+
+    This is structured adapter testimony, not a generic provider-verification
+    flag. The caller must obtain it from the one marked insert response and
+    validate it against current PO/PR evidence with the factory below.
+    """
+
+    insert_body_digest: str
+    draft_name: str
+    document: Mapping[str, object]
+    document_digest: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "insert_body_digest",
+            _digest_text(self.insert_body_digest, "insert_body_digest"),
+        )
+        draft_name = _required_text(self.draft_name, "draft_name")
+        document = _mapping(self.document, "native draft acknowledgement document")
+        if document.get("name") != draft_name:
+            raise ValueError("native draft acknowledgement name does not match document")
+        object.__setattr__(self, "draft_name", draft_name)
+        object.__setattr__(self, "document", cast(Mapping[str, Any], _frozen(document)))
+        object.__setattr__(self, "document_digest", _digest(document))
+
+    def record(self) -> dict[str, object]:
+        return {
+            "insert_body_digest": self.insert_body_digest,
+            "draft_name": self.draft_name,
+            "document": _canonical(self.document),
+            "document_digest": self.document_digest,
+        }
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, object]) -> NativeDraftAcknowledgement:
+        expected_fields = {"insert_body_digest", "draft_name", "document", "document_digest"}
+        if set(record) != expected_fields:
+            raise ValueError("native draft acknowledgement record fields are invalid")
+        insert_body_digest = record["insert_body_digest"]
+        draft_name = record["draft_name"]
+        document = record["document"]
+        document_digest = record["document_digest"]
+        if (
+            not isinstance(insert_body_digest, str)
+            or not isinstance(draft_name, str)
+            or not isinstance(document, Mapping)
+            or not isinstance(document_digest, str)
+        ):
+            raise ValueError("native draft acknowledgement record values are invalid")
+        acknowledgement = cls(
+            insert_body_digest=insert_body_digest,
+            draft_name=draft_name,
+            document=cast(Mapping[str, object], document),
+        )
+        if acknowledgement.document_digest != document_digest:
+            raise ValueError("native draft acknowledgement record digest does not match document")
+        return acknowledgement
+
+
+@dataclass(frozen=True, slots=True)
+class NativeSubmitRequest:
+    """The one full-document native submit request derived from an acknowledged draft."""
+
+    method: str
+    path: str
+    body: Mapping[str, object]
+    draft_name: str
+    body_digest: str = field(init=False)
+    document_digest: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if self.method != "POST":
+            raise ValueError("native submit request method must be POST")
+        if self.path != SUBMIT_PATH:
+            raise ValueError("native submit request path is not allowlisted")
+        draft_name = _required_text(self.draft_name, "native submit request draft_name")
+        body = _mapping(self.body, "native submit request body")
+        if set(body) != {"doc"} or not isinstance(body["doc"], Mapping):
+            raise ValueError("native submit request body must contain exactly one document")
+        document = _mapping(cast(Mapping[str, object], body["doc"]), "native submit document")
+        if document.get("name") != draft_name:
+            raise ValueError("native submit document name does not match draft_name")
+        frozen_body = _frozen({"doc": document})
+        object.__setattr__(self, "draft_name", draft_name)
+        object.__setattr__(self, "body", cast(Mapping[str, Any], frozen_body))
+        object.__setattr__(self, "document_digest", _digest(document))
+        object.__setattr__(self, "body_digest", _digest({"doc": document}))
+
+    @classmethod
+    def from_draft(cls, draft: NativeDraftAcknowledgement) -> NativeSubmitRequest:
+        if not isinstance(draft, NativeDraftAcknowledgement):
+            raise TypeError("native submit request requires NativeDraftAcknowledgement")
+        return cls(
+            method="POST",
+            path=SUBMIT_PATH,
+            body={"doc": draft.document},
+            draft_name=draft.draft_name,
+        )
+
+    def record(self) -> dict[str, object]:
+        return {
+            "method": self.method,
+            "path": self.path,
+            "body": _canonical(self.body),
+            "draft_name": self.draft_name,
+            "body_digest": self.body_digest,
+            "document_digest": self.document_digest,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class NativeSubmittedReadback:
+    """A complete exact-name submitted document tied to the frozen draft document."""
+
+    draft_name: str
+    draft_document_digest: str
+    document: Mapping[str, object]
+    document_digest: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        draft_name = _required_text(self.draft_name, "submitted readback draft_name")
+        object.__setattr__(
+            self,
+            "draft_document_digest",
+            _digest_text(self.draft_document_digest, "draft_document_digest"),
+        )
+        document = _mapping(self.document, "native submitted readback document")
+        if document.get("name") != draft_name:
+            raise ValueError("native submitted readback name does not match draft_name")
+        object.__setattr__(self, "draft_name", draft_name)
+        object.__setattr__(self, "document", cast(Mapping[str, Any], _frozen(document)))
+        object.__setattr__(self, "document_digest", _digest(document))
+
+    def record(self) -> dict[str, object]:
+        return {
+            "draft_name": self.draft_name,
+            "draft_document_digest": self.draft_document_digest,
+            "document": _canonical(self.document),
+            "document_digest": self.document_digest,
         }
 
 
@@ -174,4 +354,92 @@ def bind_native_insert_request(
         path=INSERT_PATH,
         body=body,
         bill_digest=basis.bill_digest,
+    )
+
+
+def validate_native_draft_acknowledgement(
+    basis: SyntheticBillingBasis,
+    *,
+    purchase_order: Mapping[str, Any],
+    purchase_receipt: Mapping[str, Any],
+    insert_request: NativeInsertRequest,
+    document: Mapping[str, Any],
+) -> NativeDraftAcknowledgement:
+    """Admit a complete known-name insert response through the shared validator."""
+
+    if not isinstance(basis, SyntheticBillingBasis):
+        raise TypeError("native draft acknowledgement requires SyntheticBillingBasis")
+    if not isinstance(insert_request, NativeInsertRequest):
+        raise TypeError("native draft acknowledgement requires NativeInsertRequest")
+    if insert_request.bill_digest != basis.bill_digest:
+        raise ValueError("native insert request bill digest does not match the bill basis")
+    bound_body = _mapping(insert_request.body, "native insert request body")
+    validate_native_purchase_invoice(
+        basis,
+        purchase_order=purchase_order,
+        purchase_receipt=purchase_receipt,
+        document=cast(Mapping[str, Any], bound_body),
+        state="MAPPED",
+        expected_bill_reference=basis.bill_reference,
+        expected_bill_date=basis.bill_date,
+    )
+    draft = _mapping(document, "native draft acknowledgement document")
+    name = _required_text(draft.get("name"), "native draft acknowledgement name")
+    validate_native_purchase_invoice(
+        basis,
+        purchase_order=purchase_order,
+        purchase_receipt=purchase_receipt,
+        document=draft,
+        state="DRAFT",
+        expected_name=name,
+        expected_bill_reference=basis.bill_reference,
+        expected_bill_date=basis.bill_date,
+    )
+    return NativeDraftAcknowledgement(
+        insert_body_digest=insert_request.body_digest,
+        draft_name=name,
+        document=draft,
+    )
+
+
+def validate_native_submitted_readback(
+    basis: SyntheticBillingBasis,
+    *,
+    purchase_order: Mapping[str, Any],
+    purchase_receipt: Mapping[str, Any],
+    draft: NativeDraftAcknowledgement,
+    document: Mapping[str, Any],
+) -> NativeSubmittedReadback:
+    """Admit an exact known-name submitted document through the shared validator."""
+
+    if not isinstance(basis, SyntheticBillingBasis):
+        raise TypeError("native submitted readback requires SyntheticBillingBasis")
+    if not isinstance(draft, NativeDraftAcknowledgement):
+        raise TypeError("native submitted readback requires NativeDraftAcknowledgement")
+    draft_document = _mapping(draft.document, "native draft acknowledgement document")
+    validate_native_purchase_invoice(
+        basis,
+        purchase_order=purchase_order,
+        purchase_receipt=purchase_receipt,
+        document=cast(Mapping[str, Any], draft_document),
+        state="DRAFT",
+        expected_name=draft.draft_name,
+        expected_bill_reference=basis.bill_reference,
+        expected_bill_date=basis.bill_date,
+    )
+    submitted = _mapping(document, "native submitted readback document")
+    validate_native_purchase_invoice(
+        basis,
+        purchase_order=purchase_order,
+        purchase_receipt=purchase_receipt,
+        document=submitted,
+        state="SUBMITTED",
+        expected_name=draft.draft_name,
+        expected_bill_reference=basis.bill_reference,
+        expected_bill_date=basis.bill_date,
+    )
+    return NativeSubmittedReadback(
+        draft_name=draft.draft_name,
+        draft_document_digest=draft.document_digest,
+        document=submitted,
     )
