@@ -38,6 +38,15 @@ Verification of the final four-file candidate:
   case exited0 in30.24 seconds. The diagnostic full run also reached180 seconds,
   after132 passing test indicators and no reported assertion failure; its code
   hashes were unchanged. These incomplete runs are not full acceptance.
+- A third full run reached its900-second envelope and was stopped by its owning
+  wrapper (exit-9), again with all four hashes unchanged and no reported assertion
+  failure. Raw output advanced beyond73%; this is still incomplete, not a pass.
+  Independent read-only diagnosis located a completed bottleneck in
+  `test_ledger_tail_ends_at_latest_sequence_beyond_replay_limit`:10,005 individual
+  durable SQLite appends. The test subsequently completed and the suite advanced;
+  no permanent deadlock was observed. The retained sink stack does not establish
+  a session-lock cycle or diagnose interpreter shutdown. Evidence:
+  `/private/tmp/m20-context-final-python-ecb4e34-03`.
 
 Independent evidence: `/private/tmp/m20-context-corrected-review-628y_3_x`.
 Primary frozen copy: `/private/tmp/m20-context-accepted-ecb4e34`.

@@ -198,5 +198,16 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   test.208 related and32 independent tests passed; primary strict four-file
   typing/format/lint passed. Broader runs hit their180-second envelopes and do
   not constitute full-regression acceptance. [Scoped delivery](../audits/2026-09-09-native-billing-source-context-review.md).
+- Native session experiment and the preserved first failed sequence delivered
+  `bc1aee288f565287e3676afd9f784e464ad035fb`; push and exact remote SHA verified.
+  This delivers reproducible mechanics and failure evidence, not a six-turn
+  semantic improvement or product integration.
+- The frozen context full regression also reached its900-second envelope after
+  advancing beyond73%, with unchanged hashes and no reported assertion failure.
+  An independently diagnosed10,005-transaction SQLite test completed during the
+  run; no permanent deadlock was observed. The run remains incomplete.
+- Coordinator candidate:13 independent integration tests pass, but independent
+  review found lost current-source audit evidence on successful reconciliation.
+  Correction and re-review are required before acceptance or real invoice effects.
   A separately frozen diagnostic regression continues; transport and real R4
   invoice/GL/SLE effects remain unverified.
