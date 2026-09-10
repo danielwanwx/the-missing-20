@@ -1,0 +1,50 @@
+{
+  "schema": "missing20-native-receiving-first-screen/v1",
+  "execution_revision": "be226623628161e36d6c098d5e68a6b471907b8a",
+  "scope": "one retained D4 Q4 question per candidate, not a complete conversation",
+  "model": "us.amazon.nova-pro-v1:0",
+  "sdk": "1.53.0",
+  "core_boundary": "both correctly deny independent proof of carton contents",
+  "overall_q4_acceptance": "INCOMPLETE",
+  "product_accepted": false,
+  "six_turn_sequence": "NOT_RUN",
+  "historical_baseline": "retained D4 failure; not a contemporaneous paired measurement",
+  "erp_calls": 0,
+  "iam_mutations": 0,
+  "total_cost_usd": "0.013388",
+  "frozen_files_unchanged": true,
+  "candidates": {
+    "n1": {
+      "status": "STRUCTURAL_COMPLETE",
+      "sdk_invocations": 1,
+      "logical_model_requests": 2,
+      "observed_provider_attempts": 2,
+      "source_read_count": 5,
+      "input_tokens": 7117,
+      "output_tokens": 278,
+      "cost_usd": "0.0065832",
+      "elapsed_ms": 3664,
+      "native_forced_format_fallbacks": 0,
+      "request_turns_containing_schema_error_history": 0,
+      "raw_artifact_sha256": "928824522828d24c7edbe8b679e6eaf4b6675aaa2b5a5f3e95cbca55691c441f",
+      "citation_assessment": "missing actual record identifiers",
+      "explanation_assessment": "distinguishes receiving posting from contents; precision incomplete"
+    },
+    "n2": {
+      "status": "STRUCTURAL_COMPLETE",
+      "sdk_invocations": 1,
+      "logical_model_requests": 2,
+      "observed_provider_attempts": 2,
+      "source_read_count": 5,
+      "input_tokens": 7482,
+      "output_tokens": 256,
+      "cost_usd": "0.0068048",
+      "elapsed_ms": 2974,
+      "native_forced_format_fallbacks": 0,
+      "request_turns_containing_schema_error_history": 0,
+      "raw_artifact_sha256": "d3dd36c24a57241f145b17dbee0fb2d01f7d9033c49b2222ab0fcd62b74ff669",
+      "citation_assessment": "tool name is not a record citation",
+      "explanation_assessment": "final answer gives conclusion without supporting explanation"
+    }
+  }
+}

@@ -137,3 +137,18 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   This is a mechanism result, not ERP integration or financial closure. Native
   receiving N1/N2 remains under offline implementation/review, with no new model
   result. F03/F05 remain open; the journal expansion remains paused.
+
+- DBOS experiment delivered `88a2169`; revised native billing research/design
+  delivered `be22662`; both pushed with exact remote SHA agreement. Billing now
+  requires the actual acknowledged insert name before later submit; unknown
+  insert ACK cannot gain ownership through business-field search. A smaller
+  binding candidate is being implemented in a clean isolated checkout, preserving
+  the old paused expansion.
+- Native Strands N1/N2 first paid screen completed: each read all five sources,
+  used two logical model requests and correctly denied independent carton-content
+  proof. Total USD0.013388, no native format fallback, ERP calls or IAM change.
+  Independent semantic review finds BOTH incomplete for Q4: N1 lacks record
+  citations; N2 cites a tool and omits supporting explanation. Seven final offline
+  tests pass independently and in primary verification. [Full scoped review](../audits/2026-09-09-native-receiving-first-screen-review.md).
+  Both remain candidates for a separately frozen complete six-turn evaluation;
+  no winner, product promotion, full conversation or F03/F05 acceptance is claimed.
