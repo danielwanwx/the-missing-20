@@ -4,6 +4,14 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
 
 ## Current snapshot — September 10
 
+- **Contract allocation slice shipped:** `51eae16a7f0fb41424733665ea1182aca95a0cfb`
+  matches freshly read remote main; [CI 34527498379](https://github.com/danielwanwx/the-missing-20/actions/runs/34527498379)
+  completed successfully. Independent review accepted the real Nova Pro selector
+  on synthetic contracts and the labelled UI fixture. See the
+  [scoped acceptance](../audits/2026-09-10-contract-allocation-slice.md).
+  New-case native fulfillment and actual distributor cross-app writes remain
+  pending; no stronger model has been promoted.
+
 - **User-approved final scope and earlier delivery target:** complete and submit
   by September 12, with final preview before public release. See the
   [six aligned decisions](2026-09-10-approved-demo-completion.md). Contract-aware

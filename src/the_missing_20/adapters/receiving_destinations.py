@@ -24,7 +24,9 @@ class ReceivingAPI:
         with urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed provider hosts
             return bytes(response.read())
 
-    def request(self, provider: str, path: str, *, payload: Any = None) -> Any:
+    def request(
+        self, provider: str, path: str, *, payload: Any = None, method: str | None = None
+    ) -> Any:
         config = self.config
         providers = {
             "celigo": ("https://api.integrator.io/v1", config.celigo_api_token),
@@ -37,8 +39,11 @@ class ReceivingAPI:
                 config.jira_api_token,
             )
         origin, token = providers[provider]
-        if not token or not path.startswith("/"):
+        verb = method or ("POST" if payload is not None else "GET")
+        if not token or not path.startswith("/") or verb not in {"GET", "POST", "PATCH"}:
             raise ValueError("Receiving destination credential/path is missing")
+        if payload is None and verb != "GET":
+            raise ValueError("Receiving destination payload is missing")
         request = Request(
             origin + path,
             headers={
@@ -47,7 +52,7 @@ class ReceivingAPI:
                 "Accept": "application/json",
             },
             data=json.dumps(payload).encode() if payload is not None else None,
-            method="POST" if payload is not None else "GET",
+            method=verb,
         )
         response = self.transport(request, 20)
         return json.loads(response.decode()) if response else None

@@ -111,6 +111,22 @@ def test_celigo_200_with_record_error_is_not_success():
     assert calls == ["GET", "POST"]
 
 
+def test_receiving_api_allows_explicit_patch_for_verified_case_updates():
+    calls = []
+
+    def wire(request, timeout):
+        calls.append((request.method, json.loads(request.data.decode())))
+        return b'{"id":"rec-1"}'
+
+    assert api(wire).request(
+        "airtable",
+        "/base-1/table-1/rec-1",
+        payload={"fields": {"Case ID": "M20-1"}},
+        method="PATCH",
+    ) == {"id": "rec-1"}
+    assert calls == [("PATCH", {"fields": {"Case ID": "M20-1"}})]
+
+
 def worker(tmp_path, states, fresh):
     result = ReceivingHandoffWorker.__new__(ReceivingHandoffWorker)
     result.receiving = SimpleNamespace(
