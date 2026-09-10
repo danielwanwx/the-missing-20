@@ -32,6 +32,7 @@ class _Bridge:
         self.config = config
         self.reads = 0
         self.calls: list[tuple[str, str, dict[str, object]]] = []
+        self.reconcile_calls: list[tuple[str, dict[str, object]]] = []
         self.statuses: dict[str, str] = {}
         self.state_provider: Any = None
         self.source_override: dict[str, object] | None = None
@@ -118,6 +119,8 @@ class _Bridge:
         documents = (
             [{"kind": "Shipment", "name": f"SHIP-{event_id}", "status": "Submitted"}]
             if kind == "create_shipment" and status in {"APPLIED", "ALREADY_APPLIED"}
+            else [{"kind": "Pick List", "name": f"PICK-{event_id}", "status": "Submitted"}]
+            if kind == "submit_pick" and status in {"APPLIED", "ALREADY_APPLIED"}
             else [
                 {
                     "kind": kind,
@@ -136,6 +139,26 @@ class _Bridge:
             "error_code": "ERP_UNAVAILABLE" if status == "UNKNOWN_OUTCOME" else None,
         }
 
+    def reconcile_receive_arrival(
+        self, config: Mapping[str, object], event: Mapping[str, object], event_id: str
+    ) -> Mapping[str, object]:
+        assert config == self.config
+        self.reconcile_calls.append((event_id, deepcopy(dict(event))))
+        source = self.read_case(config)
+        return {
+            "operation": "receive_arrival",
+            "event_id": event_id,
+            "status": "APPLIED",
+            "documents": [
+                {
+                    "kind": "Purchase Receipt",
+                    "name": "PR-CONFIRMED-LOT-A",
+                    "status": "Submitted",
+                }
+            ],
+            "snapshot": source,
+        }
+
 
 def _component_config() -> dict[str, object]:
     return {
@@ -145,14 +168,31 @@ def _component_config() -> dict[str, object]:
         "company": "M20 Demo Company",
         "item_code": "M20-COMPONENT-NOS",
         "uom": "Nos",
-        "cartons": 4,
+        "cartons": 5,
         "expected_pack_quantity": 10,
         "purchase_order": "PO-COMP-1",
         "accepted_warehouse": "Stores-M20",
         "quarantine_warehouse": "Quality Hold-M20",
         "lots": [
-            {"lot": "LOT-A", "expected_quantity": 20},
-            {"lot": "LOT-B", "expected_quantity": 20},
+            {
+                "lot": "LOT-A",
+                "expected_quantity": 20,
+                "cartons": 2,
+                "expected_pack_quantity": 10,
+            },
+            {
+                "lot": "LOT-B",
+                "expected_quantity": 18,
+                "cartons": 2,
+                "expected_pack_quantity": 10,
+            },
+            {
+                "lot": "LOT-C",
+                "expected_quantity": 2,
+                "cartons": 1,
+                "expected_pack_quantity": 2,
+                "replacement_for_lot": "LOT-B",
+            },
         ],
         "allocations": [
             {"customer_order": "SO-PRIORITY", "requested_quantity": 25, "priority": 1},
@@ -227,13 +267,19 @@ def _event(event_id: str, event_type: str, **fields: object) -> dict[str, object
 
 
 def _arrival(
-    event_id: str, *, lot: str, cartons: int, observed: int, item_code: str = "M20-COMPONENT-NOS"
+    event_id: str,
+    *,
+    lot: str,
+    cartons: int,
+    observed: int,
+    pack: int = 10,
+    item_code: str = "M20-COMPONENT-NOS",
 ) -> dict[str, object]:
     return _event(
         event_id,
         "arrival",
         cartons=cartons,
-        expected_pack_quantity=10,
+        expected_pack_quantity=pack,
         observed_stock_quantity=observed,
         item_code=item_code,
         lot=lot,
@@ -250,6 +296,60 @@ def _r4_arrival(event_id: str, lot: str, cartons: int) -> dict[str, object]:
         item_code="M20-DEMO-CARTON",
         lot=lot,
     )
+
+
+def _component_source_after_confirmed_arrival(config: Mapping[str, object]) -> dict[str, object]:
+    lots = cast(list[Mapping[str, object]], config["lots"])
+    allocations = cast(list[Mapping[str, object]], config["allocations"])
+    return {
+        "case_id": config["case_id"],
+        "case_label": config["case_label"],
+        "synthetic_input": config["synthetic_input"],
+        "source_status": "CURRENT",
+        "quantities": {
+            "ordered": 40,
+            "received": 20,
+            "usable": 0,
+            "held": 20,
+            "missing": 20,
+            "allocated": 0,
+            "dispatched": 0,
+            "delivery_confirmed": 0,
+            "cartons": 2,
+            "uom": config["uom"],
+        },
+        "lots": [
+            {
+                "lot": row["lot"],
+                "expected_quantity": row["expected_quantity"],
+                "cartons": 2 if row["lot"] == "LOT-A" else 0,
+                "received": 20 if row["lot"] == "LOT-A" else 0,
+                "usable": 0,
+                "held": 20 if row["lot"] == "LOT-A" else 0,
+                "status": "HELD" if row["lot"] == "LOT-A" else "AWAITING_ARRIVAL",
+            }
+            for row in lots
+        ],
+        "allocations": [
+            {
+                "customer_order": row["customer_order"],
+                "requested_quantity": row["requested_quantity"],
+                "priority": row["priority"],
+                "allocated": 0,
+                "backordered": row["requested_quantity"],
+                "dispatched": 0,
+                "reservation": "LOCAL_PLAN",
+            }
+            for row in allocations
+        ],
+        "documents": [
+            {
+                "kind": "Purchase Receipt",
+                "name": "PR-CONFIRMED-LOT-A",
+                "status": "Submitted",
+            }
+        ],
+    }
 
 
 def _codes(projection: dict[str, object]) -> set[str]:
@@ -276,6 +376,8 @@ def test_r4_remaining_arrivals_allocate_then_pick_pickup_and_delivery(tmp_path: 
         "delivery_confirmed": 0,
         "uom": "Box",
         "cartons": 20,
+        "initial_expected_cartons": 39,
+        "observed_outer_packages": 20,
     }
     final = service.record_event(_r4_arrival("arrival-r4-19", "R4-ARRIVAL-19", 19))
     assert final["quantities"]["received"] == final["quantities"]["usable"] == 39
@@ -325,11 +427,77 @@ def test_r4_remaining_arrivals_allocate_then_pick_pickup_and_delivery(tmp_path: 
         if document["kind"] == "Shipment"
     ]
     assert len(shipments) == 3
-    for index, shipment in enumerate(shipments, start=1):
-        service.record_event(_event(f"pickup-r4-{index}", "carrier_pickup", shipment_id=shipment))
-    delivered = service.record_event(_event("delivery-r4-1", "delivery", shipment_id=shipments[0]))
-    delivered = service.record_event(_event("delivery-r4-2", "delivery", shipment_id=shipments[1]))
-    delivered = service.record_event(_event("delivery-r4-3", "delivery", shipment_id=shipments[2]))
+    shipments_by_event = {
+        event_id: operation["shipment_id"]
+        for kind, event_id, operation in bridge.calls
+        if kind == "create_shipment"
+    }
+    assert set(shipments_by_event) == {"picked-r4-20", "picked-r4-4", "picked-r4-15"}
+    shipment_id_20 = shipments_by_event["picked-r4-20"]
+    shipment_id_4 = shipments_by_event["picked-r4-4"]
+    shipment_id_15 = shipments_by_event["picked-r4-15"]
+    assert isinstance(shipment_id_20, str) and shipment_id_20.startswith("M20-DIST-R4-SHIP-24-")
+    assert isinstance(shipment_id_4, str) and shipment_id_4.startswith("M20-DIST-R4-SHIP-24-")
+    assert isinstance(shipment_id_15, str) and shipment_id_15.startswith("M20-DIST-R4-SHIP-15-")
+    assert len({shipment_id_20, shipment_id_4, shipment_id_15}) == 3
+    shipment_20 = "SHIP-picked-r4-20"
+    shipment_4 = "SHIP-picked-r4-4"
+    shipment_15 = "SHIP-picked-r4-15"
+    assert {shipment_20, shipment_4, shipment_15} == set(shipments)
+    for event_id, shipment in (
+        ("pickup-r4-20", shipment_20),
+        ("pickup-r4-4", shipment_4),
+        ("pickup-r4-15", shipment_15),
+    ):
+        service.record_event(_event(event_id, "carrier_pickup", shipment_id=shipment))
+    b_delivered = service.record_event(
+        _event("delivery-r4-15", "delivery", shipment_id=shipment_15)
+    )
+    shipment_rows = {
+        row["name"]: row for row in cast(list[dict[str, object]], b_delivered["shipments"])
+    }
+    assert shipment_rows[shipment_15] == {
+        "name": shipment_15,
+        "customer_order": "SO-R4-STANDARD",
+        "lot": "R4-ARRIVAL-19",
+        "quantity": 15,
+        "picked_up": True,
+        "delivered": True,
+        "synthetic": True,
+    }
+    assert shipment_rows[shipment_20]["delivered"] is False
+    allocation_rows = {
+        row["customer_order"]: row
+        for row in cast(list[dict[str, object]], b_delivered["allocations"])
+    }
+    assert allocation_rows["SO-R4-STANDARD"].get("picked") == 15
+    assert allocation_rows["SO-R4-STANDARD"].get("delivery_confirmed") == 15
+    assert allocation_rows["SO-R4-STANDARD"].get("status") == "DELIVERY_CONFIRMED"
+    assert allocation_rows["SO-R4-PRIORITY"].get("picked") == 24
+    assert allocation_rows["SO-R4-PRIORITY"].get("delivery_confirmed") == 0
+    assert allocation_rows["SO-R4-PRIORITY"].get("status") == "PICKED"
+    event_rows = {
+        row["event_id"]: row for row in cast(list[dict[str, object]], b_delivered["events"])
+    }
+    assert event_rows["arrival-r4-20"]["observed_stock_quantity"] == 20
+    assert event_rows["picked-r4-15"].get("customer_order") == "SO-R4-STANDARD"
+    assert event_rows["picked-r4-15"].get("quantity") == 15
+    assert event_rows["pickup-r4-15"].get("shipment_id") == shipment_15
+    assert event_rows["delivery-r4-15"].get("shipment_id") == shipment_15
+    packet = workspace_server._distributor_native_packet(b_delivered)
+    sources = cast(dict[str, object], cast(dict[str, object], packet["tool_payload"])["sources"])
+    erp_facts = cast(dict[str, object], sources["read_erp_evidence"])
+    assert cast(list[dict[str, object]], erp_facts["shipments"])[0]["name"]
+    retained_events = cast(
+        list[dict[str, object]],
+        cast(dict[str, object], sources["read_collaboration_evidence"])["retained_physical_events"],
+    )
+    assert (
+        next(row for row in retained_events if row["event_id"] == "picked-r4-15")["customer_order"]
+        == "SO-R4-STANDARD"
+    )
+    service.record_event(_event("delivery-r4-20", "delivery", shipment_id=shipment_20))
+    delivered = service.record_event(_event("delivery-r4-4", "delivery", shipment_id=shipment_4))
     assert delivered["quantities"]["delivery_confirmed"] == 39
     assert [kind for kind, _event_id, _operation in bridge.calls] == [
         "receive_arrival",
@@ -363,98 +531,32 @@ def test_r4_remaining_arrivals_allocate_then_pick_pickup_and_delivery(tmp_path: 
         ("SO-R4-PRIORITY", "R4-ARRIVAL-19", 4),
         ("SO-R4-STANDARD", "R4-ARRIVAL-19", 15),
     ]
-    shipments_by_event = {
-        event_id: operation["shipment_id"]
-        for kind, event_id, operation in bridge.calls
-        if kind == "create_shipment"
-    }
-    assert set(shipments_by_event) == {"picked-r4-20", "picked-r4-4", "picked-r4-15"}
-    shipment_20 = shipments_by_event["picked-r4-20"]
-    shipment_4 = shipments_by_event["picked-r4-4"]
-    shipment_15 = shipments_by_event["picked-r4-15"]
-    assert isinstance(shipment_20, str) and shipment_20.startswith("M20-DIST-R4-SHIP-24-")
-    assert isinstance(shipment_4, str) and shipment_4.startswith("M20-DIST-R4-SHIP-24-")
-    assert isinstance(shipment_15, str) and shipment_15.startswith("M20-DIST-R4-SHIP-15-")
-    assert len({shipment_20, shipment_4, shipment_15}) == 3
     assert picked_twenty["quantities"]["dispatched"] == 20
     assert picked_four["quantities"]["dispatched"] == 24
 
 
-def test_projection_keeps_customer_delivery_and_hydrates_retained_event_facts(
-    tmp_path: Path,
-) -> None:
+def test_projection_hydrates_legacy_event_briefs_from_retained_payload(tmp_path: Path) -> None:
     service, _bridge = _service(tmp_path, _r4_config())
     service.record_event(_r4_arrival("arrival-r4-20", "R4-ARRIVAL-20", 20))
-    service.record_event(_r4_arrival("arrival-r4-19", "R4-ARRIVAL-19", 19))
-    for event_id, order, lot, quantity in (
-        ("picked-r4-20", "SO-R4-PRIORITY", "R4-ARRIVAL-20", 20),
-        ("picked-r4-4", "SO-R4-PRIORITY", "R4-ARRIVAL-19", 4),
-        ("picked-r4-15", "SO-R4-STANDARD", "R4-ARRIVAL-19", 15),
-    ):
-        service.record_event(
-            _event(
-                event_id,
-                "picked",
-                customer_order=order,
-                lot=lot,
-                quantity=quantity,
-                pick_evidence_ref=f"synthetic:{event_id}",
-            )
+    service.record_event(
+        _event(
+            "picked-r4-20",
+            "picked",
+            customer_order="SO-R4-PRIORITY",
+            lot="R4-ARRIVAL-20",
+            quantity=20,
+            pick_evidence_ref="synthetic:pick-r4-20",
         )
-    shipment_20 = "SHIP-picked-r4-20"
-    shipment_4 = "SHIP-picked-r4-4"
-    shipment_15 = "SHIP-picked-r4-15"
-    for event_id, shipment in (
-        ("pickup-r4-20", shipment_20),
-        ("pickup-r4-4", shipment_4),
-        ("pickup-r4-15", shipment_15),
-    ):
-        service.record_event(_event(event_id, "carrier_pickup", shipment_id=shipment))
-    b_delivered = service.record_event(
-        _event("delivery-r4-15", "delivery", shipment_id=shipment_15)
     )
-
-    shipments = {
-        row["name"]: row for row in cast(list[dict[str, object]], b_delivered["shipments"])
-    }
-    assert shipments[shipment_15] == {
-        "name": shipment_15,
-        "customer_order": "SO-R4-STANDARD",
-        "lot": "R4-ARRIVAL-19",
-        "quantity": 15,
-        "picked_up": True,
-        "delivered": True,
-        "synthetic": True,
-    }
-    assert shipments[shipment_20]["delivered"] is False
-    allocations = {
-        row["customer_order"]: row
-        for row in cast(list[dict[str, object]], b_delivered["allocations"])
-    }
-    assert allocations["SO-R4-STANDARD"].get("picked") == 15
-    assert allocations["SO-R4-STANDARD"].get("delivery_confirmed") == 15
-    assert allocations["SO-R4-STANDARD"].get("status") == "DELIVERY_CONFIRMED"
-    assert allocations["SO-R4-PRIORITY"].get("picked") == 24
-    assert allocations["SO-R4-PRIORITY"].get("delivery_confirmed") == 0
-    assert allocations["SO-R4-PRIORITY"].get("status") == "PICKED"
-    packet = workspace_server._distributor_native_packet(b_delivered)
-    sources = cast(dict[str, object], cast(dict[str, object], packet["tool_payload"])["sources"])
-    erp_facts = cast(dict[str, object], sources["read_erp_evidence"])
-    assert {row["name"] for row in cast(list[dict[str, object]], erp_facts["shipments"])} == {
-        shipment_20,
-        shipment_4,
-        shipment_15,
-    }
-
     row = service._db.execute(
-        "SELECT state_json FROM distributor_operation_events WHERE event_id='delivery-r4-15'"
+        "SELECT state_json FROM distributor_operation_events WHERE event_id='picked-r4-20'"
     ).fetchone()
     assert row is not None and isinstance(row[0], str)
     retained_state = json.loads(row[0])
     assert isinstance(retained_state, dict)
-    retained_events = retained_state.get("events")
-    assert isinstance(retained_events, list)
-    for event in retained_events:
+    events = retained_state.get("events")
+    assert isinstance(events, list)
+    for event in events:
         if not isinstance(event, dict):
             continue
         for field in (
@@ -470,20 +572,20 @@ def test_projection_keeps_customer_delivery_and_hydrates_retained_event_facts(
         ):
             event.pop(field, None)
     service._db.execute(
-        "UPDATE distributor_operation_events SET state_json=? WHERE event_id='delivery-r4-15'",
+        "UPDATE distributor_operation_events SET state_json=? WHERE event_id='picked-r4-20'",
         (json.dumps(retained_state, sort_keys=True, separators=(",", ":")),),
     )
 
-    hydrated = service.projection()
-    events = {
-        event["event_id"]: event for event in cast(list[dict[str, object]], hydrated["events"])
+    projection = service.projection()
+    events_by_id = {
+        event["event_id"]: event for event in cast(list[dict[str, object]], projection["events"])
     }
-    assert events["arrival-r4-20"]["cartons"] == 20
-    assert events["arrival-r4-20"]["observed_stock_quantity"] == 20
-    assert events["picked-r4-15"]["customer_order"] == "SO-R4-STANDARD"
-    assert events["picked-r4-15"]["quantity"] == 15
-    assert events["pickup-r4-15"]["shipment_id"] == shipment_15
-    assert events["delivery-r4-15"]["shipment_id"] == shipment_15
+    assert events_by_id["arrival-r4-20"]["cartons"] == 20
+    assert events_by_id["arrival-r4-20"]["observed_stock_quantity"] == 20
+    assert events_by_id["picked-r4-20"]["customer_order"] == "SO-R4-PRIORITY"
+    assert events_by_id["picked-r4-20"]["lot"] == "R4-ARRIVAL-20"
+    assert events_by_id["picked-r4-20"]["quantity"] == 20
+    assert events_by_id["picked-r4-20"]["pick_evidence_ref"] == "synthetic:pick-r4-20"
 
 
 def test_projection_marks_a_partial_order_delivery_without_closing_the_order(
@@ -683,6 +785,18 @@ def test_r4_core_drives_real_native_bridge_two_arrivals_and_three_exact_tranches
             "Arrival, pickup, and delivery are recorded synthetic test events; they are not "
             "actual sensor, carrier, or customer-receipt proof."
         ),
+        "quantity_evidence": (
+            "Carton and inner counts establish recorded quantities and any observed "
+            "discrepancy; they do not establish its cause or responsible party."
+        ),
+        "attribution_evidence": (
+            "This packet contains no supplier packing verification or transit/custody "
+            "investigation establishing attribution for that discrepancy."
+        ),
+        "inspection_evidence": (
+            "Quality Inspection records are declared report measurements and stated coverage; "
+            "they are not independent physical tests performed by the agent."
+        ),
         "native_inventory_accounting": (
             "Native Purchase Order received quantities, Purchase Receipts, and Stock Ledger "
             "Entries support inventory accounting only; they do not prove carrier pickup or "
@@ -701,6 +815,18 @@ def test_r4_core_drives_real_native_bridge_two_arrivals_and_three_exact_tranches
         "recorded_events": (
             "Arrival, pickup, and delivery are recorded operational events; this packet does "
             "not assert independent sensor, carrier, or customer-receipt verification."
+        ),
+        "quantity_evidence": (
+            "Carton and inner counts establish recorded quantities and any observed "
+            "discrepancy; they do not establish its cause or responsible party."
+        ),
+        "attribution_evidence": (
+            "This packet contains no supplier packing verification or transit/custody "
+            "investigation establishing attribution for that discrepancy."
+        ),
+        "inspection_evidence": (
+            "Quality Inspection records are declared report measurements and stated coverage; "
+            "they are not independent physical tests performed by the agent."
         ),
         "native_inventory_accounting": (
             "Native Purchase Order received quantities, Purchase Receipts, and Stock Ledger "
@@ -774,6 +900,131 @@ def test_cartons_do_not_become_parts_and_shortage_stays_visible(tmp_path: Path) 
     ]
 
 
+def test_native_packet_scopes_quantity_attribution_and_inspection_evidence() -> None:
+    expected = {
+        "quantity_evidence": (
+            "Carton and inner counts establish recorded quantities and any observed "
+            "discrepancy; they do not establish its cause or responsible party."
+        ),
+        "attribution_evidence": (
+            "This packet contains no supplier packing verification or transit/custody "
+            "investigation establishing attribution for that discrepancy."
+        ),
+        "inspection_evidence": (
+            "Quality Inspection records are declared report measurements and stated coverage; "
+            "they are not independent physical tests performed by the agent."
+        ),
+    }
+    projection = {
+        "case_id": "M20-DIST-TEST",
+        "case_label": "Packet evidence boundary test",
+        "quantities": {},
+        "lots": [],
+        "allocations": [],
+        "documents": [],
+        "shipments": [],
+        "events": [],
+    }
+
+    for synthetic_input in (True, False):
+        packet = workspace_server._distributor_native_packet(
+            {**projection, "synthetic_input": synthetic_input}
+        )
+        sources = cast(
+            dict[str, object], cast(dict[str, object], packet["tool_payload"])["sources"]
+        )
+        facts = cast(dict[str, object], sources["read_erp_evidence"])
+        provenance = cast(dict[str, object], facts["event_provenance"])
+        assert {key: provenance[key] for key in expected} == expected
+        assert ("synthetic test events" in provenance["recorded_events"]) is synthetic_input
+
+
+def test_component_replacement_closes_only_the_supported_parent_shortage_and_keeps_quality_facts(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path)
+    service.record_event(_arrival("arrival-a", lot="LOT-A", cartons=2, observed=20))
+    service.record_event(
+        _event(
+            "inspection-a-sample-fail",
+            "inspection",
+            lot="LOT-A",
+            result="FAIL",
+            scope="SAMPLE",
+            metric="diameter_mm",
+            measured=10.4,
+            sample_quantity=2,
+            inspection_report_ref="synthetic:qi-a-sample-fail",
+        )
+    )
+    shortage_state = service.record_event(
+        _arrival("arrival-b", lot="LOT-B", cartons=2, observed=18)
+    )
+    assert shortage_state["quantities"]["initial_expected_cartons"] == 4
+    assert shortage_state["quantities"]["observed_outer_packages"] == 4
+    replacement = service.record_event(
+        _arrival("arrival-c-replacement", lot="LOT-C", cartons=1, observed=2, pack=2)
+    )
+
+    assert replacement["quantities"]["received"] == 40
+    assert replacement["quantities"]["missing"] == 0
+    shortage = next(
+        alert
+        for alert in cast(list[dict[str, object]], replacement["alerts"])
+        if alert["code"] == "PARTS_SHORTAGE" and alert.get("lot") == "LOT-B"
+    )
+    assert shortage["quantity"] == 2
+    assert shortage["status"] == "RESOLVED"
+    assert "PACK_QUANTITY_MISMATCH" not in _codes(replacement)
+    assert [kind for kind, _event_id, _operation in bridge.calls].count("receive_arrival") == 3
+
+    packet = workspace_server._distributor_native_packet(replacement)
+    sources = cast(dict[str, object], cast(dict[str, object], packet["tool_payload"])["sources"])
+    control = cast(dict[str, object], sources["read_control_context"])
+    quality_policy = cast(dict[str, object], control["quality_policy"])
+    assert quality_policy["inspection_criteria"] == {
+        "diameter_mm": {"minimum": 9.9, "maximum": 10.1}
+    }
+    erp_facts = cast(dict[str, object], sources["read_erp_evidence"])
+    erp_quantities = cast(dict[str, object], erp_facts["quantities"])
+    assert erp_quantities["initial_expected_cartons"] == 4
+    assert erp_quantities["observed_outer_packages"] == erp_quantities["cartons"] == 5
+    assert [
+        (lot["lot"], lot["expected_pack_quantity"], lot.get("replacement_for_lot"))
+        for lot in cast(list[dict[str, object]], erp_facts["lots"])
+    ] == [
+        ("LOT-A", 10, None),
+        ("LOT-B", 10, None),
+        ("LOT-C", 2, "LOT-B"),
+    ]
+    quality_alert = next(
+        alert
+        for alert in cast(list[dict[str, object]], control["active_alerts"])
+        if alert["code"] == "QUALITY_FAILED"
+    )
+    assert quality_alert == {
+        "code": "QUALITY_FAILED",
+        "status": "OPEN",
+        "message": (
+            "A sample measurement failed. The lot is held pending supported disposition; "
+            "this does not establish every held unit is defective."
+        ),
+        "event_id": "inspection-a-sample-fail",
+        "evidence_ref": "synthetic:inspection-a-sample-fail",
+        "synthetic": True,
+        "lot": "LOT-A",
+        "quantity": 20,
+        "held_quantity": 20,
+        "scope": "SAMPLE",
+        "sample_quantity": 2,
+        "metric": "diameter_mm",
+        "measured": 10.4,
+        "criterion": {"minimum": 9.9, "maximum": 10.1},
+        "required_lot_quantity": 20,
+        "inspection_report_ref": "synthetic:qi-a-sample-fail",
+    }
+
+
 def test_failed_sample_holds_lot_without_calling_every_piece_defective_and_full_release_resumes(
     tmp_path: Path,
 ) -> None:
@@ -802,7 +1053,7 @@ def test_failed_sample_holds_lot_without_calling_every_piece_defective_and_full_
         if alert["code"] == "QUALITY_FAILED"
     )
     assert quality_alert["scope"] == "SAMPLE" and quality_alert["sample_quantity"] == 2
-    assert "defective" not in str(quality_alert).lower()
+    assert "does not establish every held unit is defective" in quality_alert["message"]
     released = service.record_event(
         _event(
             "inspection-a-release",
@@ -880,8 +1131,12 @@ def test_held_or_wrong_sku_input_never_creates_pick_or_delivery(tmp_path: Path) 
     wrong_sku = service.record_event(
         _arrival("arrival-wrong", lot="LOT-B", cartons=2, observed=20, item_code="OTHER-SKU")
     )
+    unknown_lot = service.record_event(
+        _arrival("arrival-unknown", lot="LOT-UNKNOWN", cartons=1, observed=10)
+    )
     assert "PICK_NOT_ELIGIBLE" in _codes(held_pick)
     assert "WRONG_SKU" in _codes(wrong_sku)
+    assert "UNKNOWN_LOT" in _codes(unknown_lot)
     assert not {kind for kind, _event_id, _operation in bridge.calls}.intersection(
         {"submit_pick", "submit_delivery_note", "create_shipment"}
     )
@@ -900,6 +1155,91 @@ def test_duplicate_event_replays_without_native_repeat_and_changed_payload_is_re
     with pytest.raises(DistributorEventConflict):
         service.record_event(changed)
     assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+
+
+def test_outbound_facts_deduplicate_reissued_pick_list_document_identity() -> None:
+    projection: dict[str, object] = {
+        "allocations": [
+            {
+                "customer_order": "SO10",
+                "requested_quantity": 15,
+                "status": "ALLOCATED",
+            }
+        ]
+    }
+    events: list[dict[str, object]] = [
+        {
+            "event_id": "picked-so10-b13-original",
+            "type": "picked",
+            "status": "APPLIED",
+            "customer_order": "SO10",
+            "quantity": 13,
+            "operations": [
+                {
+                    "kind": "submit_pick",
+                    "status": "APPLIED",
+                    "documents": [
+                        {"kind": "Pick List", "name": "MAT-PICK-00006", "status": "Submitted"}
+                    ],
+                }
+            ],
+        },
+        {
+            "event_id": "picked-so10-b13-continuation",
+            "type": "picked",
+            "status": "APPLIED",
+            "customer_order": "SO10",
+            "quantity": 13,
+            "operations": [
+                {
+                    "kind": "submit_pick",
+                    "status": "ALREADY_APPLIED",
+                    "documents": [
+                        {"kind": "Pick List", "name": "MAT-PICK-00006", "status": "Submitted"}
+                    ],
+                }
+            ],
+        },
+        {
+            "event_id": "picked-so10-c2",
+            "type": "picked",
+            "status": "APPLIED",
+            "customer_order": "SO10",
+            "quantity": 2,
+            "operations": [
+                {
+                    "kind": "submit_pick",
+                    "status": "APPLIED",
+                    "documents": [
+                        {"kind": "Pick List", "name": "MAT-PICK-00007", "status": "Submitted"}
+                    ],
+                }
+            ],
+        },
+        {
+            "event_id": "picked-so10-c2-blocked",
+            "type": "picked",
+            "status": "BLOCKED",
+            "customer_order": "SO10",
+            "quantity": 2,
+            "operations": [
+                {
+                    "kind": "submit_pick",
+                    "status": "BLOCKED",
+                    "documents": [
+                        {"kind": "Pick List", "name": "MAT-PICK-00008", "status": "Submitted"}
+                    ],
+                }
+            ],
+        },
+    ]
+
+    DistributorOperations._add_outbound_facts(projection, events, [])
+
+    allocation = cast(list[dict[str, object]], projection["allocations"])[0]
+    assert allocation["picked"] == 15
+    assert allocation["status"] == "PICKED"
+    assert [event["status"] for event in events] == ["APPLIED", "APPLIED", "APPLIED", "BLOCKED"]
 
 
 def test_unreconciled_current_source_holds_without_overwriting_local_case_facts(
@@ -999,6 +1339,56 @@ def test_http_projection_and_event_route_use_the_same_service(tmp_path: Path) ->
     )
     event_projection = cast(dict[str, object], sent[-1])["distributor_operations"]
     assert isinstance(event_projection, dict) and event_projection["quantities"]["received"] == 20
+
+
+def test_receive_reconciliation_admits_exact_submitted_receipt_without_replaying_event(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path)
+    bridge.statuses["receive_arrival"] = "UNKNOWN_OUTCOME"
+    retained = service.record_event(_arrival("arrival-a", lot="LOT-A", cartons=2, observed=20))
+    retained_quantities = cast(Mapping[str, object], retained["quantities"])
+    assert retained_quantities["received"] == 0
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+
+    bridge.source_override = _component_source_after_confirmed_arrival(bridge.config)
+    handler = cast(Any, object.__new__(DecisionWorkspaceHandler))
+    handler.server = SimpleNamespace(distributor_operations=service)
+    sent: list[object] = []
+    handler._send_json = lambda _status, value: sent.append(value)
+
+    handler._v1_post("/api/v1/distributor-operations/reconcile-receive", {"event_id": "arrival-a"})
+    reconciled = cast(dict[str, object], sent[-1])["distributor_operations"]
+    assert isinstance(reconciled, dict)
+    assert reconciled["quantities"]["received"] == reconciled["quantities"]["held"] == 20
+    lot_a = next(
+        row for row in cast(list[dict[str, object]], reconciled["lots"]) if row["lot"] == "LOT-A"
+    )
+    assert lot_a["expected_pack_quantity"] == 10
+    event = cast(list[dict[str, object]], reconciled["events"])[0]
+    assert event["status"] == "UNKNOWN_OUTCOME"
+    assert event["operations"] == [
+        {
+            "kind": "receive_arrival",
+            "status": "UNKNOWN_OUTCOME",
+            "documents": [],
+            "error_code": "ERP_UNAVAILABLE",
+        }
+    ]
+    reconciliations = cast(list[Mapping[str, object]], event["reconciliations"])
+    assert reconciliations[0]["status"] == "NATIVE_CONFIRMED"
+    alerts = cast(list[dict[str, object]], reconciled["alerts"])
+    unknown = next(alert for alert in alerts if alert["code"] == "NATIVE_OPERATION_UNKNOWN")
+    assert unknown["status"] == "RESOLVED"
+    assert "QUALITY_EVIDENCE_REQUIRED" in _codes(reconciled)
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+    assert bridge.reconcile_calls == [
+        ("arrival-a", _arrival("arrival-a", lot="LOT-A", cartons=2, observed=20))
+    ]
+
+    handler._v1_post("/api/v1/distributor-operations/reconcile-receive", {"event_id": "arrival-a"})
+    assert len(bridge.reconcile_calls) == 1
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
 
 
 def test_native_ask_packet_is_current_read_only_and_static_ui_files_are_allowed(

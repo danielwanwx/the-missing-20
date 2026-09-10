@@ -1,8 +1,8 @@
-"""Plan or provision the narrow synthetic R4 distributor follow-on.
+"""Plan or provision the narrow synthetic distributor demo scenarios.
 
-Use ``--mode execute --execute`` only after an independent review.  The script
-never touches the original R4 receipt/invoice; it creates a new scoped
-warehouse, customers and sales orders for the remaining 39 Box.
+Use ``--mode execute --execute`` only after an independent review.  The R4
+follow-on never touches the original R4 receipt/invoice.  The component case
+creates its own batched Nos item, PO, inspection warehouses and customer orders.
 """
 
 from __future__ import annotations
@@ -33,8 +33,21 @@ MARKER: Final = "M20 DIST R4 PO16 SYNTHETIC"
 SALES_RATE: Final = 75.0
 CUSTOMER_GROUP: Final = "Demo Customer Group"
 TERRITORY: Final = "United States"
+ITEM_GROUP: Final = "Demo Item Group"
 _ORDER_24: Final = "REQUIRES_PROVISION_CUSTOMER_ORDER_24"
 _ORDER_15: Final = "REQUIRES_PROVISION_CUSTOMER_ORDER_15"
+
+COMPONENT_CASE_ID: Final = "M20-DIST-COMPONENT-40"
+COMPONENT_MARKER: Final = "M20 DIST COMPONENT 40 SYNTHETIC"
+COMPONENT_ITEM: Final = "M20-DIST-COMPONENT-NOS"
+COMPONENT_PO_MARKER: Final = f"{COMPONENT_MARKER} PURCHASE ORDER"
+COMPONENT_SALES_RATE: Final = 6.0
+COMPONENT_UNIT_RATE: Final = 4.0
+COMPONENT_QUALITY_PARAMETER: Final = "M20 Distributor Diameter"
+COMPONENT_ACCEPTED_WAREHOUSE: Final = "M20 Distributor Component Accepted"
+COMPONENT_INSPECTION_WAREHOUSE: Final = "M20 Distributor Component Inspection"
+_COMPONENT_ORDER_25: Final = "REQUIRES_PROVISION_COMPONENT_ORDER_25"
+_COMPONENT_ORDER_15: Final = "REQUIRES_PROVISION_COMPONENT_ORDER_15"
 
 
 class ProvisioningBlocked(ValueError):
@@ -61,6 +74,12 @@ def _rows(payload: object) -> list[Mapping[str, object]]:
     if any(not isinstance(row, Mapping) for row in rows):
         raise ProvisioningBlocked("ERP returned an invalid list row")
     return list(rows)
+
+
+def _required_text(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ProvisioningBlocked(f"{label} has no stable text value")
+    return value
 
 
 def _find(
@@ -236,6 +255,124 @@ def _plan(po_item: Mapping[str, object], *, supplier: str, date: str) -> dict[st
     }
 
 
+def _component_plan(
+    *, supplier: str, date: str, purchase_order: str, purchase_order_item: str
+) -> dict[str, object]:
+    """Return the isolated batch-and-quality runtime config without a write."""
+
+    return {
+        "case_id": COMPONENT_CASE_ID,
+        "case_label": "Synthetic component count, inspection and release",
+        "synthetic_input": True,
+        "company": COMPANY,
+        "supplier": supplier,
+        "item_code": COMPONENT_ITEM,
+        "uom": "Nos",
+        "stock_uom": "Nos",
+        "expected_pack_quantity": 10,
+        "cartons": 5,
+        "purchase_order": purchase_order,
+        "purchase_order_item": purchase_order_item,
+        "marker": COMPONENT_MARKER,
+        "currency": "USD",
+        "unit_rate": COMPONENT_UNIT_RATE,
+        "warehouses": {
+            "accepted": "REQUIRES_PROVISION_COMPONENT_ACCEPTED_WAREHOUSE",
+            "quarantine": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
+        },
+        "receipt_plans": [
+            {
+                "lot": "LOT-A",
+                "marker": f"{COMPONENT_MARKER} LOT-A",
+                "quantity": 20,
+                "cartons": 2,
+                "expected_pack_quantity": 10,
+                "warehouse": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
+                "batch_no": "M20-DIST-COMP-BATCH-A",
+            },
+            {
+                "lot": "LOT-B",
+                "marker": f"{COMPONENT_MARKER} LOT-B",
+                "quantity": 18,
+                "cartons": 2,
+                "expected_pack_quantity": 10,
+                "warehouse": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
+                "batch_no": "M20-DIST-COMP-BATCH-B",
+            },
+            {
+                "lot": "LOT-C",
+                "marker": f"{COMPONENT_MARKER} LOT-C REPLACEMENT",
+                "quantity": 2,
+                "cartons": 1,
+                "expected_pack_quantity": 2,
+                "warehouse": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
+                "batch_no": "M20-DIST-COMP-BATCH-C",
+            },
+        ],
+        "lots": [
+            {
+                "lot": "LOT-A",
+                "expected_quantity": 20,
+                "cartons": 2,
+                "expected_pack_quantity": 10,
+            },
+            {
+                "lot": "LOT-B",
+                "expected_quantity": 18,
+                "cartons": 2,
+                "expected_pack_quantity": 10,
+            },
+            {
+                "lot": "LOT-C",
+                "expected_quantity": 2,
+                "cartons": 1,
+                "expected_pack_quantity": 2,
+                "replacement_for_lot": "LOT-B",
+            },
+        ],
+        "allocations": [
+            {"customer_order": _COMPONENT_ORDER_25, "requested_quantity": 25, "priority": 1},
+            {"customer_order": _COMPONENT_ORDER_15, "requested_quantity": 15, "priority": 2},
+        ],
+        "customer_orders": [_COMPONENT_ORDER_25, _COMPONENT_ORDER_15],
+        "pick_tranches": [
+            {"customer_order": _COMPONENT_ORDER_25, "lot": "LOT-A", "quantity": 20},
+            {"customer_order": _COMPONENT_ORDER_25, "lot": "LOT-B", "quantity": 5},
+            {"customer_order": _COMPONENT_ORDER_15, "lot": "LOT-B", "quantity": 13},
+            {"customer_order": _COMPONENT_ORDER_15, "lot": "LOT-C", "quantity": 2},
+        ],
+        "policy": {
+            "inspection_required": True,
+            "reservation_supported": False,
+            "inspection_criteria": {"diameter_mm": {"minimum": 9.9, "maximum": 10.1}},
+        },
+        "quality_parameters": {"diameter_mm": COMPONENT_QUALITY_PARAMETER},
+        "shipping": {
+            "native_read_enabled": True,
+            "shipments": {
+                _COMPONENT_ORDER_25: {
+                    "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-25",
+                    "pickup_address": "REQUIRES_PROVISION_COMPONENT_PICKUP_ADDRESS",
+                    "delivery_address": "REQUIRES_PROVISION_COMPONENT_DELIVERY_ADDRESS_25",
+                    "pickup_date": date,
+                    "pickup_from": "09:00:00",
+                    "pickup_to": "17:00:00",
+                    "parcel_weight": 1,
+                },
+                _COMPONENT_ORDER_15: {
+                    "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-15",
+                    "pickup_address": "REQUIRES_PROVISION_COMPONENT_PICKUP_ADDRESS",
+                    "delivery_address": "REQUIRES_PROVISION_COMPONENT_DELIVERY_ADDRESS_15",
+                    "pickup_date": date,
+                    "pickup_from": "09:00:00",
+                    "pickup_to": "17:00:00",
+                    "parcel_weight": 1,
+                },
+            },
+        },
+    }
+
+
 def _warehouse(client: ERPNextDemoExecutor, *, name: str) -> Mapping[str, object]:
     return _single_or_create(
         client,
@@ -275,6 +412,83 @@ def _customer(client: ERPNextDemoExecutor, *, name: str) -> Mapping[str, object]
             and document.get("territory") == TERRITORY
             and document.get("disabled") in (0, False, None)
         ),
+    )
+
+
+def _component_item(client: ERPNextDemoExecutor) -> Mapping[str, object]:
+    return _single_or_create(
+        client,
+        doctype="Item",
+        lookup_field="item_code",
+        lookup_value=COMPONENT_ITEM,
+        payload={
+            "doctype": "Item",
+            "item_code": COMPONENT_ITEM,
+            "item_name": "M20 synthetic batched component",
+            "description": (
+                f"{COMPONENT_MARKER}; inbound stock is held in the inspection warehouse "
+                "until a native whole-lot quality release."
+            ),
+            "item_group": ITEM_GROUP,
+            "stock_uom": "Nos",
+            "is_stock_item": 1,
+            "is_purchase_item": 1,
+            "is_sales_item": 1,
+            "has_batch_no": 1,
+            "create_new_batch": 0,
+            "inspection_required_before_purchase": 0,
+            "inspection_required_before_delivery": 0,
+        },
+        verify=lambda document: (
+            document.get("item_code") == COMPONENT_ITEM
+            and document.get("item_group") == ITEM_GROUP
+            and document.get("stock_uom") == "Nos"
+            and document.get("is_stock_item") in (1, True)
+            and document.get("is_purchase_item") in (1, True)
+            and document.get("is_sales_item") in (1, True)
+            and document.get("has_batch_no") in (1, True)
+            and document.get("create_new_batch") in (0, False, None)
+            and document.get("inspection_required_before_purchase") in (0, False, None)
+            and document.get("inspection_required_before_delivery") in (0, False, None)
+        ),
+    )
+
+
+def _component_batch(
+    client: ERPNextDemoExecutor, *, batch_id: str, item_code: str, description: str, date: str
+) -> Mapping[str, object]:
+    return _single_or_create(
+        client,
+        doctype="Batch",
+        lookup_field="batch_id",
+        lookup_value=batch_id,
+        payload={
+            "doctype": "Batch",
+            "batch_id": batch_id,
+            "item": item_code,
+            "manufacturing_date": date,
+            "description": description,
+        },
+        verify=lambda document: (
+            document.get("batch_id") == batch_id
+            and document.get("item") == item_code
+            and document.get("disabled") in (0, False, None)
+        ),
+    )
+
+
+def _component_quality_parameter(client: ERPNextDemoExecutor) -> Mapping[str, object]:
+    return _single_or_create(
+        client,
+        doctype="Quality Inspection Parameter",
+        lookup_field="parameter",
+        lookup_value=COMPONENT_QUALITY_PARAMETER,
+        payload={
+            "doctype": "Quality Inspection Parameter",
+            "parameter": COMPONENT_QUALITY_PARAMETER,
+            "description": "Synthetic component diameter in millimetres for the M20 demo.",
+        },
+        verify=lambda document: document.get("parameter") == COMPONENT_QUALITY_PARAMETER,
     )
 
 
@@ -338,11 +552,15 @@ def _sales_order(
     quantity: int,
     priority: int,
     date: str,
+    item_code: str = ITEM,
+    uom: str = "Box",
+    marker_prefix: str = MARKER,
+    unit_rate: float = SALES_RATE,
 ) -> Mapping[str, object]:
     customer_name = customer.get("name")
     if not isinstance(customer_name, str) or not customer_name:
         raise ProvisioningBlocked("customer has no stable ERP identity")
-    marker = f"{MARKER} CUSTOMER-{priority}"
+    marker = f"{marker_prefix} CUSTOMER-{priority}"
 
     def matches(document: Mapping[str, object]) -> bool:
         items = document.get("items")
@@ -353,10 +571,13 @@ def _sales_order(
             and isinstance(items, list)
             and len(items) == 1
             and isinstance(items[0], Mapping)
-            and items[0].get("item_code") == ITEM
+            and items[0].get("item_code") == item_code
             and items[0].get("qty") == quantity
-            and items[0].get("uom") == "Box"
+            and items[0].get("uom") == uom
+            and items[0].get("stock_uom") == uom
+            and items[0].get("conversion_factor") == 1
             and items[0].get("warehouse") == warehouse
+            and items[0].get("rate") == unit_rate
         )
 
     document = _single_or_create(
@@ -377,14 +598,14 @@ def _sales_order(
             "po_no": marker,
             "items": [
                 {
-                    "item_code": ITEM,
+                    "item_code": item_code,
                     "description": marker,
                     "qty": quantity,
-                    "uom": "Box",
-                    "stock_uom": "Box",
+                    "uom": uom,
+                    "stock_uom": uom,
                     "conversion_factor": 1,
                     "warehouse": warehouse,
-                    "rate": SALES_RATE,
+                    "rate": unit_rate,
                     "delivery_date": date,
                 }
             ],
@@ -392,6 +613,130 @@ def _sales_order(
         verify=matches,
     )
     return _submit(client, document) if document.get("docstatus") == 0 else document
+
+
+def _component_purchase_order(
+    client: ERPNextDemoExecutor, *, supplier: str, inspection_warehouse: str, date: str
+) -> tuple[Mapping[str, object], Mapping[str, object]]:
+    """Create or verify the one explicitly marked component PO.
+
+    The deployed tenant does not expose a reliable PO remarks field, so parent
+    discovery is bounded by the verified company/supplier and each candidate is
+    reread before its item-row marker is trusted.
+    """
+
+    def candidates() -> list[Mapping[str, object]]:
+        query = urlencode(
+            {
+                "fields": json.dumps(["name", "docstatus"]),
+                "filters": json.dumps([["company", "=", COMPANY], ["supplier", "=", supplier]]),
+                "limit_page_length": "50",
+                "order_by": "creation asc",
+            }
+        )
+        rows = _rows(_request(client, f"/api/resource/Purchase%20Order?{query}"))
+        if len(rows) >= 50:
+            raise ProvisioningBlocked("component PO discovery is incomplete")
+        documents = [
+            _document(client, "Purchase Order", _required_text(row.get("name"), "component PO row"))
+            for row in rows
+        ]
+        matches: list[Mapping[str, object]] = []
+        for document in documents:
+            items = document.get("items")
+            if not isinstance(items, list):
+                raise ProvisioningBlocked("component PO has no item rows")
+            component_rows = [
+                row
+                for row in items
+                if isinstance(row, Mapping) and row.get("item_code") == COMPONENT_ITEM
+            ]
+            if not component_rows:
+                continue
+            if (
+                len(component_rows) != 1
+                or component_rows[0].get("description") != COMPONENT_PO_MARKER
+            ):
+                raise ProvisioningBlocked("component item already belongs to an unverified PO")
+            matches.append(document)
+        if len(matches) > 1:
+            raise ProvisioningBlocked("ambiguous existing component PO")
+        return matches
+
+    def line_for(order: Mapping[str, object]) -> Mapping[str, object]:
+        items = order.get("items")
+        if not isinstance(items, list):
+            raise ProvisioningBlocked("component PO has no item rows")
+        lines = [
+            row
+            for row in items
+            if isinstance(row, Mapping)
+            and row.get("item_code") == COMPONENT_ITEM
+            and row.get("description") == COMPONENT_PO_MARKER
+        ]
+        if len(lines) != 1:
+            raise ProvisioningBlocked("component PO does not have one marked item row")
+        line = lines[0]
+        if (
+            order.get("company") != COMPANY
+            or order.get("supplier") != supplier
+            or order.get("currency") != "USD"
+            or line.get("qty") != 40
+            or line.get("uom") != "Nos"
+            or line.get("stock_uom") != "Nos"
+            or line.get("conversion_factor") != 1
+            or line.get("rate") != COMPONENT_UNIT_RATE
+            or line.get("warehouse") != inspection_warehouse
+            or not isinstance(line.get("name"), str)
+        ):
+            raise ProvisioningBlocked("component PO differs from the authorized fixture")
+        return line
+
+    matches = candidates()
+    if not matches:
+        response = _request(
+            client,
+            "/api/resource/Purchase%20Order",
+            method="POST",
+            payload={
+                "doctype": "Purchase Order",
+                "company": COMPANY,
+                "supplier": supplier,
+                "currency": "USD",
+                "conversion_rate": 1,
+                "transaction_date": date,
+                "schedule_date": date,
+                "items": [
+                    {
+                        "item_code": COMPONENT_ITEM,
+                        "description": COMPONENT_PO_MARKER,
+                        "qty": 40,
+                        "uom": "Nos",
+                        "stock_uom": "Nos",
+                        "conversion_factor": 1,
+                        "rate": COMPONENT_UNIT_RATE,
+                        "warehouse": inspection_warehouse,
+                        "schedule_date": date,
+                    }
+                ],
+            },
+        )
+        if not isinstance(response, Mapping) or not isinstance(response.get("data"), Mapping):
+            raise ProvisioningBlocked("unknown component PO insert outcome; inspect before rerun")
+        matches = candidates()
+        if len(matches) != 1:
+            raise ProvisioningBlocked("component PO insert could not be uniquely reread")
+    order = matches[0]
+    if order.get("docstatus") == 2:
+        raise ProvisioningBlocked("component PO is cancelled; inspect before a new write")
+    line_for(order)
+    submitted = _submit(client, order) if order.get("docstatus") == 0 else order
+    if submitted.get("docstatus") != 1:
+        raise ProvisioningBlocked("component PO is not submitted")
+    reread = _document(
+        client, "Purchase Order", _required_text(submitted.get("name"), "component PO name")
+    )
+    return reread, line_for(reread)
 
 
 def provision_r4(client: ERPNextDemoExecutor, *, date: str) -> dict[str, object]:
@@ -510,6 +855,166 @@ def provision_r4(client: ERPNextDemoExecutor, *, date: str) -> dict[str, object]
     return config
 
 
+def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, object]:
+    """Provision the isolated batched component case and return its exact config."""
+
+    if client._environment != "demo":
+        raise ProvisioningBlocked("writes require MISSING20_ENVIRONMENT=demo")
+    reference_order, _ = _po_line(client)
+    supplier = _required_text(reference_order.get("supplier"), "PO16 supplier")
+
+    item = _component_item(client)
+    item_name = _required_text(item.get("name"), "component item")
+    accepted = _warehouse(client, name=COMPONENT_ACCEPTED_WAREHOUSE)
+    inspection = _warehouse(client, name=COMPONENT_INSPECTION_WAREHOUSE)
+    accepted_name = _required_text(accepted.get("name"), "component accepted warehouse")
+    inspection_name = _required_text(inspection.get("name"), "component inspection warehouse")
+    parameter = _component_quality_parameter(client)
+    if parameter.get("parameter") != COMPONENT_QUALITY_PARAMETER:
+        raise ProvisioningBlocked(
+            "component quality parameter does not match the configured metric"
+        )
+    batches = {
+        lot: _component_batch(
+            client,
+            batch_id=batch_id,
+            item_code=item_name,
+            description=f"{COMPONENT_MARKER} {lot}",
+            date=date,
+        )
+        for lot, batch_id in {
+            "LOT-A": "M20-DIST-COMP-BATCH-A",
+            "LOT-B": "M20-DIST-COMP-BATCH-B",
+            "LOT-C": "M20-DIST-COMP-BATCH-C",
+        }.items()
+    }
+    batch_names = {
+        lot: _required_text(batch.get("name"), f"component {lot} batch")
+        for lot, batch in batches.items()
+    }
+    purchase_order, po_item = _component_purchase_order(
+        client,
+        supplier=supplier,
+        inspection_warehouse=inspection_name,
+        date=date,
+    )
+    config = _component_plan(
+        supplier=supplier,
+        date=date,
+        purchase_order=_required_text(purchase_order.get("name"), "component PO"),
+        purchase_order_item=_required_text(po_item.get("name"), "component PO item"),
+    )
+    config["warehouses"] = {"accepted": accepted_name, "quarantine": inspection_name}
+    plans = cast(list[dict[str, object]], config["receipt_plans"])
+    for plan in plans:
+        lot = _required_text(plan.get("lot"), "component receipt plan lot")
+        plan["warehouse"] = inspection_name
+        plan["batch_no"] = batch_names[lot]
+
+    customer_25 = _customer(client, name="M20 Component Customer 25")
+    customer_15 = _customer(client, name="M20 Component Customer 15")
+    order_25 = _sales_order(
+        client,
+        customer=customer_25,
+        warehouse=accepted_name,
+        quantity=25,
+        priority=1,
+        date=date,
+        item_code=item_name,
+        uom="Nos",
+        marker_prefix=COMPONENT_MARKER,
+        unit_rate=COMPONENT_SALES_RATE,
+    )
+    order_15 = _sales_order(
+        client,
+        customer=customer_15,
+        warehouse=accepted_name,
+        quantity=15,
+        priority=2,
+        date=date,
+        item_code=item_name,
+        uom="Nos",
+        marker_prefix=COMPONENT_MARKER,
+        unit_rate=COMPONENT_SALES_RATE,
+    )
+    customer_25_name = _required_text(customer_25.get("name"), "component customer 25")
+    customer_15_name = _required_text(customer_15.get("name"), "component customer 15")
+    order_25_name = _required_text(order_25.get("name"), "component order 25")
+    order_15_name = _required_text(order_15.get("name"), "component order 15")
+    pickup = _address(
+        client,
+        title="M20 Component Pickup",
+        link_doctype="Company",
+        link_name=COMPANY,
+    )
+    delivery_25 = _address(
+        client,
+        title="M20 Component Customer 25",
+        link_doctype="Customer",
+        link_name=customer_25_name,
+    )
+    delivery_15 = _address(
+        client,
+        title="M20 Component Customer 15",
+        link_doctype="Customer",
+        link_name=customer_15_name,
+    )
+    contact_25 = _contact(
+        client,
+        first_name="M20 Component Contact 25",
+        customer_name=customer_25_name,
+        email="m20-component-25@example.invalid",
+    )
+    contact_15 = _contact(
+        client,
+        first_name="M20 Component Contact 15",
+        customer_name=customer_15_name,
+        email="m20-component-15@example.invalid",
+    )
+    pickup_name = _required_text(pickup.get("name"), "component pickup address")
+    delivery_25_name = _required_text(delivery_25.get("name"), "component delivery 25 address")
+    delivery_15_name = _required_text(delivery_15.get("name"), "component delivery 15 address")
+    contact_25_name = _required_text(contact_25.get("name"), "component contact 25")
+    contact_15_name = _required_text(contact_15.get("name"), "component contact 15")
+    config["allocations"] = [
+        {"customer_order": order_25_name, "requested_quantity": 25, "priority": 1},
+        {"customer_order": order_15_name, "requested_quantity": 15, "priority": 2},
+    ]
+    config["customer_orders"] = [order_25_name, order_15_name]
+    config["pick_tranches"] = [
+        {"customer_order": order_25_name, "lot": "LOT-A", "quantity": 20},
+        {"customer_order": order_25_name, "lot": "LOT-B", "quantity": 5},
+        {"customer_order": order_15_name, "lot": "LOT-B", "quantity": 13},
+        {"customer_order": order_15_name, "lot": "LOT-C", "quantity": 2},
+    ]
+    config["shipping"] = {
+        "native_read_enabled": True,
+        "shipments": {
+            order_25_name: {
+                "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-25",
+                "pickup_address": pickup_name,
+                "delivery_address": delivery_25_name,
+                "delivery_contact": contact_25_name,
+                "pickup_date": date,
+                "pickup_from": "09:00:00",
+                "pickup_to": "17:00:00",
+                "parcel_weight": 1,
+            },
+            order_15_name: {
+                "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-15",
+                "pickup_address": pickup_name,
+                "delivery_address": delivery_15_name,
+                "delivery_contact": contact_15_name,
+                "pickup_date": date,
+                "pickup_from": "09:00:00",
+                "pickup_to": "17:00:00",
+                "parcel_weight": 1,
+            },
+        },
+    }
+    return config
+
+
 def _write_private(path: Path, value: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -527,6 +1032,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("dry", "read", "execute"), default="dry")
     parser.add_argument(
+        "--scenario",
+        choices=("r4-follow-on", "component-quality"),
+        default="r4-follow-on",
+    )
+    parser.add_argument(
         "--execute", action="store_true", help="required together with --mode execute"
     )
     parser.add_argument("--output", type=Path, required=True)
@@ -538,19 +1048,30 @@ def main() -> int:
     if args.execute and args.mode != "execute":
         raise ProvisioningBlocked("--execute is valid only with --mode execute")
     if args.mode == "dry":
-        template = _plan(
-            {"name": "REQUIRES_READ_PO16_ITEM"},
-            supplier="REQUIRES_READ_PO16_SUPPLIER",
-            date=args.date,
-        )
+        if args.scenario == "r4-follow-on":
+            template = _plan(
+                {"name": "REQUIRES_READ_PO16_ITEM"},
+                supplier="REQUIRES_READ_PO16_SUPPLIER",
+                date=args.date,
+            )
+            unresolved_source_fields = ["supplier", "purchase_order_item"]
+        else:
+            template = _component_plan(
+                supplier="REQUIRES_READ_PO16_SUPPLIER",
+                date=args.date,
+                purchase_order="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER",
+                purchase_order_item="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER_ITEM",
+            )
+            unresolved_source_fields = ["supplier"]
         value: dict[str, object] = {
             "mode": "dry",
             "write_authorized": False,
-            "scenario": "r4-follow-on",
+            "scenario": args.scenario,
             "config_template": template,
-            "unresolved_source_fields": ["supplier", "purchase_order_item"],
+            "unresolved_source_fields": unresolved_source_fields,
             "unresolved_provisioned_fields": [
                 "warehouses",
+                "purchase_order",
                 "customer_orders",
                 "shipping.shipments",
             ],
@@ -565,20 +1086,36 @@ def main() -> int:
             supplier = order.get("supplier")
             if not isinstance(supplier, str) or not supplier:
                 raise ProvisioningBlocked("PO16 has no authoritative supplier")
+            if args.scenario == "r4-follow-on":
+                config_plan = _plan(po_item, supplier=supplier, date=args.date)
+                purchase_order_item: object = po_item["name"]
+            else:
+                config_plan = _component_plan(
+                    supplier=supplier,
+                    date=args.date,
+                    purchase_order="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER",
+                    purchase_order_item="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER_ITEM",
+                )
+                purchase_order_item = None
             value = {
                 "mode": "read",
                 "write_authorized": False,
-                "scenario": "r4-follow-on",
-                "purchase_order_item": po_item["name"],
-                "config_plan": _plan(po_item, supplier=supplier, date=args.date),
+                "scenario": args.scenario,
+                "purchase_order_item": purchase_order_item,
+                "config_plan": config_plan,
             }
         else:
+            config = (
+                provision_r4(client, date=args.date)
+                if args.scenario == "r4-follow-on"
+                else provision_component(client, date=args.date)
+            )
             value = {
                 "mode": "execute",
                 "write_authorized": True,
                 "executed_at": datetime.now(UTC).isoformat(),
-                "scenario": "r4-follow-on",
-                "config": provision_r4(client, date=args.date),
+                "scenario": args.scenario,
+                "config": config,
             }
     _write_private(args.output, value)
     print(json.dumps({"mode": value["mode"], "output": str(args.output)}))

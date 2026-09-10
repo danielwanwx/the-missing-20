@@ -793,12 +793,23 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
     documents = projection.get("documents")
     shipments = projection.get("shipments")
     parent_purchase_order = projection.get("parent_purchase_order")
+    quality_policy = projection.get("quality_policy")
+    alerts = projection.get("alerts")
     if not all(
         isinstance(value, (Mapping, list)) for value in (quantities, lots, allocations, documents)
     ) or not isinstance(shipments, list):
         raise ValueError("distributor conversation lacks current source facts")
     events = projection.get("events")
     retained_events = events[-12:] if isinstance(events, list) else []
+    active_alerts = (
+        [
+            dict(alert)
+            for alert in alerts
+            if isinstance(alert, Mapping) and alert.get("status") == "OPEN"
+        ]
+        if isinstance(alerts, list)
+        else []
+    )
     synthetic_input = projection.get("synthetic_input")
     recorded_events = (
         "Arrival, pickup, and delivery are recorded synthetic test events; they are not "
@@ -821,6 +832,18 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
         "shipments": shipments,
         "event_provenance": {
             "recorded_events": recorded_events,
+            "quantity_evidence": (
+                "Carton and inner counts establish recorded quantities and any observed "
+                "discrepancy; they do not establish its cause or responsible party."
+            ),
+            "attribution_evidence": (
+                "This packet contains no supplier packing verification or transit/custody "
+                "investigation establishing attribution for that discrepancy."
+            ),
+            "inspection_evidence": (
+                "Quality Inspection records are declared report measurements and stated coverage; "
+                "they are not independent physical tests performed by the agent."
+            ),
             "native_inventory_accounting": (
                 "Native Purchase Order received quantities, Purchase Receipts, and Stock Ledger "
                 "Entries support inventory accounting only; they do not prove carrier pickup or "
@@ -850,6 +873,14 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
                         "Answer only from current source facts. Do not process events or write."
                     ),
                     "retained_event_count": len(retained_events),
+                    "quality_policy": dict(quality_policy)
+                    if isinstance(quality_policy, Mapping)
+                    else {},
+                    "active_alerts": active_alerts,
+                    "quality_interpretation": (
+                        "A sample failure can hold a lot conservatively; it does not prove every "
+                        "held unit is defective."
+                    ),
                 },
                 "read_erp_evidence": erp_facts,
                 "read_airtable_evidence": dict(unavailable),
@@ -1584,6 +1615,15 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             action = route.removeprefix(distributor_prefix)
             if action == "events":
                 result = operations.record_event(payload)
+            elif action == "reconcile-receive":
+                event_id = payload.get("event_id")
+                if set(payload) != {"event_id"} or not isinstance(event_id, str):
+                    raise APIRequestError(
+                        HTTPStatus.BAD_REQUEST,
+                        "invalid_distributor_operations_request",
+                        "reconcile-receive accepts only an event_id",
+                    )
+                result = operations.reconcile_receive_arrival(event_id)
             elif action == "ask":
                 question = payload.get("question")
                 if set(payload) != {"question"} or not isinstance(question, str):
@@ -2044,6 +2084,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             "/api/v1/agent-platform/normal-billing/execute",
             "/api/v1/agent-platform/normal-billing/reconcile",
             "/api/v1/distributor-operations/events",
+            "/api/v1/distributor-operations/reconcile-receive",
             "/api/v1/distributor-operations/ask",
         }
         if route not in allowed_routes and not route.startswith("/api/v1/incidents/"):

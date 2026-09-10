@@ -83,6 +83,20 @@ def _quantity(value: object, code: str, *, positive: bool = False) -> float:
     return result
 
 
+def _reading_quantity(value: object, code: str) -> float:
+    """Read ERPNext's numeric Quality Inspection Data field without widening config input."""
+
+    if isinstance(value, str):
+        try:
+            parsed = float(value.strip())
+        except ValueError as error:
+            raise _ScopeError(code) from error
+        if not math.isfinite(parsed) or parsed < 0:
+            raise _ScopeError(code)
+        return parsed
+    return _quantity(value, code)
+
+
 def _equal(left: object, right: object) -> bool:
     if (
         isinstance(left, bool)
@@ -162,6 +176,66 @@ class DistributorERP:
             return self._unavailable(config, "ERP_READ_FAILED")
         except (OSError, TypeError, ValueError):
             return self._unavailable(config, "ERP_READ_FAILED")
+
+    def reconcile_receive_arrival(
+        self, config: Mapping[str, object], event: Mapping[str, object], event_id: str
+    ) -> Mapping[str, object]:
+        """Confirm one already-submitted, previously unknown arrival without writing.
+
+        This is deliberately narrower than ``apply_operation``: it can only
+        read the receipt already linked to an exact retained arrival event.  It
+        never creates, submits, or retries a native document.
+        """
+
+        operation: dict[str, object] = {"kind": "receive_arrival"}
+        try:
+            scope = self._scope(config)
+            identifier = _text(event_id, "EVENT_ID_INVALID")
+            arrival = _map(event, "ARRIVAL_EVENT_INVALID")
+            if arrival.get("type") != "arrival":
+                raise _ScopeError("RECEIVE_RECONCILIATION_EVENT_INVALID")
+            plan = self._plan(scope, arrival)
+            marker = _text(plan.get("marker"), "CONFIG_INVALID")
+            receipt = self._find("Purchase Receipt", "supplier_delivery_note", marker)
+            if receipt is None:
+                return self._result(
+                    operation,
+                    identifier,
+                    _BLOCKED,
+                    "RECEIPT_RECONCILIATION_NOT_FOUND",
+                )
+            if receipt.get("docstatus") != 1:
+                return self._result(
+                    operation,
+                    identifier,
+                    _BLOCKED,
+                    "RECEIPT_RECONCILIATION_NOT_SUBMITTED",
+                )
+            self._verify_receipt(scope, plan, receipt, submitted=True)
+            if receipt.get("remarks") != f"{scope['marker']} event {identifier}":
+                raise _ScopeError("RECEIPT_RECONCILIATION_EVENT_MISMATCH")
+            self._verify_receipt_ledger(scope, receipt)
+            snapshot = self.read_case(scope)
+            if snapshot.get("source_status") != "CURRENT":
+                return self._result(
+                    operation,
+                    identifier,
+                    "UNAVAILABLE",
+                    "ERP_SOURCE_UNAVAILABLE",
+                )
+            return self._result(
+                operation,
+                identifier,
+                _APPLIED,
+                documents=[self._public_document("Purchase Receipt", receipt)],
+                snapshot=snapshot,
+            )
+        except _ScopeError as error:
+            return self._result(operation, event_id, _BLOCKED, error.code)
+        except DemoExecutionBlocked:
+            return self._result(operation, event_id, "UNAVAILABLE", "ERP_READ_FAILED")
+        except (OSError, TypeError, ValueError):
+            return self._result(operation, event_id, "UNAVAILABLE", "ERP_READ_FAILED")
 
     def apply_operation(
         self, config: Mapping[str, object], operation: Mapping[str, object], event_id: str
@@ -278,6 +352,24 @@ class DistributorERP:
             policy.get("reservation_supported"), bool
         ):
             raise _ScopeError("CONFIG_INVALID")
+        if policy["inspection_required"]:
+            criteria = _map(policy.get("inspection_criteria"), "CONFIG_INVALID")
+            parameters = _map(scope.get("quality_parameters"), "CONFIG_INVALID")
+            if not criteria or set(criteria) != set(parameters):
+                raise _ScopeError("CONFIG_INVALID")
+            for metric, bounds in criteria.items():
+                _text(metric, "CONFIG_INVALID")
+                _text(parameters.get(metric), "CONFIG_INVALID")
+                values = _map(bounds, "CONFIG_INVALID")
+                minimum = _quantity(values.get("minimum"), "CONFIG_INVALID")
+                maximum = _quantity(values.get("maximum"), "CONFIG_INVALID")
+                if minimum > maximum:
+                    raise _ScopeError("CONFIG_INVALID")
+        elif (
+            policy.get("inspection_criteria") is not None
+            or scope.get("quality_parameters") is not None
+        ):
+            raise _ScopeError("CONFIG_INVALID")
         if not _rows(scope.get("receipt_plans"), "CONFIG_INVALID"):
             raise _ScopeError("CONFIG_INVALID")
         lots = _rows(scope.get("lots"), "CONFIG_INVALID")
@@ -313,6 +405,13 @@ class DistributorERP:
                 plan is None
                 or not _equal(configured_lot.get("expected_quantity"), plan.get("quantity"))
                 or not _equal(configured_lot.get("cartons"), plan.get("cartons"))
+                or (
+                    policy["inspection_required"]
+                    and not _equal(
+                        configured_lot.get("expected_pack_quantity"),
+                        plan.get("expected_pack_quantity"),
+                    )
+                )
             ):
                 raise _ScopeError("CONFIG_INVALID")
         seen_tranches: set[tuple[str, str, float]] = set()
@@ -350,6 +449,19 @@ class DistributorERP:
 
     def _request(self, path: str, *, method: str = "GET", payload: object | None = None) -> object:
         return self._executor._request(path, method=method, payload=payload)
+
+    def _authenticated_erp_identity(self) -> str:
+        response = _map(
+            self._request("/api/method/frappe.auth.get_logged_user"),
+            "ERP_IDENTITY_UNAVAILABLE",
+        )
+        identity = response.get("message")
+        if not isinstance(identity, str) or not identity.strip():
+            raise _ScopeError("ERP_IDENTITY_INVALID")
+        identity = identity.strip()
+        if identity.lower() == "guest":
+            raise _ScopeError("ERP_IDENTITY_INVALID")
+        return identity
 
     def _document(self, doctype: str, name: str) -> Mapping[str, object]:
         return _map(self._executor._document(doctype, name), "SOURCE_SCHEMA_MISMATCH")
@@ -408,24 +520,64 @@ class DistributorERP:
 
     def _plans(self, scope: Mapping[str, object]) -> list[Mapping[str, object]]:
         warehouse = _map(scope["warehouses"], "CONFIG_INVALID")
-        valid_warehouses = {
-            _text(warehouse.get("accepted"), "CONFIG_INVALID"),
-            _text(warehouse.get("quarantine"), "CONFIG_INVALID"),
-        }
+        accepted = _text(warehouse.get("accepted"), "CONFIG_INVALID")
+        quarantine = _text(warehouse.get("quarantine"), "CONFIG_INVALID")
+        valid_warehouses = {accepted, quarantine}
         expected_pack = _quantity(scope["expected_pack_quantity"], "CONFIG_INVALID", positive=True)
+        quality_case = self._inspection_required(scope)
         plans = _rows(scope.get("receipt_plans"), "CONFIG_INVALID")
         markers: set[str] = set()
+        total_cartons = 0.0
         for plan in plans:
             marker = _text(plan.get("marker"), "CONFIG_INVALID")
             _text(plan.get("lot"), "CONFIG_INVALID")
-            _quantity(plan.get("quantity"), "CONFIG_INVALID", positive=True)
-            _quantity(plan.get("cartons"), "CONFIG_INVALID", positive=True)
+            quantity = _quantity(plan.get("quantity"), "CONFIG_INVALID", positive=True)
+            cartons = _quantity(plan.get("cartons"), "CONFIG_INVALID", positive=True)
+            plan_pack = _quantity(
+                plan.get("expected_pack_quantity"), "CONFIG_INVALID", positive=True
+            )
             if marker in markers or plan.get("warehouse") not in valid_warehouses:
                 raise _ScopeError("CONFIG_INVALID")
-            if not _equal(plan.get("expected_pack_quantity"), expected_pack):
+            if not quality_case and not _equal(plan_pack, expected_pack):
                 raise _ScopeError("PACK_QUANTITY_MISMATCH")
+            if quantity > cartons * plan_pack:
+                raise _ScopeError("PACK_CAPACITY_MISMATCH")
+            if quality_case:
+                if plan.get("warehouse") != quarantine:
+                    raise _ScopeError("QUALITY_RECEIPT_WAREHOUSE_MISMATCH")
+                _text(plan.get("batch_no"), "CONFIG_INVALID")
             markers.add(marker)
+            total_cartons += cartons
+        if not _equal(total_cartons, scope.get("cartons")):
+            raise _ScopeError("CONFIG_INVALID")
         return plans
+
+    @staticmethod
+    def _inspection_required(scope: Mapping[str, object]) -> bool:
+        return _map(scope.get("policy"), "CONFIG_INVALID").get("inspection_required") is True
+
+    def _plan_batch(self, scope: Mapping[str, object], plan: Mapping[str, object]) -> str | None:
+        if not self._inspection_required(scope):
+            return None
+        return _text(plan.get("batch_no"), "CONFIG_INVALID")
+
+    @staticmethod
+    def _quality_criterion(scope: Mapping[str, object], metric: object) -> Mapping[str, object]:
+        metric_name = _text(metric, "QUALITY_CRITERION_MISMATCH")
+        policy = _map(scope.get("policy"), "CONFIG_INVALID")
+        criteria = _map(policy.get("inspection_criteria"), "CONFIG_INVALID")
+        criterion = _map(criteria.get(metric_name), "QUALITY_CRITERION_MISMATCH")
+        minimum = _quantity(criterion.get("minimum"), "QUALITY_CRITERION_MISMATCH")
+        maximum = _quantity(criterion.get("maximum"), "QUALITY_CRITERION_MISMATCH")
+        if minimum > maximum:
+            raise _ScopeError("QUALITY_CRITERION_MISMATCH")
+        return criterion
+
+    @staticmethod
+    def _quality_parameter(scope: Mapping[str, object], metric: object) -> str:
+        metric_name = _text(metric, "QUALITY_CRITERION_MISMATCH")
+        parameters = _map(scope.get("quality_parameters"), "CONFIG_INVALID")
+        return _text(parameters.get(metric_name), "QUALITY_CRITERION_MISMATCH")
 
     def _tranches(self, scope: Mapping[str, object]) -> list[Mapping[str, object]]:
         return _rows(scope.get("pick_tranches"), "CONFIG_INVALID")
@@ -560,6 +712,126 @@ class DistributorERP:
             documents.append(document)
         return documents
 
+    def _quality_transfers(self, scope: Mapping[str, object]) -> list[Mapping[str, object]]:
+        if not self._inspection_required(scope):
+            return []
+        prefix = f"{_text(scope.get('marker'), 'CONFIG_INVALID')} quality "
+        documents: list[Mapping[str, object]] = []
+        for name in self._query("Stock Entry", [["remarks", "like", f"{prefix}%"]]):
+            document = self._document("Stock Entry", name)
+            remarks = _text(document.get("remarks"), "QUALITY_TRANSFER_SCOPE_MISMATCH")
+            if not remarks.startswith(prefix):
+                raise _ScopeError("QUALITY_TRANSFER_SCOPE_MISMATCH")
+            self._quality_transfer_plan(scope, document)
+            documents.append(document)
+        return documents
+
+    def _quality_transfer_plan(
+        self, scope: Mapping[str, object], transfer: Mapping[str, object]
+    ) -> Mapping[str, object]:
+        if (
+            transfer.get("company") != scope.get("company")
+            or transfer.get("purpose") != "Material Transfer"
+        ):
+            raise _ScopeError("QUALITY_TRANSFER_SCOPE_MISMATCH")
+        items = [
+            row
+            for row in _rows(transfer.get("items"), "QUALITY_TRANSFER_SCOPE_MISMATCH")
+            if row.get("item_code") == scope.get("item_code")
+        ]
+        if len(items) != 1:
+            raise _ScopeError("QUALITY_TRANSFER_SCOPE_MISMATCH")
+        item = items[0]
+        batch_no = _text(item.get("batch_no"), "QUALITY_TRANSFER_SCOPE_MISMATCH")
+        matches = [plan for plan in self._plans(scope) if self._plan_batch(scope, plan) == batch_no]
+        if len(matches) != 1:
+            raise _ScopeError("QUALITY_TRANSFER_SCOPE_MISMATCH")
+        plan = matches[0]
+        warehouse = _map(scope.get("warehouses"), "CONFIG_INVALID")
+        if (
+            item.get("s_warehouse") != warehouse.get("quarantine")
+            or item.get("t_warehouse") != warehouse.get("accepted")
+            or not _equal(item.get("qty"), plan.get("quantity"))
+            or item.get("uom") != scope.get("uom")
+            or item.get("stock_uom") != scope.get("stock_uom")
+            or not _equal(item.get("conversion_factor"), 1)
+            or item.get("use_serial_batch_fields") not in (1, True)
+        ):
+            raise _ScopeError("QUALITY_TRANSFER_SCOPE_MISMATCH")
+        return plan
+
+    def _quality_inspection_for_transfer(
+        self, scope: Mapping[str, object], transfer: Mapping[str, object]
+    ) -> Mapping[str, object] | None:
+        name = _text(transfer.get("name"), "QUALITY_TRANSFER_SCOPE_MISMATCH")
+        names = self._query("Quality Inspection", [["reference_name", "=", name]])
+        if len(names) > 1:
+            raise _ScopeError("QUALITY_INSPECTION_AMBIGUOUS")
+        if not names:
+            return None
+        inspection = self._document("Quality Inspection", names[0])
+        plan = self._quality_transfer_plan(scope, transfer)
+        self._verify_quality_inspection(scope, plan, transfer, inspection)
+        return inspection
+
+    def _verify_quality_inspection(
+        self,
+        scope: Mapping[str, object],
+        plan: Mapping[str, object],
+        transfer: Mapping[str, object],
+        inspection: Mapping[str, object],
+        *,
+        expected_result: str | None = None,
+    ) -> None:
+        transfer_name = _text(transfer.get("name"), "QUALITY_INSPECTION_SCOPE_MISMATCH")
+        if (
+            inspection.get("docstatus") != 1
+            or inspection.get("company") != scope.get("company")
+            or inspection.get("inspection_type") != "Incoming"
+            or inspection.get("reference_type") != "Stock Entry"
+            or inspection.get("reference_name") != transfer_name
+            or inspection.get("item_code") != scope.get("item_code")
+            or inspection.get("batch_no") != self._plan_batch(scope, plan)
+        ):
+            raise _ScopeError("QUALITY_INSPECTION_SCOPE_MISMATCH")
+        transfer_items = [
+            row
+            for row in _rows(transfer.get("items"), "QUALITY_INSPECTION_SCOPE_MISMATCH")
+            if row.get("item_code") == scope.get("item_code")
+        ]
+        if len(transfer_items) != 1 or transfer_items[0].get(
+            "quality_inspection"
+        ) != inspection.get("name"):
+            raise _ScopeError("QUALITY_INSPECTION_SCOPE_MISMATCH")
+        readings = _rows(inspection.get("readings"), "QUALITY_INSPECTION_SCOPE_MISMATCH")
+        if len(readings) != 1:
+            raise _ScopeError("QUALITY_INSPECTION_SCOPE_MISMATCH")
+        reading = readings[0]
+        matching_metrics = [
+            metric
+            for metric, parameter in _map(scope.get("quality_parameters"), "CONFIG_INVALID").items()
+            if reading.get("specification") == parameter
+        ]
+        if len(matching_metrics) != 1:
+            raise _ScopeError("QUALITY_INSPECTION_SCOPE_MISMATCH")
+        criterion = self._quality_criterion(scope, matching_metrics[0])
+        measured = _reading_quantity(reading.get("reading_1"), "QUALITY_INSPECTION_SCOPE_MISMATCH")
+        actual_result = (
+            "PASS"
+            if _quantity(criterion.get("minimum"), "CONFIG_INVALID")
+            <= measured
+            <= _quantity(criterion.get("maximum"), "CONFIG_INVALID")
+            else "FAIL"
+        )
+        if (
+            reading.get("numeric") not in (1, True)
+            or not _equal(reading.get("min_value"), criterion.get("minimum"))
+            or not _equal(reading.get("max_value"), criterion.get("maximum"))
+            or inspection.get("status") != ("Accepted" if actual_result == "PASS" else "Rejected")
+            or (expected_result is not None and actual_result != expected_result)
+        ):
+            raise _ScopeError("QUALITY_INSPECTION_RESULT_MISMATCH")
+
     def _snapshot(
         self,
         scope: Mapping[str, object],
@@ -572,6 +844,23 @@ class DistributorERP:
         shipments: Sequence[Mapping[str, object]],
     ) -> dict[str, object]:
         plans = self._plans(scope)
+        quality_transfers = self._quality_transfers(scope)
+        quality_releases: dict[str, Mapping[str, object]] = {}
+        quality_inspections: list[Mapping[str, object]] = []
+        if self._inspection_required(scope):
+            for transfer in quality_transfers:
+                plan = self._quality_transfer_plan(scope, transfer)
+                inspection = self._quality_inspection_for_transfer(scope, transfer)
+                if inspection is None:
+                    raise _ScopeError("QUALITY_INSPECTION_MISSING")
+                quality_inspections.append(inspection)
+                if transfer.get("docstatus") == 1:
+                    if inspection.get("status") != "Accepted":
+                        raise _ScopeError("QUALITY_TRANSFER_SCOPE_MISMATCH")
+                    lot = _text(plan.get("lot"), "CONFIG_INVALID")
+                    if lot in quality_releases:
+                        raise _ScopeError("QUALITY_TRANSFER_AMBIGUOUS")
+                    quality_releases[lot] = transfer
         receipt_by_marker = {
             _text(document.get("supplier_delivery_note"), "SOURCE_SCHEMA_MISMATCH"): document
             for document in receipts
@@ -585,9 +874,10 @@ class DistributorERP:
         lot_held: dict[str, float] = {}
         for configured in _rows(scope.get("lots"), "CONFIG_INVALID"):
             lot = _text(configured.get("lot"), "CONFIG_INVALID")
-            plan = next((row for row in plans if row.get("lot") == lot), None)
-            if plan is None:
+            matching_plans = [row for row in plans if row.get("lot") == lot]
+            if len(matching_plans) != 1:
                 raise _ScopeError("CONFIG_INVALID")
+            plan = matching_plans[0]
             receipt = receipt_by_marker.get(_text(plan["marker"], "CONFIG_INVALID"))
             quantity = 0.0
             location = ""
@@ -599,7 +889,12 @@ class DistributorERP:
             received_cartons += (
                 _quantity(plan.get("cartons"), "CONFIG_INVALID") if receipt is not None else 0.0
             )
-            is_usable = location == accepted
+            quality_release = quality_releases.get(lot)
+            is_usable = (
+                quality_release is not None
+                if self._inspection_required(scope)
+                else location == accepted
+            )
             lot_received[lot] = quantity if is_usable else 0.0
             lot_held[lot] = quantity if location and not is_usable else 0.0
             lot_status = "USABLE" if is_usable else ("HELD" if location else "AWAITING_ARRIVAL")
@@ -711,6 +1006,13 @@ class DistributorERP:
         documents = [self._public_document("Purchase Order", order)]
         documents.extend(self._public_document("Purchase Receipt", receipt) for receipt in receipts)
         documents.extend(
+            self._public_document("Stock Entry", transfer) for transfer in quality_transfers
+        )
+        documents.extend(
+            self._public_document("Quality Inspection", inspection)
+            for inspection in quality_inspections
+        )
+        documents.extend(
             self._public_document("Sales Order", sales_order) for sales_order in orders
         )
         documents.extend(self._public_document("Pick List", pick) for pick in picks)
@@ -796,6 +1098,7 @@ class DistributorERP:
         submitted: bool,
     ) -> None:
         item = self._receipt_item(scope, receipt)
+        batch_no = self._plan_batch(scope, plan)
         if (
             receipt.get("company") != scope.get("company")
             or receipt.get("supplier") != scope.get("supplier")
@@ -807,6 +1110,8 @@ class DistributorERP:
             or not _equal(item.get("conversion_factor"), 1)
             or item.get("warehouse") != plan.get("warehouse")
             or not _equal(item.get("rejected_qty") or 0, 0)
+            or (batch_no is not None and item.get("batch_no") != batch_no)
+            or (batch_no is not None and item.get("use_serial_batch_fields") not in (1, True))
         ):
             raise _ScopeError("RECEIPT_SCOPE_MISMATCH")
 
@@ -835,6 +1140,16 @@ class DistributorERP:
             or pick.get("pick_manually") not in (1, True)
         ):
             raise _ScopeError("PICK_LIST_SCOPE_MISMATCH")
+        if self._inspection_required(scope):
+            allowed_batches = {
+                self._tranche_batch(scope, tranche)
+                for tranche in self._tranches(scope)
+                if tranche.get("customer_order") == name
+            }
+            if matches[0].get("batch_no") not in allowed_batches or matches[0].get(
+                "use_serial_batch_fields"
+            ) not in (1, True):
+                raise _ScopeError("PICK_LIST_SCOPE_MISMATCH")
 
     def _pick_quantity(
         self, scope: Mapping[str, object], order: Mapping[str, object], pick: Mapping[str, object]
@@ -850,6 +1165,15 @@ class DistributorERP:
             raise _ScopeError("PICK_LIST_SCOPE_MISMATCH")
         return _quantity(locations[0].get("stock_qty"), "PICK_LIST_SCOPE_MISMATCH", positive=True)
 
+    def _tranche_batch(
+        self, scope: Mapping[str, object], tranche: Mapping[str, object]
+    ) -> str | None:
+        lot = _text(tranche.get("lot"), "CONFIG_INVALID")
+        plans = [plan for plan in self._plans(scope) if plan.get("lot") == lot]
+        if len(plans) != 1:
+            raise _ScopeError("CONFIG_INVALID")
+        return self._plan_batch(scope, plans[0])
+
     def _pick_for(
         self,
         scope: Mapping[str, object],
@@ -861,10 +1185,32 @@ class DistributorERP:
             pick
             for pick in self._picks(scope, order)
             if _equal(self._pick_quantity(scope, order, pick), expected)
+            and (
+                self._tranche_batch(scope, tranche) is None
+                or self._pick_batch(scope, order, pick) == self._tranche_batch(scope, tranche)
+            )
         ]
         if len(matches) > 1:
             raise _ScopeError("PICK_LIST_AMBIGUOUS")
         return matches[0] if matches else None
+
+    def _pick_batch(
+        self, scope: Mapping[str, object], order: Mapping[str, object], pick: Mapping[str, object]
+    ) -> str | None:
+        if not self._inspection_required(scope):
+            return None
+        order_name = _text(order.get("name"), "SALES_ORDER_SCOPE_MISMATCH")
+        locations = [
+            row
+            for row in _rows(pick.get("locations"), "PICK_LIST_SCOPE_MISMATCH")
+            if row.get("sales_order") == order_name
+        ]
+        if len(locations) != 1:
+            raise _ScopeError("PICK_LIST_SCOPE_MISMATCH")
+        batch_no = _text(locations[0].get("batch_no"), "PICK_LIST_SCOPE_MISMATCH")
+        if locations[0].get("use_serial_batch_fields") not in (1, True):
+            raise _ScopeError("PICK_LIST_SCOPE_MISMATCH")
+        return batch_no
 
     def _delivery_matches(
         self, scope: Mapping[str, object], delivery: Mapping[str, object], order_name: str
@@ -928,6 +1274,20 @@ class DistributorERP:
             raise _ScopeError("DELIVERY_NOTE_AMBIGUOUS")
         return drafts[0] if drafts else None
 
+    def _draft_delivery_bound_to_pick(
+        self, scope: Mapping[str, object], order: Mapping[str, object], pick_name: str
+    ) -> bool:
+        """Detect a native draft for this pick that fails tranche verification."""
+
+        return any(
+            note.get("docstatus") == 0
+            and any(
+                row.get("against_pick_list") == pick_name
+                for row in _rows(note.get("items"), "DELIVERY_NOTE_SCOPE_MISMATCH")
+            )
+            for note in self._deliveries(scope, order)
+        )
+
     def _delivery_matches_tranche(
         self,
         scope: Mapping[str, object],
@@ -956,6 +1316,13 @@ class DistributorERP:
             item.get("warehouse") == accepted
             and item.get("against_pick_list") == pick_name
             and _equal(item.get("qty"), tranche.get("quantity"))
+            and (
+                self._tranche_batch(scope, tranche) is None
+                or (
+                    item.get("batch_no") == self._tranche_batch(scope, tranche)
+                    and item.get("use_serial_batch_fields") in (1, True)
+                )
+            )
         )
 
     def _verify_prepared_reference(
@@ -1067,6 +1434,14 @@ class DistributorERP:
                     "warehouse": plan["warehouse"],
                     "rate": scope["unit_rate"],
                     "schedule_date": po_item.get("schedule_date"),
+                    **(
+                        {
+                            "batch_no": self._plan_batch(scope, plan),
+                            "use_serial_batch_fields": 1,
+                        }
+                        if self._plan_batch(scope, plan) is not None
+                        else {}
+                    ),
                 }
             ],
         }
@@ -1132,11 +1507,241 @@ class DistributorERP:
     def _quality_operation(
         self, scope: Mapping[str, object], operation: Mapping[str, object], event_id: str
     ) -> Mapping[str, object]:
-        # The provisioner emits no component lot until its exact incoming-QI
-        # behavior has been accepted in this tenant.  The public operation is
-        # retained now so core never substitutes a non-native local result.
-        _ = scope
-        return self._result(operation, event_id, _BLOCKED, "QUALITY_WORKFLOW_NOT_PROVISIONED")
+        if not self._inspection_required(scope):
+            return self._result(operation, event_id, _BLOCKED, "QUALITY_WORKFLOW_NOT_PROVISIONED")
+        kind = _text(operation.get("kind"), "OPERATION_INVALID")
+        if kind == "record_inspection":
+            return self._record_inspection(scope, operation, event_id)
+        if kind == "release_from_quality":
+            return self._release_from_quality(scope, operation, event_id)
+        raise _ScopeError("OPERATION_NOT_ALLOWED")
+
+    @staticmethod
+    def _quality_marker(scope: Mapping[str, object], event_id: str) -> str:
+        return f"{_text(scope.get('marker'), 'CONFIG_INVALID')} quality {event_id}"
+
+    def _quality_transfer_for_event(
+        self, scope: Mapping[str, object], event_id: str
+    ) -> Mapping[str, object] | None:
+        document = self._find("Stock Entry", "remarks", self._quality_marker(scope, event_id))
+        if document is not None:
+            self._quality_transfer_plan(scope, document)
+        return document
+
+    def _quality_plan_for_operation(
+        self, scope: Mapping[str, object], operation: Mapping[str, object]
+    ) -> Mapping[str, object]:
+        lot = _text(operation.get("lot"), "OPERATION_TARGET_REQUIRED")
+        matches = [plan for plan in self._plans(scope) if plan.get("lot") == lot]
+        if len(matches) != 1:
+            raise _ScopeError("OPERATION_TARGET_AMBIGUOUS")
+        if operation.get("synthetic") is not True:
+            raise _ScopeError("SYNTHETIC_PROVENANCE_REQUIRED")
+        return matches[0]
+
+    def _inspection_input(
+        self,
+        scope: Mapping[str, object],
+        operation: Mapping[str, object],
+        plan: Mapping[str, object],
+    ) -> tuple[str, Mapping[str, object], float, float, str, str]:
+        result = _text(operation.get("result"), "QUALITY_INSPECTION_INPUT_INVALID")
+        inspection_scope = _text(operation.get("scope"), "QUALITY_INSPECTION_INPUT_INVALID")
+        if result not in {"PASS", "FAIL"} or inspection_scope not in {"SAMPLE", "WHOLE_LOT"}:
+            raise _ScopeError("QUALITY_INSPECTION_INPUT_INVALID")
+        metric = _text(operation.get("metric"), "QUALITY_INSPECTION_INPUT_INVALID")
+        criterion = self._quality_criterion(scope, metric)
+        if operation.get("criterion") != criterion:
+            raise _ScopeError("QUALITY_CRITERION_MISMATCH")
+        measured = _quantity(operation.get("measured"), "QUALITY_INSPECTION_INPUT_INVALID")
+        sample_quantity = _quantity(
+            operation.get("sample_quantity"), "QUALITY_INSPECTION_INPUT_INVALID", positive=True
+        )
+        if inspection_scope == "WHOLE_LOT" and sample_quantity < _quantity(
+            plan.get("quantity"), "CONFIG_INVALID", positive=True
+        ):
+            raise _ScopeError("WHOLE_LOT_EVIDENCE_INCOMPLETE")
+        actual = (
+            "PASS"
+            if _quantity(criterion.get("minimum"), "CONFIG_INVALID")
+            <= measured
+            <= _quantity(criterion.get("maximum"), "CONFIG_INVALID")
+            else "FAIL"
+        )
+        if actual != result:
+            raise _ScopeError("QUALITY_INSPECTION_RESULT_MISMATCH")
+        report = _text(operation.get("inspection_report_ref"), "QUALITY_INSPECTION_INPUT_INVALID")
+        evidence = _text(operation.get("evidence_ref"), "QUALITY_INSPECTION_INPUT_INVALID")
+        return metric, criterion, measured, sample_quantity, report, evidence
+
+    def _record_inspection(
+        self, scope: Mapping[str, object], operation: Mapping[str, object], event_id: str
+    ) -> Mapping[str, object]:
+        plan = self._quality_plan_for_operation(scope, operation)
+        metric, criterion, measured, sample_quantity, report, evidence = self._inspection_input(
+            scope, operation, plan
+        )
+        receipt = self._receipt_for(scope, plan)
+        if receipt is None:
+            raise _ScopeError("QUALITY_RECEIPT_REQUIRED")
+        existing = self._quality_transfer_for_event(scope, event_id)
+        if existing is not None:
+            inspection = self._quality_inspection_for_transfer(scope, existing)
+            if inspection is None:
+                raise _ScopeError("QUALITY_INSPECTION_MISSING")
+            self._verify_quality_inspection(
+                scope,
+                plan,
+                existing,
+                inspection,
+                expected_result=_text(operation["result"], "OPERATION_INVALID"),
+            )
+            if inspection.get("remarks") != self._inspection_remarks(report, evidence):
+                raise _ScopeError("QUALITY_INSPECTION_SCOPE_MISMATCH")
+            return self._result(
+                operation,
+                event_id,
+                _ALREADY_APPLIED,
+                documents=[
+                    self._public_document("Stock Entry", existing),
+                    self._public_document("Quality Inspection", inspection),
+                ],
+                snapshot=self.read_case(scope),
+            )
+        inspected_by = self._authenticated_erp_identity()
+        warehouse = _map(scope.get("warehouses"), "CONFIG_INVALID")
+        transfer_draft = self._create(
+            "Stock Entry",
+            {
+                "doctype": "Stock Entry",
+                "naming_series": "MAT-STE-.YYYY.-",
+                "stock_entry_type": "Material Transfer",
+                "purpose": "Material Transfer",
+                "company": scope["company"],
+                "remarks": self._quality_marker(scope, event_id),
+                "items": [
+                    {
+                        "item_code": scope["item_code"],
+                        "qty": plan["quantity"],
+                        "uom": scope["uom"],
+                        "stock_uom": scope["stock_uom"],
+                        "conversion_factor": 1,
+                        "s_warehouse": warehouse["quarantine"],
+                        "t_warehouse": warehouse["accepted"],
+                        "batch_no": self._plan_batch(scope, plan),
+                        "use_serial_batch_fields": 1,
+                        "basic_rate": scope["unit_rate"],
+                        "allow_zero_valuation_rate": 1,
+                    }
+                ],
+            },
+        )
+        transfer_name = _text(transfer_draft.get("name"), "ERP_WRITE_UNCONFIRMED")
+        transfer = self._document("Stock Entry", transfer_name)
+        self._quality_transfer_plan(scope, transfer)
+        inspection_draft = self._create(
+            "Quality Inspection",
+            {
+                "doctype": "Quality Inspection",
+                "naming_series": "MAT-QA-.YYYY.-",
+                "inspection_type": "Incoming",
+                "reference_type": "Stock Entry",
+                "reference_name": transfer_name,
+                "company": scope["company"],
+                "item_code": scope["item_code"],
+                "batch_no": self._plan_batch(scope, plan),
+                "inspected_by": inspected_by,
+                "sample_size": sample_quantity,
+                "manual_inspection": 0,
+                "remarks": self._inspection_remarks(report, evidence),
+                "readings": [
+                    {
+                        "specification": self._quality_parameter(scope, metric),
+                        "numeric": 1,
+                        "min_value": criterion["minimum"],
+                        "max_value": criterion["maximum"],
+                        "reading_1": str(measured),
+                    }
+                ],
+            },
+        )
+        inspection_submitted = self._submit(inspection_draft)
+        inspection = self._document(
+            "Quality Inspection", _text(inspection_submitted.get("name"), "ERP_WRITE_UNCONFIRMED")
+        )
+        transfer = self._document("Stock Entry", transfer_name)
+        self._verify_quality_inspection(
+            scope,
+            plan,
+            transfer,
+            inspection,
+            expected_result=_text(operation["result"], "OPERATION_INVALID"),
+        )
+        if inspection.get("remarks") != self._inspection_remarks(report, evidence):
+            raise _ScopeError("QUALITY_INSPECTION_SCOPE_MISMATCH")
+        return self._result(
+            operation,
+            event_id,
+            _APPLIED,
+            documents=[
+                self._public_document("Stock Entry", transfer),
+                self._public_document("Quality Inspection", inspection),
+            ],
+            snapshot=self.read_case(scope),
+        )
+
+    @staticmethod
+    def _inspection_remarks(report: str, evidence: str) -> str:
+        return f"Synthetic quality report {report}; evidence {evidence}"
+
+    def _release_from_quality(
+        self, scope: Mapping[str, object], operation: Mapping[str, object], event_id: str
+    ) -> Mapping[str, object]:
+        plan = self._quality_plan_for_operation(scope, operation)
+        if operation.get("scope") != "WHOLE_LOT":
+            raise _ScopeError("WHOLE_LOT_EVIDENCE_INCOMPLETE")
+        _text(operation.get("inspection_evidence_ref"), "QUALITY_INSPECTION_INPUT_INVALID")
+        transfer = self._quality_transfer_for_event(scope, event_id)
+        if transfer is None:
+            raise _ScopeError("QUALITY_INSPECTION_MISSING")
+        inspection = self._quality_inspection_for_transfer(scope, transfer)
+        if inspection is None or inspection.get("status") != "Accepted":
+            raise _ScopeError("QUALITY_RELEASE_NOT_APPROVED")
+        self._verify_quality_inspection(scope, plan, transfer, inspection, expected_result="PASS")
+        if _quantity(
+            inspection.get("sample_size"), "QUALITY_INSPECTION_SCOPE_MISMATCH"
+        ) < _quantity(plan.get("quantity"), "CONFIG_INVALID", positive=True):
+            raise _ScopeError("WHOLE_LOT_EVIDENCE_INCOMPLETE")
+        if transfer.get("docstatus") == 1:
+            return self._result(
+                operation,
+                event_id,
+                _ALREADY_APPLIED,
+                documents=[
+                    self._public_document("Stock Entry", transfer),
+                    self._public_document("Quality Inspection", inspection),
+                ],
+                snapshot=self.read_case(scope),
+            )
+        if transfer.get("docstatus") != 0:
+            raise _ScopeError("QUALITY_TRANSFER_NOT_DRAFT")
+        submitted = self._submit(transfer)
+        released = self._document(
+            "Stock Entry", _text(submitted.get("name"), "ERP_WRITE_UNCONFIRMED")
+        )
+        self._quality_transfer_plan(scope, released)
+        if released.get("docstatus") != 1:
+            raise _ScopeError("QUALITY_RELEASE_NOT_SUBMITTED")
+        return self._result(
+            operation,
+            event_id,
+            _APPLIED,
+            documents=[
+                self._public_document("Stock Entry", released),
+                self._public_document("Quality Inspection", inspection),
+            ],
+            snapshot=self.read_case(scope),
+        )
 
     def _reservation(
         self, scope: Mapping[str, object], operation: Mapping[str, object], event_id: str
@@ -1203,6 +1808,9 @@ class DistributorERP:
             and row.get("item_code") == scope.get("item_code")
             and row.get("warehouse") == accepted
         ]
+        expected_batch = self._tranche_batch(scope, tranche)
+        if expected_batch is not None:
+            matching = [row for row in matching if row.get("batch_no") == expected_batch]
         if len(matching) != 1:
             raise _ScopeError("SCOPED_PICK_LOCATION_UNAVAILABLE")
         expected = _quantity(tranche.get("quantity"), "CONFIG_INVALID", positive=True)
@@ -1212,6 +1820,10 @@ class DistributorERP:
         location["qty"] = expected
         location["stock_qty"] = expected
         location["picked_qty"] = 0
+        if expected_batch is not None:
+            if location.get("batch_no") != expected_batch:
+                raise _ScopeError("SCOPED_BATCH_LOCATION_UNAVAILABLE")
+            location["use_serial_batch_fields"] = 1
         # ERPNext v16 refreshes locations in before_save unless this native flag
         # is set.  Keep the exact accepted warehouse selected above rather than
         # letting a company-wide mapper reintroduce unrelated Stores stock.
@@ -1259,6 +1871,12 @@ class DistributorERP:
         matching = [row for row in locations if row.get("sales_order") == order_name]
         if len(matching) != 1 or not _equal(matching[0].get("stock_qty"), expected):
             raise _ScopeError("PICK_QUANTITY_MISMATCH")
+        batch_no = self._tranche_batch(scope, tranche)
+        if batch_no is not None and (
+            matching[0].get("batch_no") != batch_no
+            or matching[0].get("use_serial_batch_fields") not in (1, True)
+        ):
+            raise _ScopeError("PICK_BATCH_SCOPE_MISMATCH")
         matching[0]["picked_qty"] = expected
         pick_name = _text(pick.get("name"), "PICK_LIST_NOT_AVAILABLE")
         response = _map(
@@ -1289,30 +1907,48 @@ class DistributorERP:
     ) -> Mapping[str, object]:
         order = self._order_for(scope, operation)
         tranche = self._tranche_for(scope, operation, require_lot=True)
+        pick = self._pick_for(scope, order, tranche)
         existing = self._delivery_for(scope, order, tranche)
         if existing is not None:
-            note = existing
-            if note.get("docstatus") != 1:
-                raise _ScopeError("DELIVERY_NOTE_NOT_SUBMITTED")
-            return self._result(
-                operation,
-                event_id,
-                _ALREADY_APPLIED,
-                documents=[self._public_document("Delivery Note", note)],
-                snapshot=self.read_case(scope),
+            if existing.get("docstatus") == 1:
+                return self._result(
+                    operation,
+                    event_id,
+                    _ALREADY_APPLIED,
+                    documents=[self._public_document("Delivery Note", existing)],
+                    snapshot=self.read_case(scope),
+                )
+            if pick is None or pick.get("docstatus") != 1:
+                raise _ScopeError("SUBMITTED_PICK_REQUIRED")
+            return self._submit_delivery_draft(
+                scope, operation, event_id, order, tranche, pick, existing
             )
-        pick = self._pick_for(scope, order, tranche)
         if pick is None or pick.get("docstatus") != 1:
             raise _ScopeError("SUBMITTED_PICK_REQUIRED")
+        pick_name = _text(pick.get("name"), "PICK_LIST_NOT_AVAILABLE")
+        if self._draft_delivery_bound_to_pick(scope, order, pick_name):
+            raise _ScopeError("DELIVERY_NOTE_SCOPE_MISMATCH")
         mapped = self._mapped(
             "erpnext.stock.doctype.pick_list.pick_list.create_delivery_note",
-            _text(pick.get("name"), "PICK_LIST_NOT_AVAILABLE"),
+            pick_name,
         )
         # ERPNext v16's native mapper saves and returns a draft Delivery Note.
         # Creating it again would duplicate a delivery and make a later shipment
         # ambiguous, so only submit that returned native draft.
         mapped_name = _text(mapped.get("name"), "NATIVE_MAPPER_REJECTED")
         draft = self._document("Delivery Note", mapped_name)
+        return self._submit_delivery_draft(scope, operation, event_id, order, tranche, pick, draft)
+
+    def _submit_delivery_draft(
+        self,
+        scope: Mapping[str, object],
+        operation: Mapping[str, object],
+        event_id: str,
+        order: Mapping[str, object],
+        tranche: Mapping[str, object],
+        pick: Mapping[str, object],
+        draft: Mapping[str, object],
+    ) -> Mapping[str, object]:
         if not self._delivery_matches_tranche(
             scope,
             draft,
@@ -1334,15 +1970,12 @@ class DistributorERP:
         submitted = self._submit(draft)
         note_name = _text(submitted.get("name"), "ERP_WRITE_UNCONFIRMED")
         note = self._document("Delivery Note", note_name)
-        if (
-            note.get("docstatus") != 1
-            or not self._delivery_matches(
-                scope, note, _text(order.get("name"), "SALES_ORDER_SCOPE_MISMATCH")
-            )
-            or not _equal(
-                self._delivery_quantity(scope, note)[1],
-                tranche.get("quantity"),
-            )
+        if note.get("docstatus") != 1 or not self._delivery_matches_tranche(
+            scope,
+            note,
+            order,
+            tranche,
+            _text(pick.get("name"), "PICK_LIST_NOT_AVAILABLE"),
         ):
             raise _ScopeError("DELIVERY_NOTE_SCOPE_MISMATCH")
         return self._result(
@@ -1465,9 +2098,7 @@ class DistributorERP:
             # text; preserve the exact wire shape verified against v16.
             payload["target_doc"] = json.dumps(dict(target_doc), sort_keys=True)
         response = _map(
-            self._request(
-                f"/api/method/{method}", method="POST", payload=payload
-            ),
+            self._request(f"/api/method/{method}", method="POST", payload=payload),
             "NATIVE_MAPPER_REJECTED",
         )
         return dict(_map(response.get("message"), "NATIVE_MAPPER_REJECTED"))

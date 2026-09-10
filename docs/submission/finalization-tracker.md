@@ -4,7 +4,7 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
 
 ## Current snapshot — September 10
 
-- **R4 distributor receiving/fulfillment is VERIFIED_IN_DEMO; the component slice remains in progress.** Industry research
+- **R4 distributor receiving/fulfillment is VERIFIED_IN_DEMO; the component native business flow is verified; model causality remains FAILED.** Industry research
   and the native-workflow design passed independent review and were committed as
   `04516b21c36634ccb36ca392828fef14a6c2a767`; push and fresh remote SHA matched.
   The accepted design covers PO16's remaining 20+19 Box, customer demand 24+15,
@@ -16,10 +16,16 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
   facts; Strands native per-turn current-source input corrected it, and turns5/7
   passed independent numeric/provenance review. Minor explanatory wording remains
   disclosed; no broad accuracy claim is made. The separate component PO17/SO9/SO10
-  now has four cartons and 38/40 parts received. Its first receipt's native batch
-  feature failure was resolved without a duplicate receipt; quality release and
-  downstream component fulfillment still await real acceptance. Demo Batch and
-  Shipment API permissions were verified after adding the corresponding native
+  now has 40/40 Nos received after replacement, three supported lot releases,
+  four submitted Delivery Notes/Shipments, customer dispatch25/15 and separate
+  synthetic POD25/15, independently reviewed as scoped GO. Both dedicated warehouses
+  end at zero. Three retained historical alerts still set the page stage to HOLD. Initial setup
+  repairs, unknown attempts and a blocked out-of-order tranche remain disclosed.
+  Component NovaPro answers still wrongly attribute the shortage to the supplier;
+  a native Nova2 comparison awaits an AWS administrator login for the explicitly
+  authorized policy. This does not block the verified native business effects.
+  See [component evidence](../audits/2026-09-10-distributor-component-live-acceptance.md).
+  Demo Batch and Shipment API permissions were verified after adding native
   roles; no quality-stop setting was relaxed. See the
   [design](../research/2026-09-10-distributor-native-workflow-design.md) and
   [acceptance contract](../audits/2026-09-10-distributor-operations-acceptance-plan.md).

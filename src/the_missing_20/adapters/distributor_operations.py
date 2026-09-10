@@ -325,6 +325,253 @@ class DistributorOperations:
                 raise
             return projection
 
+    def reconcile_receive_arrival(self, event_id: str) -> dict[str, object]:
+        """Admit an exact submitted receipt for the latest unknown arrival without retrying it."""
+
+        identifier = _text(event_id, "event_id")
+        with self._lock:
+            state = self._latest_state()
+            if state is None:
+                raise ValueError("No retained distributor event can be reconciled.")
+            event = self._reconcilable_receive_event(state, identifier)
+            if self._has_receive_reconciliation(state, identifier):
+                source = self._read_source()
+                state, source = self._merge_source(state, source)
+                return self._projection(state, source)
+            bridge = self._erp
+            reconcile = getattr(bridge, "reconcile_receive_arrival", None)
+            if not callable(reconcile):
+                return self._receive_reconciliation_projection(
+                    state, identifier, "UNAVAILABLE", "ERP_RECONCILIATION_UNAVAILABLE"
+                )
+            try:
+                raw = reconcile(self._config, event, identifier)
+            except Exception:
+                return self._receive_reconciliation_projection(
+                    state, identifier, "UNAVAILABLE", "ERP_RECONCILIATION_READ_FAILED"
+                )
+            if not isinstance(raw, Mapping) or raw.get("operation") != "receive_arrival":
+                return self._receive_reconciliation_projection(
+                    state, identifier, "UNAVAILABLE", "ERP_RECONCILIATION_MALFORMED"
+                )
+            status = raw.get("status")
+            error_code = raw.get("error_code")
+            if status != "APPLIED" or raw.get("event_id") != identifier:
+                return self._receive_reconciliation_projection(
+                    state,
+                    identifier,
+                    status if isinstance(status, str) else "UNAVAILABLE",
+                    error_code if isinstance(error_code, str) and error_code else None,
+                )
+            snapshot = raw.get("snapshot")
+            if not isinstance(snapshot, Mapping) or snapshot.get("source_status") != "CURRENT":
+                return self._receive_reconciliation_projection(
+                    state, identifier, "UNAVAILABLE", "ERP_RECONCILIATION_SOURCE_UNAVAILABLE"
+                )
+            if (
+                snapshot.get("case_id") != self._config["case_id"]
+                or snapshot.get("case_label") != self._config["case_label"]
+                or snapshot.get("synthetic_input") is not self._config["synthetic_input"]
+            ):
+                return self._receive_reconciliation_projection(
+                    state, identifier, "UNAVAILABLE", "ERP_RECONCILIATION_SCOPE_MISMATCH"
+                )
+            try:
+                source = self._canonical_source(snapshot)
+            except ValueError:
+                return self._receive_reconciliation_projection(
+                    state, identifier, "UNAVAILABLE", "ERP_RECONCILIATION_SOURCE_MALFORMED"
+                )
+            documents = _documents(raw.get("documents"))
+            if len(documents) != 1 or documents[0].get("kind") != "Purchase Receipt":
+                return self._receive_reconciliation_projection(
+                    state, identifier, "UNAVAILABLE", "ERP_RECONCILIATION_RECEIPT_MALFORMED"
+                )
+            updated = self._apply_receive_reconciliation(state, event, source, documents)
+            projection = self._projection(updated, source)
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                self._db.execute(
+                    "UPDATE distributor_operation_events SET state_json=? WHERE event_id=?",
+                    (_encode(updated), identifier),
+                )
+                self._db.commit()
+            except Exception:
+                self._db.rollback()
+                raise
+            return projection
+
+    def _reconcilable_receive_event(
+        self, state: Mapping[str, object], event_id: str
+    ) -> dict[str, object]:
+        """Return only the latest retained arrival with an unknown native receipt outcome."""
+
+        events = state.get("events")
+        if not isinstance(events, list) or not events:
+            raise ValueError("No retained distributor event can be reconciled.")
+        latest = events[-1]
+        if not isinstance(latest, Mapping) or latest.get("event_id") != event_id:
+            raise ValueError("Only the latest retained event can be reconciled.")
+        operations = latest.get("operations")
+        if (
+            latest.get("type") != "arrival"
+            or latest.get("status") != "UNKNOWN_OUTCOME"
+            or not isinstance(operations, list)
+            or not any(
+                isinstance(operation, Mapping)
+                and operation.get("kind") == "receive_arrival"
+                and operation.get("status") == "UNKNOWN_OUTCOME"
+                for operation in operations
+            )
+        ):
+            raise ValueError("This event is not an unknown arrival outcome.")
+        event = self._stored_event(event_id)
+        if event is None or event.get("type") != "arrival":
+            raise ValueError("The retained arrival payload is unavailable.")
+        return event
+
+    @staticmethod
+    def _has_receive_reconciliation(state: Mapping[str, object], event_id: str) -> bool:
+        events = state.get("events")
+        if not isinstance(events, list):
+            return False
+        for event in events:
+            if not isinstance(event, Mapping) or event.get("event_id") != event_id:
+                continue
+            reconciliations = event.get("reconciliations")
+            return isinstance(reconciliations, list) and any(
+                isinstance(record, Mapping)
+                and record.get("operation") == "receive_arrival"
+                and record.get("status") == "NATIVE_CONFIRMED"
+                for record in reconciliations
+            )
+        return False
+
+    def _receive_reconciliation_projection(
+        self,
+        state: Mapping[str, object],
+        event_id: str,
+        status: str,
+        error_code: str | None,
+    ) -> dict[str, object]:
+        """Expose a read-only failed admission without changing retained event history."""
+
+        source = self._read_source()
+        merged, source = self._merge_source(state, source)
+        projection = self._projection(merged, source)
+        projection["reconciliation"] = {
+            "event_id": event_id,
+            "operation": "receive_arrival",
+            "status": status,
+            **({"error_code": error_code} if error_code else {}),
+        }
+        return projection
+
+    def _apply_receive_reconciliation(
+        self,
+        state: Mapping[str, object],
+        event: Mapping[str, object],
+        source: Mapping[str, object],
+        documents: list[dict[str, object]],
+    ) -> dict[str, object]:
+        """Project exact read-back facts while retaining the original unknown operation."""
+
+        updated = cast(dict[str, object], _copy(state))
+        source_quantities = cast(Mapping[str, object], source["quantities"])
+        quantities = cast(dict[str, object], updated["quantities"])
+        initial_expected_cartons = quantities.get("initial_expected_cartons")
+        quantities.update(_copy(source_quantities))
+        if initial_expected_cartons is not None:
+            quantities["initial_expected_cartons"] = initial_expected_cartons
+        quantities["observed_outer_packages"] = source_quantities["cartons"]
+
+        old_lots = {
+            row.get("lot"): row
+            for row in cast(list[Mapping[str, object]], updated["lots"])
+            if isinstance(row.get("lot"), str)
+        }
+        reconciled_lots: list[dict[str, object]] = []
+        for raw_lot in cast(list[Mapping[str, object]], source["lots"]):
+            lot_name = _text(raw_lot.get("lot"), "source lot")
+            prior = old_lots.get(lot_name)
+            if prior is None:  # pragma: no cover - canonical source already checks scope
+                raise ValueError("source lot scope mismatch")
+            row = cast(dict[str, object], _copy(prior))
+            for field in ("expected_quantity", "cartons", "received", "usable", "held", "status"):
+                row[field] = _copy(raw_lot[field])
+            reconciled_lots.append(row)
+        updated["lots"] = reconciled_lots
+        updated["allocations"] = _copy(source["allocations"])
+        updated["documents"] = _merge_documents(
+            _documents(updated.get("documents")),
+            _documents(source.get("documents")),
+            documents,
+        )
+        parent_purchase_order = source.get("parent_purchase_order")
+        if isinstance(parent_purchase_order, Mapping):
+            updated["parent_purchase_order"] = _copy(parent_purchase_order)
+        else:
+            updated.pop("parent_purchase_order", None)
+        updated["source_status"] = "CURRENT"
+        updated["source_error"] = None
+        updated["source_observation"] = {
+            "quantities": _copy(source["quantities"]),
+            "lots": _copy(source["lots"]),
+            "allocations": _copy(source["allocations"]),
+            "documents": _copy(source["documents"]),
+            "parent_purchase_order": _copy(parent_purchase_order)
+            if isinstance(parent_purchase_order, Mapping)
+            else None,
+        }
+
+        event_id = _text(event["event_id"], "event_id")
+        reconciliation = {
+            "operation": "receive_arrival",
+            "status": "NATIVE_CONFIRMED",
+            "documents": _copy(documents),
+            "reconciled_at": self._now().isoformat(),
+        }
+        events = cast(list[dict[str, object]], updated["events"])
+        matching = [row for row in events if row.get("event_id") == event_id]
+        if len(matching) != 1:  # pragma: no cover - retained state is internal
+            raise RuntimeError("reconciliation event history is unavailable")
+        record = matching[0]
+        reconciliations = record.get("reconciliations")
+        if not isinstance(reconciliations, list):
+            reconciliations = []
+            record["reconciliations"] = reconciliations
+        reconciliations.append(reconciliation)
+        self._resolve_receive_unknown_alert(updated, event_id)
+
+        lot_name = _text(event["lot"], "lot")
+        lot = self._lot(updated, lot_name)
+        policy = cast(Mapping[str, object], self._config["policy"])
+        if (
+            policy["inspection_required"] is True
+            and lot is not None
+            and _quantity(lot.get("held"), "lot held") > 0
+        ):
+            self._alert(
+                updated,
+                code="QUALITY_EVIDENCE_REQUIRED",
+                message="Received stock is held until configured inspection evidence is recorded.",
+                event=event,
+                lot=lot_name,
+                quantity=_quantity(lot["held"], "lot held"),
+            )
+        return updated
+
+    @staticmethod
+    def _resolve_receive_unknown_alert(state: dict[str, object], event_id: str) -> None:
+        for alert in cast(list[dict[str, object]], state["alerts"]):
+            if (
+                alert.get("code") == "NATIVE_OPERATION_UNKNOWN"
+                and alert.get("operation") == "receive_arrival"
+                and alert.get("event_id") == event_id
+                and alert.get("status") == "OPEN"
+            ):
+                alert["status"] = "RESOLVED"
+
     def ask(self, question: str) -> dict[str, object]:
         """Run an injected read-only conversation turn, never an event or ERP write."""
 
@@ -416,6 +663,7 @@ class DistributorOperations:
         if not isinstance(lots, list) or not lots:
             raise ValueError("lots requires at least one configured lot")
         seen_lots: set[str] = set()
+        replacement_lots: dict[str, str] = {}
         for row in lots:
             if not isinstance(row, Mapping):
                 raise ValueError("lots must contain JSON objects")
@@ -424,6 +672,17 @@ class DistributorOperations:
                 raise ValueError("lot identities must be unique")
             seen_lots.add(lot)
             _quantity(row.get("expected_quantity"), "expected_quantity", positive=True)
+            if "cartons" in row:
+                _whole(row["cartons"], "lot cartons", positive=True)
+            if "expected_pack_quantity" in row:
+                _quantity(row["expected_pack_quantity"], "expected_pack_quantity", positive=True)
+            replacement = row.get("replacement_for_lot")
+            if replacement is not None:
+                replacement_lots[lot] = _text(replacement, "replacement_for_lot")
+        if any(
+            target not in seen_lots or target == lot for lot, target in replacement_lots.items()
+        ):
+            raise ValueError("replacement_for_lot must name another configured lot")
         allocations = normalized.get("allocations")
         if not isinstance(allocations, list) or not allocations:
             raise ValueError("allocations requires at least one configured customer order")
@@ -768,6 +1027,13 @@ class DistributorOperations:
                 "expected_quantity": _wire(
                     _quantity(row["expected_quantity"], "expected_quantity")
                 ),
+                "expected_pack_quantity": _wire(
+                    _quantity(
+                        row.get("expected_pack_quantity", self._config["expected_pack_quantity"]),
+                        "expected_pack_quantity",
+                        positive=True,
+                    )
+                ),
                 "cartons": 0,
                 "received": 0,
                 "usable": 0,
@@ -776,6 +1042,11 @@ class DistributorOperations:
             }
             for row in lots
         ]
+        for row, lot in zip(lots, lot_rows, strict=True):
+            replacement = row.get("replacement_for_lot")
+            if replacement is not None:
+                lot["replacement_for_lot"] = _text(replacement, "replacement_for_lot")
+        initial_expected_cartons = self._initial_expected_cartons(lots)
         return {
             "case_id": self._config["case_id"],
             "case_label": self._config["case_label"],
@@ -791,6 +1062,8 @@ class DistributorOperations:
                 "delivery_confirmed": 0,
                 "uom": self._config["uom"],
                 "cartons": 0,
+                "initial_expected_cartons": initial_expected_cartons,
+                "observed_outer_packages": 0,
             },
             "lots": lot_rows,
             "allocations": [
@@ -819,6 +1092,18 @@ class DistributorOperations:
             "source_error": "ERP_SOURCE_NOT_READ",
             "source_observation": None,
         }
+
+    def _initial_expected_cartons(self, lots: list[Mapping[str, object]]) -> int:
+        if all("cartons" in row for row in lots):
+            return sum(
+                (
+                    _whole(row["cartons"], "lot cartons", positive=True)
+                    for row in lots
+                    if row.get("replacement_for_lot") is None
+                ),
+                0,
+            )
+        return _whole(self._config["cartons"], "cartons", positive=True)
 
     def _latest_state(self) -> dict[str, object] | None:
         row = self._db.execute(
@@ -1027,9 +1312,6 @@ class DistributorOperations:
         )
         cartons = _whole(event["cartons"], "cartons", positive=True)
         pack = _quantity(event["expected_pack_quantity"], "expected_pack_quantity", positive=True)
-        configured_pack = _quantity(
-            self._config["expected_pack_quantity"], "expected_pack_quantity"
-        )
         if item_code != self._config["item_code"]:
             self._alert(
                 state,
@@ -1052,6 +1334,7 @@ class DistributorOperations:
             )
             self._append_event(state, event, "BLOCKED", operations)
             return state, "BLOCKED"
+        configured_pack = self._expected_pack_for_lot(lot_name)
         if pack != configured_pack:
             self._alert(
                 state,
@@ -1142,6 +1425,16 @@ class DistributorOperations:
                 quantity=expected_for_cartons - observed,
             )
         self._recompute_quantities(state)
+        replacement_for_lot = self._replacement_for_lot(lot_name)
+        quantities = cast(Mapping[str, object], state["quantities"])
+        if (
+            replacement_for_lot is not None
+            and _quantity(lot["received"], "lot received")
+            == _quantity(lot["expected_quantity"], "expected_quantity")
+            and _quantity(quantities["received"], "received")
+            == _quantity(quantities["ordered"], "ordered")
+        ):
+            self._resolve_alerts(state, {"PARTS_SHORTAGE"}, replacement_for_lot)
         status = self._operations_status(operations)
         self._append_event(state, event, status, operations)
         return state, status
@@ -1197,6 +1490,7 @@ class DistributorOperations:
             return state, "BLOCKED"
         tested = _quantity(event["sample_quantity"], "sample_quantity", positive=True)
         lot_received = _quantity(lot["received"], "lot received")
+        inspection_evidence = self._inspection_evidence(event, bounds, lot_received)
         if event["scope"] == "WHOLE_LOT" and tested < lot_received:
             self._alert(
                 state,
@@ -1205,6 +1499,7 @@ class DistributorOperations:
                 event=event,
                 lot=lot_name,
                 quantity=lot_received - tested,
+                extra=inspection_evidence,
             )
             self._append_event(state, event, "BLOCKED", operations)
             return state, "BLOCKED"
@@ -1239,12 +1534,13 @@ class DistributorOperations:
                 state,
                 code="QUALITY_FAILED",
                 message=(
-                    "The measured inspection failed. The lot is held pending supported disposition."
+                    "A sample measurement failed. The lot is held pending supported disposition; "
+                    "this does not establish every held unit is defective."
                 ),
                 event=event,
                 lot=lot_name,
                 quantity=quantity,
-                extra={"scope": event["scope"], "sample_quantity": event["sample_quantity"]},
+                extra={**inspection_evidence, "held_quantity": _wire(quantity)},
             )
             self._recompute_allocations(state)
         elif event["scope"] != "WHOLE_LOT":
@@ -1256,6 +1552,7 @@ class DistributorOperations:
                 ),
                 event=event,
                 lot=lot_name,
+                extra=inspection_evidence,
             )
         else:
             release = self._native(
@@ -1697,9 +1994,10 @@ class DistributorOperations:
         if row is None:
             return None
         try:
-            return self._validate_event(_decoded(cast(str, row[0]), "event payload"))
+            payload = self._validate_event(_decoded(cast(str, row[0]), "event payload"))
         except (RuntimeError, ValueError):
             return None
+        return payload
 
     def _append_resumed_operation(
         self, state: dict[str, object], prior_event_id: str, outcome: _NativeOutcome
@@ -1755,6 +2053,39 @@ class DistributorOperations:
                 "synthetic": event["synthetic"],
             }
         return True
+
+    def _expected_pack_for_lot(self, lot_name: str) -> Decimal:
+        configured = self._configured_lot(lot_name)
+        return _quantity(
+            configured.get("expected_pack_quantity", self._config["expected_pack_quantity"]),
+            "expected_pack_quantity",
+            positive=True,
+        )
+
+    def _replacement_for_lot(self, lot_name: str) -> str | None:
+        replacement = self._configured_lot(lot_name).get("replacement_for_lot")
+        return _text(replacement, "replacement_for_lot") if replacement is not None else None
+
+    def _configured_lot(self, lot_name: str) -> Mapping[str, object]:
+        lots = cast(list[Mapping[str, object]], self._config["lots"])
+        matches = [row for row in lots if row.get("lot") == lot_name]
+        if len(matches) != 1:  # pragma: no cover - constructor validates configured identities
+            raise RuntimeError("configured lot is unavailable")
+        return matches[0]
+
+    @staticmethod
+    def _inspection_evidence(
+        event: Mapping[str, object], bounds: Mapping[str, object], lot_received: Decimal
+    ) -> dict[str, object]:
+        return {
+            "scope": event["scope"],
+            "sample_quantity": event["sample_quantity"],
+            "metric": event["metric"],
+            "measured": event["measured"],
+            "criterion": _copy(bounds),
+            "required_lot_quantity": _wire(lot_received),
+            "inspection_report_ref": event["inspection_report_ref"],
+        }
 
     @staticmethod
     def _consume_prepared(state: dict[str, object], order: str, quantity: Decimal) -> None:
@@ -1832,6 +2163,7 @@ class DistributorOperations:
                 ),
                 "dispatched": _wire(dispatched),
                 "cartons": cartons,
+                "observed_outer_packages": cartons,
             }
         )
 
@@ -1973,6 +2305,11 @@ class DistributorOperations:
         result["events"] = event_briefs
         result["shipments"] = shipment_rows
         self._add_outbound_facts(result, event_briefs, shipment_rows)
+        policy = cast(Mapping[str, object], self._config["policy"])
+        result["quality_policy"] = {
+            "inspection_required": policy["inspection_required"],
+            "inspection_criteria": _copy(policy.get("inspection_criteria") or {}),
+        }
         alerts = cast(list[dict[str, object]], result["alerts"])
         if source["source_status"] != "CURRENT" and not any(
             alert.get("code") == "SOURCE_UNAVAILABLE" and alert.get("derived") is True
@@ -2053,6 +2390,7 @@ class DistributorOperations:
         shipments: list[dict[str, object]],
     ) -> None:
         picked_by_order: dict[str, Decimal] = {}
+        counted_pick_lists: set[str] = set()
         for event in events:
             if event.get("type") != "picked":
                 continue
@@ -2060,17 +2398,24 @@ class DistributorOperations:
             operations = event.get("operations")
             if not isinstance(order, str) or not isinstance(operations, list):
                 continue
+            pick_lists = {
+                name
+                for operation in operations
+                if isinstance(operation, Mapping)
+                and operation.get("kind") == "submit_pick"
+                and operation.get("status") in _SUCCESS
+                for document in _documents(operation.get("documents"))
+                if document.get("kind") == "Pick List"
+                and isinstance(name := document.get("name"), str)
+            }
+            if not pick_lists or pick_lists.intersection(counted_pick_lists):
+                continue
             try:
                 quantity = _quantity(event.get("quantity"), "picked quantity", positive=True)
             except ValueError:
                 continue
-            if any(
-                isinstance(operation, Mapping)
-                and operation.get("kind") == "submit_pick"
-                and operation.get("status") in _SUCCESS
-                for operation in operations
-            ):
-                picked_by_order[order] = picked_by_order.get(order, Decimal()) + quantity
+            counted_pick_lists.update(pick_lists)
+            picked_by_order[order] = picked_by_order.get(order, Decimal()) + quantity
         delivered_by_order: dict[str, Decimal] = {}
         for shipment in shipments:
             if shipment.get("delivered") is not True:
