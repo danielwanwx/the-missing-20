@@ -1,0 +1,273 @@
+{
+  "schema_version": "missing20-erpnext-evidence/v1",
+  "source_id": "synthetic-erp",
+  "case_id": "SYNTHETIC-D4-CASE",
+  "configured_document_names": {
+    "purchase_order": "SYN-PO-01",
+    "purchase_receipt": "SYN-PR-01",
+    "purchase_invoice": ""
+  },
+  "provider": "ERPNext Synthetic Fixture",
+  "read_only": true,
+  "status": "CONNECTED",
+  "documents": [
+    {
+      "kind": "purchase_order",
+      "name": "SYN-PO-01",
+      "status": "SUBMITTED",
+      "quantity": 40.0,
+      "supplier": "Synthetic Supplier Ltd.",
+      "unit_rate": 50.0,
+      "line_value": 2000.0,
+      "currency": "USD",
+      "docstatus": 1,
+      "modified": "2026-01-01 00:00:00",
+      "transaction_date": "2026-01-01",
+      "schedule_date": "2026-01-01",
+      "company": "Synthetic Demo Company",
+      "net_total": 2000.0,
+      "total_taxes_and_charges": 0.0,
+      "discount_amount": 0.0,
+      "items": [
+        {
+          "name": "SYN-PO-ITEM-01",
+          "item_code": "SYNTHETIC-CARTON",
+          "qty": 40.0,
+          "uom": "Box",
+          "stock_uom": "Box",
+          "conversion_factor": 1.0,
+          "net_rate": 50.0,
+          "net_amount": 2000.0,
+          "rate": 50.0,
+          "amount": 2000.0,
+          "warehouse": "Synthetic Stores",
+          "received_qty": 2.0,
+          "schedule_date": "2026-01-01"
+        }
+      ],
+      "uom": "Box"
+    },
+    {
+      "kind": "purchase_receipt",
+      "name": "SYN-PR-01",
+      "status": "RECEIVED",
+      "delivery_note": "SYNTHETIC-PHOTO-A",
+      "received": 1.0,
+      "accepted": 1.0,
+      "rejected": 0.0,
+      "quality_hold_remaining": 0.0,
+      "quality_hold_warehouse": "",
+      "docstatus": 1,
+      "modified": "2026-01-01 00:00:00",
+      "posting_date": "2026-01-01",
+      "posting_time": "00:00:00",
+      "company": "Synthetic Demo Company",
+      "currency": "USD",
+      "net_total": 50.0,
+      "total_taxes_and_charges": 0.0,
+      "discount_amount": 0.0,
+      "is_return": 0,
+      "case_scope_complete": true,
+      "items": [
+        {
+          "name": "SYN-PR-ITEM-01",
+          "item_code": "SYNTHETIC-CARTON",
+          "qty": 1.0,
+          "uom": "Box",
+          "stock_uom": "Box",
+          "conversion_factor": 1.0,
+          "net_rate": 50.0,
+          "net_amount": 50.0,
+          "rate": 50.0,
+          "amount": 50.0,
+          "purchase_order": "SYN-PO-01",
+          "purchase_order_item": "SYN-PO-ITEM-01",
+          "warehouse": "Synthetic Stores",
+          "received_qty": 1.0,
+          "rejected_qty": 0.0
+        }
+      ],
+      "uom": "Box"
+    },
+    {
+      "kind": "purchase_receipt",
+      "name": "SYN-PR-00",
+      "status": "RECEIVED",
+      "docstatus": 1,
+      "modified": "2026-01-01 00:00:00",
+      "posting_date": "2026-01-01",
+      "posting_time": "00:00:00",
+      "company": "Synthetic Demo Company",
+      "currency": "USD",
+      "net_total": 50.0,
+      "total_taxes_and_charges": 0.0,
+      "discount_amount": 0.0,
+      "is_return": 0,
+      "case_scope_complete": true,
+      "items": [
+        {
+          "name": "SYN-PR-ITEM-00",
+          "item_code": "SYNTHETIC-CARTON",
+          "qty": 1.0,
+          "uom": "Box",
+          "stock_uom": "Box",
+          "conversion_factor": 1.0,
+          "net_rate": 50.0,
+          "net_amount": 50.0,
+          "rate": 50.0,
+          "amount": 50.0,
+          "purchase_order": "SYN-PO-01",
+          "purchase_order_item": "SYN-PO-ITEM-01",
+          "warehouse": "Synthetic Stores",
+          "received_qty": 1.0,
+          "rejected_qty": 0.0
+        }
+      ],
+      "uom": "Box",
+      "accepted": 1.0,
+      "rejected": 0.0,
+      "received": 1.0,
+      "quality_hold_remaining": 0.0,
+      "delivery_note": "SYNTHETIC-PHOTO-B"
+    }
+  ],
+  "primary_document_names": {
+    "purchase_order": "SYN-PO-01",
+    "purchase_receipt": "SYN-PR-01"
+  },
+  "ledger_evidence": {
+    "status": "CONNECTED",
+    "source": "ERPNext Synthetic Fixture",
+    "read_only": true,
+    "voucher_names": [
+      "SYN-PR-01",
+      "SYN-PR-00"
+    ],
+    "stock_entries": [
+      {
+        "name": "SYN-SLE-00",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "SYN-PR-00",
+        "item_code": "SYNTHETIC-CARTON",
+        "warehouse": "Synthetic Stores",
+        "actual_qty": 1.0,
+        "qty_after_transaction": 4.0,
+        "stock_value_difference": 50.0,
+        "company": "Synthetic Demo Company",
+        "posting_date": "2026-01-01",
+        "posting_time": "00:00:00"
+      },
+      {
+        "name": "SYN-SLE-OLD",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "SYN-PR-01",
+        "item_code": "SYNTHETIC-CARTON",
+        "warehouse": "Synthetic Stores",
+        "actual_qty": 1.0,
+        "qty_after_transaction": 5.0,
+        "stock_value_difference": 50.0,
+        "company": "Synthetic Demo Company",
+        "posting_date": "2026-01-01",
+        "posting_time": "00:00:00"
+      }
+    ],
+    "general_ledger_entries": [
+      {
+        "name": "SYN-GLE-01",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "SYN-PR-00",
+        "account": "Synthetic Stock In Hand",
+        "debit": 50.0,
+        "credit": 0.0,
+        "company": "Synthetic Demo Company",
+        "posting_date": "2026-01-01",
+        "party_type": "None",
+        "party": "None"
+      },
+      {
+        "name": "SYN-GLE-02",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "SYN-PR-00",
+        "account": "Synthetic Stock Received Not Billed",
+        "debit": 0.0,
+        "credit": 50.0,
+        "company": "Synthetic Demo Company",
+        "posting_date": "2026-01-01",
+        "party_type": "None",
+        "party": "None"
+      },
+      {
+        "name": "SYN-GLE-03",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "SYN-PR-01",
+        "account": "Synthetic Stock In Hand",
+        "debit": 50.0,
+        "credit": 0.0,
+        "company": "Synthetic Demo Company",
+        "posting_date": "2026-01-01",
+        "party_type": "None",
+        "party": "None"
+      },
+      {
+        "name": "SYN-GLE-04",
+        "voucher_type": "Purchase Receipt",
+        "voucher_no": "SYN-PR-01",
+        "account": "Synthetic Stock Received Not Billed",
+        "debit": 0.0,
+        "credit": 50.0,
+        "company": "Synthetic Demo Company",
+        "posting_date": "2026-01-01",
+        "party_type": "None",
+        "party": "None"
+      }
+    ],
+    "totals": {
+      "stock_value_difference": 100.0,
+      "debit": 100.0,
+      "credit": 100.0
+    },
+    "assertions": {
+      "stock_ledger_present": true,
+      "general_ledger_present": true,
+      "debits_equal_credits": true
+    }
+  },
+  "document_lifecycle": {
+    "purchase_order": "PRESENT",
+    "purchase_receipt": "PRESENT",
+    "purchase_invoice": "AWAITING_INVOICE"
+  },
+  "purchase_scope": "ALL_LINKED_DOCUMENTS",
+  "activity": [
+    {
+      "id": "erp-po-SYN-PO-01",
+      "source_id": "synthetic-erp",
+      "provider": "ERPNext Synthetic Fixture",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "status": "VERIFIED",
+      "label": "ERP read · purchase order SYN-PO-01",
+      "detail": "Purchase order from Synthetic Supplier Ltd."
+    },
+    {
+      "id": "erp-receipt-SYN-PR-01",
+      "source_id": "synthetic-erp",
+      "provider": "ERPNext Synthetic Fixture",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "status": "VERIFIED",
+      "label": "ERP read · receipt SYN-PR-01",
+      "detail": "1 accepted · 0 in Quality Hold · 1 received"
+    },
+    {
+      "id": "erp-purchase_receipt-SYN-PR-00",
+      "source_id": "synthetic-erp",
+      "provider": "ERPNext Synthetic Fixture",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "status": "RECEIVED",
+      "label": "ERP read · purchase receipt SYN-PR-00",
+      "detail": "Additional document linked to this purchase order"
+    }
+  ],
+  "sequence": 1,
+  "received_at": "2026-01-01T00:00:00+00:00",
+  "changed_at": "2026-01-01T00:00:00+00:00"
+}

@@ -138,7 +138,7 @@ def test_browser_renders_live_agent_platform_and_keeps_writes_disabled(tmp_path:
             _wait_ui(
                 browser,
                 (
-                    "document.body.dataset.agentPlatform === 'ready' && "
+                    "document.body && document.body.dataset.agentPlatform === 'ready' && "
                     "getComputedStyle(document.querySelector('#dashboard-chart')).display "
                     "!== 'none' && "
                     "document.querySelectorAll('#dashboard-event-feed "
@@ -383,8 +383,8 @@ def test_browser_ready_incident_link_recovers_to_registered_normal_case(tmp_path
             _wait_ui(
                 browser,
                 (
-                    "document.body.dataset.workspaceReady === 'true' || "
-                    "document.querySelector('#unavailable')?.hidden === false"
+                    "document.body && (document.body.dataset.workspaceReady === 'true' || "
+                    "document.querySelector('#unavailable')?.hidden === false)"
                 ),
                 "fresh-runtime bootstrap verdict",
             )

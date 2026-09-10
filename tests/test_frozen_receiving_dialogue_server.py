@@ -28,7 +28,7 @@ from the_missing_20.agents.live_advisory import (
     LiveAdvisoryResult,
 )
 
-FIXTURE_ROOT = Path("/private/tmp/m20-s2-d4-screen-v2")
+FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "frozen_receiving_dialogue"
 ERP_V1 = FIXTURE_ROOT / "erp-v1.json"
 ERP_V2 = FIXTURE_ROOT / "erp-v2.json"
 SAAS = FIXTURE_ROOT / "saas.json"
@@ -54,7 +54,7 @@ class OfflineFixtureRunner:
         self.calls.append({"packet": copied, "question": question})
         evidence_ids = tuple(str(item) for item in packet["evidence_ids"])
         turn = len(self.calls)
-        cited_id = "MAT-PRE-2026-00006" if turn == 1 else "PUR-ORD-2026-00015"
+        cited_id = "SYN-PR-01" if turn == 1 else "SYN-PO-01"
         assert cited_id in evidence_ids
         required_tools = tuple(str(name) for name in packet.get("required_tools", ()))
         return AdvisoryRun(
@@ -143,7 +143,7 @@ def test_file_backed_reader_requires_declared_read_only_schema_and_rereads(tmp_p
     first = reader.current()
     assert reader.external_calls == 0
     assert reader.read_count == 1
-    assert first["case_id"] == "M20-GOODS-20260909-40-R3"
+    assert first["case_id"] == "SYNTHETIC-D4-CASE"
 
     altered = dict(first)
     altered["read_only"] = False
@@ -231,7 +231,7 @@ def test_frozen_server_uses_real_http_gateway_and_persists_d4_restart(
     )
     dialogue = _mapping(fourth["dialogue_context"])
     conversation_id = dialogue["conversation_id"]
-    assert _mappings(dialogue["reference_groups"])[0]["receipt_ids"] == ["MAT-PRE-2026-00006"]
+    assert _mappings(dialogue["reference_groups"])[0]["receipt_ids"] == ["SYN-PR-01"]
     persisted = json.loads((runtime / "agent-platform-state.json").read_text(encoding="utf-8"))
     assert "OFFLINE_FIXTURE_ASSISTANT_PROSE" not in json.dumps(persisted["dialogue_intent"])
     assert hashlib.sha256(ERP_V1.read_bytes()).hexdigest() == root_v1_hash
@@ -269,16 +269,16 @@ def test_frozen_server_uses_real_http_gateway_and_persists_d4_restart(
     )
     candidates = _mapping(_mapping(sources["read_control_context"])["prior_reference_candidates"])
     assert candidates["status"] == "ONE_CANDIDATE"
-    assert candidates["previous_receipt_ids"] == ["MAT-PRE-2026-00006"]
+    assert candidates["previous_receipt_ids"] == ["SYN-PR-01"]
     stock_rows = [
         row
         for record in _mappings(_mapping(sources["read_erp_evidence"])["records"])
         for row in record.get("stock_entries", [])
-        if row.get("voucher_no") == "MAT-PRE-2026-00006"
+        if row.get("voucher_no") == "SYN-PR-01"
     ]
-    assert [row["name"] for row in stock_rows] == ["FIXTURE-SLE-R3-PR6-RENAMED"]
+    assert [row["name"] for row in stock_rows] == ["SYN-SLE-01-RENAMED"]
     assert [row["actual_qty"] for row in stock_rows] == [1.0]
-    assert "MAT-SLE-2026-00026" not in json.dumps(sources)
+    assert "SYN-SLE-OLD" not in json.dumps(sources)
     fifth_prompt = runner.calls[4]["question"]
     assert isinstance(fifth_prompt, str)
     assert "OFFLINE_FIXTURE_ASSISTANT_PROSE" not in fifth_prompt

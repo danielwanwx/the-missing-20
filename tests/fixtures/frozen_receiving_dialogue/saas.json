@@ -1,0 +1,95 @@
+{
+  "schema_version": "missing20-saas-evidence/v1",
+  "correlation_id": "SYNTHETIC-D4-CASE",
+  "read_only": true,
+  "status": "CONNECTED",
+  "sources": [
+    {
+      "source_id": "synthetic-quality-registry",
+      "provider": "Synthetic Quality Registry",
+      "status": "NOT_FOUND",
+      "record_id": "",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "Registry correlation not found",
+      "detail": "No release record matched SYNTHETIC-D4-CASE.",
+      "read_only": true
+    },
+    {
+      "source_id": "synthetic-quality-release",
+      "provider": "Synthetic Quality Release",
+      "status": "PENDING",
+      "record_id": "",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "Synthetic release receipt pending",
+      "detail": "No synthetic integration receipt has been written for this fixture.",
+      "read_only": true,
+      "evidence_kind": "RUN_RECEIPT_PENDING"
+    },
+    {
+      "source_id": "synthetic-capa-journal",
+      "provider": "Synthetic CAPA Journal",
+      "status": "VERIFIED",
+      "record_id": "SYN-QA-2",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "CAPA read · Done",
+      "detail": "[Synthetic fixture] Receiving review — SYNTHETIC-D4-CASE / ARRIVAL-01",
+      "read_only": true
+    },
+    {
+      "source_id": "synthetic-alert-journal",
+      "provider": "Synthetic Alert Journal",
+      "status": "VERIFIED",
+      "record_id": "synthetic-alert-1",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "Incident notification read",
+      "detail": "[Synthetic fixture · RECEIVED] SYNTHETIC-D4-CASE / ARRIVAL-01 ERPNext verified 1 Box of SYNTHETIC-CARTON on SYN-PR-01 (PO SYN-PO-01). Stock ledger: synthetic-ledger. Verif",
+      "read_only": true
+    }
+  ],
+  "activity": [
+    {
+      "source_id": "synthetic-quality-registry",
+      "provider": "Synthetic Quality Registry",
+      "status": "NOT_FOUND",
+      "record_id": "",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "Registry correlation not found",
+      "detail": "No release record matched SYNTHETIC-D4-CASE.",
+      "read_only": true
+    },
+    {
+      "source_id": "synthetic-quality-release",
+      "provider": "Synthetic Quality Release",
+      "status": "PENDING",
+      "record_id": "",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "Synthetic release receipt pending",
+      "detail": "No synthetic integration receipt has been written for this fixture.",
+      "read_only": true,
+      "evidence_kind": "RUN_RECEIPT_PENDING"
+    },
+    {
+      "source_id": "synthetic-capa-journal",
+      "provider": "Synthetic CAPA Journal",
+      "status": "VERIFIED",
+      "record_id": "SYN-QA-2",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "CAPA read · Done",
+      "detail": "[Synthetic fixture] Receiving review — SYNTHETIC-D4-CASE / ARRIVAL-01",
+      "read_only": true
+    },
+    {
+      "source_id": "synthetic-alert-journal",
+      "provider": "Synthetic Alert Journal",
+      "status": "VERIFIED",
+      "record_id": "synthetic-alert-1",
+      "occurred_at": "2026-01-01T00:00:00+00:00",
+      "label": "Incident notification read",
+      "detail": "[Synthetic fixture · RECEIVED] SYNTHETIC-D4-CASE / ARRIVAL-01 ERPNext verified 1 Box of SYNTHETIC-CARTON on SYN-PR-01 (PO SYN-PO-01). Stock ledger: synthetic-ledger. Verif",
+      "read_only": true
+    }
+  ],
+  "sequence": 1,
+  "received_at": "2026-01-01T00:00:00+00:00",
+  "changed_at": "2026-01-01T00:00:00+00:00"
+}
