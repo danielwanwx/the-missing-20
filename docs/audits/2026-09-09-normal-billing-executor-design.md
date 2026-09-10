@@ -6,13 +6,13 @@ One operation coordinator should compose the existing configured request callabl
 
 Before first insert, reread the complete source and compare decisive commercial identity, PO/PR revisions and relevant related-document state against the frozen approved intent. Preserve full raw snapshots separately from normalized commercial comparison. If approval is stale/refused/expired or sources are incomplete/conflicting, stop before the journal claim. Mark insert in the journal before the one POST /api/resource/Purchase%20Invoice. Construct the document from the verified native mapper plus disclosed bill reference/date, preserving native PO/PR child links, quantity, UOM, accounts and no-stock-update flags. Freeze the actual outgoing payload or its complete deterministic reconstruction before I/O. Do not call legacy _insert_and_submit, which joins two effects without these fences.
 
-Treat the POST acknowledgment only as a candidate identity. Always read the resulting exact document and use complete company/supplier related discovery to establish uniqueness. If acknowledgment is lost or malformed, discover the frozen supplier bill and target receipt-line identity. Zero hits or incomplete lookup stays unknown with the insert fence closed; multiple or contradictory hits stays conflict. No automatic reinsert. First admitted exact name must match the immutable journal identity and can never be replaced by a different readback.
+Persist the server-generated name and full draft returned by this intent's insert response, bound to its frozen request and version. Then read that exact document and use complete company/supplier related discovery to detect conflicts. If the acknowledgment is lost or malformed before an exact name is durably bound, retain an unknown insert outcome with the insert fence closed. Business-field search may support read-only investigation, but cannot establish ownership, supply a name for submission or reopen the insert fence. First admitted exact name must come from that bound response and can never be replaced by another readback.
 
 An exact own draft is an expected state transition, not a new manager approval or permission to ignore unrelated changes. Keep it in raw source evidence. Only after proving its journal-bound name, bill digest, exact native child/commercial values and complete unique lookup may the coordinator classify that own document separately from unrelated source changes for the first submit comparison. All foreign documents, returns, same-bill collisions, changed commercial facts and incomplete reads still block. Reusing the pre-insert source hash by assertion is forbidden. Approval expiry or refusal after insert prevents submit while retaining readback ability.
 
 Mark the first submit attempt durably before the one native submit request. Read back even after a transport timeout. Never repeat submit after its marker; recover by reads of the original exact invoice. Observe and report document acceptance separately from financial-effect verification. Require docstatus1, exact frozen party/bill/PO/PR/native child, quantity1 Box, amount50 USD, update_stock0 and no mixed lines/credits/returns. Verify GL entries by exact invoice voucher, party/account and debit/credit amounts, not balance alone. Verify no invoice SLE and unchanged original PR7 stock entries. If those reads are incomplete or wrong, financial closure remains unverified; do not invent success or reopen write fences.
 
-Required offline counterexamples before implementation: two concurrent execute requests share one durable marker/POST; insert timeout with zero/one/two candidates; submit timeout then submitted readback; restart in both unknown phases; renamed/conflicting draft identity; stale approval/source, refusal between phases; expected own draft vs additional foreign bill/return; malformed/partial exact lookup; wrong native child, amount/UOM/account, mixed line and update_stock; failed GL/SLE verification. Assert exact permitted network effects and no payment endpoints. Tests use injected transport and isolated journals, never existing R4 runtime databases.
+Required offline counterexamples before implementation: two concurrent execute requests share one durable marker/POST; insert timeout with zero/one/two search candidates always remains read-only without a bound response name; submit timeout then exact submitted readback; restart in both unknown phases; renamed/conflicting draft identity; stale approval/source, refusal between phases; expected own draft vs additional foreign bill/return; malformed/partial exact lookup; wrong native child, amount/UOM/account, mixed line and update_stock; failed GL/SLE verification. Assert exact permitted network effects and no payment endpoints. Tests use injected transport and isolated journals, never existing R4 runtime databases.
 
 A later actual external acceptance uses a reviewed frozen proposal and the already authorized demo invoice scope. Show the concrete synthetic bill and proposal in the product, obtain the application's explicit manager action, then verify the actual same-order invoice/GL/SLE result and restart/reconfirm no duplicates. Do not conflate a CLI coordinator test, a draft invoice or this design with visible end-to-end closure. Customer fulfillment remains a distinct next stage with its own same-order source basis.
 
@@ -103,8 +103,10 @@ existing source-stop path and cannot be repaired after the insert fence.
 
 ### Draft and submit binding
 
-After insert, the complete unique exact-draft readback is validated with the
-same `DRAFT` validator before admission. Extend the admitted draft record with
+After insert, durably bind its acknowledged server name and full returned draft
+to the saved attempt request and intent version. The subsequent complete unique
+exact-draft readback is validated with the same `DRAFT` validator before admission;
+the name must already match that acknowledged response. Extend the admitted draft record with
 the canonical exact draft document and its digest, bound to the first admitted
 draft name. A different later name or document digest enters conflict hold
 while preserving the first evidence.
@@ -126,3 +128,31 @@ The SQLite journal can bind immutable records supplied by the trusted
 coordinator; it does not establish that an arbitrary in-process caller or an
 external provider made a truthful effect. That limit remains explicit in
 executor results and tests.
+
+## Research-led selection after the DBOS experiment
+
+The accepted [DBOS comparison](2026-09-09-dbos-recovery-comparison-review.md)
+demonstrated native recovery but duplicate external effects without a target
+unique key. Do not add DBOS to the product for this billing step. Official
+Frappe v15 source also rules out treating caller-supplied Purchase Invoice names
+or optional supplier-bill duplicate checks as a native external-intent key.
+Use the accepted source reader, native mapper/binder and existing journal for
+the acknowledged-name path described here. This replaces the earlier proposed
+automatic adoption of a uniquely matching bill search result after insert ACK
+loss. The normal acknowledged path can proceed to exact invoice and GL/SLE
+verification; a committed insert whose name was not durably captured stops for
+read-only investigation. That availability limitation is explicit.
+
+Independent review approved this bounded design direction, requiring response
+provenance, frozen request/version binding, one attempt per write and fresh
+commercial/authority checks before submit. It did not approve an implementation.
+The unfinished journal expansion remains preserved and paused while its smallest
+necessary replacement is assessed; no new invoice or product closure is claimed.
+
+## Later application integration boundary — unimplemented
+
+Use the existing Case Console and agent-platform projection, not Scenario Lab's legacy recovery action. Candidate routes belong to a separate normal-billing action family under `/api/v1/agent-platform/normal-billing/`; reuse the server's strict action allowlist and JSON admission, plus the existing UI `runPlatformAction`/projection refresh. Do not call the existing recovery approve/execute endpoints. A small supplier-bill view should show the disclosed synthetic bill, exact receipt/quantity/amount, evidence links and actual prepared/approval/attempt/readback state. Never display a single generic success label before financial verification.
+
+Keep the R4 pilot basis server-bound from its admitted case/PO/PR and disclosed synthetic bill configuration. The browser does not supply arbitrary document paths, native ERP bodies or a substitute case identity. Journal approval tokens stay server-side. For this competition demo, an explicitly configured server-side demo operator identity is a sufficient initial principal boundary; disclose that it is not production manager authentication. Do not introduce an unrelated identity platform or treat its absence as a new user approval requirement. Existing demo invoice authorization remains active; exercise the concrete product approval action during the authorized test.
+
+Project only the current case's redacted journal status through GET/SSE. Source-stale, refusal, unknown attempt and identity conflict remain distinct; an old snapshot never authorizes a new action. The coordinator, these routes and the UI are later slices requiring independent tests and actual same-order evidence; this integration note does not claim they exist.

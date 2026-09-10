@@ -92,3 +92,30 @@ model semantics. Actual ERP read-only capability results are retained privately
 at `/private/tmp/m20-erp-native-capability-read-02.json`; the01 file preserves
 the separate sandbox DNS failure. Three successful GETs, zero mutations. No
 current configured identity escalation followed those false permission results.
+
+## Native ERP follow-up after the actual DBOS comparison
+
+The independently accepted experiment observed two fake effects without a unique
+target key and one with it, despite both recovered workflows reporting SUCCESS.
+DBOS is therefore not selected for billing integration at this stage.
+
+Official Frappe v15's REST `create_doc` calls `new_doc(...).insert()` without an
+external-intent idempotency contract. Purchase Invoice uses naming-series
+autoname; naming clears a caller-supplied name outside prompt/import modes.
+The optional supplier bill check is a pre-insert query, not an atomic unique
+claim. These interfaces do not supply the target property demonstrated by DBOS
+variant B. [REST implementation](https://github.com/frappe/frappe/blob/version-15/frappe/api/v1.py),
+[naming source](https://github.com/frappe/frappe/blob/version-15/frappe/model/naming.py),
+[PI metadata](https://github.com/frappe/erpnext/blob/version-15/erpnext/accounts/doctype/purchase_invoice/purchase_invoice.json),
+[PI validation](https://github.com/frappe/erpnext/blob/version-15/erpnext/accounts/doctype/purchase_invoice/purchase_invoice.py).
+
+Choose the native API plus the existing single-attempt journal for ordinary
+acknowledged creation, persist its exact server name/returned draft and then
+perform one submission with exact readback. A lost insert response without a
+durably bound name remains read-only: matching business fields cannot prove
+this attempt owns that draft. A lost submit response has an already known name
+for read-only reconciliation. This is our integration inference and explicit
+availability tradeoff, not a provider exactly-once guarantee. The
+[submit handler](https://github.com/frappe/frappe/blob/version-15/frappe/client.py)
+takes a document; it does not turn an ambiguous prior insert into an identified
+effect. [Revised design](../audits/2026-09-09-normal-billing-executor-design.md).
