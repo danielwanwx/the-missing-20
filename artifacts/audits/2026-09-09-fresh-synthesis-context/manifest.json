@@ -1,0 +1,11 @@
+{
+  "status": "FAILED_STOP_WITHDRAWN",
+  "base_sha": "adc4689e4319d92ae26f3a3ed41729c229b9cc8a",
+  "files": {
+    "src/the_missing_20/agents/live_advisory.py": "90e68f01350c8c2f4bbb0043978bf214b5fb974f499d387afdcc2a0944be126a",
+    "src/the_missing_20/agents/fresh_synthesis_context.py": "1db0b6b4e935f4726489a3cb991c169f756ec02b0ae48c53f47e0cfd12602203",
+    "scripts/diagnostics/probe_fresh_synthesis_context.py": "f25b94ff7f43cdf38f2c46f93bb8c2d91a97cfeaa95fa527afa14e83483ef8fb",
+    "tests/test_fresh_synthesis_context.py": "579bec1362bb486e7182609629601ab76fcbffd370768f42b33735cfdc956cd0"
+  },
+  "live_report_sha256": "118315bbd2bc25ba4a7d5c78abb6ddf005395207578476326fef7019a209388a"
+}
