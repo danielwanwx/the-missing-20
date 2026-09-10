@@ -44,3 +44,18 @@ The next adapter gate must also make lookup coverage explicit: COMPLETE must cov
 The frozen-regression report accurately distinguishes the original failed combined command from completed check components. Private logs confirm233 formatted files, Ruff success, strict mypy51 files,1,613 Python tests in67.86seconds, the missing @zxing/library error, and subsequently101 JS tests with zero failures/skips. No fresh Python environment or real-model acceptance is claimed. Tracker additions retain this scope and keep billing/continuity unaccepted.
 
 The S2 clarification correctly supersedes native-session wording with application dialogue_intent continuity and retains independent D4/D5 gates. The source-digest clarification correctly separates an audit snapshot from an idempotency key and preserves the submit-attempt fence; it approves no executor. The preflight appendix matches private PO/PR shape and the retained discovery summary (one PI, seven PR, no linked results). That summary is explicitly acknowledged not to contain every inspected parent payload, so it supports a preparatory report rather than independently reproducible final external acceptance. These documentation updates do not overclaim product completion; they may proceed separately from the blocked preview implementation.
+
+## Final bounded correction review — superseding verdict
+
+**APPROVED for this pure read-only preview slice.** This supersedes the candidate BLOCKED verdicts above while retaining their failure evidence. It does not approve an adapter's real lookup coverage, a durable billing executor, a manager authorization, or any financial write/full closure.
+
+Frozen SHA256:
+
+- `src/the_missing_20/adapters/normal_receipt_billing_preview.py`: `21ec05497ef76b8f39c9fef5dad023c4265d7df061a727effd9cbfd39a6fc8de`
+- `tests/test_normal_receipt_billing_preview.py`: `1f3ce8d4c831caeee765cf9d977dc45ee90f1bfba4656b0823bc39bdc0557560`
+
+Independent `.venv/bin/python -m pytest tests/test_normal_receipt_billing_preview.py -q`: **58 passed**. Independently replayed the retained return/conversion/wrong-child/wrong-account/stock-quantity/unknown-flag/NaN/wrong-scope/malformed-status and existing partial/draft/unknown/negative quantity cases: all HOLD without write authority. Replayed contradictory pagination in both directions and a present unknown alias: all HOLD. The known native PR return now HOLDs using its native header reference and PO child shape. Removing each required coverage declaration independently also HOLDs.
+
+Code inspection confirms source docstatus uses finite numeric validation excluding booleans, every supplied pagination declaration must agree with explicit complete pagination, and native receipt returns are examined before PI-style child matching. The lookup contract now requires explicit complete coverage for `receipt_line_invoices`, `receipt_returns`, and `bill_reference_collisions`. Those are caller attestations that a future adapter must prove; this pure function does not perform searches or manufacture source completeness.
+
+The unchanged private PO40/PR1/native mapper documents again produced READY with `write_allowed=False` using the explicit synthetic basis and matching native posting date. No missing supplier-bill field was inserted into ERP evidence. The supplied related envelope in this check was a declared test input, not a new live search. Source/bill digest separation and the previously verified nonmutation boundary remain intact. No product files were edited or external/model operations performed during this review.
