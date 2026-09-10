@@ -1,0 +1,92 @@
+{
+  "scope": "actual demo ERP readonly; native mapper unsaved; no insert submit or payment",
+  "raw_private_evidence_sha256": "589f6d570898999a5e00411a9565e67b6465fbace0450b9d2a9de5e4fb6ea00c",
+  "basis": {
+    "case_id": "M20-GOODS-20260909-40-R4",
+    "company": "Missing 20 Automotive Demo",
+    "supplier": "M20 Controller Systems Ltd.",
+    "bill_reference": "SUP-BILL-R4-0001",
+    "bill_date": "2026-09-09",
+    "purchase_order": "PUR-ORD-2026-00016",
+    "purchase_order_item": "458j82kp8e",
+    "purchase_receipt": "MAT-PRE-2026-00007",
+    "purchase_receipt_item": "068bbdr0mb",
+    "item_code": "M20-DEMO-CARTON",
+    "ordered_quantity": "40",
+    "quantity": "1",
+    "uom": "Box",
+    "stock_uom": "Box",
+    "conversion_factor": "1",
+    "net_rate": "50",
+    "net_amount": "50",
+    "currency": "USD",
+    "tax_amount": "0",
+    "discount_amount": "0",
+    "gross_amount": "50",
+    "source_revision": "r4-native-preflight-2026-09-09",
+    "posting_date": "2026-09-09",
+    "credit_to": "Creditors - M20",
+    "expense_account": "Stock Received But Not Billed - M20",
+    "synthetic_only": true
+  },
+  "preview": {
+    "source_digest": "426b4e94b7abec5841b43a36f31630802be2b840b7e309d7a540d6f78c2a9d00",
+    "bill_digest": "0fa7752044b9a9c003b2d25c296183187ffb53d8cf6bce00c5a12dd50c23572f",
+    "exact_ids": {
+      "case_id": "M20-GOODS-20260909-40-R4",
+      "purchase_order": "PUR-ORD-2026-00016",
+      "purchase_order_item": "458j82kp8e",
+      "purchase_receipt": "MAT-PRE-2026-00007",
+      "purchase_receipt_item": "068bbdr0mb",
+      "existing_invoice_names": []
+    },
+    "quantity": "1",
+    "uom": "Box",
+    "stock_uom": "Box",
+    "conversion_factor": "1",
+    "net_amount": "50",
+    "gross_amount": "50",
+    "required_inputs": [
+      "DISCLOSED_SYNTHETIC_BILL",
+      "COMPLETE_SCOPED_RELATED_DOCUMENT_READ",
+      "NATIVE_PR_TO_PI_MAPPER",
+      "SEPARATE_APPROVAL_REQUIRED"
+    ],
+    "status": "READY",
+    "reasons": [],
+    "read_only": true,
+    "write_allowed": false,
+    "source": {
+      "lookup_scope": {
+        "company": "Missing 20 Automotive Demo",
+        "purchase_order": "PUR-ORD-2026-00016",
+        "purchase_order_item": "458j82kp8e",
+        "purchase_receipt": "MAT-PRE-2026-00007",
+        "purchase_receipt_item": "068bbdr0mb",
+        "supplier": "M20 Controller Systems Ltd."
+      },
+      "observed_at": "2026-09-10T01:50:47.681208+00:00",
+      "read_only": true,
+      "source_revision": "00e5f4e4aad4042e369e030c3a9a03a26e8c384828ff9eb54ee0dafb7d36676f"
+    }
+  },
+  "snapshot_digest": "00e5f4e4aad4042e369e030c3a9a03a26e8c384828ff9eb54ee0dafb7d36676f",
+  "observed_at": "2026-09-10T01:50:47.681208+00:00",
+  "lookup_status": "COMPLETE",
+  "coverage": {
+    "receipt_line_invoices": true,
+    "receipt_returns": true,
+    "bill_reference_collisions": true
+  },
+  "parent_counts": {
+    "Purchase Invoice": 1,
+    "Purchase Receipt": 7
+  },
+  "request_count": 13,
+  "write_effects": "none; native mapper is unsaved",
+  "limitations": [
+    "Source collection is a point-in-time non-atomic multi-request read.",
+    "No insert, submit, financial ledger or UI acceptance.",
+    "Complete raw source snapshots remain private."
+  ]
+}
