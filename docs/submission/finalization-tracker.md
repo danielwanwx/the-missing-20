@@ -206,8 +206,12 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   advancing beyond73%, with unchanged hashes and no reported assertion failure.
   An independently diagnosed10,005-transaction SQLite test completed during the
   run; no permanent deadlock was observed. The run remains incomplete.
-- Coordinator candidate:13 independent integration tests pass, but independent
-  review found lost current-source audit evidence on successful reconciliation.
-  Correction and re-review are required before acceptance or real invoice effects.
+- Billing coordinator independently approved after correcting lost current-source
+  audit evidence and malformed insert-response retention. Final18 independent
+  integration tests and226 primary related tests pass with frozen hashes.
+  A fresh13-call R4 read and comparison with the earlier observation confirm READY
+  source compatibility for1 Box / USD50, without invoice writes. Product routes,
+  visible approval, actual invoice/GL/SLE evidence and full regression remain open.
+  [Scoped coordinator review](../audits/2026-09-09-normal-billing-coordinator-review.md).
   A separately frozen diagnostic regression continues; transport and real R4
   invoice/GL/SLE effects remain unverified.
