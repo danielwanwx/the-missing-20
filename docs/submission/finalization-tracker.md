@@ -4,11 +4,34 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
 
 ## Current snapshot — September 10
 
+- **R4 distributor receiving/fulfillment is VERIFIED_IN_DEMO; the component slice remains in progress.** Industry research
+  and the native-workflow design passed independent review and were committed as
+  `04516b21c36634ccb36ca392828fef14a6c2a767`; push and fresh remote SHA matched.
+  The accepted design covers PO16's remaining 20+19 Box, customer demand 24+15,
+  and a separate parts/quality case (four cartons, 38/40 parts, 18 held).
+  Actual R4 native readbacks now verify 20+19 received, 24+15 dispatched through
+  three submitted DNs and Shipments, with scoped stock zero and old PR7/PI8
+  unchanged. One failed-attempt DN remains draft. Synthetic POD is verified at
+  A24/24 and B15/15. A fourth real conversation turn reused obsolete shipment
+  facts; Strands native per-turn current-source input corrected it, and turns5/7
+  passed independent numeric/provenance review. Minor explanatory wording remains
+  disclosed; no broad accuracy claim is made. The separate component PO17/SO9/SO10
+  now has four cartons and 38/40 parts received. Its first receipt's native batch
+  feature failure was resolved without a duplicate receipt; quality release and
+  downstream component fulfillment still await real acceptance. Demo Batch and
+  Shipment API permissions were verified after adding the corresponding native
+  roles; no quality-stop setting was relaxed. See the
+  [design](../research/2026-09-10-distributor-native-workflow-design.md) and
+  [acceptance contract](../audits/2026-09-10-distributor-operations-acceptance-plan.md).
+  R4 evidence and retained failures are in the
+  [live acceptance](../audits/2026-09-10-distributor-r4-live-acceptance.md).
+
 - **The same R4 receiving → supplier billing path is verified in the demo.**
   PO16 / PR7 now links submitted PI8 (`ACC-PINV-2026-00008`), 1 Box / USD50.
   Exact ERP reads and the native ledger UI confirm debit/credit USD50, no new
   invoice stock entries, unchanged PR7 stock, and USD50 still unpaid.
-  The remaining 39 Box are outstanding, not proved lost or completed.
+  This statement covers the original one-Box billing slice; the later 39-Box
+  receiving/fulfillment evidence is recorded above and is not newly invoiced here.
 - Final read-only reconciliation exposed a retained metadata/digest conflict.
   PI8 still passes the submitted business validator; the journal's later review
   hold is not an invoice or accounting rollback. Preserve this known defect,

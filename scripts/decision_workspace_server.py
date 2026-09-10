@@ -14,7 +14,7 @@ import json
 import os
 import sys
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
@@ -36,6 +36,10 @@ from the_missing_20.adapters.ambiguous_receipt_source import (  # noqa: E402
 )
 from the_missing_20.adapters.automatic_investigation import AutomaticInvestigation  # noqa: E402
 from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
+from the_missing_20.adapters.distributor_operations import (  # noqa: E402
+    DISTRIBUTOR_OPERATIONS_SCHEMA_VERSION,
+    DistributorOperations,
+)
 from the_missing_20.adapters.erpnext_source import (  # noqa: E402
     ERPNextEvidenceSource,
     _read_env_file,
@@ -46,6 +50,10 @@ from the_missing_20.adapters.external_source_change import (  # noqa: E402
 from the_missing_20.adapters.live_advisory_gateway import (  # noqa: E402
     DashboardAdvisoryGateway,
     connected_competition_investigation_packet,
+)
+from the_missing_20.adapters.native_receiving_dialogue import (  # noqa: E402
+    NativeReceivingDialogueError,
+    run_native_receiving_turn,
 )
 from the_missing_20.adapters.normal_receipt_billing_coordinator import (  # noqa: E402
     CoordinatorOperationResult,
@@ -65,6 +73,10 @@ from the_missing_20.adapters.photo_receiving import (  # noqa: E402
 from the_missing_20.adapters.receiving_draft_worker import ReceivingDraftWorker  # noqa: E402
 from the_missing_20.adapters.receiving_handoff_worker import ReceivingHandoffWorker  # noqa: E402
 from the_missing_20.adapters.saas_evidence import SaaSEvidenceSource  # noqa: E402
+from the_missing_20.adapters.strands_models import (  # noqa: E402
+    BedrockNovaProConfig,
+    BedrockNovaProFactory,
+)
 from the_missing_20.agents.photo_receiving import StrandsPhotoReader  # noqa: E402
 from the_missing_20.authority_b.models import canonical_json  # noqa: E402
 from the_missing_20.authority_b.quorum import QuorumDenied  # noqa: E402
@@ -97,6 +109,7 @@ STATIC_ROOT = ROOT / "workspace"
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
+    "/operations": ("distributor-operations.html", "text/html; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/photo-receiving.js": ("photo-receiving.js", "text/javascript; charset=utf-8"),
@@ -105,6 +118,8 @@ STATIC_FILES = {
     "/operations-history.js": ("operations-history.js", "text/javascript; charset=utf-8"),
     "/operations-history.css": ("operations-history.css", "text/css; charset=utf-8"),
     "/conversation-views.js": ("conversation-views.js", "text/javascript; charset=utf-8"),
+    "/distributor-operations.js": ("distributor-operations.js", "text/javascript; charset=utf-8"),
+    "/distributor-operations.css": ("distributor-operations.css", "text/css; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
 STATIC_ASSETS = {
@@ -163,6 +178,10 @@ class APIRequestError(Exception):
 
 def _json_bytes(value: object) -> bytes:
     return (canonical_json(value) + "\n").encode("utf-8")
+
+
+def _optional_path(value: str | None) -> Path | None:
+    return Path(value.strip()) if isinstance(value, str) and value.strip() else None
 
 
 def _headers(content_type: str, content_length: int | None = None) -> dict[str, str]:
@@ -729,6 +748,168 @@ def _normal_billing_disabled_projection() -> dict[str, object]:
     }
 
 
+def _distributor_operations_disabled_projection() -> dict[str, object]:
+    """Keep the optional distributor surface inert until a private case config is selected."""
+
+    return {
+        "schema_version": DISTRIBUTOR_OPERATIONS_SCHEMA_VERSION,
+        "available": False,
+        "case_id": None,
+        "case_label": "Distributor operations is not configured.",
+        "synthetic_input": None,
+        "stage": "DISABLED",
+        "quantities": {
+            "ordered": 0,
+            "received": 0,
+            "usable": 0,
+            "held": 0,
+            "missing": 0,
+            "allocated": 0,
+            "dispatched": 0,
+            "delivery_confirmed": 0,
+            "uom": "",
+            "cartons": 0,
+        },
+        "lots": [],
+        "allocations": [],
+        "alerts": [],
+        "events": [],
+        "documents": [],
+        "shipments": [],
+        "available_event_templates": [],
+        "conversation": [],
+    }
+
+
+def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, object]:
+    """Build a compact, current, read-only source packet for the native session."""
+
+    case_id = projection.get("case_id")
+    if not isinstance(case_id, str) or not case_id:
+        raise ValueError("distributor conversation lacks a current case identity")
+    quantities = projection.get("quantities")
+    lots = projection.get("lots")
+    allocations = projection.get("allocations")
+    documents = projection.get("documents")
+    shipments = projection.get("shipments")
+    parent_purchase_order = projection.get("parent_purchase_order")
+    if not all(
+        isinstance(value, (Mapping, list)) for value in (quantities, lots, allocations, documents)
+    ) or not isinstance(shipments, list):
+        raise ValueError("distributor conversation lacks current source facts")
+    events = projection.get("events")
+    retained_events = events[-12:] if isinstance(events, list) else []
+    synthetic_input = projection.get("synthetic_input")
+    recorded_events = (
+        "Arrival, pickup, and delivery are recorded synthetic test events; they are not "
+        "actual sensor, carrier, or customer-receipt proof."
+        if synthetic_input is True
+        else (
+            "Arrival, pickup, and delivery are recorded operational events; this packet does "
+            "not assert independent sensor, carrier, or customer-receipt verification."
+        )
+    )
+    erp_facts = {
+        "status": "CURRENT",
+        "case_id": case_id,
+        "case_label": projection.get("case_label"),
+        "synthetic_input": synthetic_input,
+        "quantities": quantities,
+        "lots": lots,
+        "allocations": allocations,
+        "documents": documents,
+        "shipments": shipments,
+        "event_provenance": {
+            "recorded_events": recorded_events,
+            "native_inventory_accounting": (
+                "Native Purchase Order received quantities, Purchase Receipts, and Stock Ledger "
+                "Entries support inventory accounting only; they do not prove carrier pickup or "
+                "customer receipt."
+            ),
+        },
+    }
+    if isinstance(parent_purchase_order, Mapping):
+        erp_facts["parent_purchase_order"] = dict(parent_purchase_order)
+    unavailable = {
+        "status": "UNAVAILABLE",
+        "reason": "NOT_CONNECTED_FOR_DISTRIBUTOR_CASE",
+        "records": [],
+    }
+    return {
+        "case_id": case_id,
+        "case_class": "distributor_operations",
+        "tool_payload": {
+            "sources": {
+                "read_control_context": {
+                    "case_id": case_id,
+                    "case_label": projection.get("case_label"),
+                    "case_class": "distributor_operations",
+                    "synthetic_input": projection.get("synthetic_input"),
+                    "read_only": True,
+                    "instruction": (
+                        "Answer only from current source facts. Do not process events or write."
+                    ),
+                    "retained_event_count": len(retained_events),
+                },
+                "read_erp_evidence": erp_facts,
+                "read_airtable_evidence": dict(unavailable),
+                "read_celigo_evidence": dict(unavailable),
+                "read_collaboration_evidence": {
+                    **unavailable,
+                    "retained_physical_events": retained_events,
+                },
+            }
+        },
+    }
+
+
+def _distributor_native_ask_turn(
+    *, settings: Settings, session_root: Path
+) -> Callable[[str, Mapping[str, object]], Mapping[str, object]]:
+    """Reuse the accepted native history runner without a model fallback."""
+
+    def ask(question: str, projection: Mapping[str, object]) -> Mapping[str, object]:
+        if projection.get("available") is not True:
+            return {
+                "status": "UNAVAILABLE",
+                "detail": "Current ERP evidence is unavailable; no model request was started.",
+            }
+        try:
+            packet = _distributor_native_packet(projection)
+            case_id = str(packet["case_id"])
+            native_run = run_native_receiving_turn(
+                session_root=session_root,
+                runtime_instance_id=f"distributor-operations:{case_id}",
+                case_id=case_id,
+                conversation_id="operator",
+                packet=packet,
+                question=question,
+                factory=BedrockNovaProFactory(
+                    BedrockNovaProConfig(
+                        region=settings.aws_region,
+                        aws_profile=settings.aws_profile,
+                    )
+                ),
+            )
+        except (NativeReceivingDialogueError, OSError, ValueError) as error:
+            return {
+                "status": "UNAVAILABLE",
+                "detail": (
+                    "The native read-only distributor conversation is unavailable; "
+                    "no fallback answer was used."
+                ),
+                "error_type": type(error).__name__,
+            }
+        return {
+            "status": "COMPLETE",
+            "answer": native_run.answer,
+            "provider": native_run.provider,
+            "session_id": native_run.session_id,
+        }
+
+    return ask
+
+
 class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     """Read-only legacy adapter plus the local experiment API."""
 
@@ -769,6 +950,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     @property
     def normal_billing(self) -> NormalBillingConsole | None:
         return self.server.normal_billing  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def distributor_operations(self) -> DistributorOperations | None:
+        return self.server.distributor_operations  # type: ignore[attr-defined,no-any-return]
 
     @property
     def case_console_source_mode(self) -> str:
@@ -879,6 +1064,20 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         return sequence
 
     def _v1_get(self, route: str, query: dict[str, list[str]]) -> None:
+        if route == "/api/v1/distributor-operations":
+            if query:
+                raise APIRequestError(
+                    HTTPStatus.BAD_REQUEST,
+                    "unexpected_query",
+                    "distributor operations status accepts no query parameters",
+                )
+            projection = (
+                _distributor_operations_disabled_projection()
+                if self.distributor_operations is None
+                else self.distributor_operations.projection()
+            )
+            self._send_json(HTTPStatus.OK, {"distributor_operations": projection})
+            return
         if route == "/api/v1/agent-platform/normal-billing":
             if query:
                 raise APIRequestError(
@@ -1315,6 +1514,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         if (
             route == "/api/v1/agent-platform"
             or route == "/api/v1/agent-platform/normal-billing"
+            or route == "/api/v1/distributor-operations"
             or route == "/api/v1/agent-platform/history"
             or route == "/api/v1/agent-platform/events"
             or route == "/api/v1/ambiguous-receipt-case"
@@ -1372,6 +1572,35 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
     def _v1_post(self, route: str, payload: dict[str, object]) -> None:
+        distributor_prefix = "/api/v1/distributor-operations/"
+        if route.startswith(distributor_prefix):
+            operations = self.distributor_operations
+            if operations is None:
+                raise APIRequestError(
+                    HTTPStatus.CONFLICT,
+                    "distributor_operations_disabled",
+                    "distributor operations requires an explicit private case configuration",
+                )
+            action = route.removeprefix(distributor_prefix)
+            if action == "events":
+                result = operations.record_event(payload)
+            elif action == "ask":
+                question = payload.get("question")
+                if set(payload) != {"question"} or not isinstance(question, str):
+                    raise APIRequestError(
+                        HTTPStatus.BAD_REQUEST,
+                        "invalid_distributor_operations_request",
+                        "ask accepts only a question",
+                    )
+                result = operations.ask(question)
+            else:
+                raise APIRequestError(
+                    HTTPStatus.NOT_FOUND,
+                    "not_found",
+                    "distributor operations action was not found",
+                )
+            self._send_json(HTTPStatus.OK, {"distributor_operations": result})
+            return
         normal_billing_prefix = "/api/v1/agent-platform/normal-billing/"
         if route.startswith(normal_billing_prefix):
             if self.normal_billing is None:
@@ -1814,6 +2043,8 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             "/api/v1/agent-platform/normal-billing/approve",
             "/api/v1/agent-platform/normal-billing/execute",
             "/api/v1/agent-platform/normal-billing/reconcile",
+            "/api/v1/distributor-operations/events",
+            "/api/v1/distributor-operations/ask",
         }
         if route not in allowed_routes and not route.startswith("/api/v1/incidents/"):
             self._method_not_allowed("GET")
@@ -1946,6 +2177,8 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         normal_billing: NormalBillingConsole | None = None,
         enable_normal_billing: bool = False,
         normal_billing_source: Path | None = None,
+        distributor_operations: DistributorOperations | None = None,
+        distributor_operations_config: Path | None = None,
     ) -> None:
         if address[0] not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("decision workspace server must bind to loopback")
@@ -2012,6 +2245,46 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             )
         else:
             self.normal_billing = None
+        self.distributor_operations = distributor_operations
+        configured_operations = distributor_operations_config or _optional_path(
+            photo_values.get("MISSING20_DISTRIBUTOR_OPERATIONS_CONFIG")
+        )
+        if self.distributor_operations is None and configured_operations is not None:
+            if photo_values.get("MISSING20_ENVIRONMENT", "").strip().lower() != "demo":
+                raise ValueError(
+                    "distributor operations requires the explicitly configured demo environment"
+                )
+            try:
+                raw_operations_config = json.loads(
+                    configured_operations.read_text(encoding="utf-8")
+                )
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError("distributor operations configuration is unavailable") from error
+            if not isinstance(raw_operations_config, Mapping):
+                raise ValueError("distributor operations configuration must be a JSON object")
+            from the_missing_20.adapters.distributor_erp import (
+                DistributorERP as NativeDistributorERP,
+            )
+
+            native_adapter = (
+                NativeDistributorERP(photo_client) if photo_client is not None else None
+            )
+            distributor_settings = Settings.from_env(photo_values)
+            distributor_ask_turn = (
+                _distributor_native_ask_turn(
+                    settings=distributor_settings,
+                    session_root=normal_billing_runtime / "distributor-native-sessions",
+                )
+                if photo_values.get("MISSING20_NATIVE_RECEIVING_DIALOGUE") == "1"
+                and distributor_settings.agent_provider is AgentProvider.BEDROCK
+                else None
+            )
+            self.distributor_operations = DistributorOperations(
+                normal_billing_runtime / "distributor-operations.sqlite3",
+                raw_operations_config,
+                native_adapter,
+                ask_turn=distributor_ask_turn,
+            )
         self.photo_receiving = PhotoReceiving(
             (runtime_directory or repository_root / ".missing20-runtime")
             / "photo-receiving.sqlite3",
@@ -2162,6 +2435,8 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             self.receiving_handoff_worker.close()
         if self.automatic_investigation is not None:
             self.automatic_investigation.close()
+        if self.distributor_operations is not None:
+            self.distributor_operations.close()
         self.registry.close()
         super().server_close()
 
@@ -2186,6 +2461,11 @@ def main() -> int:
         help="retained R4 read-only source JSON required only with --enable-normal-billing",
     )
     parser.add_argument(
+        "--distributor-operations-config",
+        type=Path,
+        help="private opt-in distributor case JSON with real demo-tenant operation scope",
+    )
+    parser.add_argument(
         "--runtime-directory",
         type=Path,
         default=ROOT / ".missing20-runtime",
@@ -2199,6 +2479,7 @@ def main() -> int:
             runtime_directory=args.runtime_directory,
             enable_normal_billing=args.enable_normal_billing,
             normal_billing_source=args.normal_billing_source,
+            distributor_operations_config=args.distributor_operations_config,
         )
     except OSError as exc:
         print(f"Decision Workspace server: BLOCKED ({exc})", file=sys.stderr)
