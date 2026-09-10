@@ -1,0 +1,903 @@
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+from multiprocessing import get_context
+from multiprocessing.connection import Connection
+from multiprocessing.synchronize import Event
+from pathlib import Path
+from threading import Barrier
+from types import MappingProxyType
+from typing import cast
+
+import pytest
+
+from the_missing_20.adapters.normal_receipt_billing_journal import (
+    ACTION_NORMAL_RECEIPT_BILLING,
+    AttemptClaim,
+    BillingIntentJournal,
+    CommercialSource,
+    ExactDraftReadback,
+    ExactSubmittedReadback,
+    PrepareResult,
+    ReadbackObservation,
+)
+from the_missing_20.adapters.normal_receipt_billing_preview import (
+    BillingPreview,
+    ExactIds,
+    SyntheticBillingBasis,
+)
+
+NOW = datetime(2026, 9, 9, 22, 0, tzinfo=UTC)
+MANAGER = "m20-demo-manager"
+
+
+def _basis(
+    *,
+    case_id: str = "M20-R4-BILL-1",
+    bill_reference: str = "SUP-BILL-R4-0001",
+    purchase_receipt: str = "MAT-PRE-2026-00007",
+    purchase_receipt_item: str = "068bbdr0mb",
+    source_revision: str = "r4-read-1",
+) -> SyntheticBillingBasis:
+    return SyntheticBillingBasis(
+        case_id=case_id,
+        company="Missing 20 Automotive Demo",
+        supplier="M20 Controller Systems Ltd.",
+        bill_reference=bill_reference,
+        bill_date="2026-09-09",
+        purchase_order="PUR-ORD-2026-00016",
+        purchase_order_item="458j82kp8e",
+        purchase_receipt=purchase_receipt,
+        purchase_receipt_item=purchase_receipt_item,
+        item_code="M20-DEMO-CARTON",
+        source_revision=source_revision,
+        posting_date="2026-09-09",
+        credit_to="Creditors - M20",
+        expense_account="Stock Received But Not Billed - M20",
+    )
+
+
+def _preview(basis: SyntheticBillingBasis, *, source_digest: str = "a" * 64) -> BillingPreview:
+    return BillingPreview(
+        source_digest=source_digest,
+        bill_digest=basis.bill_digest,
+        exact_ids=ExactIds(
+            case_id=basis.case_id,
+            purchase_order=basis.purchase_order,
+            purchase_order_item=basis.purchase_order_item,
+            purchase_receipt=basis.purchase_receipt,
+            purchase_receipt_item=basis.purchase_receipt_item,
+        ),
+        quantity=basis.quantity,
+        uom=basis.uom,
+        stock_uom=basis.stock_uom,
+        conversion_factor=basis.conversion_factor,
+        net_amount=basis.net_amount,
+        gross_amount=basis.gross_amount,
+        required_inputs=(
+            "DISCLOSED_SYNTHETIC_BILL",
+            "COMPLETE_SCOPED_RELATED_DOCUMENT_READ",
+            "NATIVE_PR_TO_PI_MAPPER",
+            "SEPARATE_APPROVAL_REQUIRED",
+        ),
+        status="READY",
+        reasons=(),
+        read_only=True,
+        write_allowed=False,
+        source=MappingProxyType(
+            {
+                "read_only": True,
+                "source_revision": basis.source_revision,
+                "observed_at": "2026-09-09T21:10:00Z",
+            }
+        ),
+    )
+
+
+def _source(
+    basis: SyntheticBillingBasis,
+    *,
+    revision: str = "source-v1",
+    audit_snapshot_digest: str = "audit-snapshot-v1",
+    observed_at: str = "2026-09-09T21:10:00Z",
+    net_rate: str = "50",
+) -> CommercialSource:
+    return CommercialSource(
+        identity={
+            "company": basis.company,
+            "supplier": basis.supplier,
+            "purchase_order": basis.purchase_order,
+            "purchase_order_item": basis.purchase_order_item,
+            "purchase_receipt": basis.purchase_receipt,
+            "purchase_receipt_item": basis.purchase_receipt_item,
+            "item_code": basis.item_code,
+        },
+        revisions={
+            "purchase_order": revision,
+            "purchase_receipt": revision,
+            "related_documents": revision,
+        },
+        decisive_values={
+            "quantity": "1",
+            "uom": "Box",
+            "stock_uom": "Box",
+            "conversion_factor": "1",
+            "net_rate": net_rate,
+            "currency": "USD",
+            "gross_amount": net_rate,
+        },
+        audit_snapshot_digest=audit_snapshot_digest,
+        observed_at=observed_at,
+    )
+
+
+def _journal(tmp_path: Path) -> BillingIntentJournal:
+    return BillingIntentJournal(tmp_path / "normal-billing.sqlite3")
+
+
+def _approve(
+    journal: BillingIntentJournal,
+    intent_id: str,
+    *,
+    basis: SyntheticBillingBasis,
+    expires_at: datetime | None = None,
+) -> str:
+    approval = journal.approve(
+        intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        expires_at=expires_at or NOW + timedelta(minutes=10),
+        now=NOW,
+    )
+    assert approval.granted is True
+    assert approval.action == ACTION_NORMAL_RECEIPT_BILLING
+    assert approval.case_id == basis.case_id
+    assert approval.manager_id == MANAGER
+    assert approval.intent_version == 1
+    assert approval.token
+    return approval.token
+
+
+def _claim_insert(
+    journal: BillingIntentJournal,
+    intent_id: str,
+    basis: SyntheticBillingBasis,
+    token: str,
+    *,
+    worker_id: str = "worker-a",
+) -> AttemptClaim:
+    return journal.claim_insert(
+        intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        approval_token=token,
+        worker_id=worker_id,
+        now=NOW,
+    )
+
+
+def _process_claim(
+    database: str,
+    intent_id: str,
+    case_id: str,
+    approval_token: str,
+    worker_id: str,
+    start: Event,
+    result: Connection,
+) -> None:
+    try:
+        journal = BillingIntentJournal(database)
+        if not start.wait(timeout=10):
+            result.send((False, "START_TIMEOUT"))
+            return
+        claim = journal.claim_insert(
+            intent_id,
+            case_id=case_id,
+            manager_id=MANAGER,
+            approval_token=approval_token,
+            worker_id=worker_id,
+            now=NOW,
+        )
+        result.send((claim.granted, claim.reason))
+    except BaseException as error:
+        result.send((False, f"WORKER_ERROR:{type(error).__name__}"))
+        raise
+    finally:
+        result.close()
+
+
+def _draft(
+    basis: SyntheticBillingBasis, commercial_version: str, *, name: str = "ACC-PINV-0001"
+) -> ExactDraftReadback:
+    return ExactDraftReadback(
+        draft_name=name,
+        company=basis.company,
+        supplier=basis.supplier,
+        bill_reference=basis.bill_reference,
+        purchase_receipt=basis.purchase_receipt,
+        purchase_receipt_item=basis.purchase_receipt_item,
+        bill_digest=basis.bill_digest,
+        commercial_version=commercial_version,
+        candidate_count=1,
+        lookup_complete=True,
+        audit_snapshot_digest="draft-readback-v1",
+        observed_at="2026-09-09T22:01:00Z",
+    )
+
+
+def _submitted(basis: SyntheticBillingBasis, commercial_version: str) -> ExactSubmittedReadback:
+    return ExactSubmittedReadback(
+        invoice_name="ACC-PINV-0001",
+        company=basis.company,
+        supplier=basis.supplier,
+        bill_reference=basis.bill_reference,
+        purchase_receipt=basis.purchase_receipt,
+        purchase_receipt_item=basis.purchase_receipt_item,
+        bill_digest=basis.bill_digest,
+        commercial_version=commercial_version,
+        candidate_count=1,
+        lookup_complete=True,
+        audit_snapshot_digest="submitted-readback-v1",
+        observed_at="2026-09-09T22:02:00Z",
+    )
+
+
+def _readback(kind: str) -> ReadbackObservation:
+    return ReadbackObservation(
+        kind=kind,
+        audit_snapshot_digest=f"{kind.lower()}-readback-v1",
+        observed_at="2026-09-09T22:01:00Z",
+        details={"lookup_scope": "complete-company-supplier-bill-reference"},
+    )
+
+
+def test_read_only_ready_preview_is_evidence_not_write_permission(tmp_path: Path) -> None:
+    basis = _basis()
+    preview = _preview(basis)
+    source = _source(basis)
+    journal = _journal(tmp_path)
+
+    prepared = journal.prepare(basis, preview, source)
+
+    assert prepared.accepted is True
+    assert prepared.created is True
+    assert prepared.snapshot.phase == "PREPARED"
+    assert prepared.snapshot.authority_status == "PENDING_APPROVAL"
+    assert prepared.snapshot.insert_attempted is False
+    assert prepared.snapshot.submit_attempted is False
+    assert prepared.snapshot.business_idempotency_key != preview.source_digest
+    assert prepared.snapshot.frozen_basis["gross_amount"] == "50"
+    denied = journal.claim_insert(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        approval_token="not-an-approval",
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert denied.granted is False
+    assert denied.reason == "APPROVAL_REQUIRED"
+
+    mismatched = journal.prepare(basis, replace(preview, bill_digest="b" * 64), source)
+    assert mismatched.accepted is False
+    assert mismatched.reason == "PREVIEW_BASIS_MISMATCH"
+
+
+def test_commercial_source_preserves_exact_mapping_keys() -> None:
+    source = CommercialSource(
+        identity={"company": "M20", " company": "different"},
+        revisions={"purchase_receipt": "r1"},
+        decisive_values={},
+        audit_snapshot_digest="audit-v1",
+        observed_at="2026-09-09T21:10:00Z",
+    )
+
+    assert dict(source.identity) == {"company": "M20", " company": "different"}
+
+
+def test_approval_is_server_generated_bound_and_nonreusable(tmp_path: Path) -> None:
+    basis = _basis()
+    other_basis = _basis(
+        case_id="M20-R4-BILL-2",
+        bill_reference="SUP-BILL-R4-0002",
+        purchase_receipt="MAT-PRE-2026-00008",
+        purchase_receipt_item="068bbdr0mc",
+    )
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    other_prepared = journal.prepare(other_basis, _preview(other_basis), _source(other_basis))
+
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    repeated = journal.approve(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        expires_at=NOW + timedelta(minutes=10),
+        now=NOW,
+    )
+    assert repeated.granted is False
+    assert repeated.reason == "APPROVAL_ALREADY_ISSUED"
+    assert repeated.token is None
+
+    cross_case = journal.claim_insert(
+        other_prepared.intent_id,
+        case_id=other_basis.case_id,
+        manager_id=MANAGER,
+        approval_token=token,
+        worker_id="worker-b",
+        now=NOW,
+    )
+    stale_case = journal.claim_insert(
+        prepared.intent_id,
+        case_id="M20-R4-WRONG-CASE",
+        manager_id=MANAGER,
+        approval_token=token,
+        worker_id="worker-b",
+        now=NOW,
+    )
+    assert cross_case.granted is False
+    assert cross_case.reason == "APPROVAL_REQUIRED"
+    assert stale_case.granted is False
+    assert stale_case.reason == "CASE_MISMATCH"
+
+    claimed = _claim_insert(journal, prepared.intent_id, basis, token)
+    assert claimed.granted is True
+    assert claimed.attempt_kind == "INSERT"
+    assert claimed.idempotency_key == prepared.snapshot.business_idempotency_key
+    assert claimed.payload["basis"]["gross_amount"] == "50"
+    with pytest.raises(TypeError):
+        cast(dict[str, object], claimed.payload)["basis"] = {}
+
+
+def test_refusal_keeps_known_effect_phase_and_blocks_next_write(tmp_path: Path) -> None:
+    basis = _basis()
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    token = _approve(journal, prepared.intent_id, basis=basis)
+
+    journal.refuse(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        reason="manager stopped the bill",
+        now=NOW,
+    )
+    denied = _claim_insert(journal, prepared.intent_id, basis, token)
+    assert denied.granted is False
+    assert denied.reason == "REFUSED"
+
+    second_basis = _basis(
+        case_id="M20-R4-BILL-2",
+        bill_reference="SUP-BILL-R4-0002",
+        purchase_receipt="MAT-PRE-2026-00008",
+        purchase_receipt_item="068bbdr0mc",
+    )
+    second = journal.prepare(second_basis, _preview(second_basis), _source(second_basis))
+    second_token = _approve(journal, second.intent_id, basis=second_basis)
+    inserted = _claim_insert(journal, second.intent_id, second_basis, second_token)
+    assert inserted.granted is True
+    journal.refuse(
+        second.intent_id,
+        case_id=second_basis.case_id,
+        manager_id=MANAGER,
+        reason="stop while insert may be in flight",
+        now=NOW,
+    )
+
+    admitted = journal.admit_draft_readback(
+        second.intent_id, _draft(second_basis, second.snapshot.commercial_version)
+    )
+    submit = journal.claim_submit(
+        second.intent_id,
+        case_id=second_basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert admitted.admitted is True
+    assert admitted.snapshot.insert_attempted is True
+    assert admitted.snapshot.phase == "DRAFT_READBACK_ADMITTED"
+    assert admitted.snapshot.authority_status == "REFUSED"
+    assert submit.granted is False
+    assert submit.reason == "REFUSED"
+
+
+def test_audit_refresh_does_not_change_commercial_version_but_source_change_blocks_writes(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    source = _source(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), source)
+    token = _approve(journal, prepared.intent_id, basis=basis)
+
+    observation_refresh = _source(
+        basis,
+        audit_snapshot_digest="audit-snapshot-v2",
+        observed_at="2026-09-09T21:20:00Z",
+    )
+    refreshed = journal.refresh_source(prepared.intent_id, observation_refresh, now=NOW)
+    assert refreshed.commercial_changed is False
+    assert refreshed.snapshot.source_changed is False
+    assert refreshed.snapshot.commercial_version == prepared.snapshot.commercial_version
+    assert refreshed.snapshot.audit_snapshot_digest == "audit-snapshot-v2"
+    assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+
+    changed_basis = _basis(
+        case_id="M20-R4-BILL-2",
+        bill_reference="SUP-BILL-R4-0002",
+        purchase_receipt="MAT-PRE-2026-00008",
+        purchase_receipt_item="068bbdr0mc",
+    )
+    changed = journal.prepare(changed_basis, _preview(changed_basis), _source(changed_basis))
+    changed_token = _approve(journal, changed.intent_id, basis=changed_basis)
+    changed_source = _source(
+        changed_basis,
+        revision="source-v2",
+        audit_snapshot_digest="audit-snapshot-v3",
+        observed_at="2026-09-09T21:25:00Z",
+        net_rate="51",
+    )
+    source_change = journal.refresh_source(changed.intent_id, changed_source, now=NOW)
+    assert source_change.commercial_changed is True
+    assert source_change.snapshot.source_changed is True
+    assert source_change.snapshot.authority_status == "STALE_SOURCE"
+    blocked = _claim_insert(journal, changed.intent_id, changed_basis, changed_token)
+    assert blocked.granted is False
+    assert blocked.reason == "COMMERCIAL_SOURCE_CHANGED"
+
+
+def test_source_change_still_permits_old_effect_readback_but_never_a_next_write(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+
+    journal.refresh_source(
+        prepared.intent_id,
+        _source(basis, revision="source-v2", net_rate="51"),
+        now=NOW,
+    )
+    readback = journal.admit_draft_readback(
+        prepared.intent_id, _draft(basis, prepared.snapshot.commercial_version)
+    )
+    submit = journal.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert readback.admitted is True
+    assert readback.snapshot.source_changed is True
+    assert readback.snapshot.phase == "DRAFT_READBACK_ADMITTED"
+    assert submit.granted is False
+    assert submit.reason == "COMMERCIAL_SOURCE_CHANGED"
+
+
+def test_two_sqlite_processes_fence_same_bill_and_connections_fence_receipt_line(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "normal-billing.sqlite3"
+    basis = _basis()
+    journal = BillingIntentJournal(database)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    context = get_context("fork")
+    start = context.Event()
+    parent_a, child_a = context.Pipe(duplex=False)
+    parent_b, child_b = context.Pipe(duplex=False)
+    process_a = context.Process(
+        target=_process_claim,
+        args=(
+            str(database),
+            prepared.intent_id,
+            basis.case_id,
+            token,
+            "worker-a",
+            start,
+            child_a,
+        ),
+    )
+    process_b = context.Process(
+        target=_process_claim,
+        args=(
+            str(database),
+            prepared.intent_id,
+            basis.case_id,
+            token,
+            "worker-b",
+            start,
+            child_b,
+        ),
+    )
+    try:
+        process_a.start()
+        process_b.start()
+        child_a.close()
+        child_b.close()
+        start.set()
+        assert parent_a.poll(15)
+        assert parent_b.poll(15)
+        claims = (parent_a.recv(), parent_b.recv())
+        process_a.join(timeout=5)
+        process_b.join(timeout=5)
+        assert process_a.exitcode == 0
+        assert process_b.exitcode == 0
+    finally:
+        start.set()
+        for process in (process_a, process_b):
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=5)
+        for pipe in (child_a, child_b, parent_a, parent_b):
+            pipe.close()
+    assert sum(claim[0] for claim in claims) == 1
+    assert sum(claim[1] == "INSERT_ALREADY_ATTEMPTED" for claim in claims) == 1
+
+    line_a = _basis(
+        case_id="M20-R4-BILL-2",
+        bill_reference="SUP-BILL-R4-0002",
+        purchase_receipt="MAT-PRE-2026-00008",
+        purchase_receipt_item="068bbdr0mc",
+    )
+    line_b = replace(line_a, bill_reference="SUP-BILL-R4-0003")
+    line_database = tmp_path / "normal-billing-line-race.sqlite3"
+    line_barrier = Barrier(2)
+
+    def prepare(candidate: SyntheticBillingBasis) -> PrepareResult:
+        local = BillingIntentJournal(line_database)
+        line_barrier.wait()
+        return local.prepare(candidate, _preview(candidate), _source(candidate))
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(prepare, (line_a, line_b)))
+    assert sum(result.accepted for result in results) == 1
+    assert sum(result.reason == "RECEIPT_LINE_CONFLICT" for result in results) == 1
+
+    accepted = next(result for result in results if result.accepted)
+    winning_basis = line_a if accepted.snapshot.bill_reference == line_a.bill_reference else line_b
+    line_journal = BillingIntentJournal(line_database)
+    line_token = _approve(line_journal, accepted.intent_id, basis=winning_basis)
+    assert (
+        _claim_insert(line_journal, accepted.intent_id, winning_basis, line_token).granted is True
+    )
+
+
+def test_restart_unknown_no_hit_and_submitted_readback_never_reopen_attempts(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "normal-billing.sqlite3"
+    basis = _basis()
+    first = BillingIntentJournal(database)
+    prepared = first.prepare(basis, _preview(basis), _source(basis))
+    token = _approve(first, prepared.intent_id, basis=basis)
+
+    before_insert_restart = BillingIntentJournal(database)
+    insert = _claim_insert(before_insert_restart, prepared.intent_id, basis, token)
+    assert insert.granted is True
+    assert insert.attempt_kind == "INSERT"
+
+    after_insert_restart = BillingIntentJournal(database)
+    after_insert_restart.record_no_hit(prepared.intent_id, _readback("NO_HIT"), now=NOW)
+    repeated_insert = _claim_insert(after_insert_restart, prepared.intent_id, basis, token)
+    assert repeated_insert.granted is False
+    assert repeated_insert.reason == "INSERT_ALREADY_ATTEMPTED"
+
+    draft = after_insert_restart.admit_draft_readback(
+        prepared.intent_id, _draft(basis, prepared.snapshot.commercial_version)
+    )
+    assert draft.admitted is True
+    before_submit_restart = BillingIntentJournal(database)
+    submit = before_submit_restart.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert submit.granted is True
+    assert submit.attempt_kind == "SUBMIT"
+
+    after_submit_restart = BillingIntentJournal(database)
+    after_submit_restart.record_unknown(prepared.intent_id, _readback("UNKNOWN"), now=NOW)
+    admitted_again = after_submit_restart.admit_draft_readback(
+        prepared.intent_id, _draft(basis, prepared.snapshot.commercial_version)
+    )
+    repeated_submit = after_submit_restart.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-b",
+        now=NOW,
+    )
+    submitted = after_submit_restart.admit_submitted_readback(
+        prepared.intent_id, _submitted(basis, prepared.snapshot.commercial_version)
+    )
+    assert admitted_again.admitted is True
+    assert repeated_submit.granted is False
+    assert repeated_submit.reason == "SUBMIT_ALREADY_ATTEMPTED"
+    assert submitted.admitted is True
+    assert submitted.snapshot.phase == "SUBMITTED_READBACK_ADMITTED"
+    assert submitted.snapshot.submit_attempted is True
+    assert submitted.snapshot.last_readback_kind == "SUBMITTED"
+
+
+def test_six_step_effect_identity_repro_holds_and_preserves_first_readbacks(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    token = _approve(journal, prepared.intent_id, basis=basis)
+
+    # 1. Mark the only insert attempt.  2. Admit its first exact draft identity.
+    assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+    first_draft = _draft(basis, prepared.snapshot.commercial_version, name="PI-FIRST")
+    first = journal.admit_draft_readback(prepared.intent_id, first_draft)
+    assert first.admitted is True
+
+    # 3. A conflicting draft must not replace the first durable identity/evidence.
+    conflicting_draft = journal.admit_draft_readback(
+        prepared.intent_id,
+        replace(first_draft, draft_name="PI-OTHER"),
+    )
+    assert conflicting_draft.admitted is False
+    assert conflicting_draft.reason == "DRAFT_IDENTITY_CONFLICT"
+    assert conflicting_draft.snapshot.draft_name == "PI-FIRST"
+    assert conflicting_draft.snapshot.effect_conflict is True
+    assert conflicting_draft.snapshot.authority_status == "CONFLICT_HOLD"
+    draft_events = journal.history(prepared.intent_id)
+    assert draft_events[-2].kind == "DRAFT_READBACK_ADMITTED"
+    assert draft_events[-2].payload["name"] == "PI-FIRST"
+    assert draft_events[-1].kind == "DRAFT_READBACK_CONFLICT"
+    assert draft_events[-1].payload["incoming_proof"]["name"] == "PI-OTHER"
+    reaffirmed_draft = journal.admit_draft_readback(prepared.intent_id, first_draft)
+    assert reaffirmed_draft.admitted is True
+    assert reaffirmed_draft.snapshot.effect_conflict is True
+
+    # 4. The immutable submit payload must still name the first exact draft.
+    submit = journal.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert submit.granted is False
+    assert submit.reason == "EFFECT_IDENTITY_CONFLICT"
+
+    # A separate uncompromised intent establishes the post-submit identity steps.
+    second_basis = _basis(
+        case_id="M20-R4-BILL-2",
+        bill_reference="SUP-BILL-R4-0002",
+        purchase_receipt="MAT-PRE-2026-00008",
+        purchase_receipt_item="068bbdr0mc",
+    )
+    second = journal.prepare(second_basis, _preview(second_basis), _source(second_basis))
+    second_token = _approve(journal, second.intent_id, basis=second_basis)
+    assert _claim_insert(journal, second.intent_id, second_basis, second_token).granted is True
+    second_draft = _draft(second_basis, second.snapshot.commercial_version, name="PI-FIRST")
+    assert journal.admit_draft_readback(second.intent_id, second_draft).admitted is True
+    second_submit = journal.claim_submit(
+        second.intent_id,
+        case_id=second_basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert second_submit.granted is True
+    assert second_submit.payload["draft_name"] == "PI-FIRST"
+
+    # 5. Admit only the submitted identity named by that frozen submit payload.
+    first_submitted = journal.admit_submitted_readback(
+        second.intent_id,
+        replace(
+            _submitted(second_basis, second.snapshot.commercial_version), invoice_name="PI-FIRST"
+        ),
+    )
+    assert first_submitted.admitted is True
+
+    # 6. A later different submitted identity is a readback conflict, never replacement.
+    conflicting_submitted = journal.admit_submitted_readback(
+        second.intent_id,
+        replace(
+            _submitted(second_basis, second.snapshot.commercial_version), invoice_name="PI-THIRD"
+        ),
+    )
+    assert conflicting_submitted.admitted is False
+    assert conflicting_submitted.reason == "SUBMITTED_IDENTITY_CONFLICT"
+    assert conflicting_submitted.snapshot.submitted_invoice_name == "PI-FIRST"
+    assert conflicting_submitted.snapshot.effect_conflict is True
+    assert conflicting_submitted.snapshot.authority_status == "CONFLICT_HOLD"
+    submitted_events = journal.history(second.intent_id)
+    assert submitted_events[-2].kind == "SUBMITTED_READBACK_ADMITTED"
+    assert submitted_events[-2].payload["name"] == "PI-FIRST"
+    assert submitted_events[-1].kind == "SUBMITTED_READBACK_CONFLICT"
+    assert submitted_events[-1].payload["incoming_proof"]["name"] == "PI-THIRD"
+    reaffirmed_submitted = journal.admit_submitted_readback(
+        second.intent_id,
+        replace(
+            _submitted(second_basis, second.snapshot.commercial_version), invoice_name="PI-FIRST"
+        ),
+    )
+    assert reaffirmed_submitted.admitted is True
+    assert reaffirmed_submitted.snapshot.effect_conflict is True
+
+
+def test_submitted_readback_must_match_the_frozen_submit_draft_name(tmp_path: Path) -> None:
+    basis = _basis()
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+    assert (
+        journal.admit_draft_readback(
+            prepared.intent_id,
+            _draft(basis, prepared.snapshot.commercial_version, name="PI-FIRST"),
+        ).admitted
+        is True
+    )
+    submit = journal.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert submit.granted is True
+    assert submit.payload["draft_name"] == "PI-FIRST"
+
+    mismatched = journal.admit_submitted_readback(
+        prepared.intent_id,
+        replace(
+            _submitted(basis, prepared.snapshot.commercial_version), invoice_name="PI-DIFFERENT"
+        ),
+    )
+    assert mismatched.admitted is False
+    assert mismatched.reason == "SUBMITTED_DRAFT_NAME_MISMATCH"
+    assert mismatched.snapshot.submitted_invoice_name is None
+    assert mismatched.snapshot.effect_conflict is True
+    assert mismatched.snapshot.authority_status == "CONFLICT_HOLD"
+
+
+def test_expiry_and_invalid_draft_proof_never_authorize_a_repeat_attempt(tmp_path: Path) -> None:
+    basis = _basis()
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    token = _approve(
+        journal,
+        prepared.intent_id,
+        basis=basis,
+        expires_at=NOW + timedelta(seconds=1),
+    )
+    expired = journal.claim_insert(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        approval_token=token,
+        worker_id="worker-a",
+        now=NOW + timedelta(seconds=2),
+    )
+    assert expired.granted is False
+    assert expired.reason == "APPROVAL_EXPIRED"
+
+    second_basis = _basis(
+        case_id="M20-R4-BILL-2",
+        bill_reference="SUP-BILL-R4-0002",
+        purchase_receipt="MAT-PRE-2026-00008",
+        purchase_receipt_item="068bbdr0mc",
+    )
+    second = journal.prepare(second_basis, _preview(second_basis), _source(second_basis))
+    second_token = _approve(journal, second.intent_id, basis=second_basis)
+    assert _claim_insert(journal, second.intent_id, second_basis, second_token).granted is True
+    invalid = journal.admit_draft_readback(
+        second.intent_id,
+        replace(_draft(second_basis, second.snapshot.commercial_version), candidate_count=2),
+    )
+    submit = journal.claim_submit(
+        second.intent_id,
+        case_id=second_basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert invalid.admitted is False
+    assert invalid.reason == "DRAFT_READBACK_NOT_UNIQUE"
+    assert submit.granted is False
+    assert submit.reason == "DRAFT_READBACK_REQUIRED"
+
+
+def test_explicit_reprepare_versions_unattempted_intent_and_invalidates_old_token(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    preview = _preview(basis)
+    source = _source(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, preview, source)
+    old_token = _approve(journal, prepared.intent_id, basis=basis)
+    journal.refuse(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        reason="reprepare with a fresh confirmation",
+        now=NOW,
+    )
+
+    replacement_source = _source(
+        basis,
+        revision="source-v2",
+        audit_snapshot_digest="audit-snapshot-v2",
+        observed_at="2026-09-09T22:05:00Z",
+    )
+    reprepared = journal.reprepare(
+        prepared.intent_id,
+        basis,
+        preview,
+        replacement_source,
+        now=NOW,
+    )
+    assert reprepared.accepted is True
+    assert reprepared.snapshot.intent_version == 2
+    assert reprepared.snapshot.phase == "PREPARED"
+    assert reprepared.snapshot.authority_status == "PENDING_APPROVAL"
+    old_token_claim = _claim_insert(journal, prepared.intent_id, basis, old_token)
+    assert old_token_claim.granted is False
+    assert old_token_claim.reason == "APPROVAL_REQUIRED"
+
+    new_token = journal.approve(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        expires_at=NOW + timedelta(minutes=10),
+        now=NOW,
+    )
+    assert new_token.granted is True
+    assert new_token.intent_version == 2
+    assert new_token.token is not None
+    assert _claim_insert(journal, prepared.intent_id, basis, new_token.token).granted is True
+    blocked = journal.reprepare(
+        prepared.intent_id,
+        basis,
+        preview,
+        replacement_source,
+        now=NOW,
+    )
+    assert blocked.accepted is False
+    assert blocked.reason == "INSERT_ALREADY_ATTEMPTED"
+    assert [event.kind for event in journal.history(prepared.intent_id)] == [
+        "PREPARED",
+        "APPROVED",
+        "REFUSED",
+        "REPREPARED",
+        "APPROVED",
+        "INSERT_ATTEMPT_MARKED",
+    ]
+
+
+def test_history_keeps_immutable_basis_preview_and_source_versions(tmp_path: Path) -> None:
+    basis = _basis()
+    preview = _preview(basis)
+    source = _source(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, preview, source)
+    journal.refresh_source(
+        prepared.intent_id,
+        _source(basis, audit_snapshot_digest="audit-snapshot-v2"),
+        now=NOW,
+    )
+
+    snapshot = journal.get(prepared.intent_id)
+    history = journal.history(prepared.intent_id)
+    assert snapshot.frozen_basis["gross_amount"] == "50"
+    assert snapshot.frozen_preview["bill_digest"] == basis.bill_digest
+    assert [event.kind for event in history] == ["PREPARED", "SOURCE_REFRESHED"]
+    assert history[-1].payload["audit_snapshot_digest"] == "audit-snapshot-v2"
+    with pytest.raises(TypeError):
+        snapshot.frozen_basis["gross_amount"] = "999"  # type: ignore[index]
