@@ -14,6 +14,11 @@ from typing import Final, Protocol
 from urllib.parse import quote, urlencode, urlsplit
 
 from the_missing_20.adapters.demo_executor import DemoExecutionBlocked
+from the_missing_20.adapters.distributor_allocation import (
+    ContractAllocationError,
+    compile_plan,
+    contract_mode,
+)
 
 _RESOURCE: Final = "/api/resource"
 _WRITE_UNKNOWN: Final = "UNKNOWN_OUTCOME"
@@ -954,34 +959,7 @@ class DistributorERP:
                 lot_row["status"] = "USABLE"
             usable += _quantity(lot_row["usable"], "SOURCE_SCHEMA_MISMATCH")
             held += _quantity(lot_row["held"], "SOURCE_SCHEMA_MISMATCH")
-        allocation_rows: list[dict[str, object]] = []
-        remaining_usable = usable
-        for allocation in sorted(
-            _rows(scope.get("allocations"), "CONFIG_INVALID"),
-            key=lambda row: _quantity(row.get("priority"), "CONFIG_INVALID", positive=True),
-        ):
-            name = _text(allocation.get("customer_order"), "CONFIG_INVALID")
-            requested = _quantity(
-                allocation.get("requested_quantity"), "CONFIG_INVALID", positive=True
-            )
-            complete = dispatched[name]
-            if complete > requested:
-                raise _ScopeError("ERP_SOURCE_RECONCILIATION_UNKNOWN")
-            allocated = min(remaining_usable, requested - complete)
-            remaining_usable -= allocated
-            allocation_rows.append(
-                {
-                    "customer_order": name,
-                    "priority": allocation.get("priority"),
-                    "requested_quantity": requested,
-                    # This is a case-local plan, never a native Stock Reservation Entry.
-                    "allocated": allocated,
-                    "backordered": requested - complete - allocated,
-                    "uom": scope["uom"],
-                    "dispatched": complete,
-                    "reservation": "LOCAL_PLAN",
-                }
-            )
+        allocation_rows = self._source_allocations(scope, lots, dispatched, usable)
         for shipment in shipments:
             shipment_id = _text(shipment.get("shipment_id"), "ERP_SOURCE_RECONCILIATION_UNKNOWN")
             links = _rows(
@@ -1069,6 +1047,98 @@ class DistributorERP:
             "source_revision": source_revision,
             "source_status": "CURRENT",
         }
+
+    def _source_allocations(
+        self,
+        scope: Mapping[str, object],
+        lots: Sequence[Mapping[str, object]],
+        dispatched: Mapping[str, float],
+        usable: float,
+    ) -> list[dict[str, object]]:
+        """Derive source allocation using the configured case policy only.
+
+        Contract cases use the same deterministic promise-date compiler as the
+        durable operations state.  Legacy cases retain their established numeric
+        priority ordering.
+        """
+
+        configured = _rows(scope.get("allocations"), "CONFIG_INVALID")
+        if contract_mode(scope):
+            terms: list[dict[str, object]] = []
+            for allocation in configured:
+                name = _text(allocation.get("customer_order"), "CONFIG_INVALID")
+                requested = _quantity(
+                    allocation.get("requested_quantity"), "CONFIG_INVALID", positive=True
+                )
+                complete = dispatched[name]
+                if complete > requested:
+                    raise _ScopeError("ERP_SOURCE_RECONCILIATION_UNKNOWN")
+                terms.append({**allocation, "dispatched": complete})
+            try:
+                plan = compile_plan(allocations=terms, lots=list(lots), prepared_picks=[])
+            except ContractAllocationError as error:
+                raise _ScopeError("CONFIG_INVALID") from error
+            planned = {
+                _text(row.get("customer_order"), "CONFIG_INVALID"): _quantity(
+                    row.get("quantity"), "CONFIG_INVALID"
+                )
+                for row in _rows(plan.get("rows"), "CONFIG_INVALID")
+            }
+            if set(planned) != set(dispatched):
+                raise _ScopeError("CONFIG_INVALID")
+            rows: list[dict[str, object]] = []
+            for allocation in configured:
+                name = _text(allocation.get("customer_order"), "CONFIG_INVALID")
+                requested = _quantity(
+                    allocation.get("requested_quantity"), "CONFIG_INVALID", positive=True
+                )
+                complete = dispatched[name]
+                allocated = planned[name]
+                if allocated + complete > requested:
+                    raise _ScopeError("ERP_SOURCE_RECONCILIATION_UNKNOWN")
+                rows.append(
+                    {
+                        "customer_order": name,
+                        "priority": allocation.get("priority"),
+                        "requested_quantity": requested,
+                        "allocated": allocated,
+                        "backordered": requested - complete - allocated,
+                        "uom": scope["uom"],
+                        "dispatched": complete,
+                        "reservation": "LOCAL_PLAN",
+                    }
+                )
+            return rows
+
+        allocation_rows: list[dict[str, object]] = []
+        remaining_usable = usable
+        for allocation in sorted(
+            configured,
+            key=lambda row: _quantity(row.get("priority"), "CONFIG_INVALID", positive=True),
+        ):
+            name = _text(allocation.get("customer_order"), "CONFIG_INVALID")
+            requested = _quantity(
+                allocation.get("requested_quantity"), "CONFIG_INVALID", positive=True
+            )
+            complete = dispatched[name]
+            if complete > requested:
+                raise _ScopeError("ERP_SOURCE_RECONCILIATION_UNKNOWN")
+            allocated = min(remaining_usable, requested - complete)
+            remaining_usable -= allocated
+            allocation_rows.append(
+                {
+                    "customer_order": name,
+                    "priority": allocation.get("priority"),
+                    "requested_quantity": requested,
+                    # This is a case-local plan, never a native Stock Reservation Entry.
+                    "allocated": allocated,
+                    "backordered": requested - complete - allocated,
+                    "uom": scope["uom"],
+                    "dispatched": complete,
+                    "reservation": "LOCAL_PLAN",
+                }
+            )
+        return allocation_rows
 
     @staticmethod
     def _revision(value: Mapping[str, object]) -> str:

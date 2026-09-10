@@ -460,6 +460,36 @@ def component_config() -> dict[str, Any]:
     }
 
 
+def contract_component_config() -> dict[str, Any]:
+    """Fresh-case terms: promise date precedes the numeric customer priority."""
+
+    config = component_config()
+    config["allocation_policy"] = {"version": "v1"}
+    config["allocations"] = [
+        {
+            "customer_order": COMPONENT_ORDER_25,
+            "requested_quantity": 25,
+            "priority": 2,
+            "promised_delivery_at": "2026-09-11T09:00:00+00:00",
+            "customer_priority": 2,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 10,
+            "allow_final_remainder": True,
+        },
+        {
+            "customer_order": COMPONENT_ORDER_15,
+            "requested_quantity": 15,
+            "priority": 1,
+            "promised_delivery_at": "2026-09-12T09:00:00+00:00",
+            "customer_priority": 1,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 5,
+            "allow_final_remainder": True,
+        },
+    ]
+    return config
+
+
 class ComponentNativeERP(NativeERP):
     """Focused native-document fake for the component QI → stock-release path."""
 
@@ -1076,6 +1106,125 @@ def test_component_batches_hold_failed_sample_then_release_whole_lot_and_trace_d
         and row["items"][0]["use_serial_batch_fields"] == 1
         for row in client.documents["Delivery Note"].values()
     )
+
+
+def test_contract_source_readback_uses_promise_date_and_conserves_native_dispatch() -> None:
+    client = ComponentNativeERP()
+    bridge = DistributorERP(client)
+    settings = contract_component_config()
+
+    for lot, cartons, quantity, pack in (("LOT-A", 2, 20, 10), ("LOT-B", 2, 18, 10)):
+        assert (
+            _result(
+                bridge.apply_operation(
+                    settings,
+                    _component_arrival(lot, cartons, quantity, pack),
+                    f"arrival-contract-{lot.lower()}",
+                )
+            )["status"]
+            == "APPLIED"
+        )
+    for lot, quantity in (("LOT-A", 20),):
+        inspection = _inspection(
+            lot, result="PASS", scope="WHOLE_LOT", measured=10, sample_quantity=quantity
+        )
+        assert (
+            _result(bridge.apply_operation(settings, inspection, f"qi-contract-{lot}"))["status"]
+            == "APPLIED"
+        )
+        assert (
+            _result(bridge.apply_operation(settings, _release(lot), f"qi-contract-{lot}"))["status"]
+            == "APPLIED"
+        )
+
+    def allocations() -> dict[str, Mapping[str, object]]:
+        return {
+            str(row["customer_order"]): row
+            for row in cast(list[Mapping[str, object]], bridge.read_case(settings)["allocations"])
+        }
+
+    first = allocations()
+    assert (first[COMPONENT_ORDER_25]["allocated"], first[COMPONENT_ORDER_15]["allocated"]) == (
+        20.0,
+        0.0,
+    )
+
+    inspection = _inspection(
+        "LOT-B", result="PASS", scope="WHOLE_LOT", measured=10, sample_quantity=18
+    )
+    assert (
+        _result(bridge.apply_operation(settings, inspection, "qi-contract-lot-b"))["status"]
+        == "APPLIED"
+    )
+    assert (
+        _result(bridge.apply_operation(settings, _release("LOT-B"), "qi-contract-lot-b"))["status"]
+        == "APPLIED"
+    )
+    second = allocations()
+    assert (second[COMPONENT_ORDER_25]["allocated"], second[COMPONENT_ORDER_15]["allocated"]) == (
+        25.0,
+        13.0,
+    )
+
+    assert (
+        _result(
+            bridge.apply_operation(
+                settings,
+                _component_arrival("LOT-C", 1, 2, 2),
+                "arrival-contract-lot-c",
+            )
+        )["status"]
+        == "APPLIED"
+    )
+    inspection = _inspection(
+        "LOT-C", result="PASS", scope="WHOLE_LOT", measured=10, sample_quantity=2
+    )
+    assert (
+        _result(bridge.apply_operation(settings, inspection, "qi-contract-lot-c"))["status"]
+        == "APPLIED"
+    )
+    assert (
+        _result(bridge.apply_operation(settings, _release("LOT-C"), "qi-contract-lot-c"))["status"]
+        == "APPLIED"
+    )
+    third = allocations()
+    assert (third[COMPONENT_ORDER_25]["allocated"], third[COMPONENT_ORDER_15]["allocated"]) == (
+        25.0,
+        15.0,
+    )
+
+    for order, lot, quantity, priority, event_id in (
+        (COMPONENT_ORDER_25, "LOT-A", 20, 2, "contract-picked-a-20"),
+        (COMPONENT_ORDER_25, "LOT-B", 5, 2, "contract-picked-b-05"),
+        (COMPONENT_ORDER_15, "LOT-B", 13, 1, "contract-picked-b-13"),
+        (COMPONENT_ORDER_15, "LOT-C", 2, 1, "contract-picked-c-02"),
+    ):
+        _run_component_tranche(
+            bridge,
+            settings,
+            order=order,
+            lot=lot,
+            quantity=quantity,
+            priority=priority,
+            event_id=event_id,
+        )
+
+    final = _result(bridge.read_case(settings))
+    rows = {
+        str(row["customer_order"]): row
+        for row in cast(list[Mapping[str, object]], final["allocations"])
+    }
+    assert final["quantities"]["dispatched"] == 40.0
+    assert (
+        rows[COMPONENT_ORDER_25]["allocated"],
+        rows[COMPONENT_ORDER_25]["dispatched"],
+        rows[COMPONENT_ORDER_25]["backordered"],
+    ) == (0.0, 25.0, 0.0)
+    assert (
+        rows[COMPONENT_ORDER_15]["allocated"],
+        rows[COMPONENT_ORDER_15]["dispatched"],
+        rows[COMPONENT_ORDER_15]["backordered"],
+    ) == (0.0, 15.0, 0.0)
 
 
 def test_quality_inspection_uses_authenticated_erp_identity() -> None:

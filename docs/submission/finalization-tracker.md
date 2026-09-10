@@ -341,3 +341,12 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   post-invoice source mapping; Luna approved billing/renewal. See the linked current
   audit for test scope, costs, preserved failures and limitations. Precise staging,
   commit, push and remote-SHA verification apply to this accepted slice.
+
+September 10 fresh-case cross-app slice: `3ea1431d6c2adbc4770d7e30b448ccc3fdc6a6a5`
+pushed and remote SHA verified; CI run34531606727 completed SUCCESS. Real PO18
+receipts13/14 total38 of40 parts in four cartons; same Airtable/Jira records and
+Celigo/Slack updates VERIFIED. Subsequent A20 contract selection and native
+quality release/pick preparation applied, but current readback reported
+ERP_SOURCE_RECONCILIATION_UNKNOWN. That next-step failure is retained and remains
+open; this release is not whole-case completion. Financial and final dialogue
+acceptance remain pending.
