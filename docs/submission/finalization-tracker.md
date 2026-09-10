@@ -213,5 +213,11 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   source compatibility for1 Box / USD50, without invoice writes. Product routes,
   visible approval, actual invoice/GL/SLE evidence and full regression remain open.
   [Scoped coordinator review](../audits/2026-09-09-normal-billing-coordinator-review.md).
+- R4 local workspace resumed on8897 with its original runtime and auto-prepare
+  paused. Actual API/DOM confirms the same case,1/40 Box received and0 invoices.
+  One invoice-inspector defect was independently corrected: aggregate ERP ledger
+  balance no longer appears as invoice-specific “Verified”.101 JS tests and an
+  actual reload/click check pass. [Display review](../audits/2026-09-09-invoice-inspector-evidence-scope-review.md).
+  This is one page interaction, not full F07 or same-order billing acceptance.
   A separately frozen diagnostic regression continues; transport and real R4
   invoice/GL/SLE effects remain unverified.

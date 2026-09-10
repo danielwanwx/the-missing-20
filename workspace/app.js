@@ -5419,7 +5419,6 @@
           ["Invoice", value(impact?.invoice_status || (flow?.invoiceHeld ? "HELD" : "OPEN"))],
           ["Invoice value", impact ? formatCurrency(impact.invoice_value, currency) : "—"],
           ["Live source", value(liveERPDocument("purchase_invoice")?.name || "WAITING")],
-          ["Balanced posting", ledger.assertions?.debits_equal_credits ? "Verified" : "Not verified"],
         ],
       },
     };
