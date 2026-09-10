@@ -124,6 +124,7 @@ class NativeERP:
                     "docstatus": 1,
                     "company": COMPANY,
                     "supplier": SUPPLIER,
+                    "currency": "USD",
                     "items": [
                         {
                             "name": PO_ITEM,
@@ -134,6 +135,8 @@ class NativeERP:
                             "stock_uom": "Box",
                             "conversion_factor": 1,
                             "schedule_date": "2026-09-10",
+                            "rate": 50,
+                            "net_amount": 2000,
                         }
                     ],
                 }
@@ -146,6 +149,8 @@ class NativeERP:
             "Pick List": {},
             "Delivery Note": {},
             "Shipment": {},
+            "Purchase Invoice": {},
+            "Sales Invoice": {},
         }
         self.ledger: list[dict[str, object]] = []
         self.calls: list[tuple[str, str, object | None]] = []
@@ -159,6 +164,7 @@ class NativeERP:
             "docstatus": 1,
             "company": COMPANY,
             "customer": customer,
+            "currency": "USD",
             "items": [
                 {
                     "name": f"{name}-ITEM",
@@ -166,6 +172,8 @@ class NativeERP:
                     "qty": quantity,
                     "uom": "Box",
                     "stock_reserved_qty": 0,
+                    "rate": 50,
+                    "net_amount": quantity * 50,
                 }
             ],
         }
@@ -207,7 +215,22 @@ class NativeERP:
 
     @staticmethod
     def _matches(document: Mapping[str, object], filters: list[list[object]]) -> bool:
-        for field, operator, expected in filters:
+        for clause in filters:
+            if len(clause) == 4 and clause[0] in {
+                "Purchase Invoice Item",
+                "Sales Invoice Item",
+            }:
+                _, field, operator, expected = clause
+                if not isinstance(field, str):
+                    return False
+                return any(
+                    NativeERP._matches(item, [[field, operator, expected]])
+                    for item in cast(list[Mapping[str, object]], document.get("items", []))
+                    if isinstance(item, Mapping)
+                )
+            if len(clause) != 3:
+                return False
+            field, operator, expected = clause
             actual = document.get(str(field))
             if operator == "=" and actual == expected:
                 continue
@@ -849,6 +872,124 @@ def _run_component_tranche(
             )
         )["status"]
         == "APPLIED"
+    )
+
+
+def test_read_case_exposes_exact_order_and_invoice_facts_without_payment_inference() -> None:
+    client = NativeERP()
+    client.documents["Purchase Invoice"] = {
+        "PINV-EXACT": {
+            "doctype": "Purchase Invoice",
+            "name": "PINV-EXACT",
+            "docstatus": 1,
+            "status": "Submitted",
+            "company": COMPANY,
+            "supplier": SUPPLIER,
+            "currency": "USD",
+            "grand_total": 2000,
+            "outstanding_amount": 1250,
+            "items": [{"item_code": ITEM, "purchase_order": PO, "po_detail": PO_ITEM}],
+        },
+        "PINV-OTHER-LINE": {
+            "doctype": "Purchase Invoice",
+            "name": "PINV-OTHER-LINE",
+            "docstatus": 1,
+            "company": COMPANY,
+            "supplier": SUPPLIER,
+            "currency": "USD",
+            "grand_total": 50,
+            "outstanding_amount": 50,
+            "items": [{"item_code": ITEM, "purchase_order": PO, "po_detail": "other-line"}],
+        },
+    }
+    client.documents["Sales Invoice"] = {
+        "SINV-24-EXACT": {
+            "doctype": "Sales Invoice",
+            "name": "SINV-24-EXACT",
+            "docstatus": 1,
+            "status": "Submitted",
+            "company": COMPANY,
+            "customer": "M20 Customer 24",
+            "currency": "USD",
+            "grand_total": 1200,
+            "outstanding_amount": 400,
+            "items": [
+                {
+                    "item_code": ITEM,
+                    "sales_order": ORDER_24,
+                    "so_detail": f"{ORDER_24}-ITEM",
+                }
+            ],
+        }
+    }
+
+    snapshot = _result(DistributorERP(client).read_case(r4_config()))
+
+    financials = cast(Mapping[str, object], snapshot["financials"])
+    assert financials["status"] == "CURRENT"
+    purchase = cast(Mapping[str, object], financials["purchase_order"])
+    assert purchase["supplier"] == SUPPLIER
+    assert purchase["currency"] == "USD"
+    assert purchase["line"] == {
+        "quantity": 40.0,
+        "rate": 50.0,
+        "net_amount": 2000.0,
+        "received_quantity": 1.0,
+    }
+    sales = cast(list[Mapping[str, object]], financials["sales_orders"])
+    assert sales[0]["value_scope"] == "ORDER_LINE_NET_AMOUNT_NOT_INVOICE_OR_REVENUE"
+    assert cast(Mapping[str, object], sales[0]["line"])["net_amount"] == 1200.0
+    purchase_invoices = cast(Mapping[str, object], financials["purchase_invoices"])
+    assert purchase_invoices == {
+        "status": "CURRENT",
+        "records": [
+            {
+                "document": {
+                    "kind": "Purchase Invoice",
+                    "name": "PINV-EXACT",
+                    "status": "Submitted",
+                    "url": "https://erp.example.test/app/purchase-invoice/PINV-EXACT",
+                },
+                "docstatus": 1,
+                "currency": "USD",
+                "grand_total": 2000.0,
+                "outstanding_amount": 1250.0,
+                "amount_scope": "INVOICE_LEVEL_TOTAL_AND_OUTSTANDING",
+            }
+        ],
+    }
+    sales_invoices = cast(list[Mapping[str, object]], financials["sales_invoices"])
+    assert sales_invoices[0]["customer_order"] == ORDER_24
+    assert sales_invoices[0]["status"] == "CURRENT"
+    assert (
+        cast(list[Mapping[str, object]], sales_invoices[0]["records"])[0]["grand_total"] == 1200.0
+    )
+    assert sales_invoices[1] == {
+        "customer_order": ORDER_15,
+        "status": "MISSING",
+        "records": [],
+    }
+    assert all(method == "GET" for _path, method, _payload in client.calls)
+    assert not any("Payment%20Entry" in path for path, _method, _payload in client.calls)
+
+
+def test_read_case_keeps_operational_source_current_when_invoice_reads_fail() -> None:
+    class InvoiceUnavailableERP(NativeERP):
+        def _request(
+            self, path: str, *, method: str = "GET", payload: object | None = None
+        ) -> object:
+            if method == "GET" and ("Purchase%20Invoice" in path or "Sales%20Invoice" in path):
+                raise OSError("invoice access unavailable")
+            return super()._request(path, method=method, payload=payload)
+
+    snapshot = _result(DistributorERP(InvoiceUnavailableERP()).read_case(r4_config()))
+
+    assert snapshot["source_status"] == "CURRENT"
+    financials = cast(Mapping[str, object], snapshot["financials"])
+    assert cast(Mapping[str, object], financials["purchase_invoices"])["status"] == "UNAVAILABLE"
+    assert all(
+        cast(Mapping[str, object], row)["status"] == "UNAVAILABLE"
+        for row in cast(list[Mapping[str, object]], financials["sales_invoices"])
     )
 
 

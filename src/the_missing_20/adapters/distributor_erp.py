@@ -172,8 +172,9 @@ class DistributorERP:
                 note for order_doc in orders for note in self._deliveries(scope, order_doc)
             ]
             shipments = self._shipments(scope)
+            financials = self._financials(scope, order, po_item, orders)
             return self._snapshot(
-                scope, order, po_item, receipts, orders, picks, deliveries, shipments
+                scope, order, po_item, receipts, orders, picks, deliveries, shipments, financials
             )
         except _ScopeError as error:
             return self._unavailable(config, error.code)
@@ -661,6 +662,161 @@ class DistributorERP:
             raise _ScopeError("SALES_ORDER_SCOPE_MISMATCH")
         return matches[0]
 
+    def _financials(
+        self,
+        scope: Mapping[str, object],
+        purchase_order: Mapping[str, object],
+        purchase_line: Mapping[str, object],
+        sales_orders: Sequence[Mapping[str, object]],
+    ) -> dict[str, object]:
+        """Return optional commercial facts without changing physical-source admission.
+
+        The inventory snapshot remains authoritative even when an ERP instance
+        does not permit its invoice relationship reads.  Amounts are deliberately
+        labelled at their document level; this adapter neither reads payments nor
+        infers cash or revenue from an order or invoice.
+        """
+
+        try:
+            purchase = self._financial_order(
+                "Purchase Order", purchase_order, purchase_line, received=True
+            )
+            sales = [
+                self._financial_order("Sales Order", document, self._order_item(scope, document))
+                for document in sales_orders
+            ]
+        except _ScopeError:
+            return {"status": "UNAVAILABLE", "reason": "ERP_FINANCIAL_READ_FAILED"}
+
+        purchase_invoices = self._related_invoices(
+            doctype="Purchase Invoice",
+            child_doctype="Purchase Invoice Item",
+            relation="purchase_order",
+            detail_relation="po_detail",
+            source_document=purchase_order,
+            source_line=purchase_line,
+            scope=scope,
+            party_field="supplier",
+        )
+        sales_invoices = [
+            {
+                "customer_order": _text(order.get("name"), "SALES_ORDER_SCOPE_MISMATCH"),
+                **self._related_invoices(
+                    doctype="Sales Invoice",
+                    child_doctype="Sales Invoice Item",
+                    relation="sales_order",
+                    detail_relation="so_detail",
+                    source_document=order,
+                    source_line=self._order_item(scope, order),
+                    scope=scope,
+                    party_field="customer",
+                ),
+            }
+            for order in sales_orders
+        ]
+        return {
+            "status": "CURRENT",
+            "purchase_order": purchase,
+            "sales_orders": sales,
+            "purchase_invoices": purchase_invoices,
+            "sales_invoices": sales_invoices,
+        }
+
+    def _financial_order(
+        self,
+        kind: str,
+        document: Mapping[str, object],
+        line: Mapping[str, object],
+        *,
+        received: bool = False,
+    ) -> dict[str, object]:
+        financial_line: dict[str, object] = {
+            "quantity": _quantity(line.get("qty"), "FINANCIAL_SOURCE_MISMATCH"),
+            "rate": _quantity(line.get("rate"), "FINANCIAL_SOURCE_MISMATCH"),
+            "net_amount": _quantity(line.get("net_amount"), "FINANCIAL_SOURCE_MISMATCH"),
+        }
+        if received:
+            financial_line["received_quantity"] = _quantity(
+                line.get("received_qty"), "FINANCIAL_SOURCE_MISMATCH"
+            )
+        result: dict[str, object] = {
+            "document": self._public_document(kind, document),
+            "currency": _text(document.get("currency"), "FINANCIAL_SOURCE_MISMATCH"),
+            "line": financial_line,
+        }
+        if kind == "Purchase Order":
+            result["supplier"] = _text(document.get("supplier"), "FINANCIAL_SOURCE_MISMATCH")
+        else:
+            result["customer"] = _text(document.get("customer"), "FINANCIAL_SOURCE_MISMATCH")
+            result["value_scope"] = "ORDER_LINE_NET_AMOUNT_NOT_INVOICE_OR_REVENUE"
+        return result
+
+    def _related_invoices(
+        self,
+        *,
+        doctype: str,
+        child_doctype: str,
+        relation: str,
+        detail_relation: str,
+        source_document: Mapping[str, object],
+        source_line: Mapping[str, object],
+        scope: Mapping[str, object],
+        party_field: str,
+    ) -> dict[str, object]:
+        """Read only invoices whose line links exactly to this case order line."""
+
+        try:
+            source_name = _text(source_document.get("name"), "FINANCIAL_SOURCE_MISMATCH")
+            source_line_name = _text(source_line.get("name"), "FINANCIAL_SOURCE_MISMATCH")
+            names = self._query(doctype, [[child_doctype, relation, "=", source_name]])
+            records: list[dict[str, object]] = []
+            for name in names:
+                invoice = self._document(doctype, name)
+                matching_lines = [
+                    line
+                    for line in _rows(invoice.get("items"), "FINANCIAL_INVOICE_SCOPE_MISMATCH")
+                    if line.get(relation) == source_name
+                    and line.get(detail_relation) == source_line_name
+                    and line.get("item_code") == scope.get("item_code")
+                ]
+                # An invoice can contain a different line from the same order.
+                # It is not an invoice for this configured case line.
+                if not matching_lines:
+                    continue
+                if (
+                    invoice.get("company") != scope.get("company")
+                    or invoice.get(party_field) != source_document.get(party_field)
+                    or not isinstance(invoice.get("docstatus"), int)
+                    or invoice["docstatus"] not in {0, 1, 2}
+                ):
+                    raise _ScopeError("FINANCIAL_INVOICE_SCOPE_MISMATCH")
+                if len(matching_lines) != 1:
+                    raise _ScopeError("FINANCIAL_INVOICE_SCOPE_MISMATCH")
+                records.append(
+                    {
+                        "document": self._public_document(doctype, invoice),
+                        "docstatus": invoice["docstatus"],
+                        "currency": _text(invoice.get("currency"), "FINANCIAL_SOURCE_MISMATCH"),
+                        "grand_total": _quantity(
+                            invoice.get("grand_total"), "FINANCIAL_SOURCE_MISMATCH"
+                        ),
+                        "outstanding_amount": _quantity(
+                            invoice.get("outstanding_amount"), "FINANCIAL_SOURCE_MISMATCH"
+                        ),
+                        "amount_scope": "INVOICE_LEVEL_TOTAL_AND_OUTSTANDING",
+                    }
+                )
+            return (
+                {"status": "CURRENT", "records": records}
+                if records
+                else {
+                    "status": "MISSING",
+                    "records": [],
+                }
+            )
+        except (DemoExecutionBlocked, OSError, TypeError, ValueError, _ScopeError):
+            return {"status": "UNAVAILABLE", "reason": "ERP_INVOICE_READ_FAILED"}
+
     def _picks(
         self, scope: Mapping[str, object], order: Mapping[str, object]
     ) -> list[Mapping[str, object]]:
@@ -847,6 +1003,7 @@ class DistributorERP:
         picks: Sequence[Mapping[str, object]],
         deliveries: Sequence[Mapping[str, object]],
         shipments: Sequence[Mapping[str, object]],
+        financials: Mapping[str, object],
     ) -> dict[str, object]:
         plans = self._plans(scope)
         quality_transfers = self._quality_transfers(scope)
@@ -1032,6 +1189,7 @@ class DistributorERP:
                 "lots": lots,
                 "allocations": allocation_rows,
                 "documents": documents,
+                "financials": financials,
             }
         )
         return {
@@ -1046,6 +1204,7 @@ class DistributorERP:
             "source_identity": source_identity,
             "source_revision": source_revision,
             "source_status": "CURRENT",
+            "financials": dict(financials),
         }
 
     def _source_allocations(

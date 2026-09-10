@@ -523,6 +523,7 @@ class DistributorOperations:
             updated.pop("parent_purchase_order", None)
         updated["source_status"] = "CURRENT"
         updated["source_error"] = None
+        updated["financials"] = _copy(source["financials"])
         updated["source_observation"] = {
             "quantities": _copy(source["quantities"]),
             "lots": _copy(source["lots"]),
@@ -531,6 +532,7 @@ class DistributorOperations:
             "parent_purchase_order": _copy(parent_purchase_order)
             if isinstance(parent_purchase_order, Mapping)
             else None,
+            "financials": _copy(source["financials"]),
         }
 
         event_id = _text(event["event_id"], "event_id")
@@ -921,12 +923,20 @@ class DistributorOperations:
         documents = _documents(raw_documents)
         if not isinstance(raw_documents, list) or len(documents) != len(raw_documents):
             raise ValueError("source documents are malformed")
+        try:
+            financials = self._canonical_financials(source.get("financials"))
+        except ValueError:
+            financials = {
+                "status": "UNAVAILABLE",
+                "reason": "FINANCIAL_SOURCE_MALFORMED",
+            }
         canonical: dict[str, object] = {
             "source_status": "CURRENT",
             "documents": documents,
             "quantities": quantities,
             "lots": lots,
             "allocations": allocations,
+            "financials": financials,
         }
         if parent_purchase_order is not None:
             canonical["parent_purchase_order"] = parent_purchase_order
@@ -999,6 +1009,150 @@ class DistributorOperations:
         if set(result) != set(expected):
             raise ValueError("source lots are incomplete")
         return [result[name] for name in sorted(result)]
+
+    def _canonical_financials(self, raw: object) -> dict[str, object]:
+        """Keep optional commercial readbacks local to the financial projection."""
+
+        if raw is None:
+            return {"status": "UNAVAILABLE", "reason": "FINANCIAL_NOT_PROVIDED"}
+        if not isinstance(raw, Mapping):
+            raise ValueError("financial source is malformed")
+        status = raw.get("status")
+        if status == "UNAVAILABLE":
+            return {
+                "status": "UNAVAILABLE",
+                "reason": _text(raw.get("reason"), "financial reason"),
+            }
+        if status != "CURRENT":
+            raise ValueError("financial source status is malformed")
+        purchase = self._canonical_financial_order(
+            raw.get("purchase_order"), "Purchase Order", self._config["purchase_order"], True
+        )
+        raw_sales = raw.get("sales_orders")
+        if not isinstance(raw_sales, list):
+            raise ValueError("financial sales orders are malformed")
+        sales: dict[str, dict[str, object]] = {}
+        for row in raw_sales:
+            canonical = self._canonical_financial_order(row, "Sales Order", None, False)
+            document = cast(Mapping[str, object], canonical["document"])
+            name = _text(document.get("name"), "financial sales order")
+            if name in sales:
+                raise ValueError("financial sales orders are ambiguous")
+            sales[name] = canonical
+        expected_sales = {
+            _text(row["customer_order"], "customer_order")
+            for row in cast(list[Mapping[str, object]], self._config["allocations"])
+        }
+        if set(sales) != expected_sales:
+            raise ValueError("financial sales order scope mismatch")
+        purchase_invoices = self._canonical_invoice_group(
+            raw.get("purchase_invoices"), "Purchase Invoice"
+        )
+        raw_sales_invoices = raw.get("sales_invoices")
+        if not isinstance(raw_sales_invoices, list):
+            raise ValueError("financial sales invoices are malformed")
+        sales_invoices: dict[str, dict[str, object]] = {}
+        for row in raw_sales_invoices:
+            if not isinstance(row, Mapping):
+                raise ValueError("financial sales invoice is malformed")
+            order = _text(row.get("customer_order"), "financial sales invoice order")
+            if order in sales_invoices:
+                raise ValueError("financial sales invoices are ambiguous")
+            sales_invoices[order] = {
+                "customer_order": order,
+                **self._canonical_invoice_group(row, "Sales Invoice"),
+            }
+        if set(sales_invoices) != expected_sales:
+            raise ValueError("financial sales invoice scope mismatch")
+        return {
+            "status": "CURRENT",
+            "purchase_order": purchase,
+            "sales_orders": [sales[name] for name in sorted(sales)],
+            "purchase_invoices": purchase_invoices,
+            "sales_invoices": [sales_invoices[name] for name in sorted(sales_invoices)],
+        }
+
+    @staticmethod
+    def _canonical_financial_document(raw: object, kind: str) -> dict[str, object]:
+        documents = _documents([raw])
+        if len(documents) != 1 or documents[0].get("kind") != kind:
+            raise ValueError("financial document is malformed")
+        return documents[0]
+
+    def _canonical_financial_order(
+        self, raw: object, kind: str, expected_name: object | None, purchase: bool
+    ) -> dict[str, object]:
+        if not isinstance(raw, Mapping):
+            raise ValueError("financial order is malformed")
+        document = self._canonical_financial_document(raw.get("document"), kind)
+        if expected_name is not None and document.get("name") != expected_name:
+            raise ValueError("financial purchase order scope mismatch")
+        line = raw.get("line")
+        if not isinstance(line, Mapping):
+            raise ValueError("financial order line is malformed")
+        canonical_line: dict[str, object] = {
+            "quantity": _wire(_quantity(line.get("quantity"), "financial quantity")),
+            "rate": _wire(_quantity(line.get("rate"), "financial rate")),
+            "net_amount": _wire(_quantity(line.get("net_amount"), "financial net amount")),
+        }
+        if purchase:
+            canonical_line["received_quantity"] = _wire(
+                _quantity(line.get("received_quantity"), "financial received quantity")
+            )
+        result: dict[str, object] = {
+            "document": document,
+            "currency": _text(raw.get("currency"), "financial currency"),
+            "line": canonical_line,
+        }
+        if purchase:
+            result["supplier"] = _text(raw.get("supplier"), "financial supplier")
+        else:
+            if raw.get("value_scope") != "ORDER_LINE_NET_AMOUNT_NOT_INVOICE_OR_REVENUE":
+                raise ValueError("financial sales order amount scope is malformed")
+            result["customer"] = _text(raw.get("customer"), "financial customer")
+            result["value_scope"] = "ORDER_LINE_NET_AMOUNT_NOT_INVOICE_OR_REVENUE"
+        return result
+
+    def _canonical_invoice_group(self, raw: object, kind: str) -> dict[str, object]:
+        if not isinstance(raw, Mapping):
+            raise ValueError("financial invoice group is malformed")
+        status = raw.get("status")
+        if status == "UNAVAILABLE":
+            return {
+                "status": "UNAVAILABLE",
+                "reason": _text(raw.get("reason"), "financial invoice reason"),
+            }
+        records = raw.get("records")
+        if not isinstance(records, list):
+            raise ValueError("financial invoice records are malformed")
+        if status == "MISSING":
+            if records:
+                raise ValueError("missing financial invoices have records")
+            return {"status": "MISSING", "records": []}
+        if status != "CURRENT" or not records:
+            raise ValueError("financial invoice status is malformed")
+        canonical: dict[str, dict[str, object]] = {}
+        for row in records:
+            if not isinstance(row, Mapping):
+                raise ValueError("financial invoice is malformed")
+            document = self._canonical_financial_document(row.get("document"), kind)
+            name = _text(document.get("name"), "financial invoice name")
+            docstatus = _whole(row.get("docstatus"), "financial invoice docstatus")
+            if name in canonical or docstatus not in {0, 1, 2}:
+                raise ValueError("financial invoice scope mismatch")
+            if row.get("amount_scope") != "INVOICE_LEVEL_TOTAL_AND_OUTSTANDING":
+                raise ValueError("financial invoice amount scope is malformed")
+            canonical[name] = {
+                "document": document,
+                "docstatus": docstatus,
+                "currency": _text(row.get("currency"), "financial invoice currency"),
+                "grand_total": _wire(_quantity(row.get("grand_total"), "financial grand total")),
+                "outstanding_amount": _wire(
+                    _quantity(row.get("outstanding_amount"), "financial outstanding amount")
+                ),
+                "amount_scope": "INVOICE_LEVEL_TOTAL_AND_OUTSTANDING",
+            }
+        return {"status": "CURRENT", "records": [canonical[name] for name in sorted(canonical)]}
 
     def _canonical_source_allocations(self, raw_allocations: object) -> list[dict[str, object]]:
         if not isinstance(raw_allocations, list):
@@ -1127,6 +1281,7 @@ class DistributorOperations:
             "shipments": {},
             "prepared_picks": [],
             "conversation": [],
+            "financials": {"status": "UNAVAILABLE", "reason": "FINANCIAL_NOT_PROVIDED"},
             "source_status": "UNAVAILABLE",
             "source_error": "ERP_SOURCE_NOT_READ",
             "source_observation": None,
@@ -1190,6 +1345,7 @@ class DistributorOperations:
                 next_state["parent_purchase_order"] = _copy(parent_purchase_order)
             else:
                 next_state.pop("parent_purchase_order", None)
+            next_state["financials"] = _copy(current["financials"])
             next_state["source_observation"] = {
                 "quantities": _copy(current["quantities"]),
                 "lots": _copy(current["lots"]),
@@ -1198,9 +1354,14 @@ class DistributorOperations:
                 "parent_purchase_order": _copy(parent_purchase_order)
                 if isinstance(parent_purchase_order, Mapping)
                 else None,
+                "financials": _copy(current["financials"]),
             }
         else:
             next_state.pop("parent_purchase_order", None)
+            next_state["financials"] = {
+                "status": "UNAVAILABLE",
+                "reason": "ERP_SOURCE_UNAVAILABLE",
+            }
         return next_state, current
 
     def _source_matches_state(

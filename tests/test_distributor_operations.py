@@ -395,6 +395,79 @@ def _codes(projection: dict[str, object]) -> set[str]:
     }
 
 
+def test_projection_keeps_optional_financial_facts_local_to_current_erp_source(
+    tmp_path: Path,
+) -> None:
+    config = _r4_config()
+    service, bridge = _service(tmp_path, config)
+    missing = service.projection()
+    assert missing["available"] is True
+    assert missing["financials"] == {
+        "status": "UNAVAILABLE",
+        "reason": "FINANCIAL_NOT_PROVIDED",
+    }
+
+    source = cast(dict[str, object], bridge.read_case(config))
+    orders = cast(list[Mapping[str, object]], config["allocations"])
+    source["financials"] = {
+        "status": "CURRENT",
+        "purchase_order": {
+            "document": {
+                "kind": "Purchase Order",
+                "name": config["purchase_order"],
+                "status": "Submitted",
+            },
+            "supplier": "M20 Supplier",
+            "currency": "USD",
+            "line": {"quantity": 40, "received_quantity": 0, "rate": 50, "net_amount": 2000},
+        },
+        "sales_orders": [
+            {
+                "document": {
+                    "kind": "Sales Order",
+                    "name": row["customer_order"],
+                    "status": "Submitted",
+                },
+                "customer": f"Customer {row['customer_order']}",
+                "currency": "USD",
+                "line": {
+                    "quantity": row["requested_quantity"],
+                    "rate": 50,
+                    "net_amount": row["requested_quantity"] * 50,
+                },
+                "value_scope": "ORDER_LINE_NET_AMOUNT_NOT_INVOICE_OR_REVENUE",
+            }
+            for row in orders
+        ],
+        "purchase_invoices": {"status": "MISSING", "records": []},
+        "sales_invoices": [
+            {"customer_order": row["customer_order"], "status": "MISSING", "records": []}
+            for row in orders
+        ],
+    }
+    bridge.source_override = source
+
+    current = service.projection()
+    assert current["available"] is True
+    financials = cast(Mapping[str, object], current["financials"])
+    assert financials["status"] == "CURRENT"
+    assert cast(Mapping[str, object], financials["purchase_order"])["line"] == {
+        "quantity": 40,
+        "rate": 50,
+        "net_amount": 2000,
+        "received_quantity": 0,
+    }
+    assert cast(Mapping[str, object], financials["purchase_invoices"])["status"] == "MISSING"
+
+    source["financials"] = {"status": "CURRENT", "purchase_order": "malformed"}
+    malformed = service.projection()
+    assert malformed["available"] is True
+    assert malformed["financials"] == {
+        "status": "UNAVAILABLE",
+        "reason": "FINANCIAL_SOURCE_MALFORMED",
+    }
+
+
 def test_r4_remaining_arrivals_allocate_then_pick_pickup_and_delivery(tmp_path: Path) -> None:
     service, bridge = _service(tmp_path, _r4_config())
     first = service.record_event(_r4_arrival("arrival-r4-20", "R4-ARRIVAL-20", 20))

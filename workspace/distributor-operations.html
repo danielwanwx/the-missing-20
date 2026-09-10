@@ -124,6 +124,13 @@
           <div id="ops-alerts-list" class="ops-alert-list" aria-live="polite"></div>
         </section>
 
+        <section id="ops-financials-panel" class="ops-panel" aria-labelledby="ops-financials-title" hidden>
+          <header class="ops-panel-header"><div><span class="object-label">Commercial evidence</span><h2 id="ops-financials-title">Order and invoice records</h2></div><span id="ops-financials-status" class="state-badge state-neutral">Unavailable</span></header>
+          <p id="ops-financials-note" class="ops-panel-copy">Commercial records are read from the current ERP source. Sales order line amounts are order values; they are not revenue. Invoice totals and outstanding amounts are invoice-level amounts.</p>
+          <div class="ops-financial-section"><h3>Source order lines</h3><div id="ops-financial-orders" class="ops-financial-grid" aria-live="polite"></div></div>
+          <div class="ops-financial-section"><h3>Invoice records</h3><div id="ops-financial-invoices" class="ops-financial-grid" aria-live="polite"></div></div>
+        </section>
+
         <section id="ops-handoffs-panel" class="ops-panel" aria-labelledby="ops-handoffs-title">
           <header class="ops-panel-header"><div><span class="object-label">Same-case external records</span><h2 id="ops-handoffs-title">Cross-system readback</h2></div><span class="ops-count-label" id="ops-handoffs-count">No verified links</span></header>
           <div id="ops-handoffs-list" class="ops-handoff-list" aria-live="polite"></div>

@@ -21,6 +21,10 @@ const {
   recommendedAction,
   statusTone,
   deliveryCompletionLabel,
+  normalizeFinancials,
+  financialStatusMessage,
+  financialOrderSummary,
+  invoiceRecordSummary,
 } = require('../workspace/distributor-operations.js');
 
 test('projection keeps missing source quantities unknown instead of turning them into zero', () => {
@@ -307,6 +311,48 @@ test('arrival activity uses the source stock UOM for counted quantity', () => {
   assert.equal(arrivalQuantitySummary({}, { quantities: { uom: 'Box' } }), 'Quantity count unknown');
 });
 
+test('commercial projection preserves order line values and invoice-level amounts', () => {
+  const financials = normalizeFinancials({
+    status: 'CURRENT',
+    purchase_order: {
+      currency: 'USD',
+      supplier: 'M20 Supplier',
+      document: { name: 'PO-18', status: 'Submitted', url: '/app/purchase-order/PO-18' },
+      line: { quantity: 40, rate: 4, net_amount: 160 },
+    },
+    sales_orders: [{
+      currency: 'USD',
+      customer: 'Demo Customer',
+      document: { name: 'SO-11', status: 'To Deliver', url: '/app/sales-order/SO-11' },
+      line: { quantity: 25, rate: 6, net_amount: 150 },
+    }],
+    purchase_invoices: { status: 'MISSING', records: [] },
+    sales_invoices: [{ customer_order: 'SO-11', status: 'CURRENT', records: [{
+      docstatus: 1,
+      currency: 'USD',
+      grand_total: 150,
+      outstanding_amount: 150,
+      document: { name: 'SI-11', status: 'Submitted', url: '/app/sales-invoice/SI-11' },
+    }] }],
+  });
+  assert.equal(financials.status, 'CURRENT');
+  assert.match(financialOrderSummary(financials.purchase_order, 'Box'), /Line amount: USD 160/);
+  assert.match(financialOrderSummary(financials.sales_orders[0], 'Nos'), /Line amount: USD 150/);
+  assert.match(invoiceRecordSummary(financials.sales_invoices[0].records[0]), /Docstatus 1/);
+  assert.match(invoiceRecordSummary(financials.sales_invoices[0].records[0]), /Invoice-level grand total USD 150/);
+  assert.match(invoiceRecordSummary(financials.sales_invoices[0].records[0]), /Invoice-level outstanding amount USD 150/);
+});
+
+test('missing and unavailable invoice states stay distinct and never say unpaid', () => {
+  const missing = financialStatusMessage('MISSING', 'Purchase');
+  const unavailable = financialStatusMessage('UNAVAILABLE', 'Sales');
+  assert.match(missing, /No purchase invoice linked/i);
+  assert.match(unavailable, /data is unavailable/i);
+  assert.doesNotMatch(`${missing} ${unavailable}`, /unpaid/i);
+  assert.equal(normalizeFinancials({ status: 'UNAVAILABLE' }).purchase_invoices.status, 'UNAVAILABLE');
+  assert.deepEqual(normalizeFinancials({ status: 'UNAVAILABLE' }).purchase_invoices.records, []);
+});
+
 test('answers hide paired reasoning blocks and alerts retain an actionable tone', () => {
   assert.equal(cleanAnswer('Visible answer <thinking>private chain</thinking> <analysis>also private</analysis>'), 'Visible answer');
   assert.equal(statusTone('QUALITY_HOLD'), 'coral');
@@ -320,5 +366,8 @@ test('page exposes the guarded business loop and synthetic evidence label', () =
   assert.match(html, /Delivery confirmed/);
   assert.match(html, /Ask about this operation/);
   assert.match(html, /Cross-system readback/);
+  assert.match(html, /Commercial evidence/);
+  assert.match(html, /Sales order line amounts are order values; they are not revenue/);
+  assert.match(html, /ops-financials-panel/);
   assert.match(html, /distributor-operations\.js/);
 });

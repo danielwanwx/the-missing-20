@@ -359,3 +359,10 @@ CI34532525611 failed solely on the existing browser readiness probe dereferencin
 The one-line null-safe readiness predicate preserves the assertions and timeout;
 primary rerun of that exact browser test passed with loopback enabled. The failed
 CI remains retained; its replacement run still needs verification.
+
+CI readiness correction `e3658965458e040fb7cd6c0b56dd9c5c4d1d84f7` was pushed,
+remote SHA verified, and CI34533153849 completed SUCCESS. Fresh PO18 currently
+has 38 received/dispatched, A25/B13 dispatched, and 20 declared synthetic delivery
+confirmations. Commercial evidence backend/UI passed independent review and
+actual ERP/UI checks (PO USD160, SO USD150/90, linked invoices missing); final
+2-part replacement and remaining confirmations are still being exercised.

@@ -141,6 +141,7 @@
       events: Array.isArray(source.events),
       documents: Array.isArray(source.documents),
       handoffs: Array.isArray(source.handoffs),
+      financials: isRecord(source.financials),
       available_event_templates: Array.isArray(source.available_event_templates),
     };
     return {
@@ -156,6 +157,7 @@
       events: Array.isArray(source.events) ? source.events : [],
       documents: Array.isArray(source.documents) ? source.documents : [],
       handoffs: Array.isArray(source.handoffs) ? source.handoffs : [],
+      financials: isRecord(source.financials) ? normalizeFinancials(source.financials) : {},
       available_event_templates: normalizeTemplates(source.available_event_templates),
       conversation: Array.isArray(source.conversation)
         ? source.conversation
@@ -223,6 +225,71 @@
         records,
       };
     });
+  }
+
+  function normalizeInvoiceGroup(value) {
+    const source = isRecord(value) ? value : {};
+    const rawStatus = text(source.status).toUpperCase();
+    const status = ["CURRENT", "MISSING", "UNAVAILABLE"].includes(rawStatus) ? rawStatus : "UNAVAILABLE";
+    return {
+      ...source,
+      status,
+      records: Array.isArray(source.records) ? source.records.filter(isRecord) : [],
+    };
+  }
+
+  function normalizeFinancials(value) {
+    const source = isRecord(value) ? value : {};
+    return {
+      ...source,
+      status: ["CURRENT", "UNAVAILABLE"].includes(text(source.status).toUpperCase())
+        ? text(source.status).toUpperCase()
+        : "UNAVAILABLE",
+      purchase_order: isRecord(source.purchase_order) ? { ...source.purchase_order } : null,
+      sales_orders: Array.isArray(source.sales_orders) ? source.sales_orders.filter(isRecord) : [],
+      purchase_invoices: normalizeInvoiceGroup(source.purchase_invoices),
+      sales_invoices: Array.isArray(source.sales_invoices)
+        ? source.sales_invoices.filter(isRecord).map((row) => ({
+          ...row,
+          customer_order: firstText(row, ["customer_order", "sales_order"]),
+          ...normalizeInvoiceGroup(row),
+        }))
+        : [],
+    };
+  }
+
+  function financialStatusMessage(status, kind = "") {
+    const label = kind ? `${kind} invoice` : "Invoice";
+    const normalized = text(status).toUpperCase();
+    if (normalized === "CURRENT") return "Current ERP source returned invoice records.";
+    if (normalized === "MISSING") return `No ${label.toLowerCase()} linked in the current ERP source.`;
+    return `${label} data is unavailable from the current ERP source.`;
+  }
+
+  function formatMoney(value, currency) {
+    const amount = numberFrom(value);
+    const unit = text(currency);
+    if (!finite(amount)) return "Amount unavailable";
+    return unit ? `${unit} ${formatNumber(amount)}` : `Amount known; currency unavailable (${formatNumber(amount)})`;
+  }
+
+  function financialOrderSummary(order, unit = "units") {
+    const line = isRecord(order?.line) ? order.line : {};
+    const currency = text(order?.currency);
+    const amount = formatMoney(line.net_amount, currency);
+    const rate = formatMoney(line.rate, currency);
+    const quantity = numberFrom(line.quantity);
+    const quantityText = finite(quantity) ? `${formatNumber(quantity)} ${unit}` : "Quantity unavailable";
+    return `Line amount: ${amount} · Rate: ${rate} × ${quantityText}`;
+  }
+
+  function invoiceRecordSummary(record) {
+    if (!isRecord(record)) return "Invoice record unavailable.";
+    const documentRecord = isRecord(record.document) ? record.document : {};
+    const docstatus = finite(numberFrom(record.docstatus)) ? `Docstatus ${formatNumber(numberFrom(record.docstatus))}` : "Docstatus unavailable";
+    const status = firstText(documentRecord, ["status"]) || "Status unavailable";
+    const currency = text(record.currency) || "Currency unavailable";
+    return `${docstatus} · Status ${status} · Currency ${currency} · Invoice-level grand total ${formatMoney(record.grand_total, record.currency)} · Invoice-level outstanding amount ${formatMoney(record.outstanding_amount, record.currency)}`;
   }
 
   function normalizeContractPlan(value) {
@@ -356,6 +423,10 @@
     normalizeProjection,
     normalizeHandoffs,
     groupHandoffs,
+    normalizeFinancials,
+    financialStatusMessage,
+    financialOrderSummary,
+    invoiceRecordSummary,
     normalizeContractPlan,
     contractPlanRows,
     contractDecisionState,
@@ -791,6 +862,129 @@
     }));
   }
 
+  function appendFinancialDocument(parent, documentRecord) {
+    const name = firstText(documentRecord, ["name", "record_id", "id"]) || "ERP document";
+    const href = safeHref(documentRecord.url || documentRecord.href);
+    if (href) {
+      const anchor = document.createElement("a");
+      anchor.href = href; anchor.target = "_blank"; anchor.rel = "noopener noreferrer";
+      anchor.textContent = name; parent.append(anchor);
+    } else {
+      const label = document.createElement("span");
+      label.textContent = `${name} · link unavailable`; parent.append(label);
+    }
+  }
+
+  function financialOrderCard(order, label, unit) {
+    const card = document.createElement("article"); card.className = "ops-financial-card";
+    const documentRecord = isRecord(order.document) ? order.document : {};
+    const heading = document.createElement("div"); heading.className = "ops-financial-heading";
+    const identity = document.createElement("div");
+    const kind = document.createElement("small"); kind.textContent = firstText(documentRecord, ["kind", "doctype", "type"]) || label;
+    const name = document.createElement("strong"); name.textContent = label;
+    const link = document.createElement("span"); link.className = "ops-financial-document";
+    appendFinancialDocument(link, documentRecord);
+    identity.append(kind, name, link);
+    const status = document.createElement("span"); status.className = "ops-financial-status";
+    status.textContent = `Status: ${firstText(documentRecord, ["status"]) || "Status unavailable"}`;
+    heading.append(identity, status);
+    const party = firstText(order, ["supplier", "customer"]);
+    const partyNode = document.createElement("p"); partyNode.className = "ops-financial-party";
+    partyNode.textContent = `${label.startsWith("Sales") ? "Customer" : "Supplier"}: ${party || "Party unavailable"}`;
+    const detail = document.createElement("p"); detail.className = "ops-financial-detail";
+    detail.textContent = financialOrderSummary(order, unit);
+    const currency = document.createElement("small"); currency.className = "ops-financial-meta";
+    currency.textContent = `Currency: ${text(order.currency) || "Currency unavailable"}`;
+    card.append(heading, partyNode, detail, currency);
+    return card;
+  }
+
+  function financialInvoiceCard(record) {
+    const card = document.createElement("article"); card.className = "ops-financial-card ops-financial-invoice";
+    const documentRecord = isRecord(record.document) ? record.document : {};
+    const heading = document.createElement("div"); heading.className = "ops-financial-heading";
+    const identity = document.createElement("div");
+    const kind = document.createElement("small"); kind.textContent = firstText(documentRecord, ["kind", "doctype", "type"]) || "Invoice";
+    const name = document.createElement("strong"); name.textContent = firstText(documentRecord, ["name", "record_id", "id"]) || "Invoice record";
+    const link = document.createElement("span"); link.className = "ops-financial-document";
+    appendFinancialDocument(link, documentRecord);
+    identity.append(kind, name, link);
+    const status = document.createElement("span"); status.className = "ops-financial-status";
+    status.textContent = firstText(documentRecord, ["status"]) || "Status unavailable";
+    heading.append(identity, status);
+    const detail = document.createElement("p"); detail.className = "ops-financial-detail";
+    detail.textContent = invoiceRecordSummary(record);
+    card.append(heading, detail);
+    return card;
+  }
+
+  function renderInvoiceGroup(parent, title, group, unit) {
+    const section = document.createElement("section"); section.className = "ops-financial-group";
+    const heading = document.createElement("div"); heading.className = "ops-financial-group-heading";
+    const titleNode = document.createElement("strong"); titleNode.textContent = title;
+    const badge = document.createElement("span");
+    badge.className = `state-badge state-${group.status === "CURRENT" ? "lime" : group.status === "MISSING" ? "amber" : "coral"}`;
+    badge.textContent = pretty(group.status);
+    heading.append(titleNode, badge);
+    const note = document.createElement("p"); note.className = "ops-financial-note";
+    note.textContent = group.status === "CURRENT" && group.records.length
+      ? "Invoice records read from the current ERP source."
+      : group.status === "CURRENT"
+        ? "Current ERP source returned no invoice records."
+        : financialStatusMessage(group.status, title.startsWith("Sales") ? "Sales" : "Purchase");
+    section.append(heading, note);
+    if (group.status === "CURRENT" && group.records.length) {
+      const records = document.createElement("div"); records.className = "ops-financial-records";
+      records.append(...group.records.map((record) => financialInvoiceCard(record, unit)));
+      section.append(records);
+    }
+    parent.append(section);
+  }
+
+  function renderFinancials(next) {
+    const panel = $("ops-financials-panel");
+    if (!panel) return;
+    if (!next._provided.financials) {
+      panel.hidden = true;
+      return;
+    }
+    const financials = normalizeFinancials(next.financials);
+    panel.hidden = false;
+    const status = $("ops-financials-status");
+    if (status) {
+      status.className = `state-badge state-${financials.status === "CURRENT" ? "lime" : "coral"}`;
+      status.textContent = pretty(financials.status);
+    }
+    setText("ops-financials-note", financials.status === "CURRENT"
+      ? "Commercial records are read from the current ERP source. Sales order line amounts are order values; they are not revenue. Invoice totals and outstanding amounts are invoice-level amounts."
+      : "Commercial evidence is unavailable from the current ERP source. No amounts are inferred.");
+    const orders = $("ops-financial-orders");
+    const invoices = $("ops-financial-invoices");
+    orders.replaceChildren(); invoices.replaceChildren();
+    if (financials.status !== "CURRENT") {
+      orders.append(emptyList("Source order lines are unavailable from the current ERP source."));
+      invoices.append(emptyList("Invoice records are unavailable from the current ERP source."));
+      return;
+    }
+    const unit = text(next.quantities?.uom) || "units";
+    if (financials.purchase_order) {
+      orders.append(financialOrderCard(financials.purchase_order, "Purchase order", unit));
+    }
+    for (const order of financials.sales_orders) {
+      const name = firstText(order.document, ["name", "record_id", "id"]) || "Sales order";
+      orders.append(financialOrderCard(order, `Sales order · ${name}`, unit));
+    }
+    if (!orders.childNodes.length) orders.append(emptyList("No source order lines returned from the current ERP source."));
+    renderInvoiceGroup(invoices, "Purchase invoices", financials.purchase_invoices, unit);
+    if (financials.sales_invoices.length) {
+      for (const row of financials.sales_invoices) {
+        renderInvoiceGroup(invoices, `Sales invoices · ${row.customer_order || "Order unavailable"}`, normalizeInvoiceGroup(row), unit);
+      }
+    } else {
+      invoices.append(emptyList("No sales invoice groups returned from the current ERP source."));
+    }
+  }
+
   function arrivalQuantitySummary(event, next) {
     const observed = numberFrom(event.observed_stock_quantity);
     if (!finite(observed)) return "Quantity count unknown";
@@ -1048,6 +1242,7 @@
     renderAlerts(next);
     renderHandoffs(next);
     renderDocuments(next);
+    renderFinancials(next);
     renderEvents(next);
     if (!skipConversation) renderConversation(next);
     updateEventButton();
