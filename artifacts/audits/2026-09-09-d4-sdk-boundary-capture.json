@@ -1,0 +1,96 @@
+{
+  "capture_kind": "strands_model_stream_input_boundary",
+  "capture_scope": "post_tool_acquisition_model_stream_before_typed_synthesis",
+  "historical_intermediate_assistant_reconstructed": false,
+  "historical_wire_capture": false,
+  "input_paths": {
+    "artifact": "/private/tmp/m20-s2-d4-live-q4.json",
+    "erp_source": "/private/tmp/m20-s2-d4-screen-v2/erp-v1.json",
+    "saas_source": "/private/tmp/m20-s2-d4-screen-v2/saas.json"
+  },
+  "input_sha256": {
+    "artifact": "146b211f876b12d5e85710fccd636f647111b70e44d636141d26b1fd375412d7",
+    "erp_source": "f9562ff5d61c1840b55a36b284b57677e78dd1e3abd89041182da89948eb65e5",
+    "saas_source": "66d911222c58c57bee87be5abf9e700be7f704a6a677e81110c46eee085732fa"
+  },
+  "limitations": [
+    "This is a current-code reconstruction, not retained historical Bedrock HTTP bytes.",
+    "The local fixed tool sequence is synthetic orchestration, not a model decision.",
+    "Candidate admission by existing validation is not semantic correctness or a model pass."
+  ],
+  "provider_fallback": false,
+  "provider_requests": 0,
+  "reconstruction": {
+    "assistant_prose_in_reconstructed_context": false,
+    "current_question_from_historical_artifact": true,
+    "execution_revision": "7f586304daf9f04c172e13c232404b6f2a0b8aa3",
+    "historical_intermediate_assistant_reconstructed": false,
+    "historical_wire_capture": false,
+    "packed_context_sha256": "dfe99d5c81ee55c5f895461bed3cd66c1186ce4966a45c492505f99f82839bd3",
+    "prior_human_request_count": 3,
+    "source_mode": "frozen_read_only_fixture",
+    "source_observability": {
+      "erp_external_calls": 0,
+      "erp_fixture_reads": 1,
+      "saas_external_calls": 0,
+      "saas_fixture_reads": 1
+    },
+    "strands_agents_version": "1.53.0"
+  },
+  "retained_candidate_admission": {
+    "answer_displayed_or_persisted": false,
+    "candidate_disposition": "SAFE_NOOP",
+    "candidate_evidence_ids": [
+      "PUR-ORD-2026-00015",
+      "MAT-PRE-2026-00006",
+      "MAT-PRE-2026-00005",
+      "MAT-PRE-2026-00006:ledger",
+      "1788981560.785039",
+      "QRC-2"
+    ],
+    "candidate_sha256": "cd2d2d4df10de0743ba89df29fef7b21e6a07971a58afb4fa17ab2497744d969",
+    "existing_full_validation_seam": true,
+    "model_quality_pass": false,
+    "provider_requests": 0,
+    "semantic_accuracy_assessed": false,
+    "separate_from_boundary_capture": true,
+    "status": "ADMITTED_BY_EXISTING_VALIDATION",
+    "synthetic_candidate_injection": true,
+    "tool_calls": [
+      "read_control_context",
+      "read_erp_evidence",
+      "read_airtable_evidence",
+      "read_celigo_evidence",
+      "read_collaboration_evidence"
+    ],
+    "validation_retries": 0
+  },
+  "schema_version": "missing20-frozen-receiving-sdk-boundary-capture/v1",
+  "status": "CAPTURED_OFFLINE",
+  "stream_boundary": {
+    "answer_emitted": false,
+    "captured_phase": "post_tool_acquisition_model_stream_before_typed_synthesis",
+    "invocation_state_sha256": "123232125d61ce92d32572f0c635d77a9ed58836c5a43666c468d59b64ecfdc9",
+    "messages_sha256": "9bdd9e71456cce9d23f810e54a34d0466d0f968b45b56a3fd4aa9b9c975bc089",
+    "model_facing_physical_basis": {
+      "independently_observed_quantity": null,
+      "physical_observation_basis": "RECEIPT_CONFIRMED",
+      "raw_physically_arrived_present": false,
+      "receipt_confirmed_lower_bound": 2.0
+    },
+    "stopped_after_tools": true,
+    "stream_call_count": 6,
+    "system_prompt_content_sha256": "c08f93fe64025e3a1de425e8bb3972b779776e3e491388b37e6aaf940f03e6bb",
+    "system_prompt_sha256": "cad53cb41f4484e0d227d484109ce38a502eaa5b3a3e769ea728dabf7da10bf9",
+    "tool_result_names": [
+      "read_control_context",
+      "read_erp_evidence",
+      "read_airtable_evidence",
+      "read_celigo_evidence",
+      "read_collaboration_evidence"
+    ],
+    "tool_specs_sha256": "eb45da71e228b4a8859daf7b95aab0e68b194b9c743947dbc9115da72d173336",
+    "typed_synthesis_input_captured": false
+  },
+  "synthetic_tool_orchestration": true
+}

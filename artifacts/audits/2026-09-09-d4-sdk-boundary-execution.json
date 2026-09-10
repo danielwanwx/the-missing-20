@@ -1,0 +1,17 @@
+{
+  "scope": "offline provenance rerun; not a model retry",
+  "before_sha256": {
+    "script": "0424d427625abbf7c58ae14c736aec24e9a844cfb4f5d97af20bbe2347fd1eea",
+    "tests": "ebf9083d9bc7b6570ac92be79f5d9c6613c8438f20a1510ee41afad0658e227b"
+  },
+  "after_sha256": {
+    "script": "0424d427625abbf7c58ae14c736aec24e9a844cfb4f5d97af20bbe2347fd1eea",
+    "tests": "ebf9083d9bc7b6570ac92be79f5d9c6613c8438f20a1510ee41afad0658e227b"
+  },
+  "unchanged": true,
+  "exit_code": 0,
+  "stdout": "Frozen SDK boundary capture: COMPLETE (/private/tmp/m20-s2-d4-sdk-boundary-capture-exact-02.json; revision 7f586304daf9f04c172e13c232404b6f2a0b8aa3)\n",
+  "stderr": "exception=<BoundaryCaptureStopped> | event loop cycle failed\n",
+  "output": "/private/tmp/m20-s2-d4-sdk-boundary-capture-exact-02.json",
+  "output_sha256": "7b85e1b48f7e54a7d85ab0b7d964b9ad2ad0eb01636fac73bfe73fdddbdc4653"
+}
