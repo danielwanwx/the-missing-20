@@ -288,7 +288,7 @@ def test_browser_completes_human_gated_case_and_exposes_resolution_packet(
             _wait_ui(
                 browser,
                 (
-                    "document.body.dataset.agentPlatform === 'ready' && "
+                    "document.body && document.body.dataset.agentPlatform === 'ready' && "
                     "document.querySelectorAll("
                     "'#platform-source-receipts .platform-source-receipt').length === 5"
                 ),

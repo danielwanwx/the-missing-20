@@ -350,3 +350,12 @@ quality release/pick preparation applied, but current readback reported
 ERP_SOURCE_RECONCILIATION_UNKNOWN. That next-step failure is retained and remains
 open; this release is not whole-case completion. Financial and final dialogue
 acceptance remain pending.
+
+Contract source readback fix `ab950312b56fac8b0e14cb82e336c864b06655b9` was pushed
+and remote SHA verified. Fresh same-runtime GET restored available=true A20/B0;
+first A20 native dispatch and declared synthetic delivery were then APPLIED.
+CI34532525611 failed solely on the existing browser readiness probe dereferencing
+`document.body` before navigation had created it (1975 passed, 1 skipped).
+The one-line null-safe readiness predicate preserves the assertions and timeout;
+primary rerun of that exact browser test passed with loopback enabled. The failed
+CI remains retained; its replacement run still needs verification.
