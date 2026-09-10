@@ -1,0 +1,104 @@
+{
+  "status": "FAILED",
+  "revision": "4706a9245f33b715442444b8520290b4f40f2c27",
+  "manifest": "/private/tmp/m20-s2-d4-screen-v2/manifest.json",
+  "manifest_sha256": "fb099e41552ccef42376ed3b9d5a0455b2456d1ddfe0afed8ca8e1a74a1128ac",
+  "source_scope": "real Bedrock model over frozen demo ERP/SaaS snapshots; no ERP writes",
+  "planned_turns": 6,
+  "reached_turns": 4,
+  "turns": [
+    {
+      "turn": 1,
+      "artifact": "/private/tmp/m20-s2-d4-live-q1.json",
+      "sha256": "2ec1606d50337db5ed5861fa7b922f6b5cf4e4a0718bb9ca5fe5efa4a11f2c1d",
+      "runtime_status": "COMPLETE",
+      "primary_semantics": "NO_STOP_CONDITION_FOUND",
+      "answer": "Disposition: SAFE_NOOP. The quantity posted for the order MAT-PRE-2026-00006 is 1.0 Box, supported by the stock-ledger record MAT-SLE-2026-00026. The receipt has been verified and posted, and there is no indication of loss or need for retry. Next: Inspect the current balance of the order MAT-PRE-2026-00006 after the posted receipt to ensure accuracy.",
+      "usage": {
+        "incremental_cost_usd": 0.0225584,
+        "input_tokens": 23410,
+        "output_tokens": 1197,
+        "request_count": 4,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    {
+      "turn": 2,
+      "artifact": "/private/tmp/m20-s2-d4-live-q2.json",
+      "sha256": "3d43447b5d8379d86888538a20b5bd4c16eb96c18a463cd2c57563798f59f2ef",
+      "runtime_status": "COMPLETE",
+      "primary_semantics": "NO_STOP_CONDITION_FOUND",
+      "answer": "Disposition: SAFE_NOOP. The current receiving packet has no supplier invoice yet, and the arrival facts are empty. The ERP evidence shows a posted quantity of 1.0 Box for MAT-PRE-2026-00006, supported by the stock-ledger record MAT-SLE-2026-00026. There are no indications of loss, lateness, or incidents based on the outstanding order alone. Next: Inspect, read, and verify records without executing or suggesting an inventory write.",
+      "usage": {
+        "incremental_cost_usd": 0.0229088,
+        "input_tokens": 23964,
+        "output_tokens": 1168,
+        "request_count": 4,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    {
+      "turn": 3,
+      "artifact": "/private/tmp/m20-s2-d4-live-q3.json",
+      "sha256": "3233025116dde7b30a75b8daf516a3b917fb6ea45fafd5813eb58a6212114809",
+      "runtime_status": "COMPLETE",
+      "primary_semantics": "NO_STOP_CONDITION_FOUND",
+      "answer": "Disposition: SAFE_NOOP. The ordered quantity for purchase order PUR-ORD-2026-00015 is 40 Box. The outstanding order quantity, which represents the amount yet to be received, is 38 Box. This is derived from the ordered quantity minus the cumulative received quantity, which is 2 Box. The evidence supporting these quantities is found in the ERP records, specifically the purchase order and the purchase receipts. The stock-ledger records that support the posted receipts are MAT-SLE-2026-00025 and MAT-SLE-2026-00026. The case is classified as SAFE_NOOP because the posted arrivals reconcile, there is no unresolved arrival review or uncertain receiving write, and there is no exception recovery. The remaining planned deliveries or a future invoice are not considered an incident. Next: Inspect the current available stock of M20-DEMO-CARTON in the warehouse to ensure it matches the expected balance.",
+      "usage": {
+        "incremental_cost_usd": 0.023176,
+        "input_tokens": 23754,
+        "output_tokens": 1304,
+        "request_count": 4,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    {
+      "turn": 4,
+      "artifact": "/private/tmp/m20-s2-d4-live-q4.json",
+      "sha256": "146b211f876b12d5e85710fccd636f647111b70e44d636141d26b1fd375412d7",
+      "runtime_status": "COMPLETE",
+      "primary_semantics": "FAIL",
+      "answer": "Disposition: SAFE_NOOP. The receiving basis independently proves what was physically inside the cartons. The ERP and collaboration evidence confirm the receipt and stock ledger update. There are no discrepancies or missing information. The ERP receipt MAT-PRE-2026-00006 and stock-ledger records MAT-SLE-2026-00025 and MAT-SLE-2026-00026 independently verify the posted stock. The collaboration evidence 1788981560.785039 and QRC-2 confirms the receipt verification. Next: Inspect/read/verify records without executing or suggesting an inventory write.",
+      "usage": {
+        "incremental_cost_usd": 0.0226216,
+        "input_tokens": 23733,
+        "output_tokens": 1136,
+        "request_count": 4,
+        "source_cache_hits": 0,
+        "validation_retries": 0
+      }
+    },
+    {
+      "turn": 5,
+      "status": "NOT_REACHED",
+      "reason": "Stopped after turn4 falsely claimed independent physical contents proof."
+    },
+    {
+      "turn": 6,
+      "status": "NOT_REACHED",
+      "reason": "Stopped after turn4 falsely claimed independent physical contents proof."
+    }
+  ],
+  "cost_usd": 0.0912648,
+  "logical_model_requests": 16,
+  "restart_branch": "NOT_REACHED",
+  "independent_review": "FAILED; docs/audits/2026-09-09-d4-live-screen-review.md",
+  "startup_attempts": [
+    {
+      "runtime": "/private/tmp/m20-s2-d4-live-runtime",
+      "status": "sandbox bind Operation not permitted; no model call"
+    },
+    {
+      "runtime": "/private/tmp/m20-s2-d4-live-runtime-02",
+      "status": "started with authorized loopback/network"
+    }
+  ],
+  "limitations": [
+    "Raw source snapshots and full HTTP responses remain local private evidence.",
+    "This archive contains complete reached answers and usage, but is not a full reproducible source bundle.",
+    "Independent semantic review recorded separately."
+  ]
+}
