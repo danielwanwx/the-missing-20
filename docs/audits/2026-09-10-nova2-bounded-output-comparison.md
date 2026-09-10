@@ -137,3 +137,49 @@ Final focused26 Python tests passed (distributor operations plus native dialogue
 Ruff formatting/lint passed for both source/test files, and the independent code
 review confirmed the final consistency guards. No ERP event/write, new model
 factory, output-budget change, alternate memory layer or Nova2 promotion occurred.
+
+
+## Next bounded source-contract check: confirmation evidence basis
+
+The next source candidate attaches the evidence basis to each order's delivery
+confirmation quantity. Global provenance alone did not prevent the turn5 error.
+`delivery_confirmed` remains a recorded quantity, with an adjacent evidence object
+that identifies synthetic/recorded/unspecified events and explicitly leaves
+independent physical receipt NOT_VERIFIED. This derives provenance from the
+existing synthetic_input source field; it cannot establish new physical facts.
+No system-prompt patch, answer rewrite, model upgrade or budget increase.
+
+Freeze one real UI question before the change is executed:
+“请核对刚才‘客户应该已经收到货’这句话：当前每张订单的签收数量是什么性质的证据？能据此确认真实客户收货吗？请分别说明系统完成状态与现实收货证明。”
+Acceptance requires25/15 recorded synthetic confirmation quantities, no assertion
+of real customer receipt, and separation from actual native DN/stock effects.
+Retain existing native session, including turn5 failure. One initial paid check;
+a failure triggers a fresh design reassessment rather than repeated wording edits.
+
+
+## Confirmation-basis result and limited acceptance
+
+The real UI turn7 used the same NovaPro model, original session and budgets after
+adding per-order confirmation evidence. Private snapshot:
+`component-native-turn7-confirmation-basis.json`. The exact turn6 twelve-message
+prefix is retained in fourteen messages, including the failed turn5 answer.
+
+The answer correctly explains that recorded confirmation is synthetic, is not
+sensor/carrier/customer-receipt evidence and cannot establish real receipt. It
+requires independent signed receipt or carrier proof and distinguishes system
+completion from physical receipt. It does not repeat the per-order25/15 amounts
+or identify native DN/stock effects, so it is not a full prospective-rubric pass.
+The independent reviewer grants scoped GO to the source-contract repair and
+immediate physical-provenance correction under the user's demo-first boundary.
+Turn5 remains FAILED; no general model certification or model migration is made.
+
+Final primary29 focused Python tests and implementation Ruff format/lint passed;
+independent code and actual-answer review passed the stated limited scope.
+Executed SHA-256:
+- `scripts/decision_workspace_server.py`: `73ad9243043465aa869a7aa1cebcab9a38b87a8709df725fb52faacf6a96aa0f`
+- `tests/test_distributor_operations.py`: `65d2836ec96572764b27b3ecd90f586442e012c096b4a595e3b9974645654bf8`
+
+Current product stays on NovaPro with its original1551 output cap. Nova2 access
+is available but the tested Nova2 configurations are rejected for this case.
+The business path, source arithmetic and explicit evidence basis are accepted
+separately; broad complex-task accuracy and submission readiness remain open.

@@ -975,11 +975,54 @@ def test_native_packet_projects_independent_per_order_fulfillment_facts() -> Non
             "picked": 13,
             "dispatched": 0,
             "delivery_confirmed": 0,
+            "delivery_confirmation_evidence": {
+                "kind": "UNSPECIFIED",
+                "independent_physical_receipt": "NOT_VERIFIED",
+                "definition": (
+                    "delivery_confirmed is a recorded confirmation quantity, not an "
+                    "independently verified physical receipt."
+                ),
+            },
             "remaining_to_pick": 2,
             "remaining_to_dispatch": 15,
             "remaining_delivery_confirmation": 15,
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("synthetic_input", "kind"),
+    [
+        (True, "SYNTHETIC_RECORDED_EVENT"),
+        (False, "RECORDED_EVENT"),
+        (None, "UNSPECIFIED"),
+    ],
+)
+def test_fulfillment_confirmation_evidence_never_claims_physical_receipt(
+    synthetic_input: object, kind: str
+) -> None:
+    facts = workspace_server.distributor_fulfillment_facts(
+        {"uom": "Nos"},
+        [
+            {
+                "customer_order": "SO10",
+                "requested_quantity": 15,
+                "picked": 15,
+                "dispatched": 15,
+                "delivery_confirmed": 15,
+            }
+        ],
+        synthetic_input,
+    )
+
+    assert facts[0]["delivery_confirmation_evidence"] == {
+        "kind": kind,
+        "independent_physical_receipt": "NOT_VERIFIED",
+        "definition": (
+            "delivery_confirmed is a recorded confirmation quantity, not an independently "
+            "verified physical receipt."
+        ),
+    }
 
 
 def test_fulfillment_facts_omit_missing_invalid_or_inconsistent_counts() -> None:

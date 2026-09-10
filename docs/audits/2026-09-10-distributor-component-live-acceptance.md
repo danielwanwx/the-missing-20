@@ -1,7 +1,8 @@
 # Component shortage and quality live acceptance
 
 Status: SCOPED GO for native business closure after independent final review.
-Component model causality remains FAILED; overall finalization is not accepted.
+Earlier component model failures remain retained; later scoped corrections are
+recorded in the bounded comparison audit. Overall finalization is not accepted.
 This is separate from the original R4 Box order. Research and acceptance design are published in `04516b21`.
 
 ## Frozen business scenario
@@ -267,3 +268,14 @@ primary verification passed the 13 relevant JS tests and a fresh actual in-app
 browser reload on port8901. DOM readback confirmed the new label, all three
 UNKNOWN/BLOCKED alert records, declared synthetic inputs and SO9/SO10 picked,
 dispatched and confirmed25/15. No new ERP write or model invocation was needed.
+
+
+## Subsequent dialogue corrections
+
+See [bounded model/source comparison](2026-09-10-nova2-bounded-output-comparison.md)
+for later real questions, exact retained-history checks and independent reviews.
+Explicit fulfillment facts corrected the picked-vs-dispatched confusion, and
+per-order evidence basis corrected the immediate synthetic-POD/physical-receipt
+inference. These are scoped source improvements; earlier failed answers remain
+failed, response-detail omissions remain disclosed, and no overall model or
+submission-readiness pass is claimed.

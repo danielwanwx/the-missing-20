@@ -9,7 +9,9 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
   delivery quantities corrected NovaPro's15-vs2 dispatch confusion. Three actual
   UI follow-ups retained native history8→10→12 messages; numeric and causality
   answers passed scoped review, but one answer inferred physical receipt from
-  synthetic POD. Nova2 was evaluated and rejected on this case; the existing
+  synthetic POD. A subsequently reviewed per-order evidence-basis correction
+  made turn7 explicitly retract physical receipt inference; its omission of
+  per-order25/15 details remains disclosed. Nova2 was evaluated and rejected on this case; the existing
   NovaPro model and output budget remain unchanged. See the
   [bounded comparison and retained failures](../audits/2026-09-10-nova2-bounded-output-comparison.md).
 

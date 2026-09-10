@@ -798,7 +798,7 @@ def _fulfillment_wire(quantity: Decimal) -> int | float:
 
 
 def distributor_fulfillment_facts(
-    quantities: object, allocations: object
+    quantities: object, allocations: object, synthetic_input: object = None
 ) -> list[dict[str, object]]:
     """Derive per-order fulfillment arithmetic only when every source count is known."""
 
@@ -807,6 +807,20 @@ def distributor_fulfillment_facts(
     uom = quantities.get("uom")
     if not isinstance(uom, str) or not uom.strip():
         return []
+    confirmation_evidence = {
+        "kind": (
+            "SYNTHETIC_RECORDED_EVENT"
+            if synthetic_input is True
+            else "RECORDED_EVENT"
+            if synthetic_input is False
+            else "UNSPECIFIED"
+        ),
+        "independent_physical_receipt": "NOT_VERIFIED",
+        "definition": (
+            "delivery_confirmed is a recorded confirmation quantity, not an independently "
+            "verified physical receipt."
+        ),
+    }
     facts: list[dict[str, object]] = []
     for allocation in allocations:
         if not isinstance(allocation, Mapping):
@@ -837,6 +851,7 @@ def distributor_fulfillment_facts(
                 "picked": _fulfillment_wire(picked),
                 "dispatched": _fulfillment_wire(dispatched),
                 "delivery_confirmed": _fulfillment_wire(confirmed),
+                "delivery_confirmation_evidence": confirmation_evidence,
                 "remaining_to_pick": _fulfillment_wire(requested - picked),
                 "remaining_to_dispatch": _fulfillment_wire(requested - dispatched),
                 "remaining_delivery_confirmation": _fulfillment_wire(requested - confirmed),
@@ -890,7 +905,9 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
         "case_label": projection.get("case_label"),
         "synthetic_input": synthetic_input,
         "quantities": quantities,
-        "fulfillment_facts": distributor_fulfillment_facts(quantities, allocations),
+        "fulfillment_facts": distributor_fulfillment_facts(
+            quantities, allocations, synthetic_input
+        ),
         "lots": lots,
         "allocations": allocations,
         "documents": documents,
