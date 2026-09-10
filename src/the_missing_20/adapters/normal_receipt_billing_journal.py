@@ -976,14 +976,32 @@ class BillingIntentJournal:
             )
 
     def admit_submitted_readback(
-        self, intent_id: str, proof: NativeSubmittedReadback
+        self,
+        intent_id: str,
+        proof: NativeSubmittedReadback,
+        *,
+        audit_evidence: Mapping[str, object] | None = None,
     ) -> ReadbackAdmission:
         """Admit an exact full-document submit readback without reopening a marker."""
 
         if not isinstance(proof, NativeSubmittedReadback):
             raise TypeError("submitted readback requires NativeSubmittedReadback")
+        detached_audit = (
+            None
+            if audit_evidence is None
+            else _mapping(audit_evidence, "submitted readback audit evidence")
+        )
+        recorded_at = _time(None)
         with self._write_connection() as connection:
             row = self._intent(connection, intent_id)
+            if detached_audit is not None:
+                self._event(
+                    connection,
+                    intent_id,
+                    "SUBMITTED_READBACK_OBSERVED",
+                    {"audit_evidence": detached_audit},
+                    recorded_at,
+                )
             current = self._snapshot(connection, row)
             if not current.submit_attempted:
                 return ReadbackAdmission(False, "SUBMIT_ATTEMPT_REQUIRED", current)
@@ -1006,7 +1024,7 @@ class BillingIntentJournal:
                     event_kind="SUBMITTED_READBACK_CONFLICT",
                     known_name=acknowledgement.draft_name,
                     proof=proof.record(),
-                    recorded_at=_time(None),
+                    recorded_at=recorded_at,
                 )
             if (
                 _native_document_local_reason(
@@ -1018,7 +1036,6 @@ class BillingIntentJournal:
                 is not None
             ):
                 return ReadbackAdmission(False, "SUBMITTED_READBACK_MISMATCH", current)
-            recorded_at = _time(None)
             if current.submitted_invoice_name is not None:
                 try:
                     known = _decoded_mapping(
@@ -1045,6 +1062,14 @@ class BillingIntentJournal:
                         proof=proof.record(),
                         recorded_at=recorded_at,
                     )
+                connection.execute(
+                    """
+                    UPDATE normal_receipt_billing_intents
+                    SET last_readback_kind = 'SUBMITTED', updated_at = ?
+                    WHERE intent_id = ?
+                    """,
+                    (recorded_at, intent_id),
+                )
                 self._event(
                     connection,
                     intent_id,

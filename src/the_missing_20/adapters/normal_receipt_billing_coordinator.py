@@ -603,23 +603,19 @@ class NormalReceiptBillingCoordinator:
                 ),
                 now=now,
             )
-        # ``admit_submitted_readback`` stores the structured proof, while this
-        # existing readback event retains the complete current source and exact
-        # direct GET that were used to validate it.  It is deliberately not a
-        # commercial refresh: the acknowledged PI now belongs in raw source.
-        self._record(
+        # This neutral journal event retains the complete current source and
+        # exact direct GET that validated the proof.  It is deliberately not a
+        # commercial refresh: the acknowledged PI belongs in raw source, and
+        # observing it cannot alter readback state or grant proof authority.
+        admission = self._journal.admit_submitted_readback(
             intent_id,
-            "UNKNOWN",
-            self._observation(
-                "UNKNOWN",
+            proof,
+            audit_evidence=self._submitted_readback_audit(
                 source_read,
-                direct_document=direct.document,
-                stage="submitted_readback_observation",
-                reason=self._details(transport_reason, "SUBMITTED_READBACK_OBSERVED"),
+                direct.document,
+                transport_reason=transport_reason,
             ),
-            now=now,
         )
-        admission = self._journal.admit_submitted_readback(intent_id, proof)
         return self._result(admission.snapshot, admission=admission, reason=admission.reason)
 
     def _direct_get(self, name: str) -> _DirectRead:
@@ -769,26 +765,55 @@ class NormalReceiptBillingCoordinator:
                 assert isinstance(evidence, dict)
                 evidence["insert_response"] = insert_response
         else:
-            evidence = {
-                "source_read": {
-                    "purchase_order": source_read.purchase_order,
-                    "purchase_receipt": source_read.purchase_receipt,
-                    "mapped_invoice": source_read.mapped_invoice,
-                    "related_documents_read": source_read.related_documents_read,
-                    "evidence_manifest": source_read.evidence_manifest,
-                    "observed_at": source_read.observed_at,
-                    "snapshot_digest": source_read.snapshot_digest,
-                    "preview": source_read.preview.record(),
-                },
-                "direct_known_document": direct_document,
-                "insert_response": insert_response,
-            }
+            evidence = NormalReceiptBillingCoordinator._raw_source_evidence(
+                source_read,
+                direct_document=direct_document,
+                insert_response=insert_response,
+            )
         return ReadbackObservation(
             kind=kind,
             audit_snapshot_digest=source_read.snapshot_digest,
             observed_at=source_read.observed_at,
             details={"stage": stage, "reason": reason, "evidence": evidence},
         )
+
+    @staticmethod
+    def _raw_source_evidence(
+        source_read: NormalReceiptBillingSourceRead,
+        *,
+        direct_document: Mapping[str, object] | None = None,
+        insert_response: Mapping[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Return strict-JSON source material shared by holds and successful reads."""
+
+        return {
+            "source_read": {
+                "purchase_order": source_read.purchase_order,
+                "purchase_receipt": source_read.purchase_receipt,
+                "mapped_invoice": source_read.mapped_invoice,
+                "related_documents_read": source_read.related_documents_read,
+                "evidence_manifest": source_read.evidence_manifest,
+                "observed_at": source_read.observed_at,
+                "snapshot_digest": source_read.snapshot_digest,
+                "preview": source_read.preview.record(),
+            },
+            "direct_known_document": direct_document,
+            "insert_response": insert_response,
+        }
+
+    @classmethod
+    def _submitted_readback_audit(
+        cls,
+        source_read: NormalReceiptBillingSourceRead,
+        direct_document: Mapping[str, object],
+        *,
+        transport_reason: str | None,
+    ) -> dict[str, object]:
+        return {
+            "stage": "submitted_readback_observation",
+            "reason": cls._details(transport_reason, "SUBMITTED_READBACK_OBSERVED"),
+            **cls._raw_source_evidence(source_read, direct_document=direct_document),
+        }
 
     @staticmethod
     def _fallback_observation(

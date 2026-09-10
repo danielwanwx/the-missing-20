@@ -405,9 +405,22 @@ def test_nominal_insert_restart_submit_and_exact_known_readback(tmp_path: Path) 
     assert submitted.claim is not None and submitted.claim.granted is True
     assert submitted.admission is not None and submitted.admission.admitted is True
     assert submitted.snapshot.submitted_invoice_name == "ACC-PINV-2026-00001"
+    assert submitted.snapshot.last_readback_kind == "SUBMITTED"
     assert fake.insert_calls == 1
     assert fake.submit_calls == 1
     assert fake.direct_get_calls >= 2
+
+    reopened = NormalReceiptBillingCoordinator(
+        BillingIntentJournal(database), lambda case_id: _basis(case_id=case_id), fake
+    )
+    reaffirmed = reopened.reconcile(
+        intent_id,
+        case_id=_basis().case_id,
+    )
+
+    assert reaffirmed.admission is not None and reaffirmed.admission.admitted is True
+    assert reaffirmed.snapshot.phase == "SUBMITTED_READBACK_ADMITTED"
+    assert reaffirmed.snapshot.last_readback_kind == "SUBMITTED"
 
 
 def test_submitted_readback_retains_current_raw_source_and_direct_document(tmp_path: Path) -> None:
@@ -432,17 +445,13 @@ def test_submitted_readback_retains_current_raw_source_and_direct_document(tmp_p
     )
 
     assert submitted.admission is not None and submitted.admission.admitted is True
+    assert submitted.snapshot.last_readback_kind == "SUBMITTED"
     event = next(
-        event
-        for event in journal.history(intent_id)
-        if event.kind == "UNKNOWN"
-        and isinstance(event.payload.get("details"), Mapping)
-        and event.payload["details"].get("stage") == "submitted_readback_observation"
+        event for event in journal.history(intent_id) if event.kind == "SUBMITTED_READBACK_OBSERVED"
     )
-    details = event.payload["details"]
-    assert isinstance(details, Mapping)
-    evidence = details["evidence"]
+    evidence = event.payload["audit_evidence"]
     assert isinstance(evidence, Mapping)
+    assert evidence["stage"] == "submitted_readback_observation"
     source = evidence["source_read"]
     assert isinstance(source, Mapping)
     purchase_order = source["purchase_order"]

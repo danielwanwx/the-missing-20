@@ -1,6 +1,7 @@
 # Normal receipt billing coordinator review
 
-Status: independently APPROVED for the offline coordinator boundary.
+Status: independently APPROVED for the offline coordinator boundary, including
+the subsequently discovered repeated-readback status correction.
 Scope: compose the accepted source reader, pure source context, native request
 binding and durable journal through the existing configured ERP request callable.
 This candidate has not created or submitted a real invoice and is not wired to
@@ -71,6 +72,41 @@ Primary related regression: `/private/tmp/m20-coordinator-final-related-g9ec51_9
 | --- | --- |
 | coordinator | `aa1fd1aff879ef262946925371668150ae70a23e75c33116d375b3e40820a49f` |
 | coordinator tests | `5c1806d5cf1f962d87fcaed9f5206781dfc584bb1136071e683bf860f84ef2fd` |
+
+### Subsequent repeated-readback finding
+
+The accepted slice was delivered as `b19fad38618a3c1ace12bd1ae842539682303629`
+with matching remote SHA. A later independent counterexample found that a
+successful repeated reconcile leaves `last_readback_kind=UNKNOWN`, although
+`admitted=True`, the submitted phase and invoice identity remain correct. The
+one insert/one submit limits remain intact. The observation's separate UNKNOWN
+event updates the latest kind, while the existing reaffirmation branch does
+not restore SUBMITTED. Reopening the journal preserves this discrepancy.
+Evidence: `/private/tmp/m20-coordinator-reaffirm-review-jk8cbju3`.
+
+The independently approved correction attaches the raw observation to a neutral
+journal audit event inside the admission transaction, without changing status
+to UNKNOWN; both successful admission paths set the latest kind to SUBMITTED.
+True unknown and no-hit outcomes retain their existing behavior. Optional audit
+data is strictly detached JSON, records no new authority and remains captured
+when proof admission is rejected or conflicts with immutable first identity.
+
+Independent review passed42 targeted tests and the original standalone repeated
+readback/reopen counterexample. First, repeat and reopened snapshots now retain
+SUBMITTED, with one insert and one submit. Events pair OBSERVED→ADMITTED and
+OBSERVED→REAFFIRMED within the existing transaction. Primary related regression
+passed228 tests in18.581 seconds, exit0, with all12 source/test hashes unchanged.
+
+Independent tests: `/private/tmp/m20-atomic-readback-independent-74teqil4`.
+Independent reproduction: `/private/tmp/m20-atomic-reaffirm-repro-schm76ct`.
+Primary related regression: `/private/tmp/m20-billing-atomic-related-5hco1wfn`.
+
+| Corrected file | SHA256 |
+| --- | --- |
+| journal | `ebb3c696a56d6d13ffe061f5da7de3661575fb8359be91d1068183d6ed829dd9` |
+| coordinator | `0cfdbe164166c653f933c089b247c7355fd16fa98fde965ac694c4f4ffb9561d` |
+| journal tests | `05e0015298469991d98f92563eb49fd0b2afe7a80666e01175800d4f8d400439` |
+| coordinator tests | `51e81c38448c00320e821f715bd0750784ab60b9aaa7d72c0d029a1f1e6eb36c` |
 
 ## Fresh R4 evidence and remaining acceptance
 

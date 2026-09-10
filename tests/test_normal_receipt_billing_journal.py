@@ -741,6 +741,155 @@ def test_restart_unknown_no_hit_and_submitted_readback_never_reopen_attempts(
     assert submitted.snapshot.last_readback_kind == "SUBMITTED"
 
 
+def test_submitted_readback_audit_is_immutable_and_reaffirmation_restores_submitted_kind(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    request = _insert_request(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(basis, _preview(basis), _source(basis), insert_request=request)
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+    acknowledgement = _acknowledged_draft(request)
+    assert (
+        journal.admit_insert_acknowledgement(prepared.intent_id, acknowledgement).admitted is True
+    )
+    assert (
+        journal.claim_submit(
+            prepared.intent_id,
+            case_id=basis.case_id,
+            manager_id=MANAGER,
+            worker_id="worker-a",
+            now=NOW,
+        ).granted
+        is True
+    )
+
+    audit: dict[str, object] = {
+        "source_read": {
+            "purchase_order": {"audit_marker": "first"},
+            "evidence_manifest": [{"page": 1}],
+            "observed_at": "2026-09-09T22:01:00Z",
+        },
+        "direct_known_document": {"name": acknowledgement.draft_name, "docstatus": 1},
+    }
+    proof = _submitted_readback(acknowledgement)
+    first = journal.admit_submitted_readback(
+        prepared.intent_id,
+        proof,
+        audit_evidence=audit,
+    )
+    assert first.admitted is True
+    assert first.snapshot.last_readback_kind == "SUBMITTED"
+
+    source = cast(dict[str, object], audit["source_read"])
+    source["purchase_order"] = {"audit_marker": "mutated"}
+    source["evidence_manifest"] = []
+    observed = journal.history(prepared.intent_id)[-2]
+    assert observed.kind == "SUBMITTED_READBACK_OBSERVED"
+    retained = observed.payload["audit_evidence"]
+    assert retained["source_read"]["purchase_order"]["audit_marker"] == "first"
+    assert retained["source_read"]["evidence_manifest"][0]["page"] == 1
+    with pytest.raises(TypeError):
+        retained["source_read"] = {}
+
+    journal.record_unknown(prepared.intent_id, _readback("UNKNOWN"), now=NOW)
+    assert journal.get(prepared.intent_id).last_readback_kind == "UNKNOWN"
+
+    reopened = BillingIntentJournal(tmp_path / "normal-billing.sqlite3")
+    reaffirmed = reopened.admit_submitted_readback(
+        prepared.intent_id,
+        proof,
+        audit_evidence={"reconciliation": {"attempt": 2}},
+    )
+    assert reaffirmed.admitted is True
+    assert reaffirmed.snapshot.last_readback_kind == "SUBMITTED"
+    events = reopened.history(prepared.intent_id)
+    assert events[-2].kind == "SUBMITTED_READBACK_OBSERVED"
+    assert events[-1].kind == "SUBMITTED_READBACK_REAFFIRMED"
+
+    legacy = reopened.admit_submitted_readback(prepared.intent_id, proof)
+    assert legacy.admitted is True
+    assert legacy.snapshot.last_readback_kind == "SUBMITTED"
+    assert reopened.history(prepared.intent_id)[-1].kind == "SUBMITTED_READBACK_REAFFIRMED"
+
+
+def test_submitted_readback_audit_precedes_rejection_and_conflict_without_replacing_identity(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    request = _insert_request(basis)
+    journal = _journal(tmp_path)
+    unmarked = journal.prepare(basis, _preview(basis), _source(basis), insert_request=request)
+    acknowledgement = _acknowledged_draft(request)
+    rejected = journal.admit_submitted_readback(
+        unmarked.intent_id,
+        _submitted_readback(acknowledgement),
+        audit_evidence={"rejection": {"raw": "retained"}},
+    )
+    assert rejected.admitted is False
+    assert rejected.reason == "SUBMIT_ATTEMPT_REQUIRED"
+    assert rejected.snapshot.phase == "PREPARED"
+    assert rejected.snapshot.last_readback_kind is None
+    rejection_events = journal.history(unmarked.intent_id)
+    assert rejection_events[-1].kind == "SUBMITTED_READBACK_OBSERVED"
+    assert rejection_events[-1].payload["audit_evidence"]["rejection"]["raw"] == "retained"
+
+    second_basis = _basis(
+        case_id="M20-R4-BILL-2",
+        bill_reference="SUP-BILL-R4-0002",
+        purchase_receipt="MAT-PRE-2026-00008",
+        purchase_receipt_item="068bbdr0mc",
+    )
+    second_request = _insert_request(second_basis)
+    prepared = journal.prepare(
+        second_basis,
+        _preview(second_basis),
+        _source(second_basis),
+        insert_request=second_request,
+    )
+    token = _approve(journal, prepared.intent_id, basis=second_basis)
+    assert _claim_insert(journal, prepared.intent_id, second_basis, token).granted is True
+    first_draft = _acknowledged_draft(second_request, name="PI-FIRST")
+    assert journal.admit_insert_acknowledgement(prepared.intent_id, first_draft).admitted is True
+    assert (
+        journal.claim_submit(
+            prepared.intent_id,
+            case_id=second_basis.case_id,
+            manager_id=MANAGER,
+            worker_id="worker-a",
+            now=NOW,
+        ).granted
+        is True
+    )
+    first_proof = _submitted_readback(first_draft)
+    assert journal.admit_submitted_readback(prepared.intent_id, first_proof).admitted is True
+
+    conflicting_document = dict(first_proof.document)
+    conflicting_document["name"] = "PI-OTHER"
+    conflict = journal.admit_submitted_readback(
+        prepared.intent_id,
+        NativeSubmittedReadback(
+            draft_name="PI-OTHER",
+            draft_document_digest=first_draft.document_digest,
+            document=conflicting_document,
+        ),
+        audit_evidence={"conflict_read": {"direct_name": "PI-OTHER"}},
+    )
+    assert conflict.admitted is False
+    assert conflict.reason == "SUBMITTED_DRAFT_DOCUMENT_MISMATCH"
+    assert conflict.snapshot.submitted_invoice_name == "PI-FIRST"
+    assert conflict.snapshot.effect_conflict is True
+    assert conflict.snapshot.last_readback_kind == "SUBMITTED"
+    conflict_events = journal.history(prepared.intent_id)
+    assert conflict_events[-2].kind == "SUBMITTED_READBACK_OBSERVED"
+    assert (
+        conflict_events[-2].payload["audit_evidence"]["conflict_read"]["direct_name"] == "PI-OTHER"
+    )
+    assert conflict_events[-1].kind == "SUBMITTED_READBACK_CONFLICT"
+    assert conflict_events[-1].payload["known_name"] == "PI-FIRST"
+
+
 def test_six_step_effect_identity_repro_holds_and_preserves_first_readbacks(
     tmp_path: Path,
 ) -> None:

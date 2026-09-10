@@ -213,6 +213,11 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   source compatibility for1 Box / USD50, without invoice writes. Product routes,
   visible approval, actual invoice/GL/SLE evidence and full regression remain open.
   [Scoped coordinator review](../audits/2026-09-09-normal-billing-coordinator-review.md).
+- A subsequent repeated-readback status defect was independently reproduced and
+  corrected: observation audit now shares the journal admission transaction, and
+  successful reaffirmation restores SUBMITTED without new writes.42 independent
+  tests, the original restart/replay counterexample and228 primary related tests
+  pass with unchanged frozen hashes. This closes that status defect only.
 - R4 local workspace resumed on8897 with its original runtime and auto-prepare
   paused. Actual API/DOM confirms the same case,1/40 Box received and0 invoices.
   One invoice-inspector defect was independently corrected: aggregate ERP ledger
