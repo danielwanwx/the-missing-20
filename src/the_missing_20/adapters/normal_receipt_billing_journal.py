@@ -159,8 +159,9 @@ class CommercialSource:
     """A compact source fingerprint separate from volatile audit observation data.
 
     ``identity``, ``revisions`` and ``decisive_values`` form the commercial
-    fingerprint.  ``audit_snapshot_digest`` and ``observed_at`` are retained
-    for audit freshness only and never form an idempotency or approval key.
+    fingerprint.  ``audit_snapshot_digest``, ``observed_at`` and the detached
+    ``audit_evidence`` are retained for audit freshness only and never form an
+    idempotency or approval key.
     """
 
     identity: Mapping[str, object]
@@ -168,6 +169,7 @@ class CommercialSource:
     decisive_values: Mapping[str, object]
     audit_snapshot_digest: str
     observed_at: str
+    audit_evidence: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "identity", _frozen_mapping(_mapping(self.identity, "identity")))
@@ -178,6 +180,11 @@ class CommercialSource:
             self,
             "decisive_values",
             _frozen_mapping(_mapping(self.decisive_values, "decisive values")),
+        )
+        object.__setattr__(
+            self,
+            "audit_evidence",
+            _frozen_mapping(_mapping(self.audit_evidence, "audit evidence")),
         )
         object.__setattr__(
             self,
@@ -198,6 +205,7 @@ class CommercialSource:
             **self.commercial_record(),
             "audit_snapshot_digest": self.audit_snapshot_digest,
             "observed_at": self.observed_at,
+            "audit_evidence": _canonical(self.audit_evidence),
         }
 
 
@@ -1094,6 +1102,32 @@ class BillingIntentJournal:
     def get(self, intent_id: str) -> IntentSnapshot:
         with self._connect() as connection:
             return self._snapshot(connection, self._intent(connection, intent_id))
+
+    def bound_insert_request(self, intent_id: str) -> NativeInsertRequest | None:
+        """Return the immutable journal-bound insert request without reconstructing history."""
+
+        with self._connect() as connection:
+            row = self._intent(connection, intent_id)
+            if row["insert_binding_json"] is None:
+                return None
+            try:
+                _, request = _stored_insert_binding(row)
+            except _AdmissionError as error:
+                raise ValueError(error.code) from None
+            return request
+
+    def acknowledged_draft(self, intent_id: str) -> NativeDraftAcknowledgement | None:
+        """Return one valid acknowledgement tied to the marked insert, if present."""
+
+        with self._connect() as connection:
+            row = self._intent(connection, intent_id)
+            if row["draft_readback_json"] is None:
+                return None
+            try:
+                _, _, acknowledgement = _stored_draft_acknowledgement(row)
+            except _AdmissionError as error:
+                raise ValueError(error.code) from None
+            return acknowledgement
 
     def history(self, intent_id: str) -> tuple[JournalEvent, ...]:
         with self._connect() as connection:

@@ -343,6 +343,8 @@ def test_read_only_ready_preview_is_evidence_not_write_permission(tmp_path: Path
     assert prepared.snapshot.submit_attempted is False
     assert prepared.snapshot.business_idempotency_key != preview.source_digest
     assert prepared.snapshot.frozen_basis["gross_amount"] == "50"
+    assert journal.bound_insert_request(prepared.intent_id) is None
+    assert journal.acknowledged_draft(prepared.intent_id) is None
     denied = journal.claim_insert(
         prepared.intent_id,
         case_id=basis.case_id,
@@ -1262,6 +1264,133 @@ def test_acknowledged_draft_binds_the_original_attempt_and_submit_timeout_is_rea
     )
     assert retry.granted is False
     assert retry.reason == "SUBMIT_ALREADY_ATTEMPTED"
+
+
+def test_read_only_bound_request_and_acknowledged_draft_accessors_survive_restart(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    request = _insert_request(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=request,
+    )
+
+    bound = journal.bound_insert_request(prepared.intent_id)
+    assert bound is not None
+    assert bound.record() == request.record()
+    assert journal.acknowledged_draft(prepared.intent_id) is None
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+    acknowledgement = _acknowledged_draft(request)
+    assert (
+        journal.admit_insert_acknowledgement(prepared.intent_id, acknowledgement).admitted is True
+    )
+
+    reopened = BillingIntentJournal(tmp_path / "normal-billing.sqlite3")
+    reopened_bound = reopened.bound_insert_request(prepared.intent_id)
+    reopened_acknowledgement = reopened.acknowledged_draft(prepared.intent_id)
+
+    assert reopened_bound is not None
+    assert reopened_bound.record() == request.record()
+    assert reopened_acknowledgement is not None
+    assert reopened_acknowledgement.record() == acknowledgement.record()
+    with pytest.raises(TypeError):
+        reopened_bound.body["bill_no"] = "MUTATED"  # type: ignore[index]
+
+
+def test_read_only_accessors_reject_corrupt_bound_or_acknowledged_evidence(tmp_path: Path) -> None:
+    basis = _basis()
+    request = _insert_request(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=request,
+    )
+    database = tmp_path / "normal-billing.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE normal_receipt_billing_intents SET insert_binding_json = ? WHERE intent_id = ?",
+            (json.dumps({"corrupt": "binding"}), prepared.intent_id),
+        )
+    with pytest.raises(ValueError, match="INSERT_REQUEST_INVALID"):
+        journal.bound_insert_request(prepared.intent_id)
+
+    second = BillingIntentJournal(tmp_path / "second.sqlite3")
+    second_prepared = second.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=request,
+    )
+    token = _approve(second, second_prepared.intent_id, basis=basis)
+    assert _claim_insert(second, second_prepared.intent_id, basis, token).granted is True
+    assert (
+        second.admit_insert_acknowledgement(
+            second_prepared.intent_id, _acknowledged_draft(request)
+        ).admitted
+        is True
+    )
+    with sqlite3.connect(tmp_path / "second.sqlite3") as connection:
+        connection.execute(
+            "UPDATE normal_receipt_billing_intents SET draft_readback_json = ? WHERE intent_id = ?",
+            (json.dumps({}), second_prepared.intent_id),
+        )
+    with pytest.raises(ValueError, match="DRAFT_ACKNOWLEDGEMENT_REQUIRED"):
+        second.acknowledged_draft(second_prepared.intent_id)
+
+
+def test_audit_evidence_is_durable_but_does_not_change_the_commercial_fingerprint(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    initial = replace(
+        _source(basis),
+        audit_evidence={
+            "source_read": {"related_documents": [{"name": "ACC-PINV-0001"}]},
+            "direct_known_document": {"name": "ACC-PINV-0001", "docstatus": 0},
+        },
+    )
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis,
+        _preview(basis),
+        initial,
+        insert_request=_insert_request(basis),
+    )
+    reopened = BillingIntentJournal(tmp_path / "normal-billing.sqlite3")
+    refreshed = replace(
+        initial,
+        audit_snapshot_digest="audit-snapshot-v2",
+        observed_at="2026-09-09T22:05:00Z",
+        audit_evidence={
+            "source_read": {"related_documents": [{"name": "ACC-PINV-0001"}]},
+            "direct_known_document": {"name": "ACC-PINV-0001", "docstatus": 0},
+            "pagination_stats": {"pages": 2},
+        },
+    )
+
+    refresh = reopened.refresh_source(prepared.intent_id, refreshed, now=NOW)
+    events = reopened.history(prepared.intent_id)
+
+    assert initial.commercial_record() == refreshed.commercial_record()
+    assert initial.record() != refreshed.record()
+    assert refresh.commercial_changed is False
+    assert refresh.snapshot.source_changed is False
+    frozen_audit = refresh.snapshot.frozen_source["audit_evidence"]
+    assert frozen_audit["source_read"]["related_documents"][0]["name"] == "ACC-PINV-0001"
+    prepared_audit = events[0].payload["source"]["audit_evidence"]
+    assert prepared_audit["direct_known_document"]["docstatus"] == 0
+    assert events[-1].kind == "SOURCE_REFRESHED"
+    refreshed_audit = events[-1].payload["audit_evidence"]
+    assert refreshed_audit["pagination_stats"]["pages"] == 2
+    with pytest.raises(TypeError):
+        cast(dict[str, object], initial.audit_evidence)["source_read"] = {}
 
 
 def test_two_processes_upgrade_legacy_schema_once_without_hanging(tmp_path: Path) -> None:
