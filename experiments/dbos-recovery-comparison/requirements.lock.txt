@@ -1,0 +1,25 @@
+# Complete wheel lock for the local CPython 3.12 / macOS arm64 probe only.
+# It is intentionally not a cross-platform or production dependency lock.
+--only-binary=:all:
+click==8.5.0 \
+    --hash=sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360
+dbos==2.31.1 \
+    --hash=sha256:5c32840683cbb10727d30d208d8e1eb3ccaec7ed881776e5bf9d89cb32d7583c
+greenlet==3.5.5 \
+    --hash=sha256:49520f0c95a48b42cf55414b8e8479beb274ea70431afc33e3f79903c71f4380
+psycopg==3.3.5 \
+    --hash=sha256:ce5aa5cdb4f9379f00f487590e5890bfa7df9a164648c969ffa628505e21af4e
+psycopg-binary==3.3.5 \
+    --hash=sha256:0249c3e960cdee686000eb77169fb6590105c05bacc37e057ccdffdcd8e6ebde
+python-dateutil==2.9.0.post0 \
+    --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+PyYAML==6.0.3 \
+    --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
+six==1.17.0 \
+    --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274
+SQLAlchemy==2.0.52 \
+    --hash=sha256:be8c49131665dfe2cc74c498aa1240ffb548d0fd901325dd11c2c7a18956f727
+typing_extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8
+websockets==17.1 \
+    --hash=sha256:87f0d5e77548b0c40c8464cdb6108792e7e53f487c6400028a4ec28a8afbe5ab

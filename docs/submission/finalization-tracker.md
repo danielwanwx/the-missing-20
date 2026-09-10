@@ -125,3 +125,15 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   tests only. The DBOS structure probe actually ran one workflow/step on SQLite;
   crash/recovery comparison and independent review remain pending. F03/F05 and
   overall finalization remain open. Latest prior accepted main is `8306a89`.
+
+- Research-led methodology and candidate design delivered as `05b6f33`, pushed
+  with exact local/remote main agreement. The isolated DBOS2.31.1 comparison is
+  now independently accepted: native lost-checkpoint recovery creates two fake
+  effects without a target unique key and one with it, while both workflows
+  report SUCCESS. Completed-ID replay adds no effects. Primary and independent
+  three-test runs pass; a fresh hash-locked install and actual CLI comparison
+  pass. Initial lock-install failure and an independent timeout probe are
+  retained. [Scope and review](../audits/2026-09-09-dbos-recovery-comparison-review.md).
+  This is a mechanism result, not ERP integration or financial closure. Native
+  receiving N1/N2 remains under offline implementation/review, with no new model
+  result. F03/F05 remain open; the journal expansion remains paused.
