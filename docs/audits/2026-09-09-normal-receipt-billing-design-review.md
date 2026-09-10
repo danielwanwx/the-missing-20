@@ -54,3 +54,9 @@ Live demo, only after independent patch review:
 - Verify invoice source appears in current ERP evidence/UI and failure/unknown states remain visible. No payment entry, bank movement, delivery or sales invoice is created.
 
 Final disposition: approve proceeding with this amended minimal design and offline implementation. Withhold external-write acceptance until the journal boundaries, exact commercial contract and concurrency tests above are implemented and independently reviewed. Existing user demo authorization remains valid; no additional approval question is needed merely to satisfy this review.
+
+## Primary clarification for the next execution slice — review before writes
+
+The preview's source digest identifies the complete observed evidence snapshot, including lookup scope/completeness and read metadata. It is not a business idempotency key. A refreshed lookup observation time naturally changes that audit digest without changing the bill or its commercial basis. Execution must compare the approved exact document identities, decisive commercial values and authoritative source revisions, while independently requiring a fresh complete lookup. Do not reject every refresh merely because its observation timestamp is new; do not ignore actual commercial/source-version changes either.
+
+Likewise, the intent's own newly discovered draft is an expected transition after an attempted insert, not proof that the original approval authorized a second insert. Before the first submit, compare that exact draft with the frozen approved bill and current source prerequisites, distinguish it from other linked drafts/bills, and enforce the separate durable submit-attempt fence. Keep the original and refreshed audit snapshots. This clarification needs independent implementation review and does not approve an unimplemented executor.
