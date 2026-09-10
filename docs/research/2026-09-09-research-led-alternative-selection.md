@@ -119,3 +119,44 @@ availability tradeoff, not a provider exactly-once guarantee. The
 [submit handler](https://github.com/frappe/frappe/blob/version-15/frappe/client.py)
 takes a document; it does not turn an ambiguous prior insert into an identified
 effect. [Revised design](../audits/2026-09-09-normal-billing-executor-design.md).
+
+## Native session selection after the first reasoning screen
+
+The actual N1/N2 screen improved the physical-evidence conclusion, but both
+answers remained incomplete. It did not test persisted assistant history.
+The proposed human-only six-turn driver was stopped before implementation:
+Q6 asks about the assistant's last answer, so that driver would omit the very
+history it claimed to test. No paid call used that proposal.
+
+Select installed Strands1.53.0 `SnapshotSessionManager` with `LocalFileStorage`
+for the isolated single-agent sequence. Current official documentation recommends
+this path for new single-agent sessions; FileSessionManager remains supported
+for repository-format compatibility, Graph/Swarm and bidirectional use, which
+this experiment does not need. `save_latest_on="message"` saves after each
+message and again after invocation. This is continuity, not business-effect
+idempotency. [Official session documentation, checked September9](https://strandsagents.com/docs/user-guide/concepts/agents/session-management/).
+
+Installed-source inspection found that snapshots restore actual messages,
+agent/manager/model state and the system prompt. N2's answer survives as its
+actual structured tool-use arguments and paired tool result; the final
+`AgentResult.structured_output` must also be retained in the turn artifact.
+Restore is not configuration validation: check the frozen contract before
+construction and the effective configuration after initialization, before any
+model call. These details require actual separate-process offline proof.
+
+Native sliding-window management is selected explicitly for this first
+continuity experiment. A window of40 messages does not promise six complete
+turns: record actual trimming and tool pairing, and verify that Q2's refusal
+and Q5's answer reach Q6. Summarization is a separate future candidate; neither
+enabling a manager nor restoring history proves that compression happened or
+preserved business facts. [Conversation management](https://strandsagents.com/docs/user-guide/concepts/agents/conversation-management/).
+
+Strands Evals' simulated actor is useful for later exploratory conversations,
+but dynamic model-generated questions add calls and do not replace this fixed
+six-question, source-change, fresh-process driver. No extra evaluation package,
+SDK upgrade, summary model or hosted memory service is selected here.
+
+Independent design review permits isolated offline implementation, with
+post-restore configuration checks, preserved partial failures and measured
+window retention required. A separately reviewed paid gate follows offline
+verification; no six-turn, product UI or F03 acceptance is implied.

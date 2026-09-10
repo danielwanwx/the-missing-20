@@ -152,3 +152,12 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   tests pass independently and in primary verification. [Full scoped review](../audits/2026-09-09-native-receiving-first-screen-review.md).
   Both remain candidates for a separately frozen complete six-turn evaluation;
   no winner, product promotion, full conversation or F03/F05 acceptance is claimed.
+
+- Native first-screen delivery is `98a1a1a`, with local/remote SHA agreement.
+  The proposed human-only six-turn driver was stopped before code because Q6
+  needs the actual prior assistant answer. Installed native SnapshotSessionManager
+  is selected after comparison with FileSessionManager; independent review
+  authorizes only the [offline six-turn implementation](../audits/2026-09-09-native-session-sequence-design.md).
+  True history, current-source refresh, process restart and partial failures are
+  tested separately from summarization. No paid six-turn or new invoice effect
+  has occurred at this point; F03/F05 remain open.
