@@ -225,6 +225,23 @@
     return payload;
   }
 
+  function deliveryCompletionLabel(next) {
+    if (!isRecord(next) || next.available !== true || !isRecord(next.quantities)) return "";
+    const sourceStatus = text(next.source_status).toUpperCase();
+    // The public projection elides source_status after deriving `available`; when it is present,
+    // it must still explicitly confirm the current source.
+    if (sourceStatus && sourceStatus !== "CURRENT") return "";
+    const quantities = next.quantities;
+    const ordered = numberFrom(quantities.ordered);
+    if (!finite(ordered) || ordered <= 0) return "";
+    if (!["received", "dispatched", "delivery_confirmed"].every((key) => numberFrom(quantities[key]) === ordered)) return "";
+    if (!["held", "missing", "usable", "allocated"].every((key) => numberFrom(quantities[key]) === 0)) return "";
+    const openAlerts = Array.isArray(next.alerts)
+      ? next.alerts.filter((alert) => isRecord(alert) && firstText(alert, ["status", "state"]).toUpperCase() === "OPEN").length
+      : 0;
+    return `Delivery confirmed · ${openAlerts} alert${openAlerts === 1 ? "" : "s"} to review`;
+  }
+
   const exported = {
     buildEventPayload,
     cleanAnswer,
@@ -240,6 +257,7 @@
     statusTone,
     deliverySummary,
     arrivalQuantitySummary,
+    deliveryCompletionLabel,
     unwrapProjection,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = exported;
@@ -763,8 +781,9 @@
     setText("ops-case-id", next.case_id || "Case identifier unavailable");
     const purchaseOrder = next.documents.find((record) => /^purchase order$/i.test(firstText(record, ["kind", "doctype", "type"])));
     setText("ops-case-po", purchaseOrder ? `PO ${firstText(purchaseOrder, ["name", "record_id", "id"]) || "identifier unavailable"}` : "Purchase order unavailable");
-    setText("ops-stage-badge", pretty(next.stage));
-    const stageBadge = $("ops-stage-badge"); stageBadge.className = `state-badge state-${statusTone(next.stage)}`; stageBadge.textContent = pretty(next.stage);
+    const stageLabel = deliveryCompletionLabel(next) || pretty(next.stage);
+    setText("ops-stage-badge", stageLabel);
+    const stageBadge = $("ops-stage-badge"); stageBadge.className = `state-badge state-${statusTone(stageLabel)}`; stageBadge.textContent = stageLabel;
     setText("ops-flow-message", firstText(next, ["message", "summary"]) || "Current quantities and evidence from the source projection.");
     setText("ops-synthetic-badge", next.synthetic_input === true ? "Declared synthetic inputs" : "Native source events");
     if (!next.available) {

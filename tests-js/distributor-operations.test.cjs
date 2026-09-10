@@ -15,6 +15,7 @@ const {
   unwrapProjection,
   recommendedAction,
   statusTone,
+  deliveryCompletionLabel,
 } = require('../workspace/distributor-operations.js');
 
 test('projection keeps missing source quantities unknown instead of turning them into zero', () => {
@@ -141,6 +142,35 @@ test('outbound delivery evidence preserves known counts and unavailable quantity
   assert.equal(deliverySummary(20, 24), 'Delivery confirmed 20 / 24');
   assert.equal(deliverySummary(0, 24), 'Delivery confirmed 0 / 24');
   assert.equal(deliverySummary(null, 24), 'Delivery confirmed unknown');
+});
+
+test('completion badge keeps delivery confirmation visible with open alerts to review', () => {
+  const completed = {
+    available: true,
+    source_status: 'CURRENT',
+    quantities: {
+      ordered: 40,
+      received: 40,
+      dispatched: 40,
+      delivery_confirmed: 40,
+      held: 0,
+      missing: 0,
+      usable: 0,
+      allocated: 0,
+    },
+    alerts: [{ status: 'OPEN' }, { status: 'OPEN' }, { status: 'OPEN' }, { status: 'RESOLVED' }],
+  };
+  assert.equal(deliveryCompletionLabel(completed), 'Delivery confirmed · 3 alerts to review');
+
+  for (const incomplete of [
+    { ...completed, quantities: { ...completed.quantities, delivery_confirmed: undefined } },
+    { ...completed, available: false },
+    { ...completed, source_status: 'UNAVAILABLE' },
+    { ...completed, quantities: { ...completed.quantities, delivery_confirmed: 39 } },
+    { ...completed, quantities: { ...completed.quantities, held: 1 } },
+  ]) {
+    assert.equal(deliveryCompletionLabel(incomplete), '');
+  }
 });
 
 test('arrival activity uses the source stock UOM for counted quantity', () => {

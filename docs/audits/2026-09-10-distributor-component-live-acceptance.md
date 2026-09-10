@@ -251,3 +251,19 @@ answer or semantic pass was obtained. Evidence:
 `component-nova2-matched-comparison-01.json`. This is a new output-budget result,
 not an IAM failure or proof that Nova2 fixes attribution. The product remains on
 its existing model pending a separately evaluated configuration.
+
+
+## Visible completion with retained alerts
+
+A separately reviewed presentation change now displays `Delivery confirmed · 3
+alerts to review` on the current component page. It requires positive ordered
+quantity, exact matching received/dispatched/confirmed totals, zero held/missing/
+usable/allocated quantities and available current source. Incomplete data or
+partial delivery keeps the original stage. Backend HOLD, original alerts and
+synthetic-evidence labels are preserved; this is not alert resolution.
+
+Terra High independently returned GO. The implementation's 114 JS tests passed;
+primary verification passed the 13 relevant JS tests and a fresh actual in-app
+browser reload on port8901. DOM readback confirmed the new label, all three
+UNKNOWN/BLOCKED alert records, declared synthetic inputs and SO9/SO10 picked,
+dispatched and confirmed25/15. No new ERP write or model invocation was needed.

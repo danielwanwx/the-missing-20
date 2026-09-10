@@ -19,7 +19,8 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
   now has 40/40 Nos received after replacement, three supported lot releases,
   four submitted Delivery Notes/Shipments, customer dispatch25/15 and separate
   synthetic POD25/15, independently reviewed as scoped GO. Both dedicated warehouses
-  end at zero. Three retained historical alerts still set the page stage to HOLD. Initial setup
+  end at zero. Three retained historical alerts still set backend stage to HOLD; the independently
+  reviewed UI now shows Delivery confirmed with 3 alerts to review. Initial setup
   repairs, unknown attempts and a blocked out-of-order tranche remain disclosed.
   Component NovaPro answers still wrongly attribute the shortage to the supplier;
   Nova2 access is now verified under the application role, but its matched
