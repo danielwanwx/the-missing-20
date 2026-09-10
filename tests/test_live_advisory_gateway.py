@@ -67,24 +67,6 @@ def test_native_sdk_stop_reason_is_visible_without_rejected_prose() -> None:
     ) == [{"stage": "structured_output", "stop_reason": "limit_total_tokens"}]
 
 
-def test_retained_history_is_not_a_queue_of_old_questions() -> None:
-    prompt = DashboardAdvisoryGateway._contextual_question(
-        [{"human": "Show revenue trends", "agent": "A prior answer"}],
-        "Should we retry this receipt?",
-    )
-    assert "answer ONLY the newest question" in prompt
-    assert "Do not add old trend" in prompt
-    assert prompt.endswith("Newest human question: Should we retry this receipt?")
-    receiving = DashboardAdvisoryGateway._contextual_question(
-        [{"human": "Show revenue trends", "agent": "STALE_REVENUE_600_PERCENT"}],
-        "Should we retry this receipt?",
-        include_prior_answers=False,
-    )
-    assert "STALE_REVENUE" not in receiving
-    assert "Human: Show revenue trends" in receiving
-    assert receiving.endswith("Newest human question: Should we retry this receipt?")
-
-
 def test_sdk_error_result_is_failure_even_without_exception() -> None:
     progress = []
     hooks = advisory_module._RuntimeTelemetryHooks(lambda name, phase: progress.append(phase))

@@ -5,6 +5,7 @@ from copy import deepcopy
 import pytest
 from test_receiving_advisory import partial_receipt
 
+from the_missing_20.adapters import dialogue_intent
 from the_missing_20.agents.live_advisory import live_recovery_packet, model_source_payloads
 from the_missing_20.agents.receiving_facts import receipt_relations, reference_candidates
 
@@ -137,10 +138,56 @@ def test_gateway_rereads_scoped_references_without_prior_assistant_claims():
     payload["conversation"] = []
 
     class Platform:
-        def current(self):
-            return deepcopy(payload)
+        def __init__(self):
+            self._dialogue: dict[str, object] = {}
+            self._runtime_instance_id = "receiving-test-runtime"
 
-        def record_conversation_turn(self, question, answer, advisory):
+        def current(self):
+            return {
+                **deepcopy(payload),
+                **dialogue_intent.public_state(
+                    self._dialogue,
+                    str(payload["case_id"]),
+                    runtime_instance_id=self._runtime_instance_id,
+                ),
+            }
+
+        def record_human_request(self, question, case_id, *, new_conversation=False):
+            self._dialogue = dialogue_intent.record_request(
+                self._dialogue,
+                case_id,
+                question,
+                "now",
+                runtime_instance_id=self._runtime_instance_id,
+                new_conversation=new_conversation,
+            )
+            return dialogue_intent.public_state(
+                self._dialogue,
+                case_id,
+                runtime_instance_id=self._runtime_instance_id,
+            )
+
+        def record_conversation_turn(
+            self,
+            question,
+            answer,
+            advisory,
+            *,
+            expected_case_id="",
+            expected_conversation_id="",
+        ):
+            del expected_case_id, expected_conversation_id
+            group = advisory.get("dialogue_reference_group")
+            if isinstance(group, dict):
+                self._dialogue = dialogue_intent.record_reference_group(
+                    self._dialogue,
+                    case_id=str(group["case_id"]),
+                    question=question,
+                    receipt_ids=list(group["receipt_ids"]),
+                    validated=group.get("provenance") == "runtime_validated",
+                    at="now",
+                    runtime_instance_id=self._runtime_instance_id,
+                )
             payload["conversation"].append(
                 {
                     "question": question,

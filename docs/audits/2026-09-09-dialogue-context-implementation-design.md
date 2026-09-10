@@ -1,6 +1,6 @@
 # Recoverable dialogue context: implementation design
 
-Status: DESIGNED, NOT_IMPLEMENTED. Independent backend review supports this bounded design. It does not claim multi-user authentication, semantic validation of old answers, or an implemented Strands session.
+Status: STRUCTURALLY IMPLEMENTED AND INDEPENDENTLY APPROVED; REAL D4/D5 SEMANTICS PENDING. The reduced design below is implemented in existing application persistence. Independent backend review supports this bounded design. It does not claim multi-user authentication, semantic validation of old answers, or an implemented Strands session.
 
 The gateway starts a new Agent per HTTP request and retains three prior display turns. Failed model prose must never enter recoverable context. A runtime-valid answer can still be semantically wrong, so restoring prior explanations as facts is unsafe. Existing application dialogue_intent remains the authority for refusal on every request.
 

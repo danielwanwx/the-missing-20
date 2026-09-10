@@ -18,6 +18,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol, cast
+from uuid import uuid4
 
 from the_missing_20.adapters import dialogue_intent, operational_metrics
 from the_missing_20.adapters.demo_executor import DemoReleasePlan
@@ -86,6 +87,7 @@ class AgentPlatform:
         self._resolution_packet: dict[str, object] = {}
         self._model_gate: dict[str, object] = {}
         self._conversation: list[dict[str, object]] = []
+        self._runtime_instance_id = uuid4().hex
         self._dialogue_intent: dict[str, object] = {}
         self._load_state()
 
@@ -102,6 +104,9 @@ class AgentPlatform:
             return
         self._sequence = int(payload.get("sequence") or 0)
         self._run_number = int(payload.get("run_number") or 0)
+        stored_runtime_id = payload.get("runtime_instance_id")
+        if isinstance(stored_runtime_id, str) and stored_runtime_id:
+            self._runtime_instance_id = stored_runtime_id
         events = payload.get("events")
         if isinstance(events, list):
             self._events = [dict(item) for item in events if isinstance(item, Mapping)][-80:]
@@ -207,6 +212,7 @@ class AgentPlatform:
             "resolution_packet": self._resolution_packet,
             "model_gate": self._model_gate,
             "conversation": self._conversation[-12:],
+            "runtime_instance_id": self._runtime_instance_id,
             "dialogue_intent": self._dialogue_intent,
             "source_sequences": self._source_sequences,
             "seen_source_records": sorted(self._seen_source_records),
@@ -2018,7 +2024,9 @@ class AgentPlatform:
                 self._validate_stored_conversation_turn(dict(turn)) for turn in self._conversation
             ],
             **dialogue_intent.public_state(
-                self._dialogue_intent, self._text(erp.get("case_id"), "M20-ERP-LIVE")
+                self._dialogue_intent,
+                self._text(erp.get("case_id"), "M20-ERP-LIVE"),
+                runtime_instance_id=self._runtime_instance_id,
             ),
             "latest_sequence": self._sequence,
         }
@@ -2321,20 +2329,46 @@ class AgentPlatform:
                 record_id=conversation_id,
             )
 
-    def record_human_request(self, question: str, case_id: str) -> dict[str, object]:
+    def record_human_request(
+        self, question: str, case_id: str, *, new_conversation: bool = False
+    ) -> dict[str, object]:
         with self._lock:
             self._dialogue_intent = dialogue_intent.record_request(
-                self._dialogue_intent, case_id, question, self._now()
+                self._dialogue_intent,
+                case_id,
+                question,
+                self._now(),
+                runtime_instance_id=self._runtime_instance_id,
+                new_conversation=new_conversation,
             )
             self._persist_state()
-            return dialogue_intent.public_state(self._dialogue_intent, case_id)
+            return dialogue_intent.public_state(
+                self._dialogue_intent,
+                case_id,
+                runtime_instance_id=self._runtime_instance_id,
+            )
 
     def record_conversation_turn(
-        self, question: str, answer: str, advisory: Mapping[str, object]
+        self,
+        question: str,
+        answer: str,
+        advisory: Mapping[str, object],
+        *,
+        expected_case_id: str = "",
+        expected_conversation_id: str = "",
     ) -> dict[str, object]:
         """Persist bounded, case-scoped dialogue without granting write authority."""
 
         with self._lock:
+            if expected_case_id or expected_conversation_id:
+                erp, saas = self._read_all()
+                current_case_id = self._text(erp.get("case_id"), "M20-ERP-LIVE")
+                if (
+                    current_case_id != expected_case_id
+                    or self._dialogue_intent.get("case_id") != expected_case_id
+                    or self._dialogue_intent.get("conversation_id") != expected_conversation_id
+                ):
+                    return self._projection(erp, saas)
             raw_evidence_ids = advisory.get("evidence_ids", [])
             evidence_ids = (
                 [str(item) for item in raw_evidence_ids]
@@ -2347,6 +2381,27 @@ class AgentPlatform:
             )
             provider = advisory.get("provider")
             usage = advisory.get("usage")
+            reference_group = advisory.get("dialogue_reference_group")
+            if (
+                isinstance(reference_group, Mapping)
+                and reference_group.get("case_id") == self._dialogue_intent.get("case_id")
+                and reference_group.get("provenance") == "runtime_validated"
+            ):
+                raw_receipt_ids = reference_group.get("receipt_ids", [])
+                receipt_ids = (
+                    [str(receipt_id) for receipt_id in raw_receipt_ids]
+                    if isinstance(raw_receipt_ids, (list, tuple))
+                    else []
+                )
+                self._dialogue_intent = dialogue_intent.record_reference_group(
+                    self._dialogue_intent,
+                    case_id=str(reference_group["case_id"]),
+                    question=question,
+                    receipt_ids=receipt_ids,
+                    validated=True,
+                    at=self._now(),
+                    runtime_instance_id=self._runtime_instance_id,
+                )
             self._conversation.append(
                 {
                     "turn_id": f"turn-{len(self._conversation) + 1:03d}",

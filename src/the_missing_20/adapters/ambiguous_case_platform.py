@@ -49,6 +49,7 @@ class AmbiguousCasePlatform:
         self._case_version = 1
         self._diagnosis_authorization: dict[str, object] = {}
         self._conversation: list[dict[str, object]] = []
+        self._runtime_instance_id = uuid4().hex
         self._dialogue_intent: dict[str, object] = {}
         self._runtime_events: list[dict[str, object]] = []
         self._evidence_observed_at = self._now()
@@ -91,7 +92,15 @@ class AmbiguousCasePlatform:
         self._case_version = int(snapshot.get("case_version", 1))
         self._diagnosis_authorization = dict(snapshot.get("diagnosis_authorization", {}))
         self._scenario_variant = str(snapshot.get("scenario_variant", "uncommitted_receipt"))
-        self._dialogue_intent = dict(snapshot.get("dialogue_intent", {}))
+        stored_runtime_id = snapshot.get("runtime_instance_id")
+        if isinstance(stored_runtime_id, str) and stored_runtime_id:
+            self._runtime_instance_id = stored_runtime_id
+        raw_dialogue_intent = snapshot.get("dialogue_intent", {})
+        self._dialogue_intent = dialogue_intent.restore_state(
+            raw_dialogue_intent if isinstance(raw_dialogue_intent, Mapping) else {},
+            case_id=self._case.case_id,
+            runtime_instance_id=self._runtime_instance_id,
+        )
         self._conversation = [
             dict(turn) for turn in snapshot.get("conversation", []) if isinstance(turn, Mapping)
         ]
@@ -134,6 +143,7 @@ class AmbiguousCasePlatform:
             "diagnosis_authorization": dict(self._diagnosis_authorization),
             "scenario_variant": self._scenario_variant,
             "conversation": list(self._conversation),
+            "runtime_instance_id": self._runtime_instance_id,
             "dialogue_intent": self._dialogue_intent,
             "runtime_events": list(self._runtime_events),
             "evidence_observed_at": self._evidence_observed_at,
@@ -316,6 +326,17 @@ class AmbiguousCasePlatform:
         scenario_variant: str = "uncommitted_receipt",
     ) -> dict[str, object]:
         """Open a fresh isolated demo case without retaining a prior run's truth."""
+
+        with self._run_lock:
+            return self._reset_locked(case, scenario_variant=scenario_variant)
+
+    def _reset_locked(
+        self,
+        case: AmbiguousReceiptCase | None = None,
+        *,
+        scenario_variant: str = "uncommitted_receipt",
+    ) -> dict[str, object]:
+        """Replace the local case while holding the dialogue completion lock."""
 
         next_case = case or primary_case()
         if self._store is not None:
@@ -998,7 +1019,11 @@ class AmbiguousCasePlatform:
             },
             "case_version": self._case_version,
             "conversation": list(self._conversation),
-            **dialogue_intent.public_state(self._dialogue_intent, self._case.case_id),
+            **dialogue_intent.public_state(
+                self._dialogue_intent,
+                self._case.case_id,
+                runtime_instance_id=self._runtime_instance_id,
+            ),
             "activity": list(self._events[-80:]),
             "latest_sequence": self._sequence,
         }
@@ -1634,57 +1659,101 @@ class AmbiguousCasePlatform:
         self.execute(approval_id, idempotency_key)
         return self.verify()
 
-    def record_human_request(self, question: str, case_id: str) -> dict[str, object]:
+    def record_human_request(
+        self, question: str, case_id: str, *, new_conversation: bool = False
+    ) -> dict[str, object]:
         with self._run_lock:
             if case_id != self._case.case_id:
                 raise ValueError("Conversation case changed; reread current context.")
             self._dialogue_intent = dialogue_intent.record_request(
-                self._dialogue_intent, case_id, question, self._now()
+                self._dialogue_intent,
+                case_id,
+                question,
+                self._now(),
+                runtime_instance_id=self._runtime_instance_id,
+                new_conversation=new_conversation,
             )
             self._persist()
-            return dialogue_intent.public_state(self._dialogue_intent, case_id)
+            return dialogue_intent.public_state(
+                self._dialogue_intent,
+                case_id,
+                runtime_instance_id=self._runtime_instance_id,
+            )
 
     def record_conversation_turn(
-        self, question: str, answer: str, advisory: Mapping[str, object]
+        self,
+        question: str,
+        answer: str,
+        advisory: Mapping[str, object],
+        *,
+        expected_case_id: str = "",
+        expected_conversation_id: str = "",
     ) -> dict[str, object]:
         """Persist a case/run-scoped visible conversation without granting write authority."""
 
-        raw_evidence_ids = advisory.get("evidence_ids", [])
-        evidence_ids = (
-            [str(item) for item in raw_evidence_ids]
-            if isinstance(raw_evidence_ids, (list, tuple))
-            else []
-        )
-        provider = advisory.get("provider", {})
-        usage = advisory.get("usage", {})
-        tool_calls = advisory.get("tool_calls", [])
-        self._conversation.append(
-            {
-                "turn_id": f"turn-{len(self._conversation) + 1:03d}",
-                "run_id": self._run_id,
-                "question": question,
-                "answer": answer,
-                "evidence_ids": evidence_ids,
-                "tool_calls": (
-                    [str(item) for item in tool_calls]
-                    if isinstance(tool_calls, (list, tuple))
+        with self._run_lock:
+            if (expected_case_id and expected_case_id != self._case.case_id) or (
+                expected_conversation_id
+                and self._dialogue_intent.get("conversation_id") != expected_conversation_id
+            ):
+                return self.current()
+            raw_evidence_ids = advisory.get("evidence_ids", [])
+            evidence_ids = (
+                [str(item) for item in raw_evidence_ids]
+                if isinstance(raw_evidence_ids, (list, tuple))
+                else []
+            )
+            provider = advisory.get("provider", {})
+            usage = advisory.get("usage", {})
+            tool_calls = advisory.get("tool_calls", [])
+            reference_group = advisory.get("dialogue_reference_group")
+            if (
+                isinstance(reference_group, Mapping)
+                and reference_group.get("case_id") == self._case.case_id
+                and reference_group.get("provenance") == "runtime_validated"
+            ):
+                raw_receipt_ids = reference_group.get("receipt_ids", [])
+                receipt_ids = (
+                    [str(receipt_id) for receipt_id in raw_receipt_ids]
+                    if isinstance(raw_receipt_ids, (list, tuple))
                     else []
-                ),
-                "provider": dict(provider) if isinstance(provider, Mapping) else {},
-                "usage": dict(usage) if isinstance(usage, Mapping) else {},
-                "latency_ms": int(advisory.get("latency_ms", 0) or 0),
-                "context_turns": int(advisory.get("context_turns", 0) or 0),
-                "created_at": self._now(),
-            }
-        )
-        self._append(
-            "human.agent.conversation.completed",
-            "ANSWERED",
-            "Evidence Agent answered",
-            f"Conversation turn {len(self._conversation)} cited "
-            f"{len(evidence_ids)} evidence records.",
-        )
-        return self.current()
+                )
+                self._dialogue_intent = dialogue_intent.record_reference_group(
+                    self._dialogue_intent,
+                    case_id=self._case.case_id,
+                    question=question,
+                    receipt_ids=receipt_ids,
+                    validated=True,
+                    at=self._now(),
+                    runtime_instance_id=self._runtime_instance_id,
+                )
+            self._conversation.append(
+                {
+                    "turn_id": f"turn-{len(self._conversation) + 1:03d}",
+                    "run_id": self._run_id,
+                    "question": question,
+                    "answer": answer,
+                    "evidence_ids": evidence_ids,
+                    "tool_calls": (
+                        [str(item) for item in tool_calls]
+                        if isinstance(tool_calls, (list, tuple))
+                        else []
+                    ),
+                    "provider": dict(provider) if isinstance(provider, Mapping) else {},
+                    "usage": dict(usage) if isinstance(usage, Mapping) else {},
+                    "latency_ms": int(advisory.get("latency_ms", 0) or 0),
+                    "context_turns": int(advisory.get("context_turns", 0) or 0),
+                    "created_at": self._now(),
+                }
+            )
+            self._append(
+                "human.agent.conversation.completed",
+                "ANSWERED",
+                "Evidence Agent answered",
+                f"Conversation turn {len(self._conversation)} cited "
+                f"{len(evidence_ids)} evidence records.",
+            )
+            return self.current()
 
     def verify(self) -> dict[str, object]:
         if self._execution.get("status") != "VERIFYING":

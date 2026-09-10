@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from decimal import Decimal
+from threading import RLock
 from typing import Any, Protocol
 from uuid import uuid4
 
+from the_missing_20.adapters import dialogue_intent
 from the_missing_20.adapters.conversation_views import history_attachment, retained_history_view
 from the_missing_20.adapters.investigation_case_sources import investigation_packet
 from the_missing_20.adapters.role_task_journal import RoleTaskJournal
@@ -19,7 +21,7 @@ from the_missing_20.agents.live_advisory import (
     live_recovery_packet,
     run_live_advisory,
 )
-from the_missing_20.agents.receiving_facts import receipt_relations, reference_candidates
+from the_missing_20.agents.receiving_facts import receipt_relations
 from the_missing_20.config import Settings
 from the_missing_20.ports.agent_model import AgentBudget, AgentBudgetLedger, AgentProvider
 
@@ -152,6 +154,10 @@ class DashboardAdvisoryGateway:
         self._runner = runner
         self._packet_factory = packet_factory
         self._delegation_journal = delegation_journal
+        # This serializes one gateway instance only. The supported boundary is
+        # one local operator/runtime, not a distributed multi-process lock.
+        self._ask_lock = RLock()
+        self._fallback_conversation_id = uuid4().hex
 
     def runtime_truth(self) -> dict[str, object]:
         """Expose non-secret provider configuration without making a provider call."""
@@ -203,30 +209,50 @@ class DashboardAdvisoryGateway:
                 )
         return self._runner(packet, **kwargs)
 
-    def ask(self, question: str) -> dict[str, object]:
-        """Run real advisory chat or return an unmistakably unavailable result."""
+    def ask(self, question: str, *, new_conversation: bool = False) -> dict[str, object]:
+        """Run one serialized, source-fresh advisory turn for this local runtime."""
 
+        # Holding the lock before *both* source reads means a second request on
+        # this gateway cannot construct a packet from a projection superseded by
+        # the first request's saved human intent.
+        with self._ask_lock:
+            return self._ask_locked(question, new_conversation=new_conversation)
+
+    def _ask_locked(self, question: str, *, new_conversation: bool) -> dict[str, object]:
         projection = self._platform.current()
         clean_question = " ".join(question.split())
-        if not clean_question or len(clean_question) > 500:
+        if not question.strip() or len(question) > 500:
             return self._unavailable(
                 projection,
                 code="VALIDATION_FAILED",
                 detail="Ask a specific evidence question using at most 500 characters.",
             )
-        record_request = getattr(self._platform, "record_human_request", None)
-        prior_projection = dict(projection)
-        if callable(record_request):
-            projection = {
-                **projection,
-                **record_request(clean_question, str(projection.get("case_id", ""))),
-            }
-        if self._settings.agent_provider is not AgentProvider.BEDROCK:
+
+        # Keep the original bounded wording. Normalization remains validation
+        # only; it is never used to replace a persisted user message.
+        current_question = question
+        case_id = str(projection.get("case_id", ""))
+        recorded = self._record_human_request(
+            current_question, case_id, new_conversation=new_conversation
+        )
+        fresh_projection = self._platform.current()
+        if str(fresh_projection.get("case_id", "")) != case_id:
             return self._unavailable(
-                projection,
-                code="AGENT_UNAVAILABLE",
-                detail="Real Strands Agent is not configured; no fallback answer was generated.",
+                fresh_projection,
+                code="CONTEXT_SCOPE_CHANGED",
+                detail=(
+                    "The case changed while the human request was being saved; no model request "
+                    "was started. Reread the current case before asking again."
+                ),
             )
+        projection = {**projection, **fresh_projection}
+        for key in ("human_intent", "human_requests", "dialogue_context"):
+            if key in recorded:
+                projection[key] = recorded[key]
+
+        # Saving the request precedes every failure path, including a source
+        # outage or an unconfigured provider. The outage boundary comes first
+        # because it must never consume a model request in any provider mode.
         freshness = projection.get("source_freshness")
         if isinstance(freshness, Mapping) and freshness.get("status") == "UNAVAILABLE":
             response = self._unavailable(
@@ -242,6 +268,18 @@ class DashboardAdvisoryGateway:
                 if retained_views:
                     unavailable_advisory["retained_views"] = retained_views
             return response
+        if self._settings.agent_provider is not AgentProvider.BEDROCK:
+            return self._unavailable(
+                projection,
+                code="AGENT_UNAVAILABLE",
+                detail="Real Strands Agent is not configured; no fallback answer was generated.",
+            )
+
+        context_state = self._dialogue_context(projection)
+        conversation_id = self._conversation_id(context_state)
+        prior_requests = self._prior_human_requests(projection, current_question)
+        authority_context = self._authority_context(projection)
+        stored_omissions = self._stored_omissions(context_state)
         try:
             packet = dict(self._packet_factory(projection))
             raw_intent = projection.get("human_intent", {})
@@ -269,46 +307,47 @@ class DashboardAdvisoryGateway:
                 packet["explanation_scope"] = "full_investigation"
             else:
                 packet["expected_reason_quantities"] = ()
+
+            relations: list[dict[str, Any]] = []
             if packet.get("case_class") == "receiving_operations":
-                sources = packet["tool_payload"]["sources"]
-                turns = prior_projection.get("conversation", [])
-                last = turns[-1] if isinstance(turns, list) and turns else {}
-                previous = last.get("receiving_references", {}) if isinstance(last, Mapping) else {}
-                sources["read_control_context"] = {
-                    **sources["read_control_context"],
-                    "prior_reference_candidates": reference_candidates(
-                        previous if isinstance(previous, Mapping) else {},
-                        case_id=packet["case_id"],
-                        relations=receipt_relations(sources["read_erp_evidence"]),
-                        source_sequence=projection.get("case_projection", {}).get(
-                            "source_sequence"
-                        ),
-                    ),
-                }
-            history = self._conversation_history(prior_projection)
-            contextual_question = self._contextual_question(
-                history,
-                clean_question,
-                include_prior_answers=packet.get("case_class") != "receiving_operations",
+                relations = self._attach_rejoined_reference_candidates(
+                    packet,
+                    projection=projection,
+                    context_state=context_state,
+                    current_question=current_question,
+                )
+
+            packed = self._pack_contextual_question(
+                packet,
+                prior_requests=prior_requests,
+                current_question=current_question,
+                authority_context=authority_context,
             )
-            if packet["read_only_requested"]:
-                contextual_question += (
-                    "\nRetained human constraint: decline/refusal/read-only remains active. "
-                    "Acknowledge it; continuing investigation does not authorize a write. "
-                    "This preserves the authority constraint, not earlier question topics."
+            packed_omissions = packed.get("omitted_requests")
+            omitted_turns = stored_omissions + (
+                packed_omissions if isinstance(packed_omissions, int) else 0
+            )
+            if packed["input_limit"] is True:
+                limited = self._unavailable(
+                    projection,
+                    code="CONTEXT_LIMIT",
+                    detail=(
+                        "The complete current question and required authority/context exceed the "
+                        "accepted input limit; no model request was started."
+                    ),
                 )
-            if "read_operational_history" in packet.get("tool_payload", {}).get("sources", {}):
-                contextual_question += (
-                    "\nIf this asks for trends or benchmarks, read_operational_history and select "
-                    "chart_metric; the server will render its actual source data. Never invent "
-                    "history. Offer up to three useful read-only follow_up_questions."
-                )
-            # Keep the actual current request last, after context and retained
-            # authority. Repeating the entire old refusal message here used to
-            # accidentally reactivate its unrelated history/revenue questions.
-            if contextual_question != clean_question:
-                contextual_question += "\nNewest human question: " + clean_question
-            run = self._run(packet, question=contextual_question, conversation_id=uuid4().hex)
+                limited_advisory = limited["agent_advisory"]
+                if isinstance(limited_advisory, dict):
+                    limited_advisory.update(
+                        {
+                            "conversation_id": conversation_id,
+                            "context_turns": 0,
+                            "omitted_turns": omitted_turns,
+                        }
+                    )
+                return limited
+            contextual_question = str(packed["prompt"])
+            run = self._run(packet, question=contextual_question, conversation_id=conversation_id)
         except AdvisoryValidationError as error:
             failed = self._unavailable(
                 projection,
@@ -320,7 +359,7 @@ class DashboardAdvisoryGateway:
             if isinstance(advisory_failure, dict):
                 advisory_failure["usage"] = error.usage
             return failed
-        except (AdvisoryUnavailable, OSError, ValueError) as error:
+        except (AdvisoryUnavailable, OSError, RuntimeError, ValueError) as error:
             failed = self._unavailable(
                 projection,
                 code="AGENT_UNAVAILABLE",
@@ -332,12 +371,22 @@ class DashboardAdvisoryGateway:
                 if isinstance(advisory_failure, dict):
                     advisory_failure["usage"] = error.usage
             return failed
+
+        # The gateway lock only protects asks that enter this instance. A case
+        # reset or an explicit new conversation can still happen elsewhere
+        # while inference is running, so never display or persist a completion
+        # that no longer belongs to the captured scope.
+        completion_projection = self._platform.current()
+        if not self._scope_matches(completion_projection, case_id, conversation_id):
+            return self._scope_changed(completion_projection)
+        projection = completion_projection
         result = run.result.model_dump(mode="json")
         answer = (
             f"Disposition: {result['disposition']}. {result['reason']} "
             f"Next: {result['safe_next_step']}"
         )
-        advisory = {
+        included_questions = packed.get("included_questions")
+        advisory: dict[str, Any] = {
             "status": "COMPLETE",
             "mode": "real_strands",
             "provider": run.provider,
@@ -347,92 +396,311 @@ class DashboardAdvisoryGateway:
             "result": result,
             "evidence_findings": run.evidence_findings,
             "runtime_events": list(run.runtime_events),
-            "context_turns": len(history),
+            "conversation_id": conversation_id,
+            "context_turns": len(included_questions) if isinstance(included_questions, list) else 0,
+            "omitted_turns": omitted_turns,
             "attachments": history_attachment(
                 packet, run.result.chart_metric, run.tool_calls, question=clean_question
             ),
             "follow_up_questions": [question[:160] for question in run.result.follow_up_questions],
         }
         if packet.get("case_class") == "receiving_operations":
-            relations = receipt_relations(packet["tool_payload"]["sources"]["read_erp_evidence"])
-            cited = set(result.get("evidence_ids", []))
+            receipt_ids = self._cited_receipt_ids(relations, result.get("evidence_ids", []))
+            source_sequence = self._source_sequence(projection)
             advisory["receiving_references"] = {
                 "case_id": packet["case_id"],
                 "status": "COMPLETE",
-                "source_sequence": projection.get("case_projection", {}).get("source_sequence"),
-                "receipt_ids": sorted(
-                    {
-                        row["receipt_id"]
-                        for row in relations
-                        if row["receipt_id"] in cited or row["evidence_id"] in cited
-                    }
-                ),
+                "source_sequence": source_sequence,
+                "receipt_ids": receipt_ids,
+                "question": current_question,
+                "provenance": "runtime_validated",
             }
+            if receipt_ids:
+                advisory["dialogue_reference_group"] = {
+                    "case_id": packet["case_id"],
+                    "question": current_question,
+                    "receipt_ids": receipt_ids,
+                    "provenance": "runtime_validated",
+                }
         record_turn = getattr(self._platform, "record_conversation_turn", None)
         if callable(record_turn):
-            projection = record_turn(
-                clean_question,
+            recorded_turn = record_turn(
+                current_question,
                 answer,
                 {**advisory, "evidence_ids": result.get("evidence_ids", [])},
+                expected_case_id=case_id,
+                expected_conversation_id=conversation_id,
             )
+            if isinstance(recorded_turn, Mapping):
+                projection = dict(recorded_turn)
+            if not self._scope_matches(projection, case_id, conversation_id):
+                return self._scope_changed(projection)
         return {
             **projection,
             "answer": answer,
             "agent_advisory": advisory,
         }
 
-    @staticmethod
-    def _conversation_history(projection: Mapping[str, object]) -> list[dict[str, str]]:
-        """Return a bounded, display-safe history for a continuing evidence dialogue."""
-
-        raw = projection.get("conversation", [])
-        if not isinstance(raw, list):
-            return []
-        history: list[dict[str, str]] = []
-        for turn in raw[-3:]:
-            if not isinstance(turn, Mapping):
-                continue
-            question = " ".join(str(turn.get("question", "")).split())[:300]
-            answer = " ".join(str(turn.get("answer", "")).split())[:650]
-            if question and answer:
-                history.append({"human": question, "agent": answer})
-        # Include requests whose model turn failed; never include rejected prose.
-        requests = projection.get("human_requests", [])
-        if isinstance(requests, list):
-            for request in requests[-3:]:
-                if not isinstance(request, Mapping):
-                    continue
-                question = str(request.get("question", ""))[:300]
-                if question and not any(turn["human"] == question for turn in history):
-                    history.append({"human": question, "agent": "No validated answer recorded."})
-        return history[-3:]
+    def _record_human_request(
+        self, question: str, case_id: str, *, new_conversation: bool
+    ) -> dict[str, object]:
+        record_request = getattr(self._platform, "record_human_request", None)
+        if not callable(record_request):
+            return {}
+        recorded = record_request(question, case_id, new_conversation=new_conversation)
+        return dict(recorded) if isinstance(recorded, Mapping) else {}
 
     @staticmethod
-    def _contextual_question(
-        history: list[dict[str, str]],
-        question: str,
-        *,
-        include_prior_answers: bool = True,
-    ) -> str:
-        if not history:
-            return question
-        transcript = "\n".join(
-            f"Human: {turn['human']}"
-            + (f"\nEvidence Agent: {turn['agent']}" if include_prior_answers else "")
-            for turn in history
+    def _dialogue_context(projection: Mapping[str, object]) -> dict[str, object]:
+        raw = projection.get("dialogue_context")
+        return dict(raw) if isinstance(raw, Mapping) else {}
+
+    def _conversation_id(self, context_state: Mapping[str, object]) -> str:
+        conversation_id = context_state.get("conversation_id")
+        if isinstance(conversation_id, str) and conversation_id:
+            return conversation_id
+        return self._fallback_conversation_id
+
+    def _scope_matches(
+        self, projection: Mapping[str, object], case_id: str, conversation_id: str
+    ) -> bool:
+        if str(projection.get("case_id", "")) != case_id:
+            return False
+        context_state = self._dialogue_context(projection)
+        if not context_state:
+            return conversation_id == self._fallback_conversation_id
+        return self._conversation_id(context_state) == conversation_id
+
+    @staticmethod
+    def _scope_changed(projection: Mapping[str, object]) -> dict[str, object]:
+        return DashboardAdvisoryGateway._unavailable(
+            projection,
+            code="CONTEXT_SCOPE_CHANGED",
+            detail=(
+                "The case or conversation changed while the model was running; its result was "
+                "discarded. Reread the current case before asking again."
+            ),
         )
+
+    @staticmethod
+    def _prior_human_requests(
+        projection: Mapping[str, object], current_question: str
+    ) -> list[dict[str, object]]:
+        raw_requests = projection.get("human_requests")
+        if not isinstance(raw_requests, list):
+            return []
+        requests: list[dict[str, object]] = []
+        for index, request in enumerate(raw_requests):
+            if not isinstance(request, Mapping):
+                continue
+            question = request.get("question")
+            if not isinstance(question, str) or not question.strip() or len(question) > 500:
+                continue
+            request_id = request.get("request_id")
+            requests.append(
+                {
+                    "request_id": request_id
+                    if isinstance(request_id, str) and request_id
+                    else f"visible-request-{index}",
+                    "question": question,
+                }
+            )
+        if requests:
+            last_question = str(requests[-1]["question"])
+            if last_question == current_question or " ".join(last_question.split()) == " ".join(
+                current_question.split()
+            ):
+                requests.pop()
+        return requests
+
+    @staticmethod
+    def _authority_context(projection: Mapping[str, object]) -> str:
+        raw_intent = projection.get("human_intent")
+        intent = raw_intent if isinstance(raw_intent, Mapping) else {}
+        if intent.get("read_only_requested") is not True:
+            return ""
         return (
-            "Continue the evidence conversation below. Treat prior dialogue only as context, "
+            "\n\nRetained human constraint: decline/refusal/read-only remains active. "
+            "Continuing investigation does not authorize a write."
+        )
+
+    @staticmethod
+    def _stored_omissions(context_state: Mapping[str, object]) -> int:
+        omitted = context_state.get("requests_omitted")
+        return omitted if isinstance(omitted, int) and not isinstance(omitted, bool) else 0
+
+    @staticmethod
+    def _context_prefix(packet: Mapping[str, Any]) -> str:
+        prefix = (
+            "Continue the evidence conversation below. Treat prior user requests only as context, "
             "not as current evidence or a list of questions to answer again. Resolve references "
             "in the new question, but answer ONLY the newest question. Do not add old trend, "
             "baseline or revenue topics unless this newest question asks for them. "
             "Before answering this turn, you MUST call read_control_context, read_erp_evidence, "
             "read_airtable_evidence, read_celigo_evidence, read_collaboration_evidence exactly "
             "once. If reconcile_source_records is available for this lifecycle, use it after "
-            "those reads. Do not request tools absent from this lifecycle. "
-            "Do not answer from the transcript alone.\n\n"
-            f"Prior conversation:\n{transcript}\n\nNewest human question: {question}"
+            "those reads. Do not request tools absent from this lifecycle. Do not answer from "
+            "the transcript alone."
         )
+        tool_payload = packet.get("tool_payload")
+        sources = tool_payload.get("sources") if isinstance(tool_payload, Mapping) else None
+        if isinstance(sources, Mapping) and "read_operational_history" in sources:
+            prefix += (
+                " If this asks for trends or benchmarks, read_operational_history and select "
+                "chart_metric; the server will render its actual source data. Never invent "
+                "history. Offer up to three useful read-only follow_up_questions."
+            )
+        return prefix
+
+    def _pack_contextual_question(
+        self,
+        packet: Mapping[str, Any],
+        *,
+        prior_requests: list[dict[str, object]],
+        current_question: str,
+        authority_context: str,
+    ) -> dict[str, object]:
+        tool_payload = packet.get("tool_payload")
+        sources = tool_payload.get("sources") if isinstance(tool_payload, Mapping) else None
+        needs_context = bool(prior_requests or authority_context) or (
+            isinstance(sources, Mapping) and "read_operational_history" in sources
+        )
+        if not needs_context:
+            return {
+                "prompt": current_question,
+                "included_questions": [],
+                "included_request_ids": [],
+                "omitted_requests": 0,
+                "input_limit": False,
+            }
+        return dialogue_intent.build_model_context(
+            prior_requests,
+            current_question=current_question,
+            authority_context=authority_context,
+            max_chars=4000,
+            prefix=self._context_prefix(packet),
+        )
+
+    @staticmethod
+    def _source_sequence(projection: Mapping[str, object]) -> object:
+        case_projection = projection.get("case_projection")
+        return (
+            case_projection.get("source_sequence") if isinstance(case_projection, Mapping) else None
+        )
+
+    @staticmethod
+    def _explicit_receipt_ids(question: str, current_receipt_ids: list[str]) -> list[str]:
+        """Find complete current-source identifiers explicitly named by the user."""
+
+        explicit: list[str] = []
+        for receipt_id in current_receipt_ids:
+            if not receipt_id or receipt_id in explicit:
+                continue
+            start = 0
+            while True:
+                index = question.find(receipt_id, start)
+                if index < 0:
+                    break
+                before = question[index - 1] if index else ""
+                after_index = index + len(receipt_id)
+                after = question[after_index] if after_index < len(question) else ""
+
+                def boundary(value: str) -> bool:
+                    return not value or not (value.isalnum() or value in "_-")
+
+                if boundary(before) and boundary(after):
+                    explicit.append(receipt_id)
+                    break
+                start = index + len(receipt_id)
+        return explicit
+
+    def _attach_rejoined_reference_candidates(
+        self,
+        packet: dict[str, Any],
+        *,
+        projection: Mapping[str, object],
+        context_state: Mapping[str, object],
+        current_question: str,
+    ) -> list[dict[str, Any]]:
+        tool_payload = packet.get("tool_payload")
+        if not isinstance(tool_payload, Mapping):
+            raise ValueError("receiving packet lacks tool payload")
+        sources = tool_payload.get("sources")
+        if not isinstance(sources, dict):
+            raise ValueError("receiving packet lacks mutable source payload")
+        control_context = sources.get("read_control_context")
+        evidence = sources.get("read_erp_evidence")
+        if not isinstance(control_context, Mapping) or not isinstance(evidence, Mapping):
+            raise ValueError("receiving packet lacks current source facts")
+        relations = receipt_relations(evidence)
+        # A receipt may have several stock-ledger rows under one admitted ERP
+        # evidence record; that is normal fan-out, not two receipt candidates.
+        # The same voucher under distinct evidence records remains duplicated
+        # below so the rejoin helper reports ambiguity rather than choosing one.
+        evidence_by_receipt: dict[str, set[str]] = {}
+        for relation in relations:
+            receipt_id = relation.get("receipt_id")
+            evidence_id = relation.get("evidence_id")
+            if (
+                isinstance(receipt_id, str)
+                and receipt_id
+                and isinstance(evidence_id, str)
+                and evidence_id
+            ):
+                evidence_by_receipt.setdefault(receipt_id, set()).add(evidence_id)
+        current_receipt_ids = [
+            receipt_id
+            for receipt_id, evidence_ids in evidence_by_receipt.items()
+            for _ in evidence_ids
+        ]
+        case_id = str(packet.get("case_id", ""))
+        explicit_ids = self._explicit_receipt_ids(current_question, current_receipt_ids)
+        explicit_ambiguities = [
+            receipt_id for receipt_id in explicit_ids if current_receipt_ids.count(receipt_id) > 1
+        ]
+        if explicit_ids:
+            candidates: dict[str, object] = {
+                "status": "AMBIGUOUS" if explicit_ambiguities else "CURRENT_QUESTION",
+                "case_id": case_id,
+                "current_receipt_ids": explicit_ids,
+                "ambiguous_receipt_ids": explicit_ambiguities,
+                "authority": (
+                    "Receipt identifiers explicitly named in the current user question take "
+                    "precedence and must be re-read from current sources."
+                ),
+            }
+        else:
+            group = dialogue_intent.latest_reference_group(context_state, case_id=case_id)
+            candidates = (
+                dialogue_intent.rejoin_reference_group(
+                    group,
+                    case_id=case_id,
+                    current_receipt_ids=current_receipt_ids,
+                    source_sequence=self._source_sequence(projection),
+                )
+                if group is not None
+                else {"status": "UNAVAILABLE", "case_id": case_id}
+            )
+        sources["read_control_context"] = {
+            **control_context,
+            "prior_reference_candidates": candidates,
+        }
+        return relations
+
+    @staticmethod
+    def _cited_receipt_ids(relations: list[dict[str, Any]], evidence_ids: object) -> list[str]:
+        cited = set(evidence_ids) if isinstance(evidence_ids, (list, tuple, set)) else set()
+        receipt_ids: list[str] = []
+        for relation in relations:
+            receipt_id = relation.get("receipt_id")
+            if (
+                isinstance(receipt_id, str)
+                and receipt_id
+                and (receipt_id in cited or relation.get("evidence_id") in cited)
+                and receipt_id not in receipt_ids
+            ):
+                receipt_ids.append(receipt_id)
+        return receipt_ids
 
     def investigate(self, projection: Mapping[str, object]) -> dict[str, object]:
         """Run the same real Strands boundary used by chat for the primary case flow.
