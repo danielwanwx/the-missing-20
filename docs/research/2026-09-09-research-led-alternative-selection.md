@@ -1,0 +1,94 @@
+# Research-led alternatives for the receiving agent
+
+Verified September9,2026 Pacific. Decision: pause expansion of the unfinished
+billing journal, preserve its candidate and failures, and compare native
+components against explicit task outcomes. No framework migration, new model,
+ERP write or product-quality improvement is established by this research.
+
+The current failure has three distinct dimensions: continuity across turns;
+unsupported reasoning over available records; and durable execution across an
+ERP acknowledgment loss. A component solving one does not automatically solve
+the others. After D4's wrong physical-proof answer, an offline reconstruction
+showed qualified source facts reach the reconstructed SDK boundary. This is not
+the historical request wire capture. It does not support treating memory loss
+as the established cause or summarization as the first repair for that error.
+
+## Candidate decisions
+
+| Candidate | Verified mechanism and fit | Decision / experiment |
+| --- | --- | --- |
+| Installed Strands1.53 native Agent/tool loop | Ordinary tools and schema tool coexist initially; forced-output fallback later restricts tools. Current two-phase acquisition/synthesis is application policy. No extra dependency is needed for this mechanism. [Documentation](https://strandsagents.com/docs/user-guide/concepts/agents/structured-output/) | First reasoning experiment: dedicated receiving question/answer loop, natural output versus narrow structured output, identical source/model/budget. Remove the cross-domain task burden in an isolated candidate rather than add answer exceptions. No semantic gain yet. |
+| Native Strands summary + session | Native conversation compression and session persistence already exist; simply enabling persistence can also retain rejected candidates before application validation. [Conversation management](https://strandsagents.com/docs/user-guide/concepts/agents/conversation-management/), [sessions](https://strandsagents.com/docs/user-guide/concepts/agents/session-management/) | Keep as a separate continuity/long-context candidate after the short reasoning screen. Measure raw recent-turn retention, source refresh, rejected-answer isolation, restart and summarization usage. Do not label it a Q4 fix. |
+| Google ADK context compaction | Official docs offer turn-interval/overlap and token-based retention. These are useful comparison patterns, but ADK App/Runner/session interfaces are a different runtime, not a Strands plug-in. [Docs](https://adk.dev/context/compaction/), [source](https://github.com/google/adk-python/blob/main/src/google/adk/apps/compaction.py) | Borrow the retention/trigger comparison, not a runtime migration solely for summary. Issue5194 reports a background compaction/session timestamp race on1.18.0; it is closed, not evidence that current ADK is broken. [Author report and discussion](https://github.com/google/adk-python/issues/5194) |
+| Strands Evals / NVIDIA NeMo Agent Toolkit | Evals supports task experiments, output/trajectory/interaction evaluation and multi-turn simulation. NeMo has an explicit Strands integration with Bedrock support and profiling. Neither makes an incorrect answer correct merely by installation. [Evals](https://github.com/strands-agents/evals), [NeMo1.8 integration](https://docs.nvidia.com/nemo/agent-toolkit/1.8/components/integrations/frameworks.html) | Prefer Strands Evals for the later repeated conversation comparison; consider NeMo if cross-framework profiling is actually needed. Do not install both runners for the same small first screen. Keep exact business invariants and independent semantic review; an LLM judge is not sole truth. |
+| Frappe/ERPNext native transaction boundary | PR→PI mapping and native document validation are reusable. A unique external key can be enforced in the ERP database. Native supplier bill duplicate validation is instead an optional SELECT-based check and does not establish atomic concurrent deduplication. [PR mapper](https://raw.githubusercontent.com/frappe/erpnext/version-15/erpnext/stock/doctype/purchase_receipt/purchase_receipt.py), [PI validation](https://raw.githubusercontent.com/frappe/erpnext/version-15/erpnext/accounts/doctype/purchase_invoice/purchase_invoice.py), [unique field schema](https://raw.githubusercontent.com/frappe/frappe/version-15/frappe/database/schema.py) | Potentially the largest simplification, because the effect and unique key share a transaction. Actual configured API identity returned false for create permission on Custom Field, Server Script and Workflow. No schema was changed. This route is currently unavailable through that identity, not disproved for the tenant or other deployments. |
+| DBOS Python / Temporal Python | Both persist workflow progress. DBOS now documents local SQLite, while Temporal adds its own service/worker. An external step/activity may execute again when its effect happened before its result was checkpointed. Stable workflow IDs do not remove that window. [DBOS architecture](https://docs.dbos.dev/architecture), [connections](https://docs.dbos.dev/python/tutorials/database-connection), [Temporal maintainer discussion](https://community.temporal.io/t/execution-guarantees-of-activities/3405) | Run the smaller DBOS SQLite prototype with a persistent fake ERP, comparing absence/presence of a target-side unique key across the same crash. Measure effects and identities, not just workflow SUCCESS. Temporal remains an alternative if long-lived multi-service orchestration warrants the service cost. |
+
+Apache Beam was also checked: its documented RunInference/data-pipeline focus
+fits batch/stream processing, not this immediate conversation or two-write ERP
+failure. This is a fit judgment for the current gap, not a claim that Apache
+projects cannot support agents. [Official ML overview](https://beam.apache.org/documentation/ml/overview/).
+
+Task decomposition and small, well-documented tool interfaces are supported by
+[Anthropic's engineering guide](https://www.anthropic.com/engineering/building-effective-agents).
+Its [context engineering guide](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+also distinguishes compaction, notes and focused agents, and cautions against
+growing lists of brittle prompt exceptions. These are vendor engineering
+recommendations, not a benchmark showing which candidate wins on our model.
+
+## Reproducibility and costs
+
+Official PyPI metadata was fetched directly for this selection: DBOS2.31.1,
+Python>=3.10, uploaded Sep8; wheel SHA256
+`5c32840683cbb10727d30d208d8e1eb3ccaec7ed881776e5bf9d89cb32d7583c`.
+Its package README still emphasizes Postgres while current connection docs also
+describe SQLite; the actual pinned package must be tested. [Package metadata](https://pypi.org/pypi/dbos/json).
+Strands Evals1.2.0, Python>=3.10, uploaded Aug21, depends on Strands>=1.42.0
+and also the tools distribution. Therefore it is not a zero-dependency toggle;
+isolate dependency resolution before adoption. [Metadata](https://pypi.org/pypi/strands-agents-evals/json).
+
+Strands/Evals/ADK/NeMo repositories report Apache-2.0; Frappe, DBOS and Temporal
+report MIT, while ERPNext reports GPLv3. Use native ERP APIs; no upstream ERP
+source is being copied into this repository by these experiments. Moving
+branches and latest docs are discovery/inspection evidence, not pinned runtime
+compatibility. Only installed1.53 and the forthcoming pinned DBOS experiment
+have local execution scope. No subscription, hosted service or new model was
+activated. Nova2's specific IAM approval remains pending.
+
+## Current loop and acceptance
+
+The [native comparison design](../audits/2026-09-09-native-receiving-comparison-design.md)
+defines N1/N2's frozen inputs, budget, source coverage, leakage prevention and
+independent review. One first-screen success merely permits the six-turn,
+source-change and restart sequence; complete core and held-out repetitions
+remain required. Candidate prompts are frozen together before either result.
+
+The DBOS experiment is an isolated comparison of replay with and without
+target-side idempotency, not a real ERP prototype. It cannot prove current
+Frappe supports the key or replace approval/source/GL/SLE verification. Choose
+adoption only after measuring what code and operational requirements it removes.
+
+Two failed correction cycles for one mechanism trigger reassessment; the
+existing stricter real-model stop remains. A new plan must name a different
+mechanism and supporting evidence. Ordinary coding defects receive bounded
+fixes; research is not a reason to abandon a sound approach after one typo.
+
+## Collection and limits
+
+Research Engine ran first from its canonical source checkout. Sandbox DNS
+preflight failed; authorized network-enabled collection then completed with
+warnings. Artifacts:
+`/private/tmp/m20-research-led-options-20260909/2026-09-09-reusable-open-source-mechanisms-for-an-existing-python-strands-b/`.
+It produced34 raw /40 total rows,9 eligible rows,3 invalid rows,28 discovery-only
+rows and8 duplicate rows. It supported zero claim buckets and missed all five
+required facets; its loop stopped for interactive recovery. Its eligible rows
+were third-party summaries and do not support the technical decisions above.
+
+Direct official web/source retrieval by primary and delegated researchers is
+separate fallback evidence, not Engine-validated research. Maintainer and issue
+reports guide counterexamples; their existence is not our reproduction of the
+reported defect. Local source inspection verifies available interfaces, not
+model semantics. Actual ERP read-only capability results are retained privately
+at `/private/tmp/m20-erp-native-capability-read-02.json`; the01 file preserves
+the separate sandbox DNS failure. Three successful GETs, zero mutations. No
+current configured identity escalation followed those false permission results.

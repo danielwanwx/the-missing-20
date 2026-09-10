@@ -107,3 +107,21 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
 
 - Offline SDK boundary diagnosis confirmed the reconstructed post-tool Strands1.53.0 input retains RECEIPT_CONFIRMED, independent quantity null and receipt lower-bound2, while the original wrong Q4 candidate is admitted by existing validation without a retry. No provider/ERP call or semantic pass follows. Initial test portability and script-freeze race are retained in the review; a separate pure offline capture records identical before/after script and test SHA with output SHA `7b85e1b48f7e54a7d85ab0b7d964b9ad2ad0eb01636fac73bfe73fdddbdc4653`. It does not capture historical HTTP bytes or later real final-synthesis inputs. F03 remains FAILED.
 - Pure native billing request binding is independently accepted after a discovered READY/source-snapshot mismatch. It now revalidates the complete current PO/PR/mapper/related tuple and matches its source/bill/identity to the detached preview before adding only the disclosed supplier bill fields. Primary and independent170 tests pass; original58 preview tests remain unchanged, with format/lint/strict checks clean. Actual saved R4 source binds offline without mutation; the request was NOT sent. [Retained failure and corrected binding review](../audits/2026-09-09-normal-billing-native-request-review.md). Durable request binding in the journal, coordinator, UI and invoice effects remain pending.
+
+- User steering: switch repeated-failure work to explicit research-led alternative
+  comparison. The unfinished journal binding is now PAUSED_UNACCEPTED, preserved
+  in place and as private patch SHA256
+  `b5cb5278239f76bb1464e1893cdda05258e9828e5e6950d65b738bda81dea3e9`.
+  It has partial passing checks, but its process-race run timed out and final
+  static/full/independent gates are incomplete. Do not ship it as accepted.
+  [Alternative selection](../research/2026-09-09-research-led-alternative-selection.md)
+  covers native Strands, Google ADK, Strands Evals/NeMo, Frappe, DBOS and Temporal.
+  Actual three-GET capability preflight found the configured ERP API identity
+  cannot create Custom Field/Server Script/Workflow; no permissions were changed.
+- Two isolated experiments selected, not product integrations: native Strands
+  N1/N2 task-focused answering under the same frozen inputs/model/budgets, and
+  DBOS2.31.1 SQLite replay with persistent fake-ERP effects with/without a unique
+  target key. Native design is independently approved for implementation/offline
+  tests only. The DBOS structure probe actually ran one workflow/step on SQLite;
+  crash/recovery comparison and independent review remain pending. F03/F05 and
+  overall finalization remain open. Latest prior accepted main is `8306a89`.
