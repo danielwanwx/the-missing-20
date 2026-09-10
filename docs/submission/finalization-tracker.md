@@ -26,8 +26,10 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
   two socket skips. No current full-suite pass is claimed; the earlier bounded
   full run timed out and imported-module type errors remain.
 - The complete slice was implemented on base `4bd0eef`; exact executed source
-  hashes are retained with private acceptance artifacts. The corresponding
-  code/audit commit and remote verification are recorded by the delivery step.
+  hashes are retained with private acceptance artifacts. Code/audit commit
+  `0fac194a0d67a2982858551990353f2863e0796a` was pushed successfully; a fresh
+  `git ls-remote origin refs/heads/main` matched local HEAD on September 10.
+  This release includes the disclosed later reconciliation hold, not its recovery.
 - Remaining submission work: final story/video, current diagram and saved
   Devpost text, judge access/reproducibility, and proportionate complex-case
   coverage. Customer fulfillment and production hardening are separate scope.
