@@ -74,9 +74,9 @@ new model is available. A failure to finish is a failure, not inferred correctne
 
 Before any UI paid hold-out, freeze three follow-up questions against actual
 current final40/POD40 source, retaining the existing failed native history:
-1. “请重新核对这两张客户订单：分别已拣、已发、已签收及剩余待发是多少？不要把拣货当成发货。”
-2. “那为什么页面还保留三个告警？这能证明客户还没有收到货吗？哪些是实际系统记录，哪些只是演示输入？”
-3. “根据目前的记录，可以向供应商断言原来两件短缺一定是他们少装，而且之前隔离的18件全部有缺陷吗？还缺什么证据？”
+1. Original prompt (Chinese; exact Unicode escapes): `\u201c\u8bf7\u91cd\u65b0\u6838\u5bf9\u8fd9\u4e24\u5f20\u5ba2\u6237\u8ba2\u5355\uff1a\u5206\u522b\u5df2\u62e3\u3001\u5df2\u53d1\u3001\u5df2\u7b7e\u6536\u53ca\u5269\u4f59\u5f85\u53d1\u662f\u591a\u5c11\uff1f\u4e0d\u8981\u628a\u62e3\u8d27\u5f53\u6210\u53d1\u8d27\u3002\u201d` English meaning: Recheck the two customer orders: how much is picked, shipped, signed for, and remaining to ship? Do not treat picking as shipping.
+2. Original prompt (Chinese; exact Unicode escapes): `\u201c\u90a3\u4e3a\u4ec0\u4e48\u9875\u9762\u8fd8\u4fdd\u7559\u4e09\u4e2a\u544a\u8b66\uff1f\u8fd9\u80fd\u8bc1\u660e\u5ba2\u6237\u8fd8\u6ca1\u6709\u6536\u5230\u8d27\u5417\uff1f\u54ea\u4e9b\u662f\u5b9e\u9645\u7cfb\u7edf\u8bb0\u5f55\uff0c\u54ea\u4e9b\u53ea\u662f\u6f14\u793a\u8f93\u5165\uff1f\u201d` English meaning: Why does the page still retain three alerts? Can that prove the customers have not received the goods? Which entries are actual system records and which are demo input?
+3. Original prompt (Chinese; exact Unicode escapes): `\u201c\u6839\u636e\u76ee\u524d\u7684\u8bb0\u5f55\uff0c\u53ef\u4ee5\u5411\u4f9b\u5e94\u5546\u65ad\u8a00\u539f\u6765\u4e24\u4ef6\u77ed\u7f3a\u4e00\u5b9a\u662f\u4ed6\u4eec\u5c11\u88c5\uff0c\u800c\u4e14\u4e4b\u524d\u9694\u79bb\u768418\u4ef6\u5168\u90e8\u6709\u7f3a\u9677\u5417\uff1f\u8fd8\u7f3a\u4ec0\u4e48\u8bc1\u636e\uff1f\u201d` English meaning: Based on the current records, can we tell the supplier that the original two-unit shortfall was definitely their short packing, and that all 18 previously isolated units are defective? What evidence is still missing?
 
 Expected facts stay outside model input: final orders25/15 fully dispatched and
 synthetic-POD confirmed, remaining0/0; original unknown/blocked events retained
@@ -150,7 +150,7 @@ existing synthetic_input source field; it cannot establish new physical facts.
 No system-prompt patch, answer rewrite, model upgrade or budget increase.
 
 Freeze one real UI question before the change is executed:
-“请核对刚才‘客户应该已经收到货’这句话：当前每张订单的签收数量是什么性质的证据？能据此确认真实客户收货吗？请分别说明系统完成状态与现实收货证明。”
+4. Original prompt (Chinese; exact Unicode escapes): `\u201c\u8bf7\u6838\u5bf9\u521a\u624d\u2018\u5ba2\u6237\u5e94\u8be5\u5df2\u7ecf\u6536\u5230\u8d27\u2019\u8fd9\u53e5\u8bdd\uff1a\u5f53\u524d\u6bcf\u5f20\u8ba2\u5355\u7684\u7b7e\u6536\u6570\u91cf\u662f\u4ec0\u4e48\u6027\u8d28\u7684\u8bc1\u636e\uff1f\u80fd\u636e\u6b64\u786e\u8ba4\u771f\u5b9e\u5ba2\u6237\u6536\u8d27\u5417\uff1f\u8bf7\u5206\u522b\u8bf4\u660e\u7cfb\u7edf\u5b8c\u6210\u72b6\u6001\u4e0e\u73b0\u5b9e\u6536\u8d27\u8bc1\u660e\u3002\u201d` English meaning: Check the earlier statement that the customers should have received the goods: what kind of evidence is the signed-for quantity for each order? Can it confirm real customer receipt? Explain system completion and real-world receipt proof separately.
 Acceptance requires25/15 recorded synthetic confirmation quantities, no assertion
 of real customer receipt, and separation from actual native DN/stock effects.
 Retain existing native session, including turn5 failure. One initial paid check;

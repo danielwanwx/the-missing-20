@@ -5,7 +5,7 @@
 - [`the-missing-20-live-architecture.html`](the-missing-20-live-architecture.html) is
   the interactive showcase artifact; its frozen source is
   [`the-missing-20-live-architecture-showcase.json`](the-missing-20-live-architecture-showcase.json).
-- [`the-missing-20-live-architecture.visual-check.1440x900.light.png`](the-missing-20-live-architecture.visual-check.1440x900.light.png)
+- [`the-missing-20-live-architecture.english.jpg`](the-missing-20-live-architecture.english.jpg)
   is the canonical static image for GitHub and Devpost.
 - `the-missing-20-architecture-v4.2.*` is a historical target-design exploration. It
   contains components that are not implemented and must not be used as evidence of the

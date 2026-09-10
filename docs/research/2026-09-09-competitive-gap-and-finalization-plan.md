@@ -1,105 +1,105 @@
-# 跨平台竞争差距与完整 finalization 计划
+# Cross-Platform Competitive Gaps and Complete Finalization Plan
 
-2026-09-09；评估基线 `2b2c008839233e1c6bc6a174b61093f8e5957a3c`。研究与计划，不是功能验收或获奖预测。当前总体状态 **NOT_READY**。本计划扩展 finalization-tracker 的需求与验收解释，不取消任何原有未完成项。
+2026-09-09; evaluation baseline 2b2c008839233e1c6bc6a174b61093f8e5957a3c. Research and plan, not feature acceptance or a prediction of winning. Overall status **NOT_READY**. This plan expands the requirements and acceptance interpretation in finalization-tracker and does not cancel any existing incomplete item.
 
-## 判断与产品范围
+## Judgment and Product Scope
 
-我们有可信的局部工程成果：一次物理输入替代样本驱动真实 ERP 收货；请求回执丢失后查证已存在单据、避免重复库存；不同 SaaS 的业务效果可回读。我们还没有证明：持续追问后仍准确、遇到复杂冲突时稳定得出正确业务结论、同一个新订单完成下游链、整个界面可靠、实际操作员获益。
+We have credible partial engineering results: one physical input substituted for a sample and drove a real ERP receipt; after a lost request acknowledgment we verified an existing document and avoided duplicate inventory; business effects across different SaaS systems can be read back. We have not shown that accuracy survives continued follow-up, that complex conflicts yield stable correct business conclusions, that one new order completes its downstream chain, that the full interface is reliable, or that real operators benefit.
 
-不能给“距离获奖还差百分之多少”。竞赛评分、可演示完成度、企业试点适用性和商业价值分别验收。当前至少有六个独立交付门槛未闭合：语义可靠性、同案业务链、复杂异常、完整 UX、可访问的提交包、实际价值测量。前五项直接影响竞赛交付，第六项影响潜在价值证据；生产隔离、安全、运维还有另一组门槛。
+We cannot state “how many percent remain before winning.” Competition scoring, demo completeness, enterprise-pilot suitability, and commercial value are accepted separately. At least six independent delivery gates remain open: semantic reliability, same-case business chain, complex exceptions, complete UX, an accessible submission package, and actual value measurement. The first five directly affect competition delivery; the sixth affects potential-value evidence. Production isolation, security, and operations add another group of gates.
 
-建议定位：**零部件经销商的收货与运营异常处理 Agent**。使用者为仓储/运营经理，现场工作人员提供物理事实，QA/采购/财务提供其职责范围的依据。解决跨 ERP、集成日志、工单和协作记录之间的调查、重复录入与异常跟进。这个定位是研究后的产品假设，尚无客户访谈或付费验证。
+Recommended position: **an Agent for receiving and operational exception handling at a parts distributor**. Users are warehouse/operations managers; onsite staff provide physical facts, while QA, purchasing, and finance provide evidence within their responsibilities. The product addresses investigation, duplicate entry, and exception follow-up across ERP, integration logs, tickets, and collaboration records. This is a research-based product hypothesis with no customer interviews or paid validation.
 
-核心问题：这批货与哪张订单对应？实际有什么证据证明到货？哪些已入账、待验、可用、仍待到？一次超时到底产生了什么效果？现在哪一步可做、谁需要补什么证据、做完是否真的落账？不要将正常分批到货包装为损失，也不要把账面记录当成现场独立观察。
+Core questions: Which order does this shipment belong to? What evidence actually proves arrival? Which quantities are posted, awaiting inspection, usable, or still due? What effect did a timeout really produce? What step is possible now, who must supply which evidence, and did the completed step actually post? Do not frame normal partial arrival as loss, and do not treat book records as independent onsite observation.
 
-## 证据与比较方法
+## Evidence and Comparison Method
 
-获奖身份、官方转述评委意见、作品作者描述、厂商文档、社区个人陈述、我们实际运行结果分别标注。没有看过的视频不称观看过，没有运行过的产品不称实测。社区样本用于发现问题，不代表市场比例；厂商效率数字不挪作我们的 ROI。评委公开表述不等于每位评委的完整评分记录。
+Label winning identity, official paraphrases of judge comments, creator descriptions, vendor documents, individual community statements, and our actual run results separately. Do not claim to have watched a video you did not watch or tested a product you did not run. Community samples help discover problems and do not represent market proportions; vendor efficiency figures are not our ROI. Public judge statements are not a complete score record from every judge.
 
-- [既有 AWS 五个获奖对照](2026-09-09-finalization-comparators.md)：EcoLafaek、AegisAgent、Province、Triage、AgentShell；胜出身份有官方公告，工作模式多为作者材料，无跨产品性能实测。
-- [跨平台获奖与评审扩展](2026-09-09-cross-platform-awards-review.md)：另列 Microsoft/SAP/Google 的官方表述及证据边界。
-- [仓储 B2B 需求及公开讨论](2026-09-09-warehouse-b2b-agent-demand-review.md)：另列原帖、偏差和行业适用性。
-- [原生 Strands 会话调研](2026-09-09-strands-conversation-memory-research.md)：已安装 API、版本和风险经独立核对。
-- [准确性与复杂任务验收](../audits/2026-09-09-agent-accuracy-complexity-acceptance-plan.md)：具体测试与独立判断方法。
+- [Existing five AWS winning comparisons](2026-09-09-finalization-comparators.md): EcoLafaek, AegisAgent, Province, Triage, and AgentShell; winning identities have official announcements, while operating details mostly come from creator materials and lack cross-product performance tests.
+- [Cross-platform awards and judging expansion](2026-09-09-cross-platform-awards-review.md): additional official Microsoft/SAP/Google statements and evidence boundaries.
+- [Warehouse B2B demand and public discussions](2026-09-09-warehouse-b2b-agent-demand-review.md): original posts, bias, and industry fit.
+- [Native Strands conversation research](2026-09-09-strands-conversation-memory-research.md): installed APIs, versions, and risks independently checked.
+- [Accuracy and complex-task acceptance](../audits/2026-09-09-agent-accuracy-complexity-acceptance-plan.md): concrete tests and independent-judgment method.
 
-主任务直接阅读的商业产品基准：
+Commercial product baselines read directly by the main task:
 
-| 基准 | 文档中实际描述的能力 | 对我们的含义与限制 |
+| Baseline | Capability actually described in the document | Meaning and limitation for us |
 | --- | --- | --- |
-| [Oracle 26B Warehouse Operations Workspace](https://docs.oracle.com/en/cloud/saas/readiness/scm/26b/inv26b/26B-inventory-wn-f43846.htm) | 库存、出库、入库、劳动力四类工作区；异常调查、供应邮件与操作建议；说明角色权限、当前数据及配置前提 | 库存聊天和异常仪表盘已有成熟平台竞争。需证明在我们的跨软件环境减少调查与返工；本文为文档核实，未登录 Oracle 实测 |
-| [Microsoft Supplier Communications Agent](https://www.microsoft.com/en-us/dynamics-365/blog/it-professional/2025/04/25/reimagining-supplier-communications-with-dynamics-365/) | 采购跟进、阅读供应商邮件、提取变更并辅助更新订单 | 日常跟进和录入是明确切入点；其产品页面的时间占比是厂商陈述，非本项目客户测量 |
+| [Oracle 26B Warehouse Operations Workspace](https://docs.oracle.com/en/cloud/saas/readiness/scm/26b/inv26b/26B-inventory-wn-f43846.htm) | Four workspaces for inventory, outbound, inbound, and labor; exception investigation, supplier email, and operating suggestions; role permissions, current-data assumptions, and configuration prerequisites are stated | Inventory chat and exception dashboards already face mature-platform competition. We must show reduced investigation and rework in our cross-software environment; this was document verification, not a logged-in Oracle test |
+| [Microsoft Supplier Communications Agent](https://www.microsoft.com/en-us/dynamics-365/blog/it-professional/2025/04/25/reimagining-supplier-communications-with-dynamics-365/) | Follow purchasing, read supplier email, extract changes, and help update orders | Routine follow-up and data entry are clear entry points; the time-share figures on its product page are vendor claims, not measurement with this project's customers |
 
-公开获奖/需求证据给出的具体启示：
+Specific lessons from public award and demand evidence:
 
-- **Microsoft Warehouse Picking，Special Ops 第三名**：官方明确转述评委认可其会话式拣货业务场景；工作结果是 D365 的 work confirmation。我们的验收也必须看到真实单据改变。[官方公告](https://devblogs.microsoft.com/powerplatform/agent-academy-hackathon-winners/)
-- **SAP Bell Equipment，SAPHILA 第三名**：收件箱货运文件经识别后匹配、更新/新建运输记录，ETA服务物料计划。包含观众投票，不能称纯Agent评委奖；无该作品专属评委原话。[AFSUG](https://afsug.com/saphila/sap-btp-hackathon/)、[SAP](https://news.sap.com/africa/2025/06/pwc-south-africa-crowned-winner-of-afsugs-first-african-hackathon-at-saphila-2025/?amp=1)
-- **Google SalesShortcut，总冠军**：输入到业务后续工作的叙事完整，但官方未给作品专属评分理由；不照搬作者声称的大量Agent。[Google公告](https://cloud.google.com/blog/products/ai-machine-learning/adk-hackathon-results-winners-and-highlights?hl=en)
-- 同一Microsoft公告分别报告评委认可 Calamity 的安全设计/工程投入、Client Kick-off 的清晰情境和价值展示。说明可检查的价值、控制和演示值得做好，不是通用获奖公式。
-- **零部件商原帖**希望从混合邮件/照片读取需求、结合ERP/表格准备报价，但明确保留人工审核；**分销商退货原帖**关注ERP接入、贷项对账与减少仓库返工；另一个D2C/3PL帖还在寻找AI实际用途。这3例支持具体任务优先，并不证明自动收货产品的市场规模。[零部件](https://www.reddit.com/r/supplychain/comments/1tm6jwu/is_anyone_actually_using_ai_to_help_with_supply/)、[退货对账](https://www.reddit.com/r/supplychain/comments/1noyh08/anyone_using_aipowered_rma_automation_besides/)、[3PL](https://www.reddit.com/r/supplychain/comments/1r5km5v/management_wants_to_integrate_ai_in_our_ops/)
+- **Microsoft Warehouse Picking, third place in Special Ops**: the official account explicitly says judges recognized its conversational picking scenario; the work result is a D365 work confirmation. Our acceptance must also see a real document change. [Official announcement](https://devblogs.microsoft.com/powerplatform/agent-academy-hackathon-winners/)
+- **SAP Bell Equipment, third place at SAPHILA**: inbox freight documents are identified and matched, transport records are updated or created, and the ETA serves material planning. It included an audience vote and cannot be called a pure Agent judge award; there is no quote from judges specific to this work. [AFSUG](https://afsug.com/saphila/sap-btp-hackathon/), [SAP](https://news.sap.com/africa/2025/06/pwc-south-africa-crowned-winner-of-afsugs-first-african-hackathon-at-saphila-2025/?amp=1)
+- **Google SalesShortcut, overall winner**: the story from input to downstream business work is complete, but the official announcement gives no work-specific scoring rationale; do not copy the creator's claims about many Agents. [Google announcement](https://cloud.google.com/blog/products/ai-machine-learning/adk-hackathon-results-winners-and-highlights?hl=en)
+- The same Microsoft announcement separately reports judges' recognition of Calamity's safety design/engineering investment and Client Kick-off's clear situation and value presentation. This shows that checkable value, controls, and presentation deserve attention; it is not a general winning formula.
+- **The parts-company original post** wanted mixed email/photo requirements read and combined with ERP/spreadsheets to prepare a quote, while explicitly retaining human review; **the distributor returns post** focused on ERP integration, credit reconciliation, and reducing warehouse rework; another D2C/3PL post was still looking for a practical AI use. These three examples support prioritizing concrete tasks, not the market size of automated receiving. [Parts](https://www.reddit.com/r/supplychain/comments/1tm6jwu/is_anyone_actually_using_ai_to_help_with_supply/), [returns reconciliation](https://www.reddit.com/r/supplychain/comments/1noyh08/anyone_using_aipowered_rma_automation_besides/), [3PL](https://www.reddit.com/r/supplychain/comments/1r5km5v/management_wants_to_integrate_ai_in_our_ops/)
 
-推断：我们的差异应放在跨系统证据冲突、可核实执行和不确定响应恢复上。不能据此声称 Oracle/Microsoft 不具备恢复能力；上述材料未提供可比基准。小型系统组合的部署成本是否更低也尚未测量。
+Inference: our difference should focus on cross-system evidence conflict, verifiable execution, and recovery from uncertain responses. This does not support claiming Oracle/Microsoft lack recovery; the material provides no comparable baseline. Whether a small system combination costs less to deploy is also unmeasured.
 
-## 能解决什么，以及尚不能承诺什么
+## What We Can Solve and What We Cannot Yet Promise
 
-| 工作 | 当前证据 | 应交付结果 | 边界 |
+| Work | Current evidence | Required delivery | Boundary |
 | --- | --- | --- | --- |
-| 分批收货与记录核对 | R3 两次1 Box；R4 一次1 Box/40 Box | 正确区分已收、已记账、可用、待验、未到，并链接原单据 | 不能推断箱内数量、真实损失、未拍到的到货 |
-| 集成超时后是否重试 | R4 已提交但 ACK 丢失后查证恢复 | 回答明确的重试建议，维持原单据与库存效果身份 | 已提交/未提交/无法查证需独立测试，不互相推广 |
-| QA/库存/日志之间的冲突调查 | 当前 synthetic 案例工具全读但判断失败 | 给出竞争假设、支持/反证、缺少的具体业务事实及安全下一步 | 修好推理前不能承诺复杂诊断准确 |
-| 订单后续履约或单据对账 | 旧20-unit案例有独立效果，新R4未闭合 | 同一新订单、真实关联行、数量/UOM/权限正确、外部回读 | 没有供应商账单不能造应付凭证；开票不等于回款/增量营收 |
-| 趋势与效率分析 | 一些合成/少量观测；无匹配操作员试验 | 说明分母、唯一业务事件、历史覆盖；测主动人工时间与返工 | 不把轮询当收货次数，不承诺预测补货/ROI |
+| Partial receiving and record reconciliation | R3: two 1-Box observations; R4: one 1-Box observation out of 40 | Correctly distinguish received, posted, usable, awaiting inspection, and due, with links to original documents | Cannot infer inner-carton quantity, real loss, or an arrival outside the photo |
+| Whether to retry after an integration timeout | R4 recovery after verifying a submitted document with a lost ACK | Give a clear retry recommendation while preserving the identity of the original document and inventory effect | Submitted, not submitted, and unverifiable states require separate tests and cannot be generalized across one another |
+| Conflict investigation across QA, inventory, and logs | Current synthetic case read all tools but judgment failed | Give competing hypotheses, supporting/contradicting evidence, missing concrete business facts, and a safe next step | Do not promise complex diagnostic accuracy before reasoning is fixed |
+| Downstream fulfillment or document reconciliation | Old 20-unit case has independent effects; new R4 is not closed | Same new order, real linked lines, correct quantity/UOM/permissions, and external readback | Without a supplier bill, do not create an accounts-payable document; invoicing is not cash collection or incremental revenue |
+| Trend and efficiency analysis | Some synthetic/few observations; no matched operator trial | State denominator, unique business events, and historical coverage; measure active human time and rework | Do not treat polling as receipt count or promise predictive replenishment/ROI |
 
-不在本次冻结范围：完整 WMS/TMS、3PL 多货主、制造/MES、自动支付、无依据的需求预测、供应商自主谈判、无限复杂开放域任务。后续如扩展，需重新建立业务证据、权限与测试。
+Out of this freeze: full WMS/TMS, 3PL multi-shipper operation, manufacturing/MES, automatic payment, unsupported demand forecasting, autonomous supplier negotiation, and unlimited open-domain complexity. Any later expansion needs new business evidence, permissions, and tests.
 
-## 执行顺序、依赖与交付门槛
+## Execution Order, Dependencies, and Delivery Gates
 
-以下为截至9月9日的规划目标，不是进度事实或截止时间保证。可并行的是资料、界面独立修正、版本兼容试验；业务闭环与发布依赖语义和执行门槛。每项经独立验收后单独 commit、push、核对远端 SHA；失败记录也保留。
+The following are planning targets as of September 9, not progress facts or a deadline guarantee. Materials, independent interface corrections, and version-compatibility experiments can run in parallel; the business loop and release depend on semantic and execution gates. After independent acceptance, each item gets its own commit, push, and remote-SHA check; failures remain recorded.
 
-| 阶段 / 目标日期 | 工作与责任 | 可核验交付 | 对应 tracker |
+| Phase / target date | Work and responsibility | Verifiable delivery | Tracker |
 | --- | --- | --- | --- |
-| P0-A / 9月10日 | 主任务修复首轮业务判断；后端独立审查 | 冻结原失败输入，分清传输结果、外部效果证据、业务可执行性、执行授权。原题与反事实都通过，不向模型泄漏预期 verdict；错误类别在 UI 正确呈现 | F03/F07 |
-| P0-B / 9月10–11日 | 主任务接入会话候选；后端审查 | 先原生摘要的单请求证据/成本测试，再已验收跨轮状态恢复。拒绝候选不得变成下一轮事实；来源更新/重启/并发/跨案隔离均测试。保持现有预算、模型与业务规则作对比 | F03 |
-| P0-C / 9月11日 | 仓储方案 + 主任务业务实施 | 冻结同一新订单的主线：现场身份/数量→正常分批收货→ACK异常与回读→有真实依据的一项下游工作→确认关闭。合法后续工作必须增加业务效果，不能用无依据开票装饰 | F04/F05 |
-| P0-D / 9月11–12日 | 后端/仓储独立验证 | 完整复杂任务矩阵、原有heldout与重复真实模型运行；逐案证据和全部失败留档。关键错误写入、重复效果、错误事实或假成功直接阻断 | F03/F06 |
-| P0-E / 9月12日17:00内部冻结目标 | 产品/发布独立验证 | 当前全部可见入口、错误/拒绝/恢复、键盘与响应式、外部链接；新当前 smoke 覆盖映射通过；最终SHA clean checkout质量及实时路径检查 | F07/F09 |
-| P1-V / 9月12日起，与测试并行 | 业务影响评审 + 实际操作员 | 按既有18对任务协议测人工主动分钟、切换/录入、返工、总时延及全尝试费用；无人实测则只给测量设计/Agent运行数据，标记价值未验证 | F11/F12 |
-| P0-F / 9月13日 | 主任务材料制作 + 发布审查 | 英文≤5分钟同案视频、当前架构/README/Devpost一致、凭证与免费评委访问到评审结束；真实与合成证据就地标明 | F01/F08/F10 |
-| 最终 / 9月14日12:00内部提交目标 | 用户具体预览与最终提交门槛 | 复核官方17:00 PDT截止，公开视频/外部公开部署/最终提交在已有流程要求的具体预览门槛后执行。失败项不被日期自动豁免 | F01/F10 |
+| P0-A / September 10 | Repair first-turn business judgment; backend independent review | Freeze the original failed input; distinguish transport result, external-effect evidence, business executability, and execution authorization. Original and counterfactual questions pass without leaking an expected verdict to the model; the UI presents the error category correctly | F03/F07 |
+| P0-B / September 10–11 | Main task session candidate; backend review | First test native summary evidence/cost for one request, then accepted cross-turn state recovery. A refused candidate must not become the next turn's fact; test source update/restart/concurrency/cross-case isolation. Compare with current budget, model, and business rules | F03 |
+| P0-C / September 11 | Warehouse design + main-task implementation | Freeze one new-order path: onsite identity/quantity → normal partial receipt → ACK exception and readback → one downstream task with real basis → confirmed closure. A legitimate downstream task must add a business effect; do not decorate it with an unsupported invoice | F04/F05 |
+| P0-D / September 11–12 | Backend/warehouse independent validation | Full complex-task matrix, existing holdout, and repeated real-model runs; preserve evidence and every failure by case. A critical wrong write, duplicate effect, wrong fact, or fake success blocks | F03/F06 |
+| P0-E / September 12 17:00 internal freeze target | Product/release independent validation | All visible entry points, errors/refusals/recovery, keyboard/responsive behavior, and external links; current smoke coverage map passes; final SHA, clean-checkout quality, and live path check | F07/F09 |
+| P1-V / from September 12, parallel with testing | Business-impact review + real operator | Measure active human minutes, switching/entry, rework, total latency, and all-attempt cost under the existing 18-pair protocol; without a real trial, provide only the measurement design and Agent-run data and mark value unverified | F11/F12 |
+| P0-F / September 13 | Main-task materials + release review | English same-case video ≤5 minutes, current architecture/README/Devpost consistent, credentials and free judge access through the review period; label real and synthetic evidence in place | F01/F08/F10 |
+| Final / September 14 12:00 internal submission target | User preview and final-submission gate | Recheck the official 17:00 PDT deadline; execute public video, external deployment, and final submission only after the concrete preview gate required by the existing process. The date does not automatically waive failures | F01/F10 |
 
-升级不是阻断其余工作的前置条件。1.53.0已支持原生摘要/session；独立试验1.55.1的相关修复，通过兼容测试与相同任务语义比较才升级。不要同时更换版本、模型、prompt、预算和记忆策略后无法解释效果。
+Upgrade is not a prerequisite for the rest. Version 1.53.0 supports native summary/session; upgrade to the 1.55.1 fixes under independent experiment only after compatibility tests and same-task semantic comparison. Do not change version, model, prompt, budget, and memory strategy together and then lose causal attribution.
 
-若9月11日晚语义与同案链仍不能通过，继续诊断，同时把最终演示范围限定为真实验收过的能力，并明确剩余缺口；这是范围决策，不将未完成链标为完成。任何范围收缩必须在 tracker、图、视频和提交文案同时体现。可推迟的是额外Agent角色、AgentCore迁移、博客、预测功能和装饰；准确事实、安全业务效果、如实展示不能推迟后仍声称已满足。
+If same-case semantics and the same-order chain still fail on the evening of September 11, continue diagnosis while limiting the final demo scope to genuinely accepted capabilities and stating remaining gaps; this is a scope decision, not a way to mark an incomplete chain complete. Any scope reduction must appear in the tracker, diagram, video, and submission copy. Extra Agent roles, AgentCore migration, blog, forecasting, and decoration may wait; accurate facts, safe business effects, and truthful presentation may not.
 
-## 如何保证精准，以及什么叫复杂问题
+## How to Ensure Precision, and What Counts as a Complex Problem
 
-无法用一组测试承诺开放域永远准确。可交付的是明确支持范围、每轮来源绑定、确定性业务约束、未知时停止相关动作，以及独立重复验收。问题复杂度按跨来源冲突、时间/版本变化、实体歧义、权限、故障及目标相互制约定义，不按字数或调用了几个Agent定义。
+No test set can promise permanent open-domain accuracy. The deliverable is a defined support scope, source binding on every turn, deterministic business constraints, stopping the relevant action when unknown, and independent repeated acceptance. Define complexity by cross-source conflict, time/version change, entity ambiguity, permissions, failures, and interacting goals, not by character count or number of Agents.
 
-分开检查：
+Check separately:
 
-1. 事实：case/SKU/单据、数量/UOM、时点与来源范围正确；确定性计算来自工具结果。
-2. 推理：区分未到/未入账/QA不可用；技术原因未知不必等于业务效果未知，反之也不能当确定。
-3. 对话：追问指代、用户纠正、拒绝、话题转换、四轮以上及重启之后保持正确上下文，最新事实覆盖过期值。
-4. 行动：提案、授权、执行、外部效果读回分别验收；摘要或一句“继续”不得制造权限。
-5. 体验/效率：真正回答最新问题；必要澄清具体、最少；记录不可完成原因、人工负担、总费用和延迟。
+1. Facts: case/SKU/document, quantity/UOM, time, and source scope are correct; deterministic calculations come from tool results.
+2. Reasoning: distinguish not arrived, not posted, and QA unavailable; an unknown technical cause need not equal an unknown business effect, and neither may be treated as certain.
+3. Dialogue: preserve correct references after follow-up, user correction, refusal, topic switch, four-plus turns, and restart; latest facts supersede stale values.
+4. Action: accept proposal, authorization, execution, and external-effect readback separately; a summary or a single “continue” cannot create permission.
+5. Experience/efficiency: answer the latest question; make necessary clarifications concrete and minimal; record why completion was impossible, human burden, total cost, and latency.
 
-[Anthropic 的 Agent eval 方法](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)强调分别看轨迹和环境最终状态，并结合代码、模型和人工判定。本项目采用独立事实/效果检查与语义评审；同模型自评、字符串包含、JSON通过都不是最终证明。外部方法是设计依据，不能替代本项目实验。
+[Anthropic's Agent evaluation method](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) emphasizes examining trajectory and final environment state separately, together with code, model, and human judgment. This project uses independent fact/effect checks and semantic review; same-model self-evaluation, string containment, and valid JSON are not final proof. The external method informs design but does not replace this project's experiment.
 
-独立验收门槛详见 accuracy-complexity 计划：覆盖当前失败、冻结heldout和未见改写；每条关键连续任务重复3次并保留全部尝试。三次稳定只支持该测试集，不估算总体正确率。任何错误或越权写入、错误case引用、单位错配、已拒绝动作复活、假称完成均为阻断；性能目标单列，不用平均分抵消。若同机制连续失败三次，停止该变体、定位原因、用有依据的新设计再试。
+See the accuracy-complexity plan for independent acceptance gates: cover current failures, frozen holdouts, and unseen rewrites; repeat every key continuous task three times and retain every attempt. Three stable runs support only that test set and do not estimate overall accuracy. Any wrong effect, unauthorized write, wrong case reference, unit mismatch, revived refused action, or false completion blocks; performance goals are separate and cannot be offset by an average score. After three consecutive failures with the same mechanism, stop that variant, locate the cause, and try again only with a justified new design.
 
-## 企业试点的后续门槛
+## Follow-Up Gates for an Enterprise Pilot
 
-比赛完成后仍需：组织与角色鉴权、租户隔离、实际 WMS/ERP 配置适配、条码与主数据治理、跨操作员去重/并发、生产部署与灾备、配额与凭证轮换、源数据保鲜、审计保留/隐私、监控告警及人工接管、训练过的真实操作员、长期工作量测量。各项需试点证据，不能由demo persona、localhost或单次恢复推导。
+After the competition, still require organizational and role authorization, tenant isolation, real WMS/ERP configuration adaptation, barcode and master-data governance, cross-operator deduplication/concurrency, production deployment and disaster recovery, quota and credential rotation, fresh source data, audit retention/privacy, monitoring/alerting and human takeover, trained real operators, and long-term workload measurement. Each needs pilot evidence; none can be inferred from a demo persona, localhost, or one recovery.
 
-交付完成条件：研究来源与限制、竞争差距、用户需求、计划及独立验收方案可查且评审完成。本文件完成不改变产品 NOT_READY 状态。
+Delivery completion means research sources and limitations, competitive gaps, user needs, the plan, and the independent acceptance design are findable and reviewed. Completing this document does not change the product's NOT_READY status.
 
-## Research Engine 采集与人工核验记录
+## Research Engine Collection and Manual Verification Record
 
-运行目录：`artifacts/research/cross-platform-demand-20260909/2026-09-09-award-winning-enterprise-ai-agents-across-aws-microsoft-google-s/`。沙箱DNS预检失败后，同一授权联网任务完成：62 raw rows，106含分块总行，54 eligible，58去重内容，48重复行，5 invalid，47 discovery-only，43 low-quality。状态 `complete_with_warnings / complete_with_review_required`；0 supported claim buckets，4项facet覆盖警告。因此其收集成功不等于论证验证通过。
+Run directory: artifacts/research/cross-platform-demand-20260909/2026-09-09-award-winning-enterprise-ai-agents-across-aws-microsoft-google-s/. After the sandbox DNS precheck failed, the same authorized network task completed: 62 raw rows, 106 total rows including chunks, 54 eligible, 58 deduplicated contents, 48 duplicates, 5 invalid, 47 discovery-only, and 43 low-quality. Status complete_with_warnings / complete_with_review_required; 0 supported claim buckets and 4 facet-coverage warnings. Collection success therefore does not equal argument verification.
 
-本报告和两个独立来源报告的关键结论来自另行直接打开的官方原文、用户原帖和本地审计；不称这些为Engine验证结论。Engine列出的第三方排行榜/ROI计算器不用于本项目准确率、获奖原因或商业效益。Engine的availability_pressure冲突标记经原始chunks审阅：一个Microsoft自述案例讨论stockout风险，另一个产品集合讨论减少过量库存；对象/指标不同，不构成同一命题真假冲突。相关厂商收益陈述仍未经外部测量，本报告不采作我们的收益。
+The key conclusions in this report and two independent source reports come from separately opening official originals, user posts, and local audits; do not call them Engine-verified conclusions. Third-party rankings/ROI calculators listed by the Engine are not used for this project's accuracy, winning rationale, or commercial impact. The Engine's availability_pressure conflict flag was reviewed against original chunks: one Microsoft self-reported case discusses stockout risk, while another product collection discusses reducing excess inventory; the objects and metrics differ, so this is not a true/false conflict about one proposition. Vendor benefit claims remain externally unmeasured and are not used as our benefits.
 
-当前赛事stand-out建议页此次仍返回Internal Error，不伪称已读；官方rules/FAQ此前本session已直接核实。原始Engine采集留在运行目录；提交保留摘要/质量报告，完整抓取不复制进产品说明。来源范围有限且非全市场穷尽；没有具名逐项评分、客户访谈、对手运行实测或对手代码安全验收。
+The current competition stand-out advice page still returned Internal Error in this run; do not claim to have read it. Official rules/FAQ were directly checked earlier in this session. Raw Engine collection stays in the run directory; the submission retains the summary/quality report and does not copy the full scrape into product documentation. The source set is limited and not an exhaustive market survey; there are no named item-by-item scores, customer interviews, hands-on runs of competitors, or security acceptance of competitor code.
 
-## 独立评审结论
+## Independent Review Conclusion
 
-跨平台/发布评审与仓储/业务影响评审均批准本研究与执行计划，未批准产品功能通过。业务冻结时必须列明具体下游单据或任务、责任角色与新增效果，不能把R4已有Slack/Airtable通知重复计为新闭环；前置轮、摘要和失败消耗全部计入事先冻结的总预算。日期未达或演示收窄，原任务未完成项仍在tracker保留。
+The cross-platform/release review and warehouse/business-impact review both approved this research and execution plan, but did not approve product features as passing. When the business path is frozen, name the concrete downstream document or task, responsible role, and added effect; do not count existing R4 Slack/Airtable notifications again as a new closed loop. Count preceding turns, summaries, and failed consumption in the pre-frozen total budget. If dates slip or the demo narrows, keep incomplete original tasks in the tracker.

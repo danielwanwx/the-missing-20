@@ -2199,7 +2199,11 @@ async def _invoke(
                 # not a substitute for source-ID and stock-effect validation.
                 prose = candidate.reason + " " + candidate.safe_next_step
                 if re.search(r"Airtable|Celigo|Slack|collaboration tools", prose, re.I) and not (
-                    re.search(r"cop(?:y|ies)|notification|corroborat|副本|通知|佐证", prose, re.I)
+                    re.search(
+                        r"cop(?:y|ies)|notification|corroborat|\u526f\u672c|\u901a\u77e5|\u4f50\u8bc1",
+                        prose,
+                        re.I,
+                    )
                 ):
                     raise AdvisoryValidationError(
                         "Explain the authority boundary: ERP receipt and stock ledger "

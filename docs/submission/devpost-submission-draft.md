@@ -70,7 +70,7 @@ The verified result is concrete: 20/20 units delivered, Sales Order
 `ACC-SINV-2026-00006`, USD 42,000 observed billed revenue, balanced Stock/GL entries,
 and an independently correlated Celigo receipt.
 
-![The Missing 20 architecture](https://raw.githubusercontent.com/danielwanwx/the-missing-20/main/docs/architecture/the-missing-20-live-architecture.visual-check.1440x900.light.png)
+![The Missing 20 architecture](https://raw.githubusercontent.com/danielwanwx/the-missing-20/main/docs/architecture/the-missing-20-live-architecture.english.jpg)
 
 ## How we built it
 
@@ -130,7 +130,7 @@ Read the diagram from left to right:
   evidence, and records a durable Resolution Packet.
 
 Canonical static diagram:
-`docs/architecture/the-missing-20-live-architecture.visual-check.1440x900.light.png`
+`docs/architecture/the-missing-20-live-architecture.english.jpg`
 
 Interactive diagram:
 `docs/architecture/the-missing-20-live-architecture.html`

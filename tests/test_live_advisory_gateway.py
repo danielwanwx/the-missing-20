@@ -44,6 +44,18 @@ def test_model_evidence_does_not_expose_expected_answers_or_solved_diagnosis() -
     assert json.dumps(packet, sort_keys=True) == original
 
 
+def test_structured_advisory_rejects_non_english_follow_up_without_translating_it() -> None:
+    with pytest.raises(ValueError, match="English-only"):
+        LiveAdvisoryResult(
+            disposition=AdvisoryDisposition.NEEDS_EVIDENCE,
+            evidence_ids=("ERP-20",),
+            reason="Current evidence is incomplete for ERP-20.",
+            safe_next_step="Inspect the current ERP record.",
+            write_performed=False,
+            follow_up_questions=("\u8bf7\u68c0\u67e5 ERP-20\u3002",),
+        )
+
+
 def test_gateway_model_budget_matches_structured_investigation_output_limit() -> None:
     factory = DashboardAdvisoryGateway(AmbiguousCasePlatform())._factory()
     assert factory.config.max_tokens == advisory_module.ADVISORY_OUTPUT_TOKENS

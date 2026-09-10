@@ -1,192 +1,192 @@
-# The Missing 20：下一阶段完整交接 Prompt
+# The Missing 20: Complete Handoff Prompt for the Next Stage
 
-交接时间：2026-09-09。以下正文可整体交给新 session 执行。
-这是工作指令与截至交接时的基线，不是全产品验收通过报告，也不是本轮重新联网核实后的比赛规则。
+Handoff date: 2026-09-09. The text below can be handed to a new session as a whole.
+This is a work instruction and the baseline as of handoff, not a full-product acceptance report or the competition rules rechecked online in this round.
 
 ---
 
-## 你的任务与交付目标
+## Your Task and Delivery Goal
 
-你接手 **The Missing 20** 的下一阶段 finalization。不要从零重做，不要只写一份漂亮计划，也不要默认前任已经把业务全链路做完。
+You are taking over the next-stage finalization of **The Missing 20**. Do not start over, write only a polished plan, or assume the previous owner completed the full business path.
 
-先进行全面、客观、有一手来源的比赛/优秀作品/行业需求调研；再用当前代码、真实运行与外部系统证据判断差距；制定设计、测试及独立评审方案；随后在现有授权范围内持续修复、整合、实测，直至形成可提交的明确版本，或者准确列出无法自行解决的阻塞。
+First research the competition, notable work, and industry needs comprehensively, objectively, and from primary sources; then use current code, real runs, and external-system evidence to judge the gaps; define a design, test, and independent-review plan; and continue fixing, integrating, and testing within existing authorization until there is a clear submit-ready version or an accurate list of blockers you cannot solve yourself.
 
-目标是让评委亲眼理解并验证：用户提供一次必要的物理输入后，平台里的真实 Strands Agent 能跨隔离的业务软件查证、关联、办理和验证业务；正常步骤自动推进，只有身份不清、证据不足、规则冲突或重要决策需要人。价值是减少重复录入与跨系统调查、降低差错和处理成本、改善履约，而不是一个会聊天的报表，也不是自动跳数字的动画。
+The goal is for judges to understand and verify that, after the user supplies one necessary physical input, a real Strands Agent can investigate, link, process, and verify business work across isolated business software; normal steps advance automatically, while unclear identity, insufficient evidence, rule conflicts, or important decisions require a person. The value is less duplicate entry and cross-system investigation, fewer errors and lower handling cost, and better fulfillment. It is not a chatty report or an animation that jumps numbers.
 
-必须分别判断：**比赛资格合规、同类作品中的竞争力、演示业务闭环、生产可部署性、真实商业效益**。它们不是同一个结论。不能保证获奖，不能把测试环境开票金额当成新增营收，也不能把部分测试通过叫 production-ready。
+Judge these separately: **competition eligibility, competitiveness against comparable work, demonstrable business loop, production deployability, and real commercial benefit**. They are different conclusions. Do not promise a win, treat test-environment invoice totals as new revenue, or call partial test success production-ready.
 
-## 1. 工作区、版本与先读材料
+## 1. Workspace, Versions, and Reading Order
 
-- 仓库：`/Users/danielwan/Documents/Hackathon/Agents-for-Humans/the-missing-20`
+- Repository: /Users/danielwan/Documents/Hackathon/Agents-for-Humans/the-missing-20
 - GitHub：`https://github.com/danielwanwx/the-missing-20`
-- 分支：`main`。
-- 最近已验证的产品修复基线：`aa4966e9ee86a84595d9d23b31d5fd8b711d5aaa`，交接时本地 HEAD 与 origin/main 一致。本交接文件可能在其后的文档提交中；启动后重新查 Git，不能硬退回这个 SHA。
-- 先完整读取当前适用的 `AGENTS.md` 和相关 skills。按任务使用 Loop Engineering；调研、诊断、设计、代码评审、UI/架构图等使用实际可用技能，不假称调用不存在的 skill。
-- 有大量旧的未跟踪研究/测试产物和本地运行库。逐项判断归属，保留用户工作，不能 `git add .`、强制 reset、覆盖数据库或全量清理 session。
-- 用户浏览器可能还停在 `8893` 的旧收货工作区。最近验证的 R3 是 `8896`，R4 是 `8897`。先查进程、启动参数、运行目录和 API 的 case_id，不能用打开的页面推断最新环境。
+- Branch: main.
+- Most recently verified product-fix baseline: aa4966e9ee86a84595d9d23b31d5fd8b711d5aaa. At handoff, local HEAD matched origin/main. This handoff file may be in a later documentation commit; check Git again at startup and do not hard-revert to this SHA.
+- Fully read the currently applicable AGENTS.md and relevant skills first. Use Loop Engineering as appropriate; use available skills for research, diagnosis, design, code review, UI/architecture diagrams without claiming to have called a skill that does not exist.
+- There are many old untracked research/test artifacts and local run stores. Determine ownership item by item, preserve user work, and do not run git add ., force reset, overwrite databases, or globally delete sessions.
+- The user's browser may still be on the old receiving workspace at 8893. The most recently verified R3 is 8896 and R4 is 8897. Check processes, launch arguments, run directories, and API case_id first; do not infer the newest environment from an open page.
 
-按这个顺序阅读（下列相对路径均相对于仓库）：
+Read in this order (all paths below are relative to the repository):
 
-1. `docs/audits/2026-09-09-r4-automatic-receiving-recovery-review.md`：最新事实与失败边界，优先于旧的“全部通过”文案。
-2. `docs/audits/2026-09-09-r3-receiving-jira-conversation-review.md`：上一轮 Jira、收货和对话问题。
-3. `docs/research/2026-09-08-warehouse-workflow-gap-baseline.md`、`2026-09-08-warehouse-operations-primary-research.md`、`2026-09-08-operational-history-benchmark-design.md`。
-4. `docs/research/2026-09-08-photo-to-work-design.md`、`2026-09-08-scan-to-work-upgrade-proposal.md`、`2026-09-07-integrated-upgrade-proposal.md`。
-5. `docs/research/2026-09-09-conversation-oss-options.md`、`2026-09-08-multi-agent-primary-source-review.md`、`2026-09-07-revenue-efficiency-causal-validation.md`。
-6. `docs/research/2026-09-03-official-competition-rubric-check.md`、`2026-09-07-submission-and-winner-readme-benchmark.md`、`2026-09-08-winner-direction-comparison.md`。
-7. `docs/submission/`、README、当前架构图与已有 release/evidence 文件。
+1. docs/audits/2026-09-09-r4-automatic-receiving-recovery-review.md: latest facts and failure boundaries, taking precedence over old “all passed” wording.
+2. docs/audits/2026-09-09-r3-receiving-jira-conversation-review.md: the prior round's Jira, receiving, and conversation issues.
+3. docs/research/2026-09-08-warehouse-workflow-gap-baseline.md, 2026-09-08-warehouse-operations-primary-research.md, 2026-09-08-operational-history-benchmark-design.md.
+4. docs/research/2026-09-08-photo-to-work-design.md, 2026-09-08-scan-to-work-upgrade-proposal.md, 2026-09-07-integrated-upgrade-proposal.md.
+5. docs/research/2026-09-09-conversation-oss-options.md, 2026-09-08-multi-agent-primary-source-review.md, 2026-09-07-revenue-efficiency-causal-validation.md.
+6. docs/research/2026-09-03-official-competition-rubric-check.md, 2026-09-07-submission-and-winner-readme-benchmark.md, 2026-09-08-winner-direction-comparison.md.
+7. docs/submission/, README, the current architecture diagram, and existing release/evidence files.
 
-部分历史资料只在本机未跟踪目录里，新的远程 checkout 可能没有。先查实际存在性；缺失就记录并从可用源码/已提交证据/官方来源重建，不能想象内容。旧研究里描述的实现缺口也可能已经修复，逐项复核，不能机械照单重做。
+Some historical material exists only in local untracked directories and may be absent from a new remote checkout. Check what exists first; if something is missing, record that and reconstruct only from available source, committed evidence, or official sources. Do not imagine content. Gaps described in old research may already be fixed, so recheck each one instead of mechanically repeating the old work.
 
-## 2. 截至交接的真实状态：不要混淆三条案例
+## 2. Actual State at Handoff: Do Not Confuse the Three Cases
 
-### R4 新照片收货：本轮只通过了有限切片
+### R4 New Photo Receiving: Only a Limited Slice Passed This Round
 
-- Case：`M20-GOODS-20260909-40-R4`；PO：`PUR-ORD-2026-00016`。
-- 40 Box 合成测试订单，USD 50/Box；只确认收到并入账 **1 Box**，其余 39 是订单未完成量，不是已证明丢失。
-- Capture：`1cbc0f589421cef6c5c828536bb14a53`；真实 Purchase Receipt：`MAT-PRE-2026-00007`。
-- 使用网上公开单箱照片 `tests/fixtures/photo_receiving/p05.jpg`，真实 Strands/Bedrock 分析，输入演示 QR 身份，明确模拟操作者确认。这不是实物运输、真实相机视频扫码或可见封箱内部商品数量的证明。
-- ERP 真正提交成功后，诊断在应用边界丢弃一次 ACK；状态持久化为 `SUBMIT_UNKNOWN`。正常服务重启自动只读核验原单，恢复为 `RECEIPT_SUBMITTED`，不会再次提交库存。
-- 真实 Airtable 记录 `rec0RfqlevwmdoLgt`，Slack 经 Celigo 消息 `1788986162.337109`；重启、三次重复请求、重复照片测试及外部回读均未产生重复业务效果。
-- Dashboard/照片详情 → ERP、Airtable、Slack 的链接已用鼠标打开并核对具体记录；不是所有页面截图与所有功能验收完成。
-- R4 只有一条真实历史观察，没有足够历史基准；没有此订单的新发票、发运、销售开票或收入提升证明。正常收货不强行创建 Jira 异常单。
-- 该切片已独立批准；最终代码 Python **1,550 passed**、前端 **98 passed**。这不证明真实模型复杂多轮语义可靠。
+- Case: M20-GOODS-20260909-40-R4; PO: PUR-ORD-2026-00016.
+- Synthetic test order for 40 Box at USD 50/Box; only **1 Box** was confirmed received and posted, while the other 39 are outstanding order quantity, not proven loss.
+- Capture: 1cbc0f589421cef6c5c828536bb14a53; real Purchase Receipt: MAT-PRE-2026-00007.
+- Used a publicly available single-box photo at tests/fixtures/photo_receiving/p05.jpg, with real Strands/Bedrock analysis, a demo QR identity, and explicit simulated operator confirmation. This does not prove physical transport, a real camera-video scan, or the quantity inside a sealed carton that was not visible.
+- After ERP really submitted successfully, the diagnosis dropped one ACK at the application boundary; state persisted as SUBMIT_UNKNOWN. A normal service restart automatically verified the original document read-only and recovered to RECEIPT_SUBMITTED without submitting inventory again.
+- Real Airtable record rec0RfqlevwmdoLgt and Slack message 1788986162.337109 through Celigo; restart, three duplicate requests, duplicate-photo tests, and external readback produced no duplicate business effect.
+- Links from Dashboard/photo details to ERP, Airtable, and Slack were opened with the mouse and checked against specific records; this is not acceptance of every page screenshot or every feature.
+- R4 has only one real historical observation and no sufficient historical baseline; there is no new invoice, shipment, sales invoicing, or revenue-lift proof for this order. Normal receiving does not force-create a Jira exception.
+- This slice was independently approved; final code passed Python **1,550** tests and frontend **98** tests. This does not establish reliable complex multi-turn semantics for the real model.
 
-R4 证据：`artifacts/audits/2026-09-09-r4-{demo-order,real-lost-ack,replay,restart-handoffs}.json`，以及 `artifacts/tests/2026-09-09-r4-shipped-regression.xml`。
-注意 readback 文件中的 `before_restart` 是**首次恢复后、第二次重启前**，不是故障前快照。
+R4 evidence: artifacts/audits/2026-09-09-r4-{demo-order,real-lost-ack,replay,restart-handoffs}.json and artifacts/tests/2026-09-09-r4-shipped-regression.xml.
+Note that readback.before_restart is **after the first recovery and before the second restart**, not a pre-failure snapshot.
 
-### R3 对话：仍是关键失败项
+### R3 Conversation: Still a Critical Failure
 
-- Case：`M20-GOODS-20260909-40-R3`；PO15；PR5、PR6 各 1 Box，总计 2/40 Box。
-- 真实 Agent 做过跨源读取和三问连续对话；曾出现运行契约通过但业务回答仍错：没有回答该不该重试、混淆库存趋势与证明收益所需的证据等。
-- source compaction、额外同模型 critic、typed-decision 限制曾试验；独立评审未通过，最后一个版本首问连续三次验证失败。**这些对话实验全部撤回，没有上线。**
-- 不能把旧 8/8、15/15 成绩迁移到此新照片收货、多轮问题上；也不能把 JSON/schema/关键词命中称为语义正确。
-- 部分对话 artifact 文件名带 `r4`，实际 JSON 的 case_id 是 R3；以内部字段为准。
-- 必读失败：`artifacts/audits/2026-09-09-r4-answer-diagnostic-v2.json` 与 `2026-09-09-r4-typed-decisions-final.json`。不要重复堆同样的 prompt、正则和自评器。
+- Case: M20-GOODS-20260909-40-R3; PO15; PR5 and PR6 1 Box each, 2/40 Box total.
+- The real Agent performed cross-source reads and a three-question continuous conversation, but a run could pass the runtime contract while its business answer was wrong: it omitted whether to retry and confused inventory trends with evidence needed to prove benefit.
+- Source compaction, an additional same-model critic, and typed-decision restrictions were tried; independent review failed, and the final version failed the first question three times in a row. **All of these conversation experiments were withdrawn and never shipped.**
+- Do not transfer the old 8/8 and 15/15 scores to this new photo-receiving, multi-turn problem; JSON/schema/keyword hits are not semantic correctness.
+- Some conversation artifact filenames contain r4, but the actual JSON case_id is R3; use the internal field.
+- Required failures to read: artifacts/audits/2026-09-09-r4-answer-diagnostic-v2.json and 2026-09-09-r4-typed-decisions-final.json. Do not pile on the same prompt, regex, and self-evaluator again.
 
-### 旧 20-unit 订单履约：证据独立保留
+### Old 20-Unit Order Fulfillment: Evidence Remains Independent
 
-旧 submission 文档描述 12/8 分解、USD 42,000 销售订单、Delivery Note、Sales Invoice 等成果。这可能是已有独立场景的有用证据，但**不等于 R3/R4 新照片流程已经接到这些业务效果**。重新核对其版本、来源、实际执行路径和证明范围后才能使用。
-特别检查 `docs/submission/judging-map.md`、`known-limitations.md`、`devpost-submission-draft.md` 的旧“最新”“通过”“only write path”等表述；照片收货扩展后它们可能过时。
+Old submission documents describe a 12/8 split, a USD 42,000 sales order, Delivery Note, Sales Invoice, and related results. This may be useful evidence from an existing independent scenario, but **it does not mean the new R3/R4 photo flow is connected to those business effects**. Check its version, sources, actual execution path, and proof scope before using it.
+In particular, inspect the old “latest,” “passed,” and “only write path” wording in docs/submission/judging-map.md, known-limitations.md, and devpost-submission-draft.md; it may be stale after the photo-receiving extension.
 
-## 3. 第一阶段：重新核实比赛与获奖竞争基准
+## 3. Phase One: Recheck Competition and Winning-Work Benchmarks
 
-用户口述的“DevCourse”在上下文中很可能指 Devpost。先从现有比赛证据确认，不因笔误卡住。
+The user's “DevCourse” may mean Devpost in context. Confirm from existing competition evidence first and do not get stuck on the typo.
 
-待实时重新核实的入口：
+Entries to recheck live:
 
-- 比赛主页：`https://agentsforhumans.devpost.com/`
-- 规则：`https://agentsforhumans.devpost.com/rules`
-- FAQ：`https://agentsforhumans.devpost.com/details/faqs`
-- 主办方建议：`https://agentsforhumans.devpost.com/updates/45987-how-to-actually-stand-out-in-agents-for-humans`
-- 最近类似比赛官方获奖公告：`https://aws-agent-hackathon.devpost.com/updates/38140-congratulations-to-the-winners-of-the-aws-ai-agent-global-hackathon`
+- Competition home: https://agentsforhumans.devpost.com/
+- Rules: https://agentsforhumans.devpost.com/rules
+- FAQ: https://agentsforhumans.devpost.com/details/faqs
+- Organizer advice: https://agentsforhumans.devpost.com/updates/45987-how-to-actually-stand-out-in-agents-for-humans
+- Recent official winners announcement for a related competition: https://aws-agent-hackathon.devpost.com/updates/38140-congratulations-to-the-winners-of-the-aws-ai-agent-global-hackathon
 
-**历史记录，不当成当前已确认事实：** 2026-09-07 的本地研究记录截止 2026-09-14 17:00 Pacific、评审到 10 月 8 日、结果预计 10 月 14 日；五项等权 Technical Implementation / Design / Potential Impact / Creativity & Originality / Presentation；Strands、英文说明、公开代码及 MIT/Apache 许可、架构图、Builder ID、最长五分钟公开视频等要求。你必须重新打开官方页面核对年份、日期、时区、具体要求及变更。不要只重复旧文档。
+**Historical record, not a currently confirmed fact:** the local 2026-09-07 research record says the deadline was 17:00 Pacific on 2026-09-14, judging through October 8, results expected October 14, and five equally weighted areas: Technical Implementation, Design, Potential Impact, Creativity & Originality, and Presentation; it also lists Strands, English explanation, public code with an MIT/Apache license, an architecture diagram, Builder ID, and a video up to five minutes. Reopen the official pages to check the year, dates, timezone, exact requirements, and changes. Do not merely repeat the old document.
 
-调研输出必须回答：
+The research output must answer:
 
-1. 当前硬性准入、赛道、SDK/AWS 使用要求、材料、访问与许可要求，哪些已经有证据满足？
-2. 此届尚未结束时，不要虚构“此比赛历年冠军”。区分同一赛事、相关 AWS/Strands 赛事、其他企业 Agent 比赛和商业产品。
-3. 从官方获奖公告确认身份，再读作品页、公开代码、演示。可从 EcoLafaek、AegisAgent、Province、AgentShell、AI-driven multi-agent fraud alert triage 等旧研究线索开始，但不预设它们仍是最佳对照。
-4. 对 4–6 个最相关作品/产品建立有深度的对照，而不是堆几十个名字：目标用户、起始输入、Agent 自主做什么、工具与外部效果、必要人审、失败恢复、UX、可复現性、效果测量、亮点与缺陷。
-5. 作品作者自述、厂商案例宣传、第三方讨论、你的代码/实操验证分开标注。不能把自己的推断写成“评委就是因此给奖”。
-6. 找出我们的优势、短板、可借鉴点和不该抄的复杂度，形成 **claim → evidence → rubric → gap → action** 映射。
+1. What hard eligibility, track, SDK/AWS use, materials, access, and licensing requirements are current, and which have evidence of being satisfied?
+2. If this edition has not ended, do not invent “past champions of this competition.” Distinguish the same event, related AWS/Strands events, other enterprise-agent competitions, and commercial products.
+3. Confirm identities from official winners announcements, then read project pages, public code, and demos. Start with old research leads such as EcoLafaek, AegisAgent, Province, AgentShell, and AI-driven multi-agent fraud alert triage, without assuming they remain the best comparisons.
+4. Build deep comparisons for 4–6 relevant works/products rather than listing dozens: target user, starting input, what the Agent does autonomously, tools and external effects, required human review, failure recovery, UX, reproducibility, measurement, strengths, and weaknesses.
+5. Label creator statements, vendor case marketing, third-party discussion, and your code/hands-on verification separately. Do not turn an inference into “judges awarded it for this reason.”
+6. Identify our strengths, weaknesses, useful lessons, and complexity not worth copying as a **claim → evidence → rubric → gap → action** map.
 
-重要结论附直接来源、访问日期、可信度与限制。遇到无法访问的仓库/视频就如实注明；搜索摘要不能替代关键证据。
+Attach direct sources, access date, credibility, and limitations to important conclusions. State honestly when a repository or video is inaccessible; a search snippet cannot replace key evidence.
 
-## 4. 第二阶段：行业真实性与可量化效益
+## 4. Phase Two: Industry Reality and Quantifiable Impact
 
-围绕一个明确 ICP 深入判断：零部件经销商/仓储收货 Manager 是否仍最适合作为主线？快递站、3PL、toC 只作适配比较，不在临近提交时无边界扩展。
+Judge one clear ICP deeply: is a parts-distributor warehouse receiving Manager still the best main path? Treat parcel stations, 3PL, and toC only as fit comparisons, without unbounded expansion near submission.
 
-研究实际日常链条：PO/ASN → 分批到场与扫码/拍照 → 身份/UOM/批次匹配 → 收货/质检/入库 → 库存与订单分配 → 拣货/交运 → 关联账单与对账 → 异常工单/沟通 → 验证关闭。需要哪些主数据、角色、单据、权限、现场事实与系统事件？
+Study the actual daily chain: PO/ASN → partial arrival and scan/photo → identity/UOM/batch match → receiving/quality inspection/putaway → inventory and order allocation → picking/hand-off → linked billing and reconciliation → exception ticket/collaboration → verified closure. What master data, roles, documents, permissions, onsite facts, and system events are needed?
 
-优先用 ERPNext、成熟 ERP/WMS/TMS、GS1、物流与会计业务文档及可核实行业案例；用 practitioner 讨论寻找摩擦点，但注明样本偏差。回答：
+Prioritize ERPNext, mature ERP/WMS/TMS, GS1, logistics/accounting documents, and verifiable industry cases; use practitioner discussions to find friction and state sample bias. Answer:
 
-- 哪些步骤已有软件规则/RPA 足够，为什么需要 LLM？哪些信息必须跨系统推理，而不是一眼看见 100−80？
-- 照片能推断什么，条码只是标识还是提供价格？价格/单位转换应来自哪个已授权主数据，而非视觉猜测？
-- 财务录入的依据是什么？照片不能证明供应商已开票、QA 放行、客户签收或已付款。
-- 哪些步骤可以低风险自动执行，哪些必须补证/授权？模型自主规划与确定性执行边界如何协作，而不是把所有步骤都停下来问人？
-- 在生产中最可能失败在哪里：身份与权限、幂等、并发、旧数据、跨单错配、重放、供应商配额、人工复核负担、可观测性与恢复能力。
+- Which steps are already sufficient with software rules/RPA, why is an LLM needed, and which information requires cross-system reasoning rather than a visible 100−80 calculation?
+- What can a photo infer? Is a barcode only an identifier or does it provide price? Which authorized master data supplies price/unit conversion instead of visual guesswork?
+- What supports financial entry? A photo cannot prove that a supplier invoiced, QA released, a customer signed, or payment occurred.
+- Which steps can run automatically at low risk, which require added evidence/authorization, and how should model planning cooperate with deterministic execution boundaries rather than stopping every step for a person?
+- Where will production fail most often: identity and permissions, idempotency, concurrency, old data, cross-document mismatch, replay, supplier quotas, human-review burden, observability, or recovery?
 
-建立可测量的业务假设：同一任务的人工主动操作时长、Agent 总耗时/p50/p95、手工录入字段数、touches、每笔异常成本、误入账/重复率、补证轮数、必要人审比例、吞吐、积压、处理成功率。
-营收/毛利/现金流/订单价值/被保护价值/模型费用分别定义，不能混算。用对照任务和相同工作量进行测量；估算写清公式、假设、数据来源和敏感性；没有生产试点不得宣称生产实测提升。ROI 是要验证的假设，不是必须编出的正数。
+Build measurable business hypotheses: active human time on the same task, Agent total time/p50/p95, manually entered fields, touches, cost per exception, error/duplicate-posting rate, evidence-round count, necessary human-review rate, throughput, backlog, and completion rate.
+Define revenue/gross margin/cash flow/order value/value protected/model cost separately and never mix them. Measure with comparison tasks and equal workload; state formulas, assumptions, data sources, and sensitivity. Without a production pilot, do not claim a production-measured lift. ROI is a hypothesis to test, not a positive number to invent.
 
-把三类 benchmark 分开：同一企业同口径的历史经营基准、公开行业参考值、Agent 与人工/旧流程的任务对照。累计库存快照的均值不是收货速度或行业效率基准；重复轮询不是新增样本。图表必须展示单位、时间窗、样本量、来源、可比性和缺失状态，公开/合成参考不能伪装成我们的经营历史。
+Separate three benchmarks: same-company historical operating baseline with the same denominator, public industry reference, and Agent versus human/old-process task comparison. The mean of cumulative inventory snapshots is not receiving speed or an industry-efficiency baseline; repeated polling is not a new sample. Charts must show unit, time window, sample size, source, comparability, and missing state. Public/synthetic references cannot masquerade as our operating history.
 
-## 5. 第三阶段：实查差距后冻结设计
+## 5. Phase Three: Check the Gaps and Freeze the Design
 
-先建立一份唯一的任务与证据台账，每项含：要求、当前状态、case/代码版本、证据、缺口原因、业务风险、验收条件、优先级、依赖、负责角色、预计投入、提交日期。
-状态至少区分：`NOT_STARTED / IMPLEMENTED_NOT_VERIFIED / VERIFIED_IN_DEMO / FAILED / BLOCKED / DEFERRED`。已写 spec ≠ 已实现，单测 pass ≠ 外部写入 pass，源读到 ≠ Agent 真正用到。
+First create one authoritative task-and-evidence ledger, with requirement, current state, case/code version, evidence, gap cause, business risk, acceptance condition, priority, dependency, owner role, estimated effort, and submission date for every item.
+At minimum distinguish: NOT_STARTED / IMPLEMENTED_NOT_VERIFIED / VERIFIED_IN_DEMO / FAILED / BLOCKED / DEFERRED. A written spec is not implementation; a passing unit test is not an external-write pass; a source read is not proof that the Agent used it.
 
-按比赛前的价值/风险/依赖排序 P0/P1/P2，优先：
+Order P0/P1/P2 by value, risk, and dependency before the competition, prioritizing:
 
-1. 真实多轮 Agent 能稳定回答复杂业务问题、引用正确且当前的证据、接受人拒绝/纠正、不把旧助手输出当新事实。
-2. 同一新订单的 physical input → receipts → 后续单据/任务 → 必要审批 → 确切外部效果 → 回读，补齐真正缺少的业务连接。
-3. 正常分批流动和复杂异常的不同正确决策；前端同步呈现真实状态及有用的趋势/基准。
-4. 冷启动、授权过期、断线、重启、重放、演示稳定性，之后才扩充模块和包装。
+1. A real multi-turn Agent that stably answers complex business questions with correct current evidence, accepts human refusal/correction, and does not treat an old assistant output as current fact.
+2. Complete the missing link for one new order: physical input → receipts → downstream document/task → necessary approval → exact external effect → readback.
+3. Correctly distinguish normal partial flow from complex exceptions, while the frontend synchronizes real state and useful trends/baselines.
+4. Cold start, expired authorization, disconnect, restart, replay, and demo stability; expand modules and packaging afterward.
 
-同时形成两张明确清单：本次比赛提交不可缺少的闭环，以及生产试点前必须补的工程/组织条件。评估生产适用性不等于在截止前重建整套企业平台；低相关的安全长尾不能挤掉主线，但必要的凭据保护、越权防护、幂等和错误呈现不能省略。
+Also maintain two explicit lists: the closed loop required for this competition submission, and engineering/organizational conditions required before a production pilot. Production suitability does not mean rebuilding an entire enterprise platform before the deadline; low-relevance security long tails must not displace the main path, but credential protection, authorization checks, idempotency, and error display cannot be omitted.
 
-设计文件须给出：现状与目标架构、对象/单位/标识、状态机、事件与 source-version 契约、各角色 Agent 的真实职责、任务移交、工具契约、必要人审、读写权限、事务/幂等/恢复、历史和指标口径、对话与 UI 数据契约、迁移兼容性、失败呈现、回滚、测试矩阵、停止条件。
+Design files must state: current and target architecture, objects/units/identifiers, state machine, event and source-version contract, actual responsibility of each Agent role, handoffs, tool contract, necessary human review, read/write permissions, transaction/idempotency/recovery, history and metric definitions, dialogue/UI data contract, migration compatibility, failure presentation, rollback, test matrix, and stop conditions.
 
-复用 Strands，只有证据说明有收益才增加 specialist/memory/evals/其他开源组件。不按一个 SaaS 一个 Agent 机械堆数量，不迁移框架来掩盖证据建模问题。对新依赖确认许可证、固定版本、维护情况、隐私/服务成本和集成测量。模型升级先核实已允许的模型、实际 SDK 兼容与成本，不绕过 AWS 权限。
+Reuse Strands; add specialist/memory/evals/other open-source components only when evidence shows value. Do not mechanically create one Agent per SaaS or migrate frameworks to hide evidence-modeling problems. For new dependencies, confirm license, pinned version, maintenance, privacy/service cost, and integration measurement. Before a model upgrade, verify permitted models, actual SDK compatibility, and cost without bypassing AWS permissions.
 
-设计自检与独立评审通过后，在已授权范围内继续实施，不再次逐步问用户是否同意。若方向、费用或外部权限确实发生重大变化，只暂停相关步骤，给出具体选择并继续独立工作。
+After design self-check and independent review pass, continue implementation within authorization without asking the user step by step again. If direction, cost, or external permissions materially change, pause only the affected step, present concrete choices, and continue independent work.
 
-## 6. 必须执行的验证矩阵
+## 6. Required Validation Matrix
 
-### 业务与实物输入
+### Business and Physical Inputs
 
-- 正常单批和逐批收货：未到期的剩余 PO 数量不误报丢失；每批只增加真实记录对应的量。
-- 多角度/相同照片、重复扫码、刷新、断网、服务重启：同一物理到货身份只产生一个应有业务效果。
-- 错 SKU、错 PO 行、箱/件单位转换、混 SKU、遮挡/低质量照片、标签冲突/未知条码：不能猜出身份或价格强行入账。
-- 丢 ACK 的已提交与未提交分支、旧确认/旧版本、源冲突、并发、部分 SaaS 失败：先查清现状，不能盲目重试写入。
-- 质量冻结与后续合规放行、补证、拒绝、纠正、恢复：必要人审准确出现，拒绝后不暗中继续写。
-- 新收货链的发票/对账/履约：只对有依据的数量和金额生成正确单据；不能把草稿、订单、收货、已开票、现金视为同一结果。不得触发真实付款。
+- Normal one-batch and partial receiving: do not misreport an unexpired remaining PO quantity as lost; each batch adds only the quantity represented by a real record.
+- Multi-angle/same photo, repeated scan, refresh, disconnect, and restart: one physical-arrival identity produces only its intended business effect.
+- Wrong SKU, wrong PO line, box/piece conversion, mixed SKU, occluded/low-quality photo, label conflict, or unknown barcode: do not guess identity or price and force a posting.
+- Submitted-with-lost-ACK and never-submitted branches, stale confirmation/version, source conflict, concurrency, and partial SaaS failure: determine the current state first; do not blindly retry a write.
+- Quality hold and later compliant release, added evidence, refusal, correction, and recovery: necessary human review appears accurately, and rejection does not continue writing silently.
+- Invoice/reconciliation/fulfillment in the new receiving chain: create documents only for supported quantity and amount; do not treat draft, order, receipt, invoiced state, and cash as the same result. Never trigger real payment.
 
-### Agent 与多轮交互
+### Agent and Multi-Turn Interaction
 
-至少覆盖状态比较、追问依据、否认初始假设、拒绝执行、补充新证据、继续调查、要求历史图、问效益、问重试、切换病例与来源中断等会话。
-冻结核心场景和独立保留集，每个关键会话至少重复三次真实模型运行；报告全部尝试/失败/延迟/token/费用，不只挑最好的一次。数量与复杂度以覆盖状态和失败机制为准，不做无目的无限调用。
+Cover at least sessions for state comparison, basis follow-up, denial of the initial assumption, refusal of execution, new evidence, continued investigation, a request for a historical chart, an impact question, a retry question, case switching, and source interruption.
+Freeze core scenarios and an independent holdout; run each key conversation with a real model at least three times. Report every attempt, failure, latency, token count, and cost rather than only the best run. Let state and failure mechanisms determine quantity and complexity; do not make unlimited calls without purpose.
 
-检查答案是否完整、数值/UOM/标识正确、来源新鲜、推理能区分竞争原因、图表有正确数据口径、follow-up 有实际用处且可点击、重要问题明确回答。不存在数据时解释具体缺什么，不能笼统“需要更多信息”。
+Check answer completeness, numeric/UOM/identifier correctness, source freshness, reasoning that distinguishes competing causes, correct chart denominators, useful clickable follow-ups, and direct answers to important questions. When data does not exist, explain exactly what is missing rather than saying only “need more information.”
 
-确定性检查用于身份/作用域/数量/权限/执行和证据闭合；独立语义评审用于解释质量。LLM judge 不是唯一真值；不要重现本轮同模型 critic 不可靠仍强行上线的失败。
+Use deterministic checks for identity, scope, quantity, permission, execution, and evidence closure; use independent semantic review for explanation quality. An LLM judge is not the sole truth; do not repeat this round's unreliable same-model critic and force it into production.
 
-### 前端与外部系统
+### Frontend and External Systems
 
-以真人鼠标完整操作 Dashboard、Investigation、照片/扫码入口、聊天、图表、审批、外链及错误恢复。逐页截图并检查关键状态；所有可点击元素都有可理解的行为、实际参数/证据或清楚的禁用原因。
-同时检查 ERPNext、Airtable、Celigo、Jira、Slack 等实际参与主线的外部页面，核对对象/数量/状态/链接；不要只截图自己的 dashboard 或只展示连接绿灯。
+Operate Dashboard, Investigation, photo/scan entry, chat, charts, approvals, links, and error recovery fully with a real mouse. Capture screenshots page by page and inspect key states; every clickable element must have understandable behavior, real parameters/evidence, or a clear disabled reason.
+Also inspect actual external pages participating in the path, including ERPNext, Airtable, Celigo, Jira, and Slack, and check object, quantity, status, and link; do not only screenshot the dashboard or show a green connection light.
 
-用户偏好不得丢失：浅灰/银白、Geist 风格字体、清晰对比、必要的纯色高亮；简洁模块、少嵌套框、细且准确的连接线；能直连就直连，线不穿字，无两端发光 dot。不要增加无操作价值的小标题、灰色解释、框架标签。
-保留服务后端的真实功能、菜单和必要 metrics。重点主屏展示、解释与细节按需展开；动态变化来自外部事件/实际工具执行，不能制造流量，未到阶段的成功标签不能提前出现。
+Do not lose the user's preferences: light gray/silver-white, Geist-style font, clear contrast, necessary solid highlights; simple modules, few nested frames, thin accurate connections; use direct links where possible, keep lines out of text, and use no glowing dots at both ends. Do not add headings, gray explanations, or framework labels with no operating value.
+Keep the backend's real features, menus, and necessary metrics. Prioritize the main screen, with explanation and detail on demand; dynamic changes must come from external events or actual tool execution, not manufactured traffic, and a success label must not appear before its stage.
 
-### 独立高标准评审
+### Independent High-Standard Review
 
-使用与实施者独立的 reviewer/subagents（本任务明确授权这一用途），分别承担：仓储操作用户、Strands/后端工程评委、产品设计评委、商业效益评委、发布可复现性评委。人员/槽位不足时分轮进行，不能主任务假装独立评委。
-给他们冻结的版本、场景、判定标准和原始证据，不要求“必须给高分”。每个结论注明实际操作/代码阅读/推断，列出阻塞缺陷与重测结果。
-按当期官方维度给分及信心说明，必要时标注 unscorable；本项目内部量表不是官方分数。严重业务错误、伪造成功、重复入账、权限越界、关键流程不可达优先于漂亮截图和平均分。
+Use reviewers/subagents independent of the implementer (this task explicitly authorizes that use) for warehouse operations, Strands/backend engineering, product design, commercial impact, and release reproducibility. If slots are limited, review in rounds; the main task must not pretend to be an independent judge.
+Give them frozen versions, scenarios, judgment rules, and raw evidence without demanding a high score. Mark whether each conclusion comes from actual operation, code reading, or inference, and list blocking defects and retest results.
+Score with the current official dimensions and explain confidence, marking unscorable when needed; the project's internal scale is not an official score. Severe business errors, fabricated success, duplicate posting, permission overreach, and unreachable key flows outrank attractive screenshots and average scores.
 
-## 7. 比赛日程、材料和 finalization 统筹
+## 7. Competition Schedule, Materials, and Finalization Coordination
 
-建立 `docs/submission/finalization-tracker.md`（已有等价文件则更新，避免重复台账），统一管理：
+Create docs/submission/finalization-tracker.md (or update an equivalent existing file rather than duplicating ledgers) to manage:
 
-- 官方截止时间、时区、核实时间、主办方变更、评审访问持续时间、计划冻结时间、提交缓冲。
-- 当前 Devpost 草稿/entry 的真实状态；旧资料记录 submission `1162519`，需在授权账户内核实，不假定已提交。
-- README、准确可读的静态架构图、英文项目说明、依赖及许可、图片使用权、环境模板、可重现启动与 judge path、证据矩阵、已知限制、代码发布版本。
-- 视频脚本/故事线/分镜/录制素材的准备状态。**实际最终录制放在业务路径冻结后**，不要花大量时间先制作无法重现的宣传片。
-- 公共仓库、可用演示/测试包、评委免费访问方式、账号/配额/试用期限、凭据过期、测试数据准备、故障备用路径。
-- 每项状态、负责人、阻塞、下一步、验收证据。每天按剩余时间调整必做范围；比赛日期变了就重算，不能跟着旧“时间还够”的判断走。
+- Official deadline, timezone, verification time, organizer changes, duration of judge access, planned freeze, and submission buffer.
+- Actual state of the current Devpost draft/entry; old material records submission 1162519, which must be verified in the authorized account and must not be assumed submitted.
+- README, accurate readable static architecture diagram, English project explanation, dependencies/licenses, image rights, environment template, reproducible startup and judge path, evidence matrix, known limitations, and release code version.
+- Video script/story/storyboard/recording-material readiness. **Make the actual final recording after the business path is frozen**; do not spend large effort first on a promotion that cannot be reproduced.
+- Public repository, usable demo/test package, free judge access, account/quota/trial duration, expired credentials, test data, and failure fallback path.
+- Status, owner, blocker, next step, and acceptance evidence for every item. Adjust required scope daily based on time remaining; if the competition date changes, recalculate rather than following an old “there is still time” judgment.
 
-用一条连贯、五分钟内可理解的候选故事验证产品：真实输入 → 正常处理 → 意外出现且初始没有答案 → Agent 跨系统找因/补证 → 必要人审或拒绝 → 精确业务动作 → 外部记录/趋势/有边界的效益证明。
-不要在没有证明的情况下把多个不同订单、不同运行模式、不同版本的片段拼成一个连续闭环。
+Validate the product with one coherent story understandable in five minutes: real input → normal processing → an unexpected state with no initial answer → Agent cross-system cause-finding/evidence gathering → necessary human review or refusal → precise business action → external record/trend/bounded impact proof.
+Do not stitch fragments from different orders, run modes, or versions into one continuous loop without proof.
 
-## 8. 权限、运行与失败处理
+## 8. Permissions, Runtime, and Failure Handling
 
-用户已授权当前项目 demo 范围内的真实订单、工单、收货、更新和有关发票测试，以及真实模型调用；**禁止真实支付**。新增付费订阅、购买、生产数据/生产环境操作、扩大 IAM 或破坏性删除需要重新确认。只使用已配置且获准的演示目标。
-不需要每一步重复请求授权。验证码/用户实际登录/新的重大边界才需要人。不得把密码、token、OTP、私人 OAuth 回调、数据库或 session 内容放进聊天、报告和 Git。
+The user has authorized real orders, tickets, receipts, updates, related invoice tests, and real model calls within the project's demo scope; **real payment is prohibited**. New paid subscriptions, purchases, production data/operations, expanded IAM, or destructive deletion require renewed confirmation. Use only configured and approved demo targets.
+Do not request permission repeatedly for every step. Human involvement is required for a verification code, actual user login, or a new material boundary. Never put passwords, tokens, OTP codes, private OAuth callbacks, database contents, or session contents in chat, reports, or Git.
 
-现有本地运行目录：`.missing20-goods-20260909-r3` 与 `.missing20-goods-20260909-r4`。它们是本机状态，不在 Git；先验证再复用。
-已用启动命令示例（先查端口和当前进程，避免重复实例）：
+Existing local run directories: .missing20-goods-20260909-r3 and .missing20-goods-20260909-r4. They are machine-local state and not in Git; verify before reuse.
+Example startup commands used (first check ports and current processes to avoid duplicate instances):
 
 ```sh
 .venv/bin/python scripts/run_goods_workspace.py --runtime-directory .missing20-goods-20260909-r4 --port 8897 --enable-handoffs --pause-auto-prepare
@@ -194,35 +194,35 @@ PYTHONPATH=src:. .venv/bin/python -m pytest -q
 npm test
 ```
 
-本机测试需要允许临时 HTTP 端口；沙箱 `Operation not permitted` 不等于业务失败。AWS 历史上出现过过期登录链接与 invalid request；必须重新生成当前认证请求，不能反复打开旧链接或擅删全部账户 session。
-交接前的 `Missing20DeveloperRole` 对 `bedrock:ListFoundationModels` 返回 AccessDenied，但已配置 Nova Pro 的实际调用可用；不要把 catalog 权限失败当成所有模型调用失败，也不要盲改 IAM。重新核验当前实际状态。
+Local tests need temporary HTTP ports allowed; a sandbox Operation not permitted is not a business failure. AWS has historically produced expired login links and invalid request; generate a current authentication request rather than reopening an old link or deleting every account session.
+Before handoff, Missing20DeveloperRole received AccessDenied for bedrock:ListFoundationModels, while the configured Nova Pro call worked; do not treat catalog permission failure as all model-call failure or change IAM blindly. Recheck current state.
 
-主要入口：`agents/live_advisory.py`、`agents/receiving_advisory.py`、`agents/photo_receiving.py`、`agents/role_delegation.py`；`adapters/live_advisory_gateway.py`、`photo_receiving.py`、`receiving_draft_worker.py`、`receiving_handoff*.py`、`receiving_destinations.py`、`receiving_jira.py`、`demo_executor.py`；`scripts/decision_workspace_server.py` 与 `workspace/`。
-实际路径从 `src/the_missing_20/` 解析，先读代码，不能依文件名推断功能完成。
+Main entry points: agents/live_advisory.py, agents/receiving_advisory.py, agents/photo_receiving.py, agents/role_delegation.py; adapters/live_advisory_gateway.py, photo_receiving.py, receiving_draft_worker.py, receiving_handoff*.py, receiving_destinations.py, receiving_jira.py, demo_executor.py; scripts/decision_workspace_server.py and workspace/.
+Resolve actual paths from src/the_missing_20/ and read the code first; do not infer feature completion from filenames.
 
-`scripts/diagnostics/prepare_receiving_lost_ack.py` **会真的写入并故意丢 ACK**，只允许新建且已配置的隔离单箱测试运行库，不能对 R4 重跑来“修复”。读取/重放测试也先读脚本确认边界。测试不得覆盖已保留的成功和失败证据。
+scripts/diagnostics/prepare_receiving_lost_ack.py **really writes and deliberately drops an ACK**. Use it only with a newly created, configured, isolated single-box test store; do not rerun it against R4 to “fix” anything. Read the script before any read/replay test to confirm its boundary. Tests must not overwrite retained success or failure evidence.
 
-## 9. 执行循环与停止条件
+## 9. Execution Loop and Stop Conditions
 
-遵循：目标 → 输入 → 小步执行 → 检查 → 根据失败调整 → 记录 → 判断停止。
+Follow: goal → input → small step → check → adjust from failure → record → decide whether to stop.
 
-- 没有关键来源：补查官方来源/代码/真实 API，仍缺则标记未知，不填臆测结论。
-- 回归失败：定位原因、最小修复、原失败重测、相关回归；不能删除断言或隐藏失败换取绿灯。
-- 同一模型问题连续三次失败：保留原始记录，停止无效重试，改用有证据的诊断/替代方案；不暂停无依赖的其他工作。
-- 独立 reviewer 发现 P0/P1：修复后请其重测，不能只回复“已注意”。
-- 每次完成可独立验收的优化后：精确 stage、commit、push；验证远端 SHA。不得只本地提交、force-push 或包含无关改动。
-- 发布、视频、最后提交等动作遵守当前有效授权与技能明确要求的最终预览 gate；准备齐全不等于已正式提交。
+- If a key source is missing: check official sources, code, or the real API; if it remains missing, mark unknown and do not fill the gap with a guess.
+- Regression failure: locate the cause, make the smallest fix, rerun the original failure and related regressions; do not delete assertions or hide failure to get green.
+- Three consecutive failures for the same model problem: retain raw records, stop ineffective retries, and use an evidence-based diagnosis or alternative; do not pause unrelated work.
+- If an independent reviewer finds P0/P1: fix it and request a retest, not merely reply “noted.”
+- After each independently accepted optimization: stage, commit, and push precisely; verify the remote SHA. Do not make only a local commit, force-push, or include unrelated changes.
+- Release, video, and final-submission actions follow current authorization and any explicit final-preview gate in the applicable skill; being prepared does not mean formally submitted.
 
-成功终态必须有：明确版本、官方硬性要求清单、同一业务链实际证据、核心复杂矩阵与真实多轮测试、逐页/外部系统验收、独立评审与缺陷关闭记录、可复现启动和材料就绪清单。尚有阻塞时只报告真实状态，不使用“全面通过/生产级/稳拿奖”。
+A successful terminal state requires: a clear version, official hard-requirement list, actual evidence for one business chain, core complex matrix and real multi-turn tests, page-by-page/external-system acceptance, independent review and defect-closure record, reproducible startup, and materials-ready checklist. If blockers remain, report actual status only; do not use “all passed,” “production-grade,” or “guaranteed winner.”
 
-## 10. 你最终交付给用户的内容
+## 10. What You Ultimately Deliver to the User
 
-1. 一份来源可靠、能直接指导取舍的比赛/行业/优秀作品对标研究。
-2. 一份当前能力和缺口台账，明确保留、优化、放弃及其理由。
-3. 可实施的设计、测试矩阵、效益验证方案与独立评审方案。
-4. 实际已修复和整合的代码、真实外部业务记录、完整成功与失败测试证据。
-5. 前端与外部系统操作记录/关键截图，能看见 Agent 的工作和业务结果。
-6. 完成或准确标识缺口的 README、架构图、Devpost 文案、视频故事线与比赛日程追踪。
-7. 独立评委结论、未闭合风险、当前提交与远端推送证明；明确是 ready to submit、conditionally ready 还是 not ready，以及原因。
+1. A reliable-source comparison of the competition, industry, and notable work that directly guides tradeoffs.
+2. A current capability and gap ledger that clearly states what is retained, improved, or abandoned and why.
+3. An implementable design, test matrix, impact-validation plan, and independent-review plan.
+4. Actually fixed and integrated code, real external business records, and complete success/failure test evidence.
+5. Frontend and external-system operation records and key screenshots that show the Agent's work and business results.
+6. README, architecture diagram, Devpost copy, video story, and competition schedule tracker completed or accurately marked with gaps.
+7. Independent judge conclusions, open risks, current submission and remote-push proof; state clearly whether it is ready to submit, conditionally ready, or not ready, and why.
 
-现在开始：先核实仓库与运行状态、读取最新 R4 审计和相关历史材料，再展开官方规则/优秀作品/行业对标调研；不要一进来先堆 UI 或再次宣称整个平台已经完成。
+Start by checking repository and runtime state and reading the latest R4 audit and related historical material, then research official rules, notable work, and industry comparisons; do not begin by piling up UI or again claiming the whole product is complete.

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Architecture v4.2：可验证的供应链异常诊断与双审批恢复",
+    "title": "Architecture v4.2: Verifiable Supply-Chain Exception Diagnosis and Dual-Approval Recovery",
     "quality_profile": "showcase",
     "animation": "none",
     "legend": {
@@ -12,21 +12,21 @@
     "views": [
       {
         "id": "reasoning",
-        "label": "为什么需要 Agent",
+        "label": "Why an Agent",
         "focus": ["business_systems", "detector", "agent_graph", "knowledge_base", "evaluator"],
-        "note": "规则只发现 100 对 80；Agent 比较临时锁、真实短装、已经入账三种解释；评估器拒绝危险结论。"
+        "note": "Rules only see 100 versus 80; the Agent compares a temporary lock, a real short shipment, and an already-posted receipt; the evaluator rejects dangerous conclusions."
       },
       {
         "id": "receipt_recovery",
-        "label": "收货消息恢复",
+        "label": "Receipt Message Recovery",
         "focus": ["integration_operator", "decision_workspace", "application_service", "case_store", "authorization_service", "signed_grant", "policy_gateway", "executor_verifier", "business_systems"],
-        "note": "操作员只能批准 restart_receipt_message；执行器重新验证状态后重启原 LUW，并证明没有重复过账。"
+        "note": "The operator may approve only restart_receipt_message; the executor rechecks state, restarts the original LUW, and proves there was no duplicate posting."
       },
       {
         "id": "invoice_release",
-        "label": "发票释放与结案",
+        "label": "Invoice Release and Case Closure",
         "focus": ["ap_approver", "decision_workspace", "application_service", "case_store", "authorization_service", "signed_grant", "policy_gateway", "executor_verifier"],
-        "note": "AP 审批人只能批准 release_invoice；Invoice=Released 后案件才 Closed；系统没有付款工具。"
+        "note": "The AP approver may approve only release_invoice; the case becomes Closed only after Invoice=Released; the system has no payment tool."
       }
     ]
   },
@@ -34,8 +34,8 @@
     {
       "id": "business_systems",
       "type": "external",
-      "label": "合成企业系统",
-      "sublabel": "EWM、qRFC、S/4、Invoice API",
+      "label": "Synthetic Enterprise Systems",
+      "sublabel": "EWM, qRFC, S/4, Invoice API",
       "pos": [40, 306],
       "size": [176, 76],
       "tag": "SAP-shaped"
@@ -43,16 +43,16 @@
     {
       "id": "detector",
       "type": "backend",
-      "label": "确定性异常检测",
-      "sublabel": "仓库 100，ERP 80",
+      "label": "Deterministic Exception Detector",
+      "sublabel": "Warehouse 100, ERP 80",
       "pos": [250, 306],
       "size": [168, 76]
     },
     {
       "id": "agent_graph",
       "type": "cloud",
-      "label": "Strands 多 Agent 调查",
-      "sublabel": "提出假设、找证据、引用 SOP",
+      "label": "Strands Multi-Agent Investigation",
+      "sublabel": "Form hypotheses, find evidence, cite SOPs",
       "pos": [470, 306],
       "size": [198, 76],
       "tag": "AgentCore Runtime"
@@ -60,44 +60,44 @@
     {
       "id": "knowledge_base",
       "type": "database",
-      "label": "版本化知识库",
-      "sublabel": "错误语义、SOP、恢复规则",
+      "label": "Versioned Knowledge Base",
+      "sublabel": "Failure semantics, SOPs, recovery rules",
       "pos": [480, 88],
       "size": [178, 72],
-      "tag": "运行时无预期答案"
+      "tag": "No expected answers at runtime"
     },
     {
       "id": "evaluator",
       "type": "security",
-      "label": "独立证据评估器",
-      "sublabel": "验证引用并拒绝危险结论",
+      "label": "Independent Evidence Evaluator",
+      "sublabel": "Validate citations and reject dangerous conclusions",
       "pos": [720, 306],
       "size": [194, 76],
-      "tag": "只读"
+      "tag": "Read-only"
     },
     {
       "id": "application_service",
       "type": "backend",
-      "label": "确定性案件服务",
-      "sublabel": "校验结果、追加事件、推进状态",
+      "label": "Deterministic Case Service",
+      "sublabel": "Validate results, append events, advance state",
       "pos": [950, 306],
       "size": [190, 76],
-      "tag": "唯一状态转换者"
+      "tag": "Only state-transition authority"
     },
     {
       "id": "case_store",
       "type": "database",
-      "label": "案件与审批账本",
-      "sublabel": "case_version、摘要、状态、审计",
+      "label": "Case and Approval Ledger",
+      "sublabel": "case_version, summaries, state, audit",
       "pos": [1180, 306],
       "size": [198, 76],
-      "tag": "DynamoDB 条件写入"
+      "tag": "DynamoDB conditional writes"
     },
     {
       "id": "decision_workspace",
       "type": "frontend",
-      "label": "决策工作台与审批 API",
-      "sublabel": "展示证据；提交角色限定审批",
+      "label": "Decision Workspace and Approval API",
+      "sublabel": "Show evidence; submit role-scoped approvals",
       "pos": [1450, 306],
       "size": [204, 76]
     },
@@ -105,7 +105,7 @@
       "id": "integration_operator",
       "type": "external",
       "label": "Integration Operator",
-      "sublabel": "仅批准消息重启",
+      "sublabel": "Approve message restart only",
       "pos": [1450, 510],
       "size": [204, 72],
       "tag": "Cognito Group A"
@@ -114,7 +114,7 @@
       "id": "ap_approver",
       "type": "external",
       "label": "AP Approver",
-      "sublabel": "仅批准发票释放",
+      "sublabel": "Approve invoice release only",
       "pos": [1450, 630],
       "size": [198, 72],
       "tag": "Cognito Group B"
@@ -122,50 +122,50 @@
     {
       "id": "authorization_service",
       "type": "security",
-      "label": "动作授权服务",
-      "sublabel": "验证审批并请求 KMS 签名",
+      "label": "Action Authorization Service",
+      "sublabel": "Validate approval and request a KMS signature",
       "pos": [1190, 740],
       "size": [210, 78],
-      "tag": "唯一签名调用者"
+      "tag": "Only signature caller"
     },
     {
       "id": "signed_grant",
       "type": "security",
-      "label": "KMS 签名动作授权",
-      "sublabel": "身份、角色、工具、参数、摘要、TTL",
+      "label": "KMS-Signed Action Grant",
+      "sublabel": "Identity, role, tool, parameters, summary, TTL",
       "pos": [900, 740],
       "size": [218, 78],
-      "tag": "唯一授权 ID"
+      "tag": "Only authorization ID"
     },
     {
       "id": "policy_gateway",
       "type": "security",
-      "label": "AgentCore Policy 与 Gateway",
-      "sublabel": "按角色、工具和完整参数判定",
+      "label": "AgentCore Policy and Gateway",
+      "sublabel": "Decide by role, tool, and complete parameters",
       "pos": [610, 740],
       "size": [226, 78],
-      "tag": "唯一变更入口"
+      "tag": "Only change entry point"
     },
     {
       "id": "executor_verifier",
       "type": "backend",
-      "label": "确定性执行与验证器",
+      "label": "Deterministic Executor and Verifier",
       "sublabel": "restart_receipt_message / release_invoice",
       "pos": [290, 740],
       "size": [250, 78],
-      "tag": "唯一持有下游写凭证"
+      "tag": "Only holder of downstream write credentials"
     }
   ],
   "boundaries": [
     {
       "kind": "region",
-      "label": "只读调查、解释与人类决策",
+      "label": "Read-only Investigation, Explanation, and Human Decisions",
       "wraps": ["detector", "agent_graph", "knowledge_base", "evaluator", "application_service", "case_store", "decision_workspace", "integration_operator", "ap_approver"],
       "pad": 24
     },
     {
       "kind": "security-group",
-      "label": "不可绕过的变更边界",
+      "label": "Non-bypassable Change Boundary",
       "wraps": ["authorization_service", "signed_grant", "policy_gateway", "executor_verifier"],
       "pad": 24
     }
@@ -174,14 +174,14 @@
     {
       "from": "business_systems",
       "to": "detector",
-      "label": "权威业务事实",
+      "label": "Authoritative Business Facts",
       "variant": "emphasis",
       "labelAt": [236, 302]
     },
     {
       "from": "detector",
       "to": "application_service",
-      "label": "异常事实；创建 versioned case",
+      "label": "Exception facts; create a versioned case",
       "variant": "emphasis",
       "fromSide": "bottom",
       "toSide": "bottom",
@@ -191,7 +191,7 @@
     {
       "from": "application_service",
       "to": "agent_graph",
-      "label": "启动只读调查",
+      "label": "Start read-only investigation",
       "variant": "emphasis",
       "fromSide": "top",
       "toSide": "left",
@@ -201,7 +201,7 @@
     {
       "from": "business_systems",
       "to": "agent_graph",
-      "label": "只读 Gateway / Adapter 取证",
+      "label": "Read-only Gateway / Adapter evidence collection",
       "variant": "dashed",
       "fromSide": "top",
       "toSide": "top",
@@ -211,49 +211,49 @@
     {
       "from": "knowledge_base",
       "to": "agent_graph",
-      "label": "带版本引用",
+      "label": "Versioned citation",
       "variant": "dashed",
       "labelAt": [569, 176]
     },
     {
       "from": "agent_graph",
       "to": "evaluator",
-      "label": "三个候选解释与证据",
+      "label": "Three candidate explanations and evidence",
       "variant": "emphasis",
       "labelAt": [690, 302]
     },
     {
       "from": "evaluator",
       "to": "application_service",
-      "label": "结构化评估结果",
+      "label": "Structured evaluation result",
       "variant": "security",
       "labelAt": [920, 396]
     },
     {
       "from": "application_service",
       "to": "case_store",
-      "label": "校验后追加事件与状态",
+      "label": "Append events and state after validation",
       "variant": "security",
       "labelAt": [1160, 396]
     },
     {
       "from": "case_store",
       "to": "decision_workspace",
-      "label": "领先假设与安全证明",
+      "label": "Leading hypothesis and safety proof",
       "variant": "emphasis",
       "labelAt": [1420, 302]
     },
     {
       "from": "integration_operator",
       "to": "decision_workspace",
-      "label": "批准 restart_receipt_message",
+      "label": "Approve restart_receipt_message",
       "variant": "security",
       "labelAt": [1552, 456]
     },
     {
       "from": "ap_approver",
       "to": "decision_workspace",
-      "label": "收货验证后批准 release_invoice",
+      "label": "Approve release_invoice after receipt verification",
       "variant": "security",
       "fromSide": "right",
       "toSide": "right",
@@ -263,7 +263,7 @@
     {
       "from": "decision_workspace",
       "to": "application_service",
-      "label": "角色限定审批命令",
+      "label": "Role-scoped approval command",
       "variant": "security",
       "fromSide": "top",
       "toSide": "top",
@@ -273,7 +273,7 @@
     {
       "from": "case_store",
       "to": "authorization_service",
-      "label": "已批准动作与完整摘要",
+      "label": "Approved action and complete summary",
       "variant": "security",
       "fromSide": "bottom",
       "toSide": "top"
@@ -281,27 +281,27 @@
     {
       "from": "authorization_service",
       "to": "signed_grant",
-      "label": "KMS 签发单次授权",
+      "label": "KMS issues one-time authorization",
       "variant": "security",
       "labelAt": [1154, 832]
     },
     {
       "from": "signed_grant",
       "to": "policy_gateway",
-      "label": "已签名授权",
+      "label": "Signed authorization",
       "variant": "security"
     },
     {
       "from": "policy_gateway",
       "to": "executor_verifier",
-      "label": "只放行精确工具与参数",
+      "label": "Allow only the exact tool and parameters",
       "variant": "security",
       "labelAt": [580, 832]
     },
     {
       "from": "executor_verifier",
       "to": "business_systems",
-      "label": "先重读，再变更，再验证",
+      "label": "Read again, change, then verify",
       "variant": "security",
       "fromSide": "left",
       "toSide": "bottom"
@@ -309,7 +309,7 @@
     {
       "from": "executor_verifier",
       "to": "application_service",
-      "label": "执行回执与验证结果",
+      "label": "Execution receipt and verification result",
       "variant": "emphasis",
       "fromSide": "bottom",
       "toSide": "top",
@@ -320,26 +320,26 @@
   "cards": [
     {
       "dot": "amber",
-      "title": "合成 SAP-shaped 主案例",
+      "title": "Synthetic SAP-shaped Main Case",
       "items": [
-        "第二个 HU 的 20 EA 消息因并发锁进入 DOCUMENT_LOCKED_RETRYABLE；锁已解除、原消息可重试且没有 material document",
-        "系统只重启原消息；at-least-once 传输与幂等键共同保证单一业务效果"
+        "The second HU's 20 EA message enters DOCUMENT_LOCKED_RETRYABLE because of a concurrency lock; the lock is cleared, the original message can be retried, and there is no material document",
+        "The system restarts only the original message; at-least-once delivery and the idempotency key together guarantee one business effect"
       ]
     },
     {
       "dot": "rose",
-      "title": "签名授权与拒绝条件",
+      "title": "Signed Authorization and Rejection Conditions",
       "items": [
-        "单次授权绑定 principal、role、case_version、tool、完整参数、摘要与 TTL",
-        "执行器 fresh-read 后才行动；签名、版本、摘要或状态变化均 fail closed；Agent 与前端没有写凭证"
+        "A one-time authorization binds principal, role, case_version, tool, complete parameters, summary, and TTL",
+        "The executor acts only after a fresh read; any signature, version, summary, or state change fails closed; the Agent and frontend have no write credentials"
       ]
     },
     {
       "dot": "emerald",
-      "title": "双审批闭环与反例",
+      "title": "Dual-Approval Loop and Counterexample",
       "items": [
-        "Principal A 重启并验证 ERP=100；Principal B 释放发票并验证 Invoice=Released 后案件才 Closed",
-        "审批前已入账则拒绝重启；授权后状态漂移则安全 no-op；两者都不能产生重复凭证"
+        "Principal A restarts and verifies ERP=100; Principal B releases the invoice and verifies Invoice=Released before the case becomes Closed",
+        "If already posted before approval, reject the restart; if state drifts after authorization, safely no-op; neither can create a duplicate document"
       ]
     }
   ]

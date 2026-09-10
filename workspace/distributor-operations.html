@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/distributor-operations.css" />
     <title>The Missing 20 | Distributor operations</title>
   </head>
-  <body data-operations-state="loading">
+  <body class="operations-shell" data-operations-state="loading">
     <a class="skip-link" href="#main-content">Skip to operations</a>
 
     <header class="topbar ops-topbar">
@@ -22,6 +22,7 @@
       <nav class="view-tabs" aria-label="Workspace views">
         <a class="view-tab" href="/?view=dashboard"><i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboard</span></a>
         <a class="view-tab is-selected" href="/operations" aria-current="page"><i class="ph ph-package" aria-hidden="true"></i><span>Operations</span></a>
+        <a class="view-tab ops-ask-link" href="#ops-chat-panel"><i class="ph ph-chat-circle-dots" aria-hidden="true"></i><span>Ask agent</span></a>
       </nav>
       <div class="topbar-context">
         <span class="header-incident-state is-live">DEMO</span>
@@ -45,6 +46,7 @@
           <strong id="ops-case-label">Loading operation</strong>
           <span id="ops-case-id" class="ops-mono">Waiting for the source</span>
           <span id="ops-case-po" class="ops-mono">Purchase order unavailable</span>
+          <span id="ops-refresh-state" class="ops-mono">No successful source refresh yet</span>
         </aside>
       </section>
 
@@ -79,6 +81,35 @@
           </div>
           <p id="ops-uom-note" class="ops-uom-note">Parts and cartons are separate observations.</p>
           <ol id="ops-stage-list" class="ops-stage-list" aria-label="Business stages"></ol>
+        </section>
+
+        <section id="ops-benchmark-panel" class="ops-panel ops-benchmark-panel" aria-labelledby="ops-benchmark-title">
+          <header class="ops-panel-header">
+            <div><span class="object-label">Current case benchmark</span><h2 id="ops-benchmark-title">Completion against customer commitments</h2></div>
+            <span id="ops-benchmark-state" class="state-badge state-neutral">Reading source</span>
+          </header>
+          <div id="ops-benchmark-grid" class="ops-benchmark-grid" aria-live="polite"></div>
+          <p id="ops-benchmark-note" class="ops-benchmark-note">This comparison uses the current case only. Historical, industry, and savings baselines are unavailable.</p>
+        </section>
+
+        <section id="ops-chat-panel" class="ops-panel ops-chat-panel" aria-labelledby="ops-chat-title">
+          <header class="ops-panel-header">
+            <div><span class="object-label">Same native conversation</span><h2 id="ops-chat-title">Ask about this operation</h2></div>
+            <div class="ops-chat-context"><span id="ops-chat-provider" class="state-badge state-neutral">Provider —</span><span id="ops-chat-context" class="ops-count-label">Current operation source</span></div>
+          </header>
+          <div id="ops-chat-answer" class="ops-chat-answer" aria-live="polite"><p class="ops-empty">Ask a read-only question about quantities, lots, customers, or delivery evidence.</p></div>
+          <form id="ops-ask-form" class="ops-ask-form" novalidate>
+            <label class="sr-only" for="ops-question">Ask about this operation</label>
+            <input id="ops-question" type="text" maxlength="500" autocomplete="off" placeholder="e.g. Which order can ship now?" required />
+            <button id="ops-ask-submit" class="button button-primary" type="submit"><i class="ph ph-chat-circle-dots" aria-hidden="true"></i>Ask</button>
+          </form>
+          <div class="ops-voice-controls" aria-label="Optional voice controls">
+            <button id="ops-dictate" class="button button-quiet" type="button" aria-pressed="false"><i class="ph ph-microphone" aria-hidden="true"></i>Dictate in English</button>
+            <button id="ops-read-answer" class="button button-quiet" type="button" disabled><i class="ph ph-speaker-high" aria-hidden="true"></i>Read answer</button>
+            <button id="ops-stop-reading" class="button button-quiet" type="button" hidden><i class="ph ph-stop-circle" aria-hidden="true"></i>Stop reading</button>
+            <span id="ops-voice-status" class="ops-voice-status" role="status" aria-live="polite">Voice controls are optional. Typing remains available.</span>
+          </div>
+          <p class="ops-chat-note">Read-only conversation. Dictation only fills the question for your review; it never sends automatically. Each answer reflects the evidence available when you asked.</p>
         </section>
 
         <section id="ops-evidence-panel" class="ops-panel ops-evidence-panel" aria-labelledby="ops-evidence-title">
@@ -122,6 +153,10 @@
         <section id="ops-alerts-panel" class="ops-panel" aria-labelledby="ops-alerts-title">
           <header class="ops-panel-header"><div><span class="object-label">Manager attention</span><h2 id="ops-alerts-title">Alerts with evidence</h2></div><span class="ops-count-label" id="ops-alerts-count">Unknown</span></header>
           <div id="ops-alerts-list" class="ops-alert-list" aria-live="polite"></div>
+          <details id="ops-resolved-alerts" class="ops-resolved-alerts" hidden>
+            <summary id="ops-resolved-alerts-summary">Resolved evidence history</summary>
+            <div id="ops-resolved-alerts-list" class="ops-resolved-alert-list"></div>
+          </details>
         </section>
 
         <section id="ops-financials-panel" class="ops-panel" aria-labelledby="ops-financials-title" hidden>
@@ -147,19 +182,6 @@
           </section>
         </div>
 
-        <section id="ops-chat-panel" class="ops-panel ops-chat-panel" aria-labelledby="ops-chat-title">
-          <header class="ops-panel-header">
-            <div><span class="object-label">Same native conversation</span><h2 id="ops-chat-title">Ask about this operation</h2></div>
-            <div class="ops-chat-context"><span id="ops-chat-provider" class="state-badge state-neutral">Provider —</span><span id="ops-chat-context" class="ops-count-label">Current operation source</span></div>
-          </header>
-          <div id="ops-chat-answer" class="ops-chat-answer" aria-live="polite"><p class="ops-empty">Ask a read-only question about quantities, lots, customers, or delivery evidence.</p></div>
-          <form id="ops-ask-form" class="ops-ask-form" novalidate>
-            <label class="sr-only" for="ops-question">Ask about this operation</label>
-            <input id="ops-question" type="text" maxlength="500" autocomplete="off" placeholder="e.g. Which order can ship now?" required />
-            <button id="ops-ask-submit" class="button button-primary" type="submit"><i class="ph ph-chat-circle-dots" aria-hidden="true"></i>Ask</button>
-          </form>
-          <p class="ops-chat-note">Read-only conversation. Each answer reflects the evidence available when you asked. Ask again after the operation changes. Unavailable chat stays unavailable.</p>
-        </section>
       </div>
 
       <noscript><p class="ops-noscript">JavaScript is required to load the current operation source.</p></noscript>

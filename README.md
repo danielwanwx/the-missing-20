@@ -69,7 +69,7 @@ and replay safety.
 
 ## Architecture
 
-![The Missing 20 verified agent architecture](docs/architecture/the-missing-20-live-architecture.visual-check.1440x900.light.png)
+![The Missing 20 verified agent architecture](docs/architecture/the-missing-20-live-architecture.english.jpg)
 
 The main path is intentionally asymmetric:
 

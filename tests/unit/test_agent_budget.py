@@ -149,7 +149,7 @@ def test_bedrock_wire_content_still_exhausts_the_budget_before_provider_io(
         delegate,
         AgentBudgetLedger(AgentBudget(max_input_tokens=2_000, max_output_tokens=100)),
     )
-    content = "物理收货" * 2_000
+    content = "\u7269\u7406\u6536\u8d27" * 2_000
     if large_field == "configuration":
         delegate.update_config(additional_args={"requestMetadata": {"context": content}})
 

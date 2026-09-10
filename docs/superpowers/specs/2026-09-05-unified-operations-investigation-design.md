@@ -1,82 +1,82 @@
-# Unified Operations / Investigation 重构设计
+# Unified Operations / Investigation Refactoring Design
 
-状态：完整方案，待整体 review；本轮完成后台真实基线与设计，未改当前前端。沿用已选定的银白、Geist、纯色节点、少解释、必要人类审查方向。
+Status: complete proposal, pending overall review; this round completed the real backend baseline and design without changing the current frontend. It follows the selected silver/white, Geist, solid-color node, low-explanation, necessary-human-review direction.
 
-## 1. 依据与边界
+## 1. Basis and Boundaries
 
-依据本轮实际审查和真实 Strands 后台运行，不扩展 SaaS 数量，不引入第二套业务逻辑。Dashboard 回答“业务现在如何”，Investigation 回答“为什么、查到了什么、需要我决定什么”。它们是同一个 case/run 的两个视图。
+Based on this round's actual review and real Strands backend runs, without expanding the number of SaaS systems or introducing a second business logic. Dashboard answers “what is happening in the business now”; Investigation answers “why, what was found, and what do I need to decide.” They are two views of the same case/run.
 
-2026-09-05 真实基线：Bedrock Nova Pro / Strands，三次模型运行成功，调查约2.9s、修复前问答4.426s、修复后问答4.173s；HTTP链路完成经理批准、合成恢复、回读。八次模型请求，16649 input tokens、1000 output tokens，工程估算成本 $0.0165192。外部业务系统写入为0，恢复为隔离本地合成数据。
+Real baseline on 2026-09-05: Bedrock Nova Pro / Strands, three successful model runs, investigation about 2.9s, pre-fix Q&A 4.426s, post-fix Q&A 4.173s; the HTTP path completed manager approval, synthetic recovery, and readback. Eight model requests, 16,649 input tokens, 1,000 output tokens, estimated engineering cost $0.0165192. External business-system writes were 0; recovery used isolated local synthetic data.
 
-质量限制：三次都只读 control_context 与 ERP；关于12/8拆分与盲目重试风险的问题，只重复需要经理批准，未充分回答。现有输入仍预置 expected_disposition，因此此基线不是独立调查能力验收。
+Quality limitation: all three runs only read control_context and ERP; on the question about the 12/8 split and blind-retry risk, they repeated that manager approval was required without answering fully. The current input still preloads expected_disposition, so this baseline is not an acceptance of independent investigation capability.
 
-## 2. 方案选择
+## 2. Option Selection
 
-比较三个方向：
+Compare three directions:
 
-1. **推荐：保留 Dashboard，重建同源的 Investigation。** 最小必要范围内消除旧页面和两套事实源，保护已有视效投入。
-2. 把所有内容塞进 Dashboard：切页少，但监控、对话、审查和证据相互挤占，重现当前拥挤问题。
-3. 全量重写前端框架：可以获得更清晰工程结构，但本阶段迁移风险大，且不能自动解决后台状态分裂。
+1. **Recommended: keep Dashboard and rebuild a same-source Investigation.** Remove the old page and two fact sources within the minimum necessary scope while protecting existing visual investment.
+2. Put everything into Dashboard: fewer page switches, but monitoring, dialogue, review, and evidence crowd each other and recreate the current density problem.
+3. Rewrite the frontend framework wholesale: it could provide a clearer engineering structure, but migration risk is high at this stage and it would not automatically solve split backend state.
 
-选择1。按模块逐步抽取现有原生JS，不同时做框架迁移。独立开发中的视图不得作为新第三套事实源。
+Choose option 1. Extract the existing native JavaScript incrementally by module and do not migrate frameworks at the same time. A view under independent development must not become a third source of truth.
 
-## 3. 两个视图、一套页面框架
+## 3. Two Views, One Page Framework
 
-共同头部只保留品牌、Operations / Investigation切换、案例选择、运行模式、连接状态。Demo Controls 放二级菜单。删除隐藏但仍可能被路由重新激活的旧 workspace。
+Keep the shared header to the brand, Operations / Investigation switch, case selector, run mode, and connection state. Put Demo Controls in a secondary menu. Remove the hidden legacy workspace that routes could still reactivate.
 
-### Operations（当前 Dashboard）
+### Operations (Current Dashboard)
 
-- 首屏一句业务状态，例如“Invoice INV-4817 needs reconciliation”；未调查时不写根因“20 stopped before ERP”。
-- 四个独立业务节点：Warehouse、Integration、ERP inventory、Invoice。连线只在必要的节点边界之间，不进入文字区域；当前暂不需要贯穿主流的装饰线。
-- 总量、可用量、待处理量明确单位；Invoice显示状态/受影响单据数，不把80 units叫80 invoices。
-- 一条持续时间轴：累计收货、可用库存、未解决数量；如要吞吐，独立使用units/min标签。批次通过标记区分，不周期清空或凭计时器重置。
-- 右侧事件列表：最新在下，跟随开关；用户向上查看自动暂停，有“N new / Resume live”。
-- 底部只留一个案件状态与入口：“Investigating / Needs your review / Verified → Open investigation”。
-- SaaS连接健康位于连接抽屉；案例证据节点仅在已关联当前case时出现，不把另一case的VERIFIED混进来。
+- The first screen has one business-status sentence, such as “Invoice INV-4817 needs reconciliation”; before investigation, do not state the root cause “20 stopped before ERP.”
+- Four independent business nodes: Warehouse, Integration, ERP inventory, and Invoice. Connect only necessary node boundaries and keep lines out of text areas; no decorative line across the main flow is needed yet.
+- State units for totals, available quantity, and pending quantity explicitly; Invoice shows status and affected-document count, not 80 invoices when the value is 80 units.
+- One continuous timeline: cumulative receipts, available inventory, unresolved quantity; if throughput is shown, use a separate units/min label. Distinguish batches with markers, and do not clear them periodically or reset them with a timer.
+- Event list on the right: newest at the bottom, with a follow switch; scrolling upward pauses live updates automatically and shows “N new / Resume live.”
+- Keep one case-status entry at the bottom: “Investigating / Needs your review / Verified → Open investigation.”
+- Put SaaS connection health in a connection drawer; show a case-evidence node only when linked to the current case, never mixing VERIFIED from another case.
 
 ### Investigation
 
-桌面首屏布局：
+Desktop first-screen layout:
 
 ```text
-同一案例头部：INV-4817 · Investigating · Real Strands · Demo business data
+Same-case header: INV-4817 | Investigating | Real Strands | Demo business data
 ┌──────────────────────────────┬──────────────────────────┐
-│ 调查进展 / 当前问题            │ 与 Agent 对话            │
-│ 正在查询的工具、已返回的证据    │ 持续会话和内联证据引用     │
-│ 假设 + 支持/反对/缺少证据      │ 必要时出现明确的人类问题   │
+│ Investigation progress / current question │ Agent conversation │
+│ Tools being queried, returned evidence     │ Ongoing session and inline citations │
+│ Hypotheses + support/opposition/missing evidence │ Explicit human question when needed │
 ├──────────────────────────────┤                          │
-│ 当前决策（仅需要时出现）       │                          │
+│ Current decision (only when needed)        │                          │
 │ 12 receipt + 8 quality        │                          │
 │ [Approve & execute] [Hold]    │                          │
 ├──────────────────────────────┴──────────────────────────┤
-│ Outcome：已完成动作、回读后结果、Resolution Packet        │
+│ Outcome: completed action, post-readback result, Resolution Packet │
 └─────────────────────────────────────────────────────────┘
 ```
 
-这是信息布局说明，不是要求绘制可见边框。具体视觉使用白色浮层、轻阴影和留白。
+This describes information layout; it does not require visible borders. Use white surfaces, light shadows, and whitespace for the concrete visual treatment.
 
-- 主区域优先说明“现在调查哪个问题”；不是一上来用巨大Agent球占据中心。
-- SaaS拓扑是可展开辅助视图，默认一行源节点与当前工具活动；未调用的工具不显示假活跃。
-- 点击证据引用，在侧边抽屉展示provider原始字段的安全投影、record ID、revision、observed_at、来源链接、支持或反驳哪个假设。抽屉占用对话区时提供明确返回，不在节点内部嵌套另一层节点。
-- 经理决策仅在方案形成且策略通过时出现。列出准确动作/数量/对象和风险；一次批准此范围并执行，后台自动回读。发生新证据或范围变化时重新批准。
-- Outcome在执行前收起，执行后保留时间、效果记录、批准绑定和前后对照；不展示固定0.94/0.99。
+- Prioritize the question “what is being investigated now” in the main area; do not lead with a huge Agent sphere.
+- The SaaS topology is an expandable auxiliary view, with one source-activity row by default; do not show fake activity for tools that were not called.
+- Clicking an evidence citation opens a side drawer with a safe projection of provider raw fields, record ID, revision, observed_at, source link, and which hypothesis it supports or refutes. When the drawer occupies the conversation area, provide a clear return action; do not nest another node layer inside a node.
+- Show manager decisions only when a plan exists and policy passes. List the exact action, quantity, object, and risk; approve this scope once and execute, with automatic backend readback. Reapprove after new evidence or a scope change.
+- Collapse Outcome before execution; after execution retain time, effect record, approval binding, and before/after comparison. Do not display fixed 0.94/0.99.
 
-### 所有状态使用同一骨架
+### All States Use One Skeleton
 
-| 状态 | 主区域 | 对话/人类介入 |
+| State | Main area | Conversation / human involvement |
 | --- | --- | --- |
-| Normal | 当前业务及最近证据，无虚假事故图 | 可问实时状态 |
-| Detected | 症状、范围、最近来源变更 | 自动读查策略开启时直接调查；可停止 |
-| Investigating | 计划和真实逐工具进度 | 可问进展，不必逐步批准 |
-| Needs evidence | 缺哪条记录、谁能提供、何时重试 | 系统能补则自动补；否则提一个明确问题 |
-| Awaiting approval | 已查证结论和有界恢复方案 | 一次经理批准或Hold |
-| Executing / Verifying | 确切已执行动作、待回读项 | 不出现提前“verified”或再次批准按钮 |
-| Verified | 持久化结果凭证 | 可追问为何完成，引用回读记录 |
-| Paused / Failed | 原证据保留，解释暂停/失败原因 | 明确Resume/Retry，避免静默降级 |
+| Normal | Current business and recent evidence, with no fake incident diagram | Ask about live status |
+| Detected | Symptom, scope, latest source change | Investigate directly when the automatic read policy is enabled; can stop |
+| Investigating | Plan and real per-tool progress | Ask about progress; no step-by-step approval needed |
+| Needs evidence | Which record is missing, who can provide it, when to retry | Fill automatically if the system can; otherwise ask one clear question |
+| Awaiting approval | Verified conclusion and bounded recovery plan | One manager approval or Hold |
+| Executing / Verifying | Exact completed action, pending readback items | No premature “verified” or second approval button |
+| Verified | Persisted outcome credential | Ask why it completed and cite readback records |
+| Paused / Failed | Preserve original evidence and explain pause/failure | Clear Resume/Retry, with no silent degradation |
 
-## 4. 单一事实源和事件契约
+## 4. Single Source of Truth and Event Contract
 
-新增应用级OperationsProjection，包装/替换旧registry的UI读取入口；Case Console不再与旧ExperimentSession平行管理同一业务案例。合成与live adapter实现同一份领域契约，但来源标识永不混淆。
+Add an application-level OperationsProjection that wraps/replaces the old registry UI read entry point; Case Console no longer manages the same business case in parallel with legacy ExperimentSession. Synthetic and live adapters implement the same domain contract, but source identity must never be conflated.
 
 ```text
 Source adapters → Evidence registry / case store → OperationsProjection
@@ -85,112 +85,112 @@ Source adapters → Evidence registry / case store → OperationsProjection
                                             └→ Resolution Packet
 ```
 
-投影必须包含：schema_version、case_id、run_id、case_version、projection_sequence、business_state、agent_state、connection_state、evidence、plan、approval、execution、verification、mode。连接在线、模型可用、业务正常是三个独立状态。
+The projection must contain: schema_version, case_id, run_id, case_version, projection_sequence, business_state, agent_state, connection_state, evidence, plan, approval, execution, verification, and mode. Connection online, model available, and business healthy are three independent states.
 
-事件契约：event_id、case_id、run_id、sequence、occurred_at、received_at、type、source、tool_call_id、evidence_ids、sanitized_summary。序号按case/run分区；切换case不能沿用旧最大序号。客户端只接受匹配身份的更新，不自行编造业务转移。
+Event contract: event_id, case_id, run_id, sequence, occurred_at, received_at, type, source, tool_call_id, evidence_ids, and sanitized_summary. Partition sequence by case/run; changing case must not reuse the old maximum sequence. The client accepts only identity-matching updates and does not invent business transitions.
 
-最小真实事件：source.changed、incident.detected、agent.started、tool.started、tool.succeeded、tool.failed、hypothesis.updated、plan.ready、human.required、approval.granted、execution.started/completed、verification.started/completed/failed、run.paused、agent.failed。
+Minimum real events: source.changed, incident.detected, agent.started, tool.started, tool.succeeded, tool.failed, hypothesis.updated, plan.ready, human.required, approval.granted, execution.started/completed, verification.started/completed/failed, run.paused, and agent.failed.
 
-恢复后投影从同一持久化源回读，前端不能通过execution.status自行覆写库存数字。重新连接按Last-Event-ID补齐，发现版本缺口重新读取快照。来源时间和采集时间分别保存，统一按用户时区显示并标注时区。
+After recovery, the projection reads back from the same persistent source; the frontend must not overwrite inventory numbers based on execution.status. Reconnect using Last-Event-ID and reload a snapshot when a version gap is found. Store source time and collection time separately, display them in the user's timezone, and label the timezone.
 
-## 5. 后台必须提供的调查能力
+## 5. Investigation Capabilities Required in the Backend
 
-- 输入只含症状、业务标识、原始证据和权限/政策边界。移除业务expected_disposition与已求解根因；评测器可以持有真值。
-- Strands选择按需读取；工具接收明确的case/record查询，调用适配器而非总是读取一个已求解快照。每次返回revision、证据ID与新鲜度。
-- 策略决定是否允许动作，模型提出诊断候选；两者独立保存，失败不能伪装Agent完成。
-- 原因说明和safe_next_step是不同字段；回答应直接回应问题，含证据引用和未知项，不能只复述审批规则。
-- 会话按case/run持久化；跨轮引用“刚才那批货”有明确上下文；与写操作分离。展示计划和证据摘要，不展示隐藏思维链。
-- 暂停取消/隔离在途调用后续效果，旧run结果不能推进新run。停止边界需独立测试，不能仅改变UI状态。
-- 当前真实基线只能证明有约束advisory和本地效果；前端标签清楚区分 Real model / Synthetic business data / External reads / Local writes。
+- Inputs contain only symptoms, business identifiers, raw evidence, and permission/policy boundaries. Remove business expected_disposition and solved root causes; the evaluator may hold the truth.
+- Strands selects reads as needed; tools receive explicit case/record queries and call adapters instead of always reading a solved snapshot. Every return includes revision, evidence ID, and freshness.
+- Policy decides whether an action is allowed and the model proposes diagnostic candidates; store them separately, and do not disguise a failure as Agent completion.
+- Cause explanation and safe_next_step are separate fields; answer the question directly with citations and unknowns, rather than merely repeating approval rules.
+- Persist sessions by case/run; cross-turn references such as “that shipment just mentioned” have explicit context; keep them separate from writes. Show plan and evidence summaries, not hidden chain-of-thought.
+- Pause/cancel isolates downstream effects of in-flight calls; an old run cannot advance a new run. Test the stop boundary independently rather than changing only UI state.
+- The current real baseline proves only constrained advisory and local effects; frontend labels must distinguish Real model / Synthetic business data / External reads / Local writes.
 
-## 6. 视觉与交互规格
+## 6. Visual and Interaction Specification
 
-- Geist字体沿用现有本地字体。背景银灰，模块纯白，正文深蓝黑；常规正文14–16px，辅助信息12–13px，关键数量24–32px。
-- 蓝/青/紫/橙/绿分别用于来源，不使用深浅双色侧条；状态另有文字/图标，不能只靠颜色。
-- 主正文对比目标4.5:1，关键图形3:1；避免半透明深色背景残留。
-- 连线1–1.5px、端点贴节点边缘中心；能直则直，必要转向使用小圆角/平滑曲线。不加端点亮dot，不靠循环跑光声称工具在工作。
-- 新数据到来短暂强调120–220ms；没有新事件不假闪。reduced-motion下无位移，保留状态更新。
-- 模块支持Focus；Arrange模式才可拖动，提供键盘移动与Reset；布局偏好按本地用户保存，不改变业务状态。
-- 1440/1280保持调查+对话双栏；中小视口改上下顺序，先当前问题/操作，再证据，聊天入口始终可达。任何断点均不露出旧图。
+- Reuse the existing local Geist font. Use a silver-gray background, pure-white modules, and dark blue-black body text; regular text 14–16px, supporting information 12–13px, key quantities 24–32px.
+- Use blue/cyan/purple/orange/green for sources without dark/light double sidebars; give states their own text/icon and never rely on color alone.
+- Target 4.5:1 contrast for body text and 3:1 for key graphics; avoid residual translucent dark backgrounds.
+- Lines 1–1.5px, endpoints touching the center of node edges; use straight lines when possible and small-radius/smooth curves when turning is necessary. No glowing endpoint dots and no looping light animation to claim that a tool is working.
+- Briefly emphasize new data for 120–220ms; do not fake-flash when there is no new event. Under reduced motion, remove movement while retaining state updates.
+- Modules support Focus; only Arrange mode allows dragging, with keyboard move and Reset; save layout preference locally without changing business state.
+- Keep investigation and conversation in two columns at 1440/1280; at small and medium widths stack them with the current question/action first, then evidence, while keeping chat reachable. Do not reveal the old diagram at any breakpoint.
 
-## 7. 实施切片
+## 7. Implementation Slices
 
-1. 数据与路由：单一投影、case/run身份、正常态新骨架、移除legacy可达路由；先补跨页数值一致测试。
-2. 真实后台：去答案泄漏、真实工具事件、问答质量、暂停与版本隔离；再把前端接上该事件流。
-3. Investigation组件：CaseHeader、InvestigationProgress、EvidenceDrawer、CaseChat、ManagerReview、Outcome；最后微调排版连线，不反向让图决定领域模型。
-4. 业务实时模拟与联动：合成系统产生持久化收货/发布/入账事件，曲线只消费已发生事件；SaaS来源按case明确关联。
-5. 浏览器验收：从源异常到真实调查、必要审查、效果回读及Dashboard同步，录制同run的证据而非各自拼接成功片段。
+1. Data and routing: one projection, case/run identity, new normal-state skeleton, and removal of reachable legacy routes; first add cross-page numeric-consistency tests.
+2. Real backend: remove answer leakage, add real tool events, answer quality, pause and version isolation; then connect the frontend to that event stream.
+3. Investigation components: CaseHeader, InvestigationProgress, EvidenceDrawer, CaseChat, ManagerReview, and Outcome; tune spacing and lines last, without letting the diagram dictate the domain model.
+4. Business real-time simulation and linkage: synthetic systems produce persistent receipt/posting/invoice events, and curves consume only events that occurred; associate SaaS sources explicitly by case.
+5. Browser acceptance: from source anomaly through real investigation, necessary review, effect readback, and Dashboard synchronization, record evidence from the same run instead of stitching together successful fragments.
 
-## 8. 验收矩阵
+## 8. Acceptance Matrix
 
-至少覆盖正常无需动作、12缺收货+8已批准、ERP已入账但回执丢失、质量待批准、审批后证据变更、写超时后查重、人工停止、断流重连。每条均检查业务结果与禁用动作，不只匹配文案。
+Cover at least normal/no action, 12 missing receipt + 8 approved, ERP posted but receipt lost, quality awaiting approval, evidence changed after approval, duplicate check after write timeout, human stop, and stream reconnect. Check business results and disabled actions for each; do not only match copy.
 
-关键门槛：
+Key gates:
 
-- 后台VERIFIED后下个投影更新中两页的库存、缺口、发票一致；刷新仍一致。
-- 真模型不可用时不声称Agent完成，重试恢复有明确状态。
-- 三个相同表象不同根因的案例，无预先真值提示仍做出不同的正确调查。
-- 工具开始/完成事件在实际调用时到达前端；源断开时不持续假“LIVE”。
-- 每次批准绑定plan digest、case version、demo tenant和范围；回读自动执行，缺证据才停止。
-- 未批准、已暂停、旧run晚到或新证据出现时，不发出未授权写入。
-- 展开证据可追到实际记录和引用；修复凭证的execution.approval_id非空且准确。
-- 多轮问题直接回应用户，前端不覆盖掉历史会话；数字与判断都有可打开引用。
-- 默认与桌面断点截图可读，键盘可完成主要流程；事件上翻不被抢滚动。
+- After backend VERIFIED, the next projection update must keep inventory, gap, and invoice consistent across both pages; refresh remains consistent.
+- When the real model is unavailable, do not claim Agent completion; retry recovery has a clear state.
+- Three cases with the same appearance but different root causes must produce different correct investigations without preloaded truth hints.
+- Tool start/complete events reach the frontend when the actual call happens; after a source disconnect, do not continue to pretend “LIVE.”
+- Each approval binds plan digest, case version, demo tenant, and scope; readback runs automatically and stops only when evidence is missing.
+- With no approval, a paused run, a late old-run result, or new evidence, emit no unauthorized write.
+- Expanded evidence reaches the actual record and citation; the resolution credential's execution.approval_id is present and exact.
+- Multi-turn questions directly answer the user, and the frontend does not overwrite conversation history; numbers and judgments have openable citations.
+- Default and desktop-breakpoint screenshots are readable, the keyboard completes the main flow, and scrolling the event list upward is not stolen.
 
-## 9. 自查
+## 9. Self-Check
 
-本方案不把“20全是漏入账”和“12漏入账+8质量库存”混为一谈；以后一种为主case。正常态不再禁用聊天或回退旧框架。保持一处经理批准，其余读查与验证自动进行；不自动批准新增外部权限、不隐瞒模型失败、不声明生产数据。没有要求新增第三方平台或改换前端框架。
+This proposal does not confuse “all 20 are missing postings” with “12 missing postings + 8 quality-held inventory”; the latter is the main case. Normal state no longer disables chat or falls back to the old framework. Keep one manager approval while all other reads and verification proceed automatically; do not auto-approve new external permissions, hide model failure, or claim production data. No new third-party platform or frontend-framework replacement is required.
 
-## 10. 第二轮细化：后台质量与 Investigation 视觉
+## 10. Second Refinement Round: Backend Quality and Investigation Visuals
 
-本节为用户要求的优化细化，尚不是已实施结果。2026-09-05再次读取当前8765页面：恢复为VERIFIED但模型仍AGENT UNAVAILABLE；本轮独立后台真实运行不改变该历史页面。当前窄窗中的Signals灰绿底块、拓扑大圆及重复状态仍存在。截图与复核记录见 `docs/audits/2026-09-05-investigation-refinement.md`。
+This section refines the optimization requested by the user; it is not an implemented result. On 2026-09-05 the current page at 8765 was read again: it had recovered to VERIFIED while the model remained AGENT UNAVAILABLE; the independent backend run in this round did not change that historical page. The narrow-window Signals gray-green block, large topology circle, and repeated states remain. Screenshots and review notes are in docs/audits/2026-09-05-investigation-refinement.md.
 
-### 10.1 不再用政策答案代替模型调查
+### 10.1 Do Not Use Policy Answers as a Substitute for Model Investigation
 
-实现责任按边界拆分，不一次重写所有系统：
+Split implementation responsibility by boundary; do not rewrite every system at once:
 
-1. `agents/live_advisory.py`：建立无答案提示的调查输入和输出。移除模型可见的expected_disposition、expected_safe_next_step、已求解diagnosis和带测试答案的temporal_hook。评测真值只留在评测器；权限、审批要求和预算仍保留。测试必须检查完整模型可见payload，而不只是prompt文本。
-2. 工具适配层：工具接受case与record查询参数，在实际调用时读取对应源的记录、关联键和版本。没有结果、源不可用、版本冲突是不同结果。取消“每个工具只能读一次”的绝对限制；在有新版本或参数不同且预算允许时可以重查。不能为了看起来多Agent而强制调用所有源。
-3. 调查输出：`findings[]`、`hypotheses[]`、`missing_evidence[]`、`proposed_actions[]`、`answer`、`citations[]`。每条结论关联证据ID；允许“目前不能确认”。策略验证器独立检查拟议动作的依据与授权，不把一个正确标签塞回模型充当答案。
-4. `live_advisory_gateway.py`：调查和问答使用同一case/run会话，但不共用“只返回safe_next_step”的问题模板。保留逐轮会话与检索记录。问原因必须解释原因，问进展必须描述尚未返回的事实，问修复结果必须引用效果回读。
-5. server与事件存储：工具包装器在真正开始/返回/失败时发布可持久化事件；页面立即收到，而不是整轮完成后补一批日志。运行状态、业务状态、连接状态分别投影。模型失败不能把历史规则恢复声称为Agent成功。
+1. agents/live_advisory.py: create investigation inputs and outputs without answer hints. Remove expected_disposition, expected_safe_next_step, solved diagnosis, and test-answer temporal_hook from what the model can see. Keep evaluation truth only in the evaluator; retain permissions, approval requirements, and budget. Tests must inspect the complete model-visible payload, not only prompt text.
+2. Tool adapter layer: tools accept case and record query parameters and read the corresponding source record, relation key, and version at call time. No result, source unavailable, and version conflict are different outcomes. Remove the absolute “each tool may be read only once” rule; reread when a new version or different parameter exists and budget allows. Do not force every source call just to look multi-agent.
+3. Investigation output: findings[], hypotheses[], missing_evidence[], proposed_actions[], answer, citations[]. Link every conclusion to an evidence ID; allow “cannot confirm at this time.” A policy validator independently checks basis and authorization for proposed actions; do not insert a correct label into the model as its answer.
+4. live_advisory_gateway.py: investigation and Q&A use the same case/run session but do not share a “return only safe_next_step” question template. Retain per-turn session and retrieval records. A cause question must explain the cause, a progress question must describe facts not yet returned, and a repair-result question must cite effect readback.
+5. Server and event storage: tool wrappers publish persistent events when a call actually starts, returns, or fails; the page receives them immediately instead of a batch after the whole turn. Project run state, business state, and connection state separately. A model failure must not be presented as Agent success through historical-rule recovery.
 
-主case的调查不预定固定顺序，但必须获得足够证据：发票异常→核对PO/ASN/ERP→识别未决12单位及质量8单位→检查集成写入结果未知→按业务键向ERP确认是否已经入账→核验确切批次的质量批准→形成有界动作→经理一次批准→幂等执行→权威回读。若ERP已有记录则不重复入账；若QA未批准则不能转移质量库存。
+The main-case investigation must not prescribe a fixed order, but must obtain enough evidence: invoice anomaly → check PO/ASN/ERP → identify the pending 12 units and quality-held 8 units → inspect the unknown integration-write outcome → confirm by business key whether ERP has posted → verify quality approval for the exact batch → form a bounded action → one manager approval → idempotent execution → authoritative readback. If ERP already has a record, do not post again; if QA has not approved, do not move quality-held inventory.
 
-### 10.2 Investigation配色与密度落到具体token
+### 10.2 Apply Investigation Color and Density to Concrete Tokens
 
-保留银白方向，不再叠加第三套主题。浅色主题下替换组件原始深色背景规则，避免不断追加更高优先级覆盖。
+Keep the silver/white direction and do not layer on a third theme. Under a light theme, replace the component's original dark-background rules instead of continually adding higher-priority overrides.
 
-| 用途 | 值 | 使用范围 |
+| Use | Value | Scope |
 | --- | --- | --- |
-| 页面背景 | #F3F5F7 | 统一画布，无绿色叠色 |
-| 模块 | #FFFFFF | 白色浮层，轻阴影，无外描边 |
-| 正文 | #17212B | 主结论、数字；对白约16.29:1 |
-| 次级内容 | #52606D | 必要时间/记录ID；对白约6.46:1 |
-| 主操作/活动 | #1D4ED8 | 开始、继续、提交；白字约6.70:1 |
-| ERP / Airtable / Celigo / Jira / Slack | #0E7490 / #1D4ED8 / #6D28D9 / #C2410C / #15803D | 独立纯色节点或图线，不作为整个模块背景；白字最低约5.02:1 |
+| Page background | #F3F5F7 | One canvas, without green tint |
+| Module | #FFFFFF | White surface, light shadow, no outer border |
+| Body text | #17212B | Main conclusions and numbers; about 16.29:1 contrast |
+| Secondary content | #52606D | Required time/record IDs; about 6.46:1 contrast |
+| Primary action/activity | #1D4ED8 | Start, continue, submit; about 6.70:1 with white text |
+| ERP / Airtable / Celigo / Jira / Slack | #0E7490 / #1D4ED8 / #6D28D9 / #C2410C / #15803D | Independent solid-color nodes or lines, not the whole module background; minimum about 5.02:1 with white text |
 
-以上比值为sRGB计算的实色对比，不代表当前页面或完整无障碍验收已通过。彩色纯色与高可读性并存；不使用彩虹渐变、发光文字、灰绿数字条、淡黄色白字按钮。源颜色表达“来自哪里”，状态用文字与图标表达“发生了什么”。
+These ratios are solid-color sRGB contrast calculations; they do not mean the current page or full accessibility acceptance has passed. Solid colors can coexist with high readability; do not use rainbow gradients, glowing text, gray-green number bars, or pale-yellow buttons with white text. Source color expresses “where it came from”; state text and icons express “what happened.”
 
-首屏减少为：紧凑案例头部、当前调查问题和证据、常驻聊天；需要审查时才出现决策区域。Signals收成紧凑业务摘要，不重复五个平台的静态清单。拓扑默认折叠为Source activity，不再用巨大Agent圆和连接到所有SaaS的放射线作为视觉主体。保留用户要求的展开/聚焦功能。
+Reduce the first screen to a compact case header, current investigation question/evidence, and persistent chat; show the decision area only when review is needed. Condense Signals into a compact business summary instead of repeating five platforms' static list. Collapse topology by default into Source activity, rather than making a huge Agent circle and spokes to every SaaS the visual centerpiece. Keep the user's requested expand/focus behavior.
 
-正常与异常沿用同一布局；已完成后以结果凭证替换失效操作，而不是保留三排禁用按钮。需要保留模型失败史时写明“Local recovery verified / Agent run failed”，不展示模糊的“0.99”。
+Use the same layout for normal and abnormal states; after completion replace dead controls with an outcome credential instead of retaining three rows of disabled buttons. When preserving model failure history, write “Local recovery verified / Agent run failed” and do not show a vague “0.99.”
 
-### 10.3 自定交付门槛，不是保证获奖
+### 10.3 Self-Defined Delivery Gates, Not a Promise of Winning
 
-[官方规则](https://agentsforhumans.devpost.com/rules)于2026-09-05复核：技术、设计、影响、原创性、展示等权；强调完整产品体验与非平凡Strands实现。下面是本项目内部验收标准，不是官方分数线。
+The [official rules](https://agentsforhumans.devpost.com/rules) were checked on 2026-09-05: technical, design, impact, originality, and presentation are equally weighted; they emphasize a complete product experience and non-trivial Strands implementation. The following are this project's internal acceptance standards, not official score thresholds.
 
-- 八类业务与恢复场景，每类至少三次真实模型运行，共24次；记录全部结果，不挑最好的一次。正常、缺收货+可放行质量、已入账但回执丢失、QA未批准、物理少发、证据冲突/不足、批准后版本变化、执行超时后查重。暂停和断流重连另做跨场景故障测试。
-- 每次同时评判根因、必要证据覆盖、引用真实性、动作/停止正确性、多轮问题回答；不能只比对disposition。任何错误写入或虚假verified均阻断交付；如仍有业务判断失败，保留失败记录并修正后重跑相关组。
-- 对照规则基线：在相同输入与工具条件下比较能解决的案例、查源次数、人工干预次数。不能宣称规则绝对无法处理；要展示Agent在多源关联、针对性追问、消化非结构化证据上的实际增益。
-- 用户从正常页面触发一个症状，能看到当前问题、真实工具活动、打开证据、追问、必要时批准、看到两页同一run的结果变化。连续三次完整浏览器旅程无状态分裂；刷新和重连不回滚。
-- 调查界面1440、1280及当前窄窗检查；正文/数据按第6节字号与对比要求；键盘可完成主要操作。工具开始/结束在本地正常网络下目标1秒内可见，业务回读结果目标2秒内两页一致，记录实测而非假定达标。
-- 影响只报告实测：恢复数量、解除的发票阻塞、是否避免重复入账、耗时/模型费用/人类干预。业务收益未测量时不编造节省百分比。
+- Eight business and recovery scenarios, at least three real model runs each, 24 total; record every result rather than selecting the best. Normal, missing receipt + releasable quality, posted-but-lost receipt, QA not approved, physical short shipment, evidence conflict/insufficiency, post-approval version change, and post-timeout duplicate check. Test pause and stream reconnect as cross-scenario fault cases.
+- Judge root cause, required evidence coverage, citation truth, action/stop correctness, and multi-turn answers together; do not compare disposition only. Any wrong write or false verified blocks delivery; if a business judgment still fails, retain the failure and rerun the affected group after correction.
+- Compare the resolvable cases, source-read count, and human-intervention count with a rules baseline under identical inputs and tools. Do not claim rules can never solve the case; show the actual gain from Agent cross-source association, targeted follow-up, and absorption of unstructured evidence.
+- From a normal page the user triggers a symptom, sees the current question and real tool activity, opens evidence, asks follow-ups, approves when needed, and sees the result change on both pages for the same run. Three complete browser journeys show no state split; refresh and reconnect do not roll back.
+- Inspect the investigation UI at 1440, 1280, and the current narrow window; body/data use the size and contrast requirements in section 6; the keyboard completes the main actions. Target tool start/end visibility within 1 second and same-page readback within 2 seconds on a local healthy network; record measurements rather than assuming the target.
+- Report measured impact only: recovery quantity, released invoice blockage, avoided duplicate postings, time/model cost/human intervention. Do not invent a savings percentage when business value is unmeasured.
 
-实施顺序：先统一投影和真实调查输入→同源工具事件与问答→Investigation布局与token→24次后台测试和浏览器闭环。可以在后端测试期间做静态样式，但在同源契约接通前不能宣布页面完成。暂不增加SaaS数量或Agent数量。
+Implementation order: unify projection and real investigation inputs → same-source tool events and Q&A → Investigation layout and tokens → 24 backend tests and browser closure. Static styling may proceed during backend testing, but do not call the page complete before the same-source contract is connected. Do not add SaaS or Agent count.
 
-## 11. KB复核后的实施注意事项
+## 11. Implementation Notes After KB Review
 
-后续用户要求已对KB的Diagnosis/validation-first/flywheel与权威资料做进一步对照，发布证据边界见[Submission and winner README benchmark](../../research/2026-09-07-submission-and-winner-readme-benchmark.md)。实施前必须纳入：复用现有深层harness组件而非再建第三套；evaluator获得真实原始证据；源在线与证据充分分开；checker失败形成针对性补查；复合根因与未知原因可表达；结果凭证before-state来自真实快照。90/4/6变体报80/8/12已被隔离probe复现。
+Later user requirements were compared further with KB Diagnosis/validation-first/flywheel material and authoritative sources; the release evidence boundary is in [Submission and winner README benchmark](../../research/2026-09-07-submission-and-winner-readme-benchmark.md). Before implementation include: reuse the existing deep-harness components rather than building a third; give the evaluator real raw evidence; separate source online from evidence sufficiency; make checker failure trigger targeted supplementary reads; express compound causes and unknown causes; derive the outcome credential's before-state from a real snapshot. The 90/4/6 variant reporting 80/8/12 was reproduced by an isolated probe.
 
-多Agent采用对照验证后按需启用，不按SaaS数量固定派发。运行时调查/动作闭环与离线失败→golden→回归→发布闭环分开；不把报告质量分数当执行权限，也不把所有运行都升级为17-validator流水线。此补充仍为审查与设计，没有应用代码实施。
+Enable multiple Agents only when comparison evidence supports them, rather than assigning one by SaaS count. Keep the runtime investigation/action loop separate from the offline failure → golden → regression → release loop; do not treat report quality scores as execution permission or upgrade every run into a 17-validator pipeline. This supplement remains review and design; no application code has been implemented.

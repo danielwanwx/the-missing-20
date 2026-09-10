@@ -18,7 +18,7 @@ Open the validated architecture artifact:
 
 - [Interactive architecture](the-missing-20-live-architecture.html)
 - [Architecture source](the-missing-20-live-architecture-showcase.json)
-- [Light review capture](the-missing-20-live-architecture.visual-check.1440x900.light.png)
+- [Light review capture](the-missing-20-live-architecture.english.jpg)
 
 ## Historical recovery runtime path
 

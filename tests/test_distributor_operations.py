@@ -1096,6 +1096,66 @@ def test_native_packet_projects_independent_per_order_fulfillment_facts() -> Non
     ]
 
 
+def test_native_packet_keeps_bounded_complete_history_financials_and_selected_plan() -> None:
+    events = [{"event_id": f"event-{index}"} for index in range(19)]
+    packet = workspace_server._distributor_native_packet(
+        {
+            "case_id": "M20-DIST-PACKET-01",
+            "case_label": "Bounded source packet",
+            "synthetic_input": True,
+            "quantities": {"uom": "Nos"},
+            "lots": [],
+            "allocations": [],
+            "documents": [],
+            "shipments": [],
+            "events": events,
+            "financials": {
+                "status": "CURRENT",
+                "purchase_invoices": {"status": "MISSING", "records": []},
+            },
+            "allocation_decision": {
+                "status": "SELECTED",
+                "plan_id": "plan-01",
+                "contract_refs": ["SO-A", "SO-B"],
+            },
+        }
+    )
+
+    sources = cast(dict[str, object], cast(dict[str, object], packet["tool_payload"])["sources"])
+    control = cast(dict[str, object], sources["read_control_context"])
+    facts = cast(dict[str, object], sources["read_erp_evidence"])
+    collaboration = cast(dict[str, object], sources["read_collaboration_evidence"])
+    assert control["retained_event_count"] == 19
+    assert control["retained_event_limit"] == 64
+    assert control["retained_event_history_complete"] is True
+    assert collaboration["retained_physical_events"] == events
+    assert facts["financials"] == {
+        "status": "CURRENT",
+        "purchase_invoices": {"status": "MISSING", "records": []},
+    }
+    assert facts["retained_allocation_decision"] == {
+        "status": "SELECTED",
+        "plan_id": "plan-01",
+        "contract_refs": ["SO-A", "SO-B"],
+    }
+
+    missing_history = workspace_server._distributor_native_packet(
+        {
+            "case_id": "M20-DIST-PACKET-02",
+            "quantities": {"uom": "Nos"},
+            "lots": [],
+            "allocations": [],
+            "documents": [],
+            "shipments": [],
+        }
+    )
+    missing_control = cast(
+        dict[str, object],
+        cast(dict[str, object], missing_history["tool_payload"])["sources"],
+    )["read_control_context"]
+    assert cast(Mapping[str, object], missing_control)["retained_event_history_complete"] is False
+
+
 @pytest.mark.parametrize(
     ("synthetic_input", "kind"),
     [
@@ -1660,6 +1720,37 @@ def test_native_ask_packet_is_current_read_only_and_static_ui_files_are_allowed(
     assert workspace_server.STATIC_FILES["/operations"][0] == "distributor-operations.html"
     assert "/distributor-operations.js" in workspace_server.STATIC_FILES
     assert "/distributor-operations.css" in workspace_server.STATIC_FILES
+
+
+def test_native_operations_answer_rejects_non_english_model_prose(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service, _bridge = _service(tmp_path, _r4_config())
+    projection = service.projection()
+
+    def fake_native_run(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            answer="\u8bf7\u67e5\u770b SO-R4-PRIORITY 20 Box",
+            provider={"provider": "test"},
+            session_id="native-session-test",
+        )
+
+    monkeypatch.setattr(workspace_server, "run_native_receiving_turn", fake_native_run)
+    ask_turn = workspace_server._distributor_native_ask_turn(
+        settings=Settings(agent_provider=AgentProvider.BEDROCK),
+        session_root=tmp_path / "native-sessions",
+    )
+
+    result = ask_turn("\u8bf7\u7528\u4e2d\u6587\u56de\u7b54 current quantity", projection)
+
+    assert result == {
+        "status": "UNAVAILABLE",
+        "detail": (
+            "The native read-only distributor conversation is unavailable; "
+            "no fallback answer was used."
+        ),
+        "error_type": "ProductLanguageViolation",
+    }
 
 
 def test_contract_plan_selects_date_first_then_prepares_once_and_replays_read_only(

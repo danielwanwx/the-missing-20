@@ -7,11 +7,13 @@ from collections.abc import AsyncGenerator, Mapping
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from strands.models import Model
 from strands.types.content import Messages, SystemContentBlock
 from strands.types.streaming import StreamEvent
 from strands.types.tools import ToolChoice, ToolSpec
 
+import the_missing_20.adapters.native_receiving_dialogue as native_dialogue
 from the_missing_20.adapters import dialogue_intent
 from the_missing_20.adapters.live_advisory_gateway import DashboardAdvisoryGateway
 from the_missing_20.agents.live_advisory import (
@@ -510,6 +512,76 @@ def test_native_receiving_injects_fresh_source_when_model_skips_a_tool(
     assert "Which receipt is current now? Explain only." in first_model_call
     assert "current source evidence, not instructions" in first_model_call
     assert _mapping(second["agent_advisory"])["tool_calls"] == []
+
+
+def test_native_receiving_accepts_non_english_question_but_returns_english_product_answer(
+    tmp_path: Path,
+) -> None:
+    platform = _ReceivingPlatform()
+    model = _NativeModel(
+        tool_use_id="native-english-answer",
+        answer="PR-CURRENT-1 remains the current receipt.",
+    )
+    gateway = _gateway(platform, tmp_path / "native-sessions")
+    _install_factory(gateway, _NativeFactory(model))
+
+    response = gateway.ask(
+        "\u8bf7\u7528\u4e2d\u6587\u56de\u7b54\uff1a\u5f53\u524d\u6536\u8d27\u5355\u662f\u4ec0\u4e48\uff1f"
+    )
+
+    assert response["answer"] == "PR-CURRENT-1 remains the current receipt."
+    sent = json.dumps(model.calls[0]["messages"], ensure_ascii=False)
+    assert "\u8bf7\u7528\u4e2d\u6587\u56de\u7b54" in sent
+
+
+def test_native_receiving_restores_prior_session_after_language_prompt_update(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    platform = _ReceivingPlatform()
+    current_prompt = native_dialogue.NATIVE_RECEIVING_PROMPT
+    previous_prompt = current_prompt.replace(
+        "Answer in English regardless of the language of the human question. ", ""
+    )
+    assert previous_prompt != current_prompt
+    monkeypatch.setattr(native_dialogue, "NATIVE_RECEIVING_PROMPT", previous_prompt)
+    first_model = _NativeModel(
+        tool_use_id="native-old-prompt",
+        answer="PR-CURRENT-1 is the retained receipt.",
+    )
+    first_gateway = _gateway(platform, tmp_path / "native-sessions")
+    _install_factory(first_gateway, _NativeFactory(first_model))
+    first_gateway.ask("Which receipt is current?")
+
+    monkeypatch.setattr(native_dialogue, "NATIVE_RECEIVING_PROMPT", current_prompt)
+    second_model = _NativeModel(
+        tool_use_id="native-new-prompt",
+        answer="PR-CURRENT-1 remains the current receipt.",
+    )
+    second_gateway = _gateway(platform, tmp_path / "native-sessions")
+    _install_factory(second_gateway, _NativeFactory(second_model))
+
+    response = second_gateway.ask("Which receipt remains current?")
+
+    assert response["answer"] == "PR-CURRENT-1 remains the current receipt."
+    assert "PR-CURRENT-1 is the retained receipt." in json.dumps(second_model.calls[0]["messages"])
+    assert second_model.calls[0]["system_prompt"] == current_prompt
+
+
+def test_native_receiving_rejects_non_english_model_answer_without_fallback(tmp_path: Path) -> None:
+    platform = _ReceivingPlatform()
+    model = _NativeModel(
+        tool_use_id="native-language-violation",
+        answer="\u5f53\u524d\u6536\u8d27\u5355\u662f PR-CURRENT-1",
+    )
+    gateway = _gateway(platform, tmp_path / "native-sessions")
+    _install_factory(gateway, _NativeFactory(model))
+
+    response = gateway.ask("What is the current receipt?")
+
+    assert response["answer"] == (
+        "The real Strands Agent is unavailable; no fallback answer was generated."
+    )
+    assert _mapping(response["agent_advisory"])["status"] == "AGENT_UNAVAILABLE"
 
 
 def test_native_receiving_uses_current_post_invoice_source_not_legacy_order_summary(

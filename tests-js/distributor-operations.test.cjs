@@ -13,6 +13,12 @@ const {
   normalizeContractPlan,
   contractPlanRows,
   contractDecisionState,
+  contractPanelState,
+  fulfillmentBenchmark,
+  activeAlertStages,
+  flowStageFacts,
+  createVoiceController,
+  projectionSourceState,
   retainConversationProjection,
   shouldPreserveTemplateFields,
   deliverySummary,
@@ -38,6 +44,16 @@ test('projection keeps missing source quantities unknown instead of turning them
   assert.equal(projection.quantities.received, null);
   assert.equal(projection.quantities.usable, undefined);
   assert.equal(projection._provided.quantities, true);
+});
+
+test('configured source failure stays distinct from a disabled operation', () => {
+  assert.equal(projectionSourceState({
+    available: false,
+    case_id: 'SYN-OPS-SOURCE-FAILURE',
+    stage: 'SOURCE_UNAVAILABLE',
+    alerts: [{ code: 'SOURCE_UNAVAILABLE', status: 'OPEN' }],
+  }), 'SOURCE_UNAVAILABLE');
+  assert.equal(projectionSourceState({ available: false, case_id: '', stage: 'DISABLED' }), 'DISABLED');
 });
 
 test('external handoffs group by provider and retain a verified evidence link', () => {
@@ -143,6 +159,101 @@ test('pending or stale contract decisions never render as selected', () => {
   assert.equal(contractDecisionState(plan, { status: 'SELECTED', plan_id: 'cap-other', state_revision: 'rev-demo-1' }), 'PENDING');
   assert.equal(contractDecisionState(plan, { status: 'UNAVAILABLE' }), 'UNAVAILABLE');
   assert.equal(contractDecisionState(plan, null), 'UNAVAILABLE');
+});
+
+test('a zero additional current plan keeps an earlier selection as historical evidence', () => {
+  const completePlan = { ...contractPlan, new_quantity: 0, rows: [{ ...contractPlan.rows[0], new_quantity: 0 }] };
+  assert.equal(contractPanelState(completePlan, {
+    status: 'SELECTED', plan_id: 'cap-earlier', state_revision: 'rev-earlier', event_id: 'evt-earlier',
+  }), 'COMPLETE');
+});
+
+test('current-case benchmark compares only source-backed commitments and recorded completion', () => {
+  const benchmark = fulfillmentBenchmark({
+    available: true,
+    synthetic_input: true,
+    quantities: { uom: 'Nos', dispatched: 40, delivery_confirmed: 40 },
+    allocations: [{ customer_order: 'SO-A', requested: 25 }, { customer_order: 'SO-B', requested: 15 }],
+  });
+  assert.deepEqual(benchmark, {
+    status: 'CURRENT', target: 40, dispatched: 40, confirmed: 40, unit: 'Nos', order_count: 2, synthetic: true,
+  });
+  assert.equal(fulfillmentBenchmark({ available: true, quantities: { dispatched: 0, delivery_confirmed: 0 }, allocations: [] }).status, 'UNAVAILABLE');
+  assert.equal(fulfillmentBenchmark({
+    available: true, quantities: { dispatched: 25, delivery_confirmed: 25 },
+    allocations: [{ customer_order: 'SO-A', requested: 25 }, { customer_order: 'SO-B' }],
+  }).status, 'UNAVAILABLE');
+});
+
+test('flow distinguishes current zero stock from cumulative completed work and only flags open alerts', () => {
+  const projection = {
+    available: true,
+    synthetic_input: true,
+    quantities: { uom: 'Nos', ordered: 40, usable: 0, held: 0, allocated: 0, dispatched: 40, delivery_confirmed: 40 },
+    allocations: [{ customer_order: 'SO-A', requested: 25, picked: 25 }, { customer_order: 'SO-B', requested: 15, picked: 15 }],
+    alerts: [{ code: 'QUALITY_CHECK', status: 'RESOLVED' }, { code: 'PARTS_SHORTAGE', status: 'OPEN' }],
+    events: [], lots: [],
+  };
+  assert.match(flowStageFacts(projection, { key: 'inspection', metric: 'usable', detail: 'Quality evidence' }).current, /No current hold/);
+  assert.match(flowStageFacts(projection, { key: 'allocation', metric: 'allocated', detail: 'Customer demand' }).current, /No stock awaiting allocation/);
+  assert.deepEqual(activeAlertStages(projection), { arrival: { index: 1, code: 'PARTS_SHORTAGE' } });
+});
+
+test('voice controller dictates English into the input without sending and reads only on request', () => {
+  const input = { value: 'Which order', focused: false, focus() { this.focused = true; } };
+  const statuses = [];
+  const dictateButton = { disabled: false, attributes: {}, setAttribute(key, value) { this.attributes[key] = value; } };
+  const readButton = { disabled: false };
+  const stopButton = { hidden: true };
+  let recognition;
+  class FakeRecognition {
+    start() { this.started = true; }
+    stop() { this.stopped = true; this.onend(); }
+  }
+  const synthesis = { spoken: [], cancelled: 0, speak(value) { this.spoken.push(value); }, cancel() { this.cancelled += 1; } };
+  const voice = createVoiceController({
+    recognitionFactory: () => { recognition = new FakeRecognition(); return recognition; },
+    speechSynthesisApi: synthesis,
+    utteranceFactory: (value) => ({ text: value }),
+    input,
+    setStatus: (message) => statuses.push(message),
+    dictateButton, readButton, stopButton,
+  });
+  assert.deepEqual(voice.support(), { dictation: true, reading: true });
+  voice.toggleDictation();
+  assert.equal(recognition.lang, 'en-US');
+  recognition.onresult({ results: [[{ transcript: 'can ship now' }]] });
+  assert.equal(input.value, 'Which order can ship now');
+  assert.equal(input.focused, true);
+  assert.match(statuses.at(-1), /Review it/);
+  recognition.onerror({ error: 'not-allowed' });
+  assert.match(statuses.at(-1), /permission was denied/);
+  voice.setAnswer('The current source records 40 dispatched.');
+  assert.equal(readButton.disabled, false);
+  voice.readAnswer();
+  assert.equal(synthesis.spoken[0].lang, 'en-US');
+  assert.equal(stopButton.hidden, false);
+  voice.setAnswer('A replacement answer from the current source.');
+  assert.equal(synthesis.cancelled, 1);
+  assert.equal(stopButton.hidden, true);
+  voice.readAnswer();
+  voice.setAnswer('A replacement answer from the current source.');
+  assert.equal(synthesis.cancelled, 1);
+  voice.setAnswer('');
+  assert.equal(synthesis.cancelled, 2);
+  voice.stopReading();
+  assert.equal(synthesis.cancelled, 3);
+});
+
+test('voice controller leaves typed interaction usable when browser speech is unsupported', () => {
+  const statuses = [];
+  const voice = createVoiceController({
+    recognitionFactory: () => { throw new Error('unsupported'); },
+    input: { value: '' }, setStatus: (message) => statuses.push(message),
+  });
+  assert.deepEqual(voice.support(), { dictation: false, reading: false });
+  assert.equal(voice.toggleDictation(), false);
+  assert.match(statuses.at(-1), /Typing remains available/);
 });
 
 test('legacy projections have no contract panel data', () => {
@@ -369,5 +480,12 @@ test('page exposes the guarded business loop and synthetic evidence label', () =
   assert.match(html, /Commercial evidence/);
   assert.match(html, /Sales order line amounts are order values; they are not revenue/);
   assert.match(html, /ops-financials-panel/);
+  assert.match(html, /Completion against customer commitments/);
+  assert.match(html, /Historical, industry, and savings baselines are unavailable/);
+  assert.match(html, /Dictate in English/);
+  assert.match(html, /Dictation only fills the question/);
+  assert.match(html, /ops-resolved-alerts/);
+  assert.ok(html.indexOf('id="ops-chat-panel"') < html.indexOf('id="ops-evidence-panel"'));
+  assert.match(html, /href="#ops-chat-panel"/);
   assert.match(html, /distributor-operations\.js/);
 });

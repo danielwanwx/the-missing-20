@@ -23,6 +23,7 @@ from the_missing_20.adapters.investigation_case_sources import (
 )
 from the_missing_20.adapters.role_task_journal import RoleTaskJournal
 from the_missing_20.adapters.strands_models import BedrockNovaProFactory
+from the_missing_20.agents.product_language import english_product_text, english_product_texts
 from the_missing_20.agents.receiving_advisory import (
     receiving_answer_gaps,
     receiving_packet,
@@ -142,6 +143,9 @@ class LiveAdvisoryResult(ContractModel):
         ]
         if len(questions) != len(set(questions)):
             raise ValueError("follow-up questions must be distinct")
+        english_product_text(self.reason, field="advisory reason")
+        english_product_text(self.safe_next_step, field="advisory safe next step")
+        english_product_texts(self.follow_up_questions, field="advisory follow-up question")
         return self
 
 
@@ -1708,13 +1712,17 @@ async def _invoke(
         model=model,
         tools=agent_tools,
         system_prompt=(
-            receiving_prompt()
+            "Answer in English regardless of the language of the human question. "
+            + receiving_prompt()
             if packet.get("case_class") == "receiving_operations"
-            else _source_investigation_prompt()
+            else "Answer in English regardless of the language of the human question. "
+            + _source_investigation_prompt()
             if packet.get("case_class") == "source_investigation"
-            else _ambiguous_policy_prompt()
+            else "Answer in English regardless of the language of the human question. "
+            + _ambiguous_policy_prompt()
             if packet.get("case_class") == "ambiguous_receipt"
-            else _policy_prompt()
+            else "Answer in English regardless of the language of the human question. "
+            + _policy_prompt()
         ),
         callback_handler=None,
         hooks=[
@@ -2052,7 +2060,11 @@ async def _invoke(
                 # not a substitute for source-ID and stock-effect validation.
                 prose = candidate.reason + " " + candidate.safe_next_step
                 if re.search(r"Airtable|Celigo|Slack|collaboration tools", prose, re.I) and not (
-                    re.search(r"cop(?:y|ies)|notification|corroborat|副本|通知|佐证", prose, re.I)
+                    re.search(
+                        r"cop(?:y|ies)|notification|corroborat|\u526f\u672c|\u901a\u77e5|\u4f50\u8bc1",
+                        prose,
+                        re.I,
+                    )
                 ):
                     raise AdvisoryValidationError(
                         "Explain the authority boundary: ERP receipt and stock ledger "

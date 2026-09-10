@@ -22,7 +22,9 @@ def requests_history(question: str) -> bool:
     return bool(
         re.search(
             r"\b(?:histor\w*|trends?|baselines?|benchmarks?|averages?|means?|charts?|"
-            r"increas\w*|decreas\w*|over time|net change)\b|历史|趋势|基准|平均|图表|增长|变化",
+            r"increas\w*|decreas\w*|over time|net change)\b|"
+            r"\u5386\u53f2|\u8d8b\u52bf|\u57fa\u51c6|\u5e73\u5747|\u56fe\u8868|"
+            r"\u589e\u957f|\u53d8\u5316",
             question,
             re.I,
         )
@@ -32,12 +34,12 @@ def requests_history(question: str) -> bool:
 def requested_history_metric(question: str) -> str | None:
     """Resolve only an unambiguous human-named metric, never a model guess."""
     aliases = {
-        "received": r"\b(?:receiving|received)\b|收货",
-        "recorded": r"\b(?:recorded|posted receipts?)\b|入账",
-        "quality_hold": r"\bquality hold\b|质量冻结",
-        "invoice_hold_value": r"\binvoice hold\b|发票冻结",
-        "outstanding_order_quantity": r"\boutstanding order\b|待交付",
-        "net_billed_sales": r"\b(?:net billed sales|billed revenue)\b|已开票",
+        "received": r"\b(?:receiving|received)\b|\u6536\u8d27",
+        "recorded": r"\b(?:recorded|posted receipts?)\b|\u5165\u8d26",
+        "quality_hold": r"\bquality hold\b|\u8d28\u91cf\u51bb\u7ed3",
+        "invoice_hold_value": r"\binvoice hold\b|\u53d1\u7968\u51bb\u7ed3",
+        "outstanding_order_quantity": r"\boutstanding order\b|\u5f85\u4ea4\u4ed8",
+        "net_billed_sales": r"\b(?:net billed sales|billed revenue)\b|\u5df2\u5f00\u7968",
     }
     selected = [key for key, pattern in aliases.items() if re.search(pattern, question, re.I)]
     return selected[0] if len(selected) == 1 else None
@@ -53,7 +55,10 @@ def retained_history_view(
     ambiguous metric request gets no automatic selection; the dashboard remains
     available for selecting other metrics explicitly.
     """
-    history_intent = r"\b(?:histor\w*|trends?|baselines?|benchmarks?)\b|历史|趋势|基准"
+    history_intent = (
+        r"\b(?:histor\w*|trends?|baselines?|benchmarks?)\b|"
+        r"\u5386\u53f2|\u8d8b\u52bf|\u57fa\u51c6"
+    )
     if not re.search(history_intent, question, re.I):
         return []
     selected = requested_history_metric(question)

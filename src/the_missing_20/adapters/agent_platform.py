@@ -2949,10 +2949,10 @@ class AgentPlatform:
                     "billing",
                     "margin",
                     "gross spread",
-                    "收入",
-                    "订单",
-                    "交付",
-                    "毛利",
+                    "\u6536\u5165",
+                    "\u8ba2\u5355",
+                    "\u4ea4\u4ed8",
+                    "\u6bdb\u5229",
                 )
             )
             if asks_recovery and self._text(execution.get("status")) == "VERIFIED":

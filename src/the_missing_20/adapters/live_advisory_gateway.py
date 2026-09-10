@@ -346,10 +346,10 @@ class DashboardAdvisoryGateway:
                     "overall",
                     "current status",
                     "what is wrong",
-                    "注意",
-                    "诊断",
-                    "整体",
-                    "所有问题",
+                    "\u6ce8\u610f",
+                    "\u8bca\u65ad",
+                    "\u6574\u4f53",
+                    "\u6240\u6709\u95ee\u9898",
                 )
             )
             if broad_question:

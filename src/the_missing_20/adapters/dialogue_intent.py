@@ -221,7 +221,8 @@ def _is_refusal(question: str) -> bool:
     return bool(
         re.search(
             r"\b(?:declin\w*|stop|read.only|without (?:writing|approval)|"
-            r"do not (?:approve|execute)|only inspect)\b|拒绝|不要执行|只读|停止执行",
+            r"do not (?:approve|execute)|only inspect)\b|"
+            r"\u62d2\u7edd|\u4e0d\u8981\u6267\u884c|\u53ea\u8bfb|\u505c\u6b62\u6267\u884c",
             question,
             re.IGNORECASE,
         )

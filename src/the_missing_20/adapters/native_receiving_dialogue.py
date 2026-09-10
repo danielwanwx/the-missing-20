@@ -31,6 +31,10 @@ from the_missing_20.agents.live_advisory import (
     SOURCE_TOOL_NAMES,
     model_source_payloads,
 )
+from the_missing_20.agents.product_language import (
+    ProductLanguageViolation,
+    english_product_text,
+)
 from the_missing_20.ports.agent_model import (
     AgentBudgetLedger,
     AgentModelFactory,
@@ -39,6 +43,7 @@ from the_missing_20.ports.agent_model import (
 )
 
 NATIVE_RECEIVING_SCHEMA_VERSION = "missing20-native-receiving-dialogue/n1"
+_ENGLISH_OUTPUT_INSTRUCTION = "Answer in English regardless of the language of the human question. "
 
 # This is the accepted v2 native-session prompt, frozen here for the opt-in N1
 # path. It deliberately contains no recovery disposition, expected answer, or
@@ -57,6 +62,7 @@ NATIVE_RECEIVING_PROMPT = " ".join(
         "Distinguish observations from inferences and scope absence claims to the evidence "
         "actually available.",
         "Include units with quantities.",
+        _ENGLISH_OUTPUT_INSTRUCTION.strip(),
         "Cite actual record identifiers from returned evidence, not tool names or response paths.",
         "State precisely what is unavailable when evidence is insufficient.",
         "Do not write, approve, post, release, or execute anything.",
@@ -261,7 +267,12 @@ def _display_answer(result: AgentResult) -> str:
     answer = "\n".join(visible).strip()
     if not answer:
         raise NativeReceivingDialogueError("native receiving Agent returned no displayable answer")
-    return answer
+    try:
+        return english_product_text(answer, field="native receiving answer")
+    except ProductLanguageViolation as error:
+        raise NativeReceivingDialogueError(
+            "native receiving answer violated English-only output"
+        ) from error
 
 
 def _context_turns(messages: object) -> int:
@@ -286,6 +297,18 @@ def _provider(factory: AgentModelFactory, model: Model) -> dict[str, Any]:
     provenance = getattr(factory, "provenance", None)
     value = provenance() if callable(provenance) else {}
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _restore_current_prompt(agent: Agent) -> None:
+    """Upgrade only the accepted pre-English N1 prompt without dropping history."""
+
+    restored = agent.system_prompt
+    legacy_prompt = NATIVE_RECEIVING_PROMPT.replace(_ENGLISH_OUTPUT_INSTRUCTION, "")
+    if restored == NATIVE_RECEIVING_PROMPT:
+        return
+    if restored != legacy_prompt:
+        raise NativeReceivingDialogueError("native receiving session prompt is incompatible")
+    agent.system_prompt = NATIVE_RECEIVING_PROMPT
 
 
 def run_native_receiving_turn(
@@ -330,6 +353,7 @@ def run_native_receiving_turn(
             checkpointing=False,
             agent_id=agent_id,
         )
+        _restore_current_prompt(agent)
         if (
             agent.system_prompt != NATIVE_RECEIVING_PROMPT
             or not isinstance(agent.conversation_manager, NullConversationManager)

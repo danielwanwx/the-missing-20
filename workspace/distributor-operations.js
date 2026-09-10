@@ -332,12 +332,181 @@
       : "PENDING";
   }
 
+  function contractPanelState(plan, decision) {
+    const normalized = normalizeContractPlan(plan);
+    if (!normalized) return "UNAVAILABLE";
+    if (numberFrom(normalized.new_quantity) === 0) return "COMPLETE";
+    return contractDecisionState(normalized, decision);
+  }
+
+  function allocationQuantity(allocation, keys) {
+    return numberFromKeys(allocation, keys);
+  }
+
+  function fulfillmentBenchmark(next) {
+    if (!isRecord(next) || next.available !== true || !isRecord(next.quantities) || !Array.isArray(next.allocations)) {
+      return { status: "UNAVAILABLE", reason: "The current source does not provide comparable fulfillment facts." };
+    }
+    const targets = next.allocations.map((allocation) =>
+      allocationQuantity(allocation, ["ordered", "requested", "requested_quantity", "demand", "quantity"])
+    );
+    if (!targets.length || targets.some((value) => !finite(value) || value < 0)) {
+      return { status: "UNAVAILABLE", reason: "Customer commitment quantities are unavailable from the current source." };
+    }
+    const target = targets.reduce((total, value) => total + value, 0);
+    const dispatched = quantity(next, "dispatched");
+    const confirmed = quantity(next, "delivery_confirmed");
+    if (!finite(dispatched) || !finite(confirmed) || target <= 0) {
+      return { status: "UNAVAILABLE", reason: "Current dispatch or delivery-confirmation quantities are unavailable." };
+    }
+    return {
+      status: "CURRENT",
+      target,
+      dispatched,
+      confirmed,
+      unit: text(next.quantities.uom) || "units",
+      order_count: targets.length,
+      synthetic: next.synthetic_input === true,
+    };
+  }
+
+  function alertStatus(alert) {
+    return firstText(alert, ["status", "state"]).toUpperCase();
+  }
+  function isResolvedAlert(alert) {
+    return /RESOLVED|CLOSED|DONE/.test(alertStatus(alert));
+  }
+  function alertStage(alert) {
+    const code = firstText(alert, ["code", "kind", "message", "detail"]).toUpperCase();
+    if (/QUALITY|INSPECTION|HOLD|SPEC/.test(code)) return "inspection";
+    if (/SHORT|MISSING|RECEIV|ARRIV|LOT|BATCH/.test(code)) return "arrival";
+    if (/ALLOC|RESERV|CUSTOMER|CONTRACT/.test(code)) return "allocation";
+    if (/PICK/.test(code)) return "picked";
+    if (/DISPATCH|SHIP|CARRIER/.test(code)) return "dispatch";
+    if (/DELIVERY|POD/.test(code)) return "delivery";
+    return "";
+  }
+  function activeAlertStages(next) {
+    if (!Array.isArray(next?.alerts)) return {};
+    return next.alerts.reduce((stages, alert, index) => {
+      if (!isRecord(alert) || isResolvedAlert(alert)) return stages;
+      const stage = alertStage(alert);
+      if (stage && !stages[stage]) stages[stage] = { index, code: firstText(alert, ["code", "kind"]) || "Active alert" };
+      return stages;
+    }, {});
+  }
+
+  function flowStageFacts(next, stage) {
+    const unit = text(next?.quantities?.uom) || "units";
+    const current = quantity(next, stage.metric);
+    const dispatched = quantity(next, "dispatched");
+    const ordered = quantity(next, "ordered");
+    if (stage.key === "inspection") {
+      const held = quantity(next, "held");
+      if (finite(held) && held > 0) return { current: `${formatNumber(held)} held now`, cumulative: "Review inspection evidence", complete: false };
+      if (finite(dispatched) && dispatched > 0) return { current: "No current hold", cumulative: `${formatNumber(dispatched)} released to fulfillment`, complete: true };
+      return { current: finite(current) ? `${formatNumber(current)} usable now` : "Inspection status unknown", cumulative: "Quality evidence", complete: stageProof(next, stage) };
+    }
+    if (stage.key === "allocation") {
+      const target = fulfillmentBenchmark(next);
+      if (target.status === "CURRENT" && target.dispatched >= target.target) return { current: "No stock awaiting allocation", cumulative: `${formatNumber(target.target)} / ${formatNumber(target.target)} committed`, complete: true };
+      return { current: finite(current) ? `${formatNumber(current)} allocated now` : "Allocation status unknown", cumulative: stage.detail, complete: stageProof(next, stage) };
+    }
+    if (stage.key === "picked") {
+      const picked = (Array.isArray(next?.allocations) ? next.allocations : []).reduce((total, allocation) => {
+        const value = allocationQuantity(allocation, ["picked", "picked_quantity", "picked_qty"]);
+        return finite(value) ? total + value : total;
+      }, 0);
+      return { current: picked > 0 ? `${formatNumber(picked)} picked cumulatively` : "Picked evidence pending", cumulative: picked > 0 ? `Recorded in current case · ${unit}` : stage.detail, complete: picked > 0 || pickedEvidenceRecorded(next) };
+    }
+    if (stage.key === "delivery") {
+      const label = finite(current) ? `${formatNumber(current)} recorded ${next.synthetic_input === true ? "synthetic " : ""}confirmations` : "Delivery confirmation unknown";
+      return { current: label, cumulative: finite(ordered) ? `${formatNumber(current)} / ${formatNumber(ordered)} ${unit}` : stage.detail, complete: finite(current) && current > 0 };
+    }
+    if (stage.key === "dispatch") {
+      return { current: finite(dispatched) ? `${formatNumber(dispatched)} dispatched cumulatively` : "Dispatch status unknown", cumulative: finite(ordered) ? `${formatNumber(dispatched)} / ${formatNumber(ordered)} ${unit}` : stage.detail, complete: finite(dispatched) && dispatched > 0 };
+    }
+    return { current: finite(current) ? `${formatNumber(current)} ${unit}` : `${stage.detail} unknown`, cumulative: stage.detail, complete: stageProof(next, stage) };
+  }
+
+  function createVoiceController({ recognitionFactory, speechSynthesisApi, utteranceFactory, input, setStatus, dictateButton, readButton, stopButton } = {}) {
+    const updateStatus = (value) => { if (typeof setStatus === "function") setStatus(value); };
+    let recognition = null;
+    try { recognition = typeof recognitionFactory === "function" ? recognitionFactory() : null; } catch (_) { recognition = null; }
+    const synthesis = speechSynthesisApi && typeof speechSynthesisApi.speak === "function" ? speechSynthesisApi : null;
+    let listening = false;
+    let reading = false;
+    let answer = "";
+    const setButtons = () => {
+      if (dictateButton) { dictateButton.disabled = !recognition; dictateButton.setAttribute?.("aria-pressed", String(listening)); }
+      if (readButton) readButton.disabled = !synthesis || !answer || reading;
+      if (stopButton) stopButton.hidden = !reading;
+    };
+    if (recognition) {
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (event) => {
+        const result = event?.results?.[event.results.length - 1];
+        const transcript = text(result?.[0]?.transcript);
+        if (transcript && input) input.value = [text(input.value), transcript].filter(Boolean).join(text(input.value) ? " " : "");
+        input?.focus?.();
+        updateStatus(transcript ? "Dictation added. Review it, then press Ask to send." : "No English dictation was captured. You can type your question.");
+      };
+      recognition.onerror = (event) => {
+        listening = false;
+        setButtons();
+        updateStatus(event?.error === "not-allowed" || event?.error === "service-not-allowed"
+          ? "Microphone permission was denied. Typing remains available."
+          : "Dictation is unavailable. Typing remains available.");
+      };
+      recognition.onend = () => { listening = false; setButtons(); };
+    }
+    const controller = {
+      support() { return { dictation: Boolean(recognition), reading: Boolean(synthesis) }; },
+      toggleDictation() {
+        if (!recognition) { updateStatus("English dictation is not supported in this browser. Typing remains available."); return false; }
+        if (listening) { recognition.stop?.(); listening = false; updateStatus("Dictation stopped. Review the question before sending."); }
+        else { listening = true; recognition.start?.(); updateStatus("Listening for English dictation. It will not send automatically."); }
+        setButtons(); return true;
+      },
+      setAnswer(value) {
+        const nextAnswer = cleanAnswer(value);
+        if (nextAnswer !== answer && reading) {
+          synthesis?.cancel?.();
+          reading = false;
+        }
+        answer = nextAnswer;
+        setButtons();
+      },
+      readAnswer() {
+        if (!synthesis || !answer || typeof utteranceFactory !== "function") { updateStatus("Answer reading is unavailable in this browser."); return false; }
+        try {
+          const utterance = utteranceFactory(answer); utterance.lang = "en-US";
+          utterance.onend = () => { reading = false; setButtons(); updateStatus("Answer reading finished."); };
+          utterance.onerror = () => { reading = false; setButtons(); updateStatus("Answer reading stopped. You can read the text above."); };
+          reading = true; synthesis.speak(utterance); setButtons(); updateStatus("Reading the answer in English."); return true;
+        } catch (_) { reading = false; setButtons(); updateStatus("Answer reading is unavailable in this browser."); return false; }
+      },
+      stopReading() { if (!synthesis) return false; synthesis.cancel?.(); reading = false; setButtons(); updateStatus("Answer reading stopped."); return true; },
+    };
+    setButtons();
+    return controller;
+  }
+
   function unwrapProjection(value) {
     if (!isRecord(value)) return null;
     for (const key of ["distributor_operations", "projection", "operation", "result"]) {
       if (isRecord(value[key]) && ("quantities" in value[key] || "available" in value[key] || "stage" in value[key])) return value[key];
     }
     return ("quantities" in value || "available" in value || "stage" in value) ? value : null;
+  }
+
+  function projectionSourceState(next) {
+    if (!isRecord(next) || next.available === true) return "CURRENT";
+    return text(next.stage).toUpperCase() === "DISABLED" || !text(next.case_id)
+      ? "DISABLED"
+      : "SOURCE_UNAVAILABLE";
   }
 
   function cleanAnswer(value) {
@@ -430,6 +599,11 @@
     normalizeContractPlan,
     contractPlanRows,
     contractDecisionState,
+    contractPanelState,
+    fulfillmentBenchmark,
+    activeAlertStages,
+    flowStageFacts,
+    createVoiceController,
     normalizeTemplate,
     normalizeTemplates,
     recommendedAction,
@@ -438,6 +612,7 @@
     arrivalQuantitySummary,
     deliveryCompletionLabel,
     unwrapProjection,
+    projectionSourceState,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = exported;
   if (typeof window !== "undefined") window.Missing20DistributorOperations = exported;
@@ -457,6 +632,7 @@
   let pollTimer = null;
   let lastProjectionAt = "";
   let retainedConversation = null;
+  let voiceController = null;
 
   function setText(id, value) {
     const node = $(id);
@@ -468,16 +644,22 @@
     const dot = $("ops-connection-dot");
     if (dot) dot.className = `status-dot status-dot-${tone}`;
   }
-  function showSourceError(error) {
+  function renderRefreshState({ retryPending = false } = {}) {
+    const prefix = retryPending ? "Source retry pending · " : "Last successful source refresh · ";
+    const value = lastProjectionAt ? formatDate(lastProjectionAt) : "none yet";
+    setText("ops-refresh-state", `${prefix}${value}`);
+  }
+  function showSourceError(error, { configuredSourceFailure = false } = {}) {
     sourceState.hidden = false;
     setText("ops-source-title", "Current operation source unavailable");
     setText("ops-source-detail", error?.message || "The source did not return a usable projection. Quantities are unknown.");
     setConnection("Unavailable", "danger");
-    if (!projection) {
+    renderRefreshState({ retryPending: Boolean(lastProjectionAt) });
+    if (!projection || configuredSourceFailure) {
       content.hidden = true;
       disabled.hidden = false;
-      disabled.querySelector("h2").textContent = "Operation source unavailable";
-      disabled.querySelector("p").textContent = "No quantities or delivery state are inferred until the source responds.";
+      disabled.querySelector("h2").textContent = configuredSourceFailure ? "Current operation source unavailable" : "Operation source unavailable";
+      disabled.querySelector("p").textContent = "No quantities, allocation, benchmark, or delivery state are inferred until the source responds.";
     }
     updateEventButton();
     updateAskButton();
@@ -485,6 +667,7 @@
   function clearSourceError() {
     sourceState.hidden = true;
     setConnection("Live source", "lime");
+    renderRefreshState();
     updateEventButton();
     updateAskButton();
   }
@@ -527,6 +710,32 @@
       ? `Parts are shown in stock UOM ${q.uom}; cartons remain a separate outer-package observation.`
       : "Stock UOM is not confirmed; cartons and part quantities remain separate observations.");
   }
+  function renderBenchmark(next) {
+    const benchmark = fulfillmentBenchmark(next);
+    const grid = $("ops-benchmark-grid");
+    const badge = $("ops-benchmark-state");
+    if (!grid || !badge) return;
+    if (benchmark.status !== "CURRENT") {
+      badge.className = "state-badge state-neutral"; badge.textContent = "Comparison unavailable";
+      setText("ops-benchmark-note", `${benchmark.reason} Historical, industry, and savings baselines are unavailable.`);
+      grid.replaceChildren(emptyList("No comparable current-case benchmark is available.")); return;
+    }
+    badge.className = "state-badge state-cyan"; badge.textContent = "Current case only";
+    const card = (label, actual, descriptor) => {
+      const node = document.createElement("article"); node.className = "ops-benchmark-card";
+      const title = document.createElement("span"); title.textContent = label;
+      const value = document.createElement("strong"); value.textContent = `${formatNumber(actual)} / ${formatNumber(benchmark.target)}`;
+      const note = document.createElement("small"); note.textContent = `${descriptor} · ${benchmark.unit}`;
+      const progress = document.createElement("progress"); progress.max = benchmark.target; progress.value = Math.min(actual, benchmark.target); progress.setAttribute("aria-label", `${label}: ${formatNumber(actual)} of ${formatNumber(benchmark.target)} ${benchmark.unit}`);
+      node.append(title, value, note, progress); return node;
+    };
+    grid.replaceChildren(
+      card("Customer commitment", benchmark.target, `${benchmark.order_count} current order${benchmark.order_count === 1 ? "" : "s"}`),
+      card("Native dispatch", benchmark.dispatched, "Recorded dispatch"),
+      card("Recorded delivery confirmation", benchmark.confirmed, benchmark.synthetic ? "Synthetic recorded event; not independently verified receipt" : "Recorded event"),
+    );
+    setText("ops-benchmark-note", `Source: current ERP case · Sample: one configured operation · Historical, industry, and savings baselines are unavailable.`);
+  }
 
   function allocationPicked(next) {
     return next.allocations.some((allocation) => finite(numberFromKeys(allocation, ["picked", "picked_quantity", "picked_qty"])) && numberFromKeys(allocation, ["picked", "picked_quantity", "picked_qty"]) > 0);
@@ -568,23 +777,32 @@
   }
   function renderStages(next) {
     const list = $("ops-stage-list");
+    const alertStages = activeAlertStages(next);
     list.replaceChildren(...STAGES.map((stage) => {
       const item = document.createElement("li");
       item.className = "ops-stage";
-      const isComplete = stageProof(next, stage);
+      const facts = flowStageFacts(next, stage);
+      const isComplete = facts.complete;
+      const alert = alertStages[stage.key];
       if (isComplete) item.classList.add("is-complete");
       if (stageHeld(next, stage)) item.classList.add("is-held");
+      if (alert) item.classList.add("is-alert");
       if (!isComplete && stageMatches(next.stage, stage.key)) item.classList.add("is-current");
       const marker = document.createElement("span");
       marker.className = "ops-stage-marker";
       marker.innerHTML = `<i class="ph ${isComplete ? "ph-check" : stage.icon}" aria-hidden="true"></i>`;
       const title = document.createElement("strong"); title.textContent = stage.label;
       const detail = document.createElement("small");
-      const value = stage.metric === "picked"
-        ? (allocationPicked(next) || pickedEvidenceRecorded(next) ? "Server recorded" : "Awaiting picked evidence")
-        : finite(quantity(next, stage.metric)) ? `${formatNumber(quantity(next, stage.metric))} ${stage.metric === "delivery_confirmed" ? "confirmed" : text(next.quantities?.uom) || "units"}` : stage.detail;
-      detail.textContent = value;
-      item.append(marker, title, detail);
+      detail.textContent = facts.current;
+      const cumulative = document.createElement("small"); cumulative.className = "ops-stage-cumulative"; cumulative.textContent = facts.cumulative;
+      item.append(marker, title, detail, cumulative);
+      if (alert) {
+        const evidence = document.createElement("a");
+        evidence.className = "ops-stage-alert-link";
+        evidence.href = `#ops-alert-${alert.index}`;
+        evidence.textContent = `${alert.code} · View evidence`;
+        item.append(evidence);
+      }
       return item;
     }));
   }
@@ -660,15 +878,17 @@
       return;
     }
     panel.hidden = false;
-    const state = contractDecisionState(plan, next.allocation_decision);
+    const state = contractPanelState(plan, next.allocation_decision);
     const decision = isRecord(next.allocation_decision) ? next.allocation_decision : {};
     const rawStatus = text(decision.status).toUpperCase();
     const badge = $("ops-contract-state");
     if (badge) {
-      badge.className = "state-badge state-amber";
-      badge.textContent = state === "SELECTED" ? "Plan selected" : state === "PENDING" ? "Decision pending" : "Decision unavailable";
+      badge.className = `state-badge state-${state === "SELECTED" ? "cyan" : state === "COMPLETE" ? "lime" : "amber"}`;
+      badge.textContent = state === "SELECTED" ? "Plan selected" : state === "COMPLETE" ? "Current plan complete" : state === "PENDING" ? "Decision pending" : "Decision unavailable";
     }
-    setText("ops-contract-note", state === "SELECTED"
+    setText("ops-contract-note", state === "COMPLETE"
+      ? "No additional allocation is currently needed. Any retained selection below is historical evidence; pick and dispatch facts remain in the fulfillment rows."
+      : state === "SELECTED"
       ? "Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Selection is a decision record; it does not itself create a pick or dispatch."
       : "Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Actual pick and dispatch evidence remains in the fulfillment rows below.");
     const meta = $("ops-contract-meta");
@@ -696,12 +916,14 @@
     }
     const decisionNode = $("ops-contract-decision");
     if (!decisionNode) return;
-    decisionNode.className = `ops-contract-decision${state === "SELECTED" ? " is-selected" : ""}`;
+    decisionNode.className = `ops-contract-decision${state === "SELECTED" || state === "COMPLETE" ? " is-selected" : ""}`;
     decisionNode.replaceChildren();
     const heading = document.createElement("strong");
-    heading.textContent = state === "SELECTED" ? "Agent decision: plan selected" : state === "PENDING" ? "Agent decision: pending" : "Agent decision: unavailable";
+    heading.textContent = state === "SELECTED" ? "Agent decision: plan selected" : state === "COMPLETE" ? "Retained historical selection" : state === "PENDING" ? "Agent decision: pending" : "Agent decision: unavailable";
     const copy = document.createElement("p");
-    copy.textContent = state === "SELECTED"
+    copy.textContent = state === "COMPLETE"
+      ? rawStatus === "SELECTED" ? "This selection belongs to an earlier fulfilled plan. The current feasible plan has zero additional quantity." : "The current feasible plan has zero additional quantity."
+      : state === "SELECTED"
       ? "This plan selection does not itself create an ERP pick or dispatch."
       : rawStatus === "SELECTED"
         ? "The recorded selection does not match this current plan, so it is not treated as selected."
@@ -749,12 +971,26 @@
 
   function renderAlerts(next) {
     const list = $("ops-alerts-list");
-    const alerts = next.alerts.filter((alert) => !/RESOLVED|CLOSED|DONE/i.test(firstText(alert, ["status", "state"])));
+    const alerts = next.alerts.filter((alert) => !isResolvedAlert(alert));
+    const resolved = next.alerts.filter((alert) => isResolvedAlert(alert));
+    const history = $("ops-resolved-alerts");
+    const historyList = $("ops-resolved-alerts-list");
     setText("ops-alerts-count", next._provided.alerts ? `${alerts.length} active alert${alerts.length === 1 ? "" : "s"}` : "Unknown");
+    if (history) history.hidden = !resolved.length;
+    if (historyList) {
+      setText("ops-resolved-alerts-summary", `Resolved evidence history · ${resolved.length}`);
+      historyList.replaceChildren(...resolved.map((alert) => {
+        const row = document.createElement("div"); row.className = "ops-resolved-alert-row";
+        const code = document.createElement("strong"); code.textContent = firstText(alert, ["code", "kind"]) || "Resolved alert";
+        const detail = document.createElement("span"); detail.textContent = firstText(alert, ["message", "detail"]) || "Resolved source alert.";
+        row.append(code, detail); return row;
+      }));
+    }
     if (!next._provided.alerts) { list.replaceChildren(emptyList("Manager alert data is unavailable from the current source.")); return; }
     if (!alerts.length) { list.replaceChildren(emptyList("No active manager alerts in the current projection.")); return; }
     list.replaceChildren(...alerts.map((alert) => {
       const card = document.createElement("article"); card.className = "ops-alert-card";
+      card.id = `ops-alert-${next.alerts.indexOf(alert)}`;
       const head = document.createElement("div"); head.className = "ops-alert-head";
       const code = document.createElement("strong"); code.className = "ops-alert-code"; code.textContent = firstText(alert, ["code", "kind"]) || "Alert";
       const badge = document.createElement("span"); badge.className = `state-badge state-${statusTone(firstText(alert, ["code", "kind"]))}`; badge.textContent = alert.synthetic === true ? "Synthetic evidence" : alert.derived === true ? "Derived date check" : "Source alert";
@@ -1113,12 +1349,14 @@
     setText("ops-chat-context", context);
     const answerNode = $("ops-chat-answer"); answerNode.classList.remove("is-error");
     if (/UNAVAILABLE|ERROR|FAILED|DISABLED/.test(status)) {
+      voiceController?.setAnswer("");
       answerNode.classList.add("is-error");
       const message = cleanAnswer(firstText(conversation, ["error", "detail", "message"]) || firstText(next, ["conversation_message"])) || "Read-only conversation is unavailable from the current bridge.";
       const paragraph = document.createElement("p"); paragraph.textContent = message; answerNode.replaceChildren(paragraph); return;
     }
     const answer = conversationAnswer(conversation);
-    if (answer) { answerNode.replaceChildren(Object.assign(document.createElement("p"), { textContent: answer })); return; }
+    if (answer) { voiceController?.setAnswer(answer); answerNode.replaceChildren(Object.assign(document.createElement("p"), { textContent: answer })); return; }
+    voiceController?.setAnswer("");
     const paragraph = document.createElement("p"); paragraph.className = "ops-empty"; paragraph.textContent = "Ask a read-only question about quantities, lots, customers, or delivery evidence."; answerNode.replaceChildren(paragraph);
   }
 
@@ -1209,7 +1447,10 @@
     const previousCaseId = projection?.case_id;
     const caseChanged = Boolean(previousCaseId && next.case_id && previousCaseId !== next.case_id);
     projection = next;
-    lastProjectionAt = new Date().toISOString();
+    if (next.available) {
+      lastProjectionAt = new Date().toISOString();
+      renderRefreshState();
+    }
     document.body.dataset.operationsState = next.available ? "ready" : "disabled";
     setText("ops-case-label", next.case_label || (next.available ? "Current operation" : "No configured operation"));
     setText("ops-case-id", next.case_id || "Case identifier unavailable");
@@ -1220,13 +1461,23 @@
     const stageBadge = $("ops-stage-badge"); stageBadge.className = `state-badge state-${statusTone(stageLabel)}`; stageBadge.textContent = stageLabel;
     setText("ops-flow-message", firstText(next, ["message", "summary"]) || "Current quantities and evidence from the source projection.");
     setText("ops-synthetic-badge", next.synthetic_input === true ? "Declared synthetic inputs" : "Native source events");
+    const sourceStateKind = projectionSourceState(next);
     if (!next.available) {
+      voiceController?.setAnswer("");
       if (caseChanged || resetEventFields) renderTemplateFields(null);
       content.hidden = true;
       disabled.hidden = false;
-      disabled.querySelector("h2").textContent = "Distributor operations are not configured";
-      disabled.querySelector("p").textContent = "This workspace is waiting for its explicit case configuration. No quantities or delivery state are inferred.";
-      setConnection("Disabled", "amber");
+      if (sourceStateKind === "SOURCE_UNAVAILABLE") {
+        const sourceAlert = next.alerts.find((alert) => firstText(alert, ["code", "kind"]).toUpperCase() === "SOURCE_UNAVAILABLE");
+        showSourceError(
+          new Error(firstText(sourceAlert, ["message", "detail"]) || "The configured operation source did not return current facts."),
+          { configuredSourceFailure: true },
+        );
+      } else {
+        disabled.querySelector("h2").textContent = "Distributor operations are not configured";
+        disabled.querySelector("p").textContent = "This workspace is waiting for its explicit case configuration. No quantities or delivery state are inferred.";
+        setConnection("Disabled", "amber");
+      }
       updateEventButton();
       updateAskButton();
       return;
@@ -1236,6 +1487,7 @@
     clearSourceError();
     renderQuantities(next);
     renderStages(next);
+    renderBenchmark(next);
     renderTemplates(next, { resetFields: resetEventFields || caseChanged });
     renderLots(next);
     renderAllocations(next);
@@ -1257,8 +1509,8 @@
     }
     return payload;
   }
-  async function refresh({ silent = false } = {}) {
-    if (loading) { refreshQueued = true; return; }
+  async function refresh({ silent = false, periodic = false } = {}) {
+    if (loading) { if (!periodic) refreshQueued = true; return; }
     loading = true;
     if (!silent && !projection) setConnection("Connecting", "cyan");
     try {
@@ -1303,6 +1555,27 @@
     }
   });
   $("ops-retry").addEventListener("click", () => { void refresh(); });
+  function initializeVoiceControls() {
+    const recognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    voiceController = createVoiceController({
+      recognitionFactory: recognitionConstructor ? () => new recognitionConstructor() : null,
+      speechSynthesisApi: window.speechSynthesis,
+      utteranceFactory: typeof window.SpeechSynthesisUtterance === "function" ? (answer) => new window.SpeechSynthesisUtterance(answer) : null,
+      input: $("ops-question"),
+      setStatus: (message) => setText("ops-voice-status", message),
+      dictateButton: $("ops-dictate"),
+      readButton: $("ops-read-answer"),
+      stopButton: $("ops-stop-reading"),
+    });
+    const support = voiceController.support();
+    setText("ops-voice-status", support.dictation || support.reading
+      ? "Optional English voice controls are ready. Dictation never sends automatically."
+      : "English voice controls are unavailable in this browser. Typing remains available.");
+    $("ops-dictate")?.addEventListener("click", () => voiceController.toggleDictation());
+    $("ops-read-answer")?.addEventListener("click", () => voiceController.readAnswer());
+    $("ops-stop-reading")?.addEventListener("click", () => voiceController.stopReading());
+  }
+  initializeVoiceControls();
   $("ops-ask-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const question = text($("ops-question").value);
@@ -1365,11 +1638,11 @@
 
   function startPolling() {
     if (pollTimer !== null) window.clearInterval(pollTimer);
-    pollTimer = document.visibilityState === "visible" ? window.setInterval(() => void refresh({ silent: true }), 5000) : null;
+    pollTimer = document.visibilityState === "visible" ? window.setInterval(() => void refresh({ silent: true, periodic: true }), 30000) : null;
   }
   document.addEventListener("visibilitychange", () => {
     startPolling();
-    if (document.visibilityState === "visible") void refresh({ silent: true });
+    if (document.visibilityState === "visible") void refresh({ silent: true, periodic: true });
   });
   window.addEventListener("pagehide", () => { if (pollTimer !== null) window.clearInterval(pollTimer); pollTimer = null; });
   updateEventButton();

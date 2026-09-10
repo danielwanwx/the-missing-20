@@ -377,3 +377,15 @@ continuation retained fixes/restarts and is not a frozen first-pass acceptance.
 See docs/audits/2026-09-10-final-component-loop-acceptance.md. Finance97f4ac1 is
 remote-verified and CI34534138248 SUCCESS. Model-name clarification, complex
 multi-turn acceptance, frozen rehearsal and final public deliverables remain open.
+
+
+English operations integration: source-backed stage quantities, case-scoped
+comparison, exception links, retained allocation, cross-app/financial records,
+30-second visible polling and optional English voice controls are implemented.
+Full local check: 1986 Python / 131 JavaScript tests, lint/format/typecheck passed.
+Tracked text is Han-free; the known Chinese architecture image is replaced.
+English display rejection passed a real Nova Pro synthetic probe, although the
+model itself still emitted Chinese internally. Complex same-session conversation
+FAILED real acceptance (wrong historical quantities, unavailable turns and HTTP500);
+no full dialogue or submission-readiness claim is made. Hardware voice acceptance
+remains open. See docs/audits/2026-09-10-english-operations-integration-review.md.

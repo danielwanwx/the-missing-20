@@ -125,7 +125,7 @@ class _Provider:
 
 
 def test_request_reservation_uses_complete_utf8_serialized_request_before_io() -> None:
-    messages: Any = [{"role": "user", "content": [{"text": "héllo 世界"}]}]
+    messages: Any = [{"role": "user", "content": [{"text": "héllo \u4e16\u754c"}]}]
     serialized_length = BudgetedModel.serialized_request_byte_length(
         messages=messages,
         tool_specs=None,

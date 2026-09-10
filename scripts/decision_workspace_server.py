@@ -90,6 +90,10 @@ from the_missing_20.agents.distributor_allocation import (  # noqa: E402
     select_contract_plan,
 )
 from the_missing_20.agents.photo_receiving import StrandsPhotoReader  # noqa: E402
+from the_missing_20.agents.product_language import (  # noqa: E402
+    ProductLanguageViolation,
+    english_product_text,
+)
 from the_missing_20.authority_b.models import canonical_json  # noqa: E402
 from the_missing_20.authority_b.quorum import QuorumDenied  # noqa: E402
 from the_missing_20.authority_b.workspace_demo import (  # noqa: E402
@@ -117,6 +121,7 @@ NORMAL_BILLING_R4_CASE_ID = "M20-GOODS-20260909-40-R4"
 NORMAL_BILLING_R4_SOURCE = Path("/private/tmp/m20-r4-billing-source-current-read-02.json")
 NORMAL_BILLING_OPERATOR_ID = "M20 Demo Manager"
 NORMAL_BILLING_APPROVAL_TTL = timedelta(minutes=10)
+_DISTRIBUTOR_NATIVE_EVENT_LIMIT = 64
 STATIC_ROOT = ROOT / "workspace"
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -1038,12 +1043,13 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
     parent_purchase_order = projection.get("parent_purchase_order")
     quality_policy = projection.get("quality_policy")
     alerts = projection.get("alerts")
+    financials = projection.get("financials")
     if not all(
         isinstance(value, (Mapping, list)) for value in (quantities, lots, allocations, documents)
     ) or not isinstance(shipments, list):
         raise ValueError("distributor conversation lacks current source facts")
     events = projection.get("events")
-    retained_events = events[-12:] if isinstance(events, list) else []
+    retained_events = events[-_DISTRIBUTOR_NATIVE_EVENT_LIMIT:] if isinstance(events, list) else []
     active_alerts = (
         [
             dict(alert)
@@ -1097,11 +1103,16 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
             ),
         },
     }
+    if isinstance(financials, Mapping):
+        erp_facts["financials"] = dict(financials)
     feasible_plan = projection.get("feasible_allocation_plan")
     if isinstance(feasible_plan, Mapping):
         erp_facts["feasible_contract_allocation_plan"] = dict(feasible_plan)
     if isinstance(parent_purchase_order, Mapping):
         erp_facts["parent_purchase_order"] = dict(parent_purchase_order)
+    allocation_decision = projection.get("allocation_decision")
+    if isinstance(allocation_decision, Mapping):
+        erp_facts["retained_allocation_decision"] = dict(allocation_decision)
     handoffs = projection.get("handoffs")
     return {
         "case_id": case_id,
@@ -1118,6 +1129,10 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
                         "Answer only from current source facts. Do not process events or write."
                     ),
                     "retained_event_count": len(retained_events),
+                    "retained_event_limit": _DISTRIBUTOR_NATIVE_EVENT_LIMIT,
+                    "retained_event_history_complete": (
+                        isinstance(events, list) and len(events) <= _DISTRIBUTOR_NATIVE_EVENT_LIMIT
+                    ),
                     "quality_policy": dict(quality_policy)
                     if isinstance(quality_policy, Mapping)
                     else {},
@@ -1196,7 +1211,23 @@ def _distributor_native_ask_turn(
                     )
                 ),
             )
-        except (NativeReceivingDialogueError, OSError, ValueError) as error:
+        except (
+            NativeReceivingDialogueError,
+            OSError,
+            ProductLanguageViolation,
+            ValueError,
+        ) as error:
+            return {
+                "status": "UNAVAILABLE",
+                "detail": (
+                    "The native read-only distributor conversation is unavailable; "
+                    "no fallback answer was used."
+                ),
+                "error_type": type(error).__name__,
+            }
+        try:
+            answer = english_product_text(native_run.answer, field="distributor answer")
+        except ProductLanguageViolation as error:
             return {
                 "status": "UNAVAILABLE",
                 "detail": (
@@ -1207,7 +1238,7 @@ def _distributor_native_ask_turn(
             }
         return {
             "status": "COMPLETE",
-            "answer": native_run.answer,
+            "answer": answer,
             "provider": native_run.provider,
             "session_id": native_run.session_id,
         }
