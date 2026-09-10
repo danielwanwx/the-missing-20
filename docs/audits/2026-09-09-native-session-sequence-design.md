@@ -1,6 +1,8 @@
 # Native six-turn conversation and restart experiment
 
 Status: independently approved for isolated implementation and offline tests.
+The initial window40 policy failed actual six-process continuity testing; the
+selected replacement is native NullConversationManager for this bounded sequence.
 Paid execution requires review of the frozen implementation and offline evidence.
 This extends the [first screen](2026-09-09-native-receiving-first-screen-review.md),
 which left both N1/N2 incomplete and selected no winner.
@@ -14,8 +16,11 @@ manually injected assistant history, summarizer or checkpoint layer is used.
 Each question runs in a new OS process. Candidates have separate private roots
 and histories. The six literal questions and current qualified source bundles
 are shared; actual histories diverge after answers, so later model inputs are
-not byte-identical. Production case preparation supplies current source and
-authority; it does not fabricate a successful product AdvisoryRun. Each new
+not byte-identical. Production case preparation supplies the current qualified
+source bundle; its detailed case authority remains audit-only. The model sees
+the current control tool's fixed read-only policy and the literal Q2 refusal
+in native history. This does not test dynamic product approval-state integration
+or fabricate a successful product AdvisoryRun. Each new
 human question enters native history once. Every turn must read all five current
 sources. Prior tool results are historical evidence, and prior assistant prose
 cannot grant execution permission.
@@ -37,10 +42,11 @@ remain unchanged. The evaluator's rubric stays outside model inputs:
 Freeze code/input hashes, literal questions, prompt, model/profile/region,
 tool specs, N2 schema and session/window configuration before either candidate.
 Verify the effective contract again after native restoration because snapshots
-restore the prompt and state. Use explicit sliding-window size40,
-should_truncate_results=True, per_turn=False, proactive_compression=None;
-retry_strategy=None and checkpointing=False. Record actual active history,
-removed messages and complete tool pairs, not a promise inferred from window size.
+restore the prompt and state. Use explicit NullConversationManager,
+retry_strategy=None and checkpointing=False. Preserve full native history and
+stop on context overflow; do not enlarge budgets or silently trim. Record actual
+active history and complete tool pairs, rather than inferring continuity from
+the manager name. This is a bounded six-turn baseline, not a long-chat policy.
 
 Offline acceptance requires actual process boundaries with a local fake Model:
 N1 refusal/last-answer retention, N2 structured-pair restoration, current-source
@@ -70,3 +76,33 @@ Local storage provides no distributed concurrency control; the driver is serial.
 Passing this sequence would permit the broader core and held-out repetitions
 and product integration design. It does not close HTTP/UI persistence, complete
 answer quality, same-order downstream billing or full finalization.
+
+## Preserved capacity failure and revised selection
+
+The initial explicit SlidingWindowConversationManager policy used window40,
+should_truncate_results=True, per_turn=False and no proactive compression.
+An actual six-process N1 run with valid serial acquisition of all five tools
+produced histories of12,24,36,36,36,36 messages. Cumulative removed-message
+counts were0,0,0,12,24,36. Q6's first SDK-facing request retained the real Q5
+answer but had lost Q2's refusal. Q5 also read the renamed v2 ledger source;
+older v1 tool results remained historical. Thus persistence worked while the
+chosen capacity policy failed the required continuity gate.
+
+The exact window40 runner SHA256 was
+`b79f6a5b9ac40de0003948233f4a3817db07150b4cdd0d796090a977cc376c4b`.
+Its code and all six prepared/turn records remain privately preserved under
+`/private/tmp/m20-native-session-window-2d77/`, including a hashed
+`continuity-failure.json`. No paid model call used this policy.
+That older fake model reused tool IDs across turns. The recorded eviction is
+an observed capacity failure, not proof of a globally unique, provider-valid
+six-turn tool history. The corrected Null experiment separately checks ordered,
+unique tool-use/result consumption; these evidence limits are not interchangeable.
+
+Independent review conditionally approved explicit native NullConversationManager
+after this failure was demonstrated. Installed1.53 source and the
+[official conversation guide](https://strandsagents.com/docs/user-guide/concepts/agents/conversation-management/)
+confirm that it keeps full history and re-raises reactive overflow. Its higher
+input cost and old/new evidence coexistence remain measured risks. It adds no
+summary call, custom memory or arbitrary window increase. The replacement must
+still pass actual six-process N1/N2 retention and fresh-source tests before the
+paid gate; the failed policy is retained, not relabeled successful.

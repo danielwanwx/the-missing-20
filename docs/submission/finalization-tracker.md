@@ -172,3 +172,31 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   This provides durable request/ACK identity, not a real invoice effect;
   coordinator, current-source reconciliation and exact GL/SLE verification are
   still required. F03/F05 and full finalization remain open.
+
+- Journal prerequisite delivered `ecb4e34`, pushed with exact local/remote SHA
+  agreement. The native window40 conversation candidate then failed actual
+  six-process offline continuity: Q2's refusal was absent from Q6 input after
+  native trimming. Full failed evidence is preserved. Independent review
+  selected native NullConversationManager for the bounded six-turn comparison,
+  keeping budgets unchanged and stopping on overflow. This is an offline policy
+  change awaiting verification, not a paid or product conversation pass.
+
+- The first real native-session comparison stopped under its frozen
+  all-five-source requirement: N1 reached Q2 (correct read-only acknowledgement,
+  zero new tools); N2 reached Q1 (ERP-only correct quantity/ledger answer, invalid
+  tool-path citation). All remaining positions are NOT_REACHED. Three actual
+  invocations used five model requests, estimated USD0.0163184. N1's real Q2
+  restored the exact Q1 history; complete six-turn reasoning is still unverified.
+  [Measured result and retention limitation](../audits/2026-09-09-native-session-first-sequence-review.md).
+  The next design must evaluate necessary current evidence separately from pure
+  instruction acknowledgement. No candidate has been promoted to the product.
+
+- Pure billing source context and strict journal read-only accessors delivered
+  `0916b72c63836673e41f85e280f8d17f3d881986`; push succeeded and the exact remote
+  main SHA was verified. The initial builder/journal contract mismatch was
+  independently reproduced and fixed with an actual prepare→ACK→refresh seam
+  test.208 related and32 independent tests passed; primary strict four-file
+  typing/format/lint passed. Broader runs hit their180-second envelopes and do
+  not constitute full-regression acceptance. [Scoped delivery](../audits/2026-09-09-native-billing-source-context-review.md).
+  A separately frozen diagnostic regression continues; transport and real R4
+  invoice/GL/SLE effects remain unverified.

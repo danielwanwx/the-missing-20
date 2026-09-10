@@ -144,12 +144,13 @@ Restore is not configuration validation: check the frozen contract before
 construction and the effective configuration after initialization, before any
 model call. These details require actual separate-process offline proof.
 
-Native sliding-window management is selected explicitly for this first
-continuity experiment. A window of40 messages does not promise six complete
-turns: record actual trimming and tool pairing, and verify that Q2's refusal
-and Q5's answer reach Q6. Summarization is a separate future candidate; neither
-enabling a manager nor restoring history proves that compression happened or
-preserved business facts. [Conversation management](https://strandsagents.com/docs/user-guide/concepts/agents/conversation-management/).
+The initial native window40 policy actually failed six-process testing: serial
+five-tool reads caused Q2's refusal to be evicted before Q6, despite preserving
+Q5's answer. Select native NullConversationManager as the replacement bounded
+full-history baseline, with unchanged budgets and overflow stopping the run.
+This trades higher input cost for retention; actual N1/N2 tests remain required.
+Summarization is a separate future candidate. Persistence alone proves neither
+compression nor factual retention. [Conversation management](https://strandsagents.com/docs/user-guide/concepts/agents/conversation-management/).
 
 Strands Evals' simulated actor is useful for later exploratory conversations,
 but dynamic model-generated questions add calls and do not replace this fixed
@@ -160,3 +161,40 @@ Independent design review permits isolated offline implementation, with
 post-restore configuration checks, preserved partial failures and measured
 window retention required. A separately reviewed paid gate follows offline
 verification; no six-turn, product UI or F03 acceptance is implied.
+
+## Tool selection after the first real session sequence
+
+The [frozen sequence result](../audits/2026-09-09-native-session-first-sequence-review.md)
+stopped N1 at Q2 and N2 at Q1 under the unconditional five-source rule. N1
+correctly acknowledged a read-only instruction without tools; N2 fetched ERP
+and gave the correct quantity/ledger ID, but used a tool path as its citation.
+The failure records and later NOT_REACHED positions remain unchanged.
+
+The native SDK lets the model choose tools according to the request; it also
+supports direct programmatic calls. Those are different execution choices.
+Requiring every tool for an acknowledgement overrides normal selection without
+adding relevant evidence. [Official tools overview, checked September9](https://strandsagents.com/docs/user-guide/concepts/tools/).
+
+Strands Evals provides tool-selection, output/faithfulness and whole-session
+evaluators. Its tool-selection evaluator assesses individual calls in context,
+including unnecessary calls; zero calls can yield no evaluations, so it cannot
+alone establish that an acknowledgement is correct or required evidence was
+not skipped. A later integration would need the output and session dimensions
+as well, with an explicitly budgeted judge model. No evaluator was installed or
+run in this screen. [Tool selection](https://strandsagents.com/docs/user-guide/evals-sdk/evaluators/tool_selection_evaluator/),
+[evaluation levels](https://strandsagents.com/docs/user-guide/evals-sdk/evaluators/).
+
+Berkeley's BFCL separates relevance/irrelevance detection from multi-turn and
+memory tasks. This supports testing whether a tool is necessary rather than
+maximizing the number of calls. It is a benchmark design reference, not an ERP
+integration component or proof about our model.
+[BFCL V4 methodology](https://gorilla.cs.berkeley.edu/blogs/15_bfcl_v4_web_search.html).
+
+Proposed next comparison: preserve native snapshots and fresh processes; use
+ordinary native tool selection, distinguish instruction acknowledgement from
+external factual claims, and independently require current relevant source
+evidence and valid record citations for those claims. Freeze the revised prompt,
+evidence rubric and failure rules before a new run. Do not continue the failed
+session, convert tool names into fabricated citations, or use the old failed
+screen as a fresh paired control. A custom router, summarizer or new runtime
+does not address the failure demonstrated here.
