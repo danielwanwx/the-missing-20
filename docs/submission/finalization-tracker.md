@@ -161,3 +161,14 @@ Submission indispensable: truthful new-order evidence chain, stable real convers
   True history, current-source refresh, process restart and partial failures are
   tested separately from summarization. No paid six-turn or new invoice effect
   has occurred at this point; F03/F05 remain open.
+
+- Native invoice request/proof dependency delivered `3d2c8ba`, pushed with exact
+  local/remote SHA agreement. Its companion journal binding passed independent
+  re-review and a frozen full1,853-test Python regression. Three native proof
+  mismatch counterexamples were first reproduced and then rejected through the
+  shared validator. The pre-freeze thread/barrier hang remains documented;
+  final bounded concurrency checks pass. [Journal acceptance scope](../audits/2026-09-09-native-billing-journal-binding-review.md).
+  The old paused candidate was preserved before exact reviewed replacement.
+  This provides durable request/ACK identity, not a real invoice effect;
+  coordinator, current-source reconciliation and exact GL/SLE verification are
+  still required. F03/F05 and full finalization remain open.

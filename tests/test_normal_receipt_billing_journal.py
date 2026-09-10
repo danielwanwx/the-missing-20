@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -19,9 +21,13 @@ from the_missing_20.adapters.normal_receipt_billing_journal import (
     BillingIntentJournal,
     CommercialSource,
     ExactDraftReadback,
-    ExactSubmittedReadback,
     PrepareResult,
     ReadbackObservation,
+)
+from the_missing_20.adapters.normal_receipt_billing_native_request import (
+    NativeDraftAcknowledgement,
+    NativeInsertRequest,
+    NativeSubmittedReadback,
 )
 from the_missing_20.adapters.normal_receipt_billing_preview import (
     BillingPreview,
@@ -143,6 +149,7 @@ def _approve(
     *,
     basis: SyntheticBillingBasis,
     expires_at: datetime | None = None,
+    expected_version: int = 1,
 ) -> str:
     approval = journal.approve(
         intent_id,
@@ -155,7 +162,7 @@ def _approve(
     assert approval.action == ACTION_NORMAL_RECEIPT_BILLING
     assert approval.case_id == basis.case_id
     assert approval.manager_id == MANAGER
-    assert approval.intent_version == 1
+    assert approval.intent_version == expected_version
     assert approval.token
     return approval.token
 
@@ -208,6 +215,20 @@ def _process_claim(
         result.close()
 
 
+def _process_open_legacy_schema(database: str, start: Event, result: Connection) -> None:
+    try:
+        if not start.wait(timeout=10):
+            result.send((False, "START_TIMEOUT"))
+            return
+        BillingIntentJournal(database)
+        result.send((True, None))
+    except BaseException as error:
+        result.send((False, type(error).__name__))
+        raise
+    finally:
+        result.close()
+
+
 def _draft(
     basis: SyntheticBillingBasis, commercial_version: str, *, name: str = "ACC-PINV-0001"
 ) -> ExactDraftReadback:
@@ -227,29 +248,82 @@ def _draft(
     )
 
 
-def _submitted(basis: SyntheticBillingBasis, commercial_version: str) -> ExactSubmittedReadback:
-    return ExactSubmittedReadback(
-        invoice_name="ACC-PINV-0001",
-        company=basis.company,
-        supplier=basis.supplier,
-        bill_reference=basis.bill_reference,
-        purchase_receipt=basis.purchase_receipt,
-        purchase_receipt_item=basis.purchase_receipt_item,
-        bill_digest=basis.bill_digest,
-        commercial_version=commercial_version,
-        candidate_count=1,
-        lookup_complete=True,
-        audit_snapshot_digest="submitted-readback-v1",
-        observed_at="2026-09-09T22:02:00Z",
-    )
-
-
 def _readback(kind: str) -> ReadbackObservation:
     return ReadbackObservation(
         kind=kind,
         audit_snapshot_digest=f"{kind.lower()}-readback-v1",
         observed_at="2026-09-09T22:01:00Z",
         details={"lookup_scope": "complete-company-supplier-bill-reference"},
+    )
+
+
+def _insert_request(
+    basis: SyntheticBillingBasis, *, remarks: str = "bound-native-request-v1"
+) -> NativeInsertRequest:
+    return NativeInsertRequest(
+        method="POST",
+        path="/api/resource/Purchase%20Invoice",
+        bill_digest=basis.bill_digest,
+        body={
+            "doctype": "Purchase Invoice",
+            "name": None,
+            "docstatus": 0,
+            "company": basis.company,
+            "supplier": basis.supplier,
+            "bill_no": basis.bill_reference,
+            "bill_date": basis.bill_date,
+            "currency": basis.currency,
+            "credit_to": basis.credit_to,
+            "update_stock": 0,
+            "is_return": 0,
+            "is_paid": 0,
+            "items": [
+                {
+                    "item_code": basis.item_code,
+                    "purchase_order": basis.purchase_order,
+                    "po_detail": basis.purchase_order_item,
+                    "purchase_receipt": basis.purchase_receipt,
+                    "pr_detail": basis.purchase_receipt_item,
+                }
+            ],
+            "remarks": remarks,
+        },
+    )
+
+
+def _acknowledged_draft(
+    request: NativeInsertRequest,
+    *,
+    name: str = "ACC-PINV-0001",
+    remarks: str = "bound-native-request-v1",
+) -> NativeDraftAcknowledgement:
+    body = dict(request.body)
+    body.update(
+        {
+            "name": name,
+            "docstatus": 0,
+            "owner": "demo@example.test",
+            "creation": "2026-09-09 22:00:00.000000",
+            "modified": "2026-09-09 22:00:00.000000",
+            "remarks": remarks,
+        }
+    )
+    return NativeDraftAcknowledgement(
+        insert_body_digest=request.body_digest,
+        draft_name=name,
+        document=body,
+    )
+
+
+def _submitted_readback(
+    acknowledgement: NativeDraftAcknowledgement,
+) -> NativeSubmittedReadback:
+    document = dict(acknowledgement.document)
+    document["docstatus"] = 1
+    return NativeSubmittedReadback(
+        draft_name=acknowledgement.draft_name,
+        draft_document_digest=acknowledgement.document_digest,
+        document=document,
     )
 
 
@@ -278,7 +352,7 @@ def test_read_only_ready_preview_is_evidence_not_write_permission(tmp_path: Path
         now=NOW,
     )
     assert denied.granted is False
-    assert denied.reason == "APPROVAL_REQUIRED"
+    assert denied.reason == "INSERT_REQUEST_UNBOUND"
 
     mismatched = journal.prepare(basis, replace(preview, bill_digest="b" * 64), source)
     assert mismatched.accepted is False
@@ -306,8 +380,15 @@ def test_approval_is_server_generated_bound_and_nonreusable(tmp_path: Path) -> N
         purchase_receipt_item="068bbdr0mc",
     )
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, _preview(basis), _source(basis))
-    other_prepared = journal.prepare(other_basis, _preview(other_basis), _source(other_basis))
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
+    other_prepared = journal.prepare(
+        other_basis,
+        _preview(other_basis),
+        _source(other_basis),
+        insert_request=_insert_request(other_basis),
+    )
 
     token = _approve(journal, prepared.intent_id, basis=basis)
     repeated = journal.approve(
@@ -354,7 +435,9 @@ def test_approval_is_server_generated_bound_and_nonreusable(tmp_path: Path) -> N
 def test_refusal_keeps_known_effect_phase_and_blocks_next_write(tmp_path: Path) -> None:
     basis = _basis()
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
     token = _approve(journal, prepared.intent_id, basis=basis)
 
     journal.refuse(
@@ -374,7 +457,12 @@ def test_refusal_keeps_known_effect_phase_and_blocks_next_write(tmp_path: Path) 
         purchase_receipt="MAT-PRE-2026-00008",
         purchase_receipt_item="068bbdr0mc",
     )
-    second = journal.prepare(second_basis, _preview(second_basis), _source(second_basis))
+    second = journal.prepare(
+        second_basis,
+        _preview(second_basis),
+        _source(second_basis),
+        insert_request=_insert_request(second_basis),
+    )
     second_token = _approve(journal, second.intent_id, basis=second_basis)
     inserted = _claim_insert(journal, second.intent_id, second_basis, second_token)
     assert inserted.granted is True
@@ -386,8 +474,8 @@ def test_refusal_keeps_known_effect_phase_and_blocks_next_write(tmp_path: Path) 
         now=NOW,
     )
 
-    admitted = journal.admit_draft_readback(
-        second.intent_id, _draft(second_basis, second.snapshot.commercial_version)
+    admitted = journal.admit_insert_acknowledgement(
+        second.intent_id, _acknowledged_draft(_insert_request(second_basis))
     )
     submit = journal.claim_submit(
         second.intent_id,
@@ -410,7 +498,9 @@ def test_audit_refresh_does_not_change_commercial_version_but_source_change_bloc
     basis = _basis()
     source = _source(basis)
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, _preview(basis), source)
+    prepared = journal.prepare(
+        basis, _preview(basis), source, insert_request=_insert_request(basis)
+    )
     token = _approve(journal, prepared.intent_id, basis=basis)
 
     observation_refresh = _source(
@@ -431,7 +521,12 @@ def test_audit_refresh_does_not_change_commercial_version_but_source_change_bloc
         purchase_receipt="MAT-PRE-2026-00008",
         purchase_receipt_item="068bbdr0mc",
     )
-    changed = journal.prepare(changed_basis, _preview(changed_basis), _source(changed_basis))
+    changed = journal.prepare(
+        changed_basis,
+        _preview(changed_basis),
+        _source(changed_basis),
+        insert_request=_insert_request(changed_basis),
+    )
     changed_token = _approve(journal, changed.intent_id, basis=changed_basis)
     changed_source = _source(
         changed_basis,
@@ -454,7 +549,9 @@ def test_source_change_still_permits_old_effect_readback_but_never_a_next_write(
 ) -> None:
     basis = _basis()
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
     token = _approve(journal, prepared.intent_id, basis=basis)
     assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
 
@@ -463,8 +560,8 @@ def test_source_change_still_permits_old_effect_readback_but_never_a_next_write(
         _source(basis, revision="source-v2", net_rate="51"),
         now=NOW,
     )
-    readback = journal.admit_draft_readback(
-        prepared.intent_id, _draft(basis, prepared.snapshot.commercial_version)
+    readback = journal.admit_insert_acknowledgement(
+        prepared.intent_id, _acknowledged_draft(_insert_request(basis))
     )
     submit = journal.claim_submit(
         prepared.intent_id,
@@ -486,7 +583,9 @@ def test_two_sqlite_processes_fence_same_bill_and_connections_fence_receipt_line
     database = tmp_path / "normal-billing.sqlite3"
     basis = _basis()
     journal = BillingIntentJournal(database)
-    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
     token = _approve(journal, prepared.intent_id, basis=basis)
     context = get_context("fork")
     start = context.Event()
@@ -549,14 +648,25 @@ def test_two_sqlite_processes_fence_same_bill_and_connections_fence_receipt_line
     line_b = replace(line_a, bill_reference="SUP-BILL-R4-0003")
     line_database = tmp_path / "normal-billing-line-race.sqlite3"
     line_barrier = Barrier(2)
+    line_journal_a = BillingIntentJournal(line_database)
+    line_journal_b = BillingIntentJournal(line_database)
 
-    def prepare(candidate: SyntheticBillingBasis) -> PrepareResult:
-        local = BillingIntentJournal(line_database)
-        line_barrier.wait()
-        return local.prepare(candidate, _preview(candidate), _source(candidate))
+    def prepare(pair: tuple[BillingIntentJournal, SyntheticBillingBasis]) -> PrepareResult:
+        local, candidate = pair
+        line_barrier.wait(timeout=5)
+        return local.prepare(
+            candidate,
+            _preview(candidate),
+            _source(candidate),
+            insert_request=_insert_request(candidate),
+        )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(prepare, (line_a, line_b)))
+        futures = (
+            pool.submit(prepare, (line_journal_a, line_a)),
+            pool.submit(prepare, (line_journal_b, line_b)),
+        )
+        results = [future.result(timeout=15) for future in futures]
     assert sum(result.accepted for result in results) == 1
     assert sum(result.reason == "RECEIPT_LINE_CONFLICT" for result in results) == 1
 
@@ -575,7 +685,9 @@ def test_restart_unknown_no_hit_and_submitted_readback_never_reopen_attempts(
     database = tmp_path / "normal-billing.sqlite3"
     basis = _basis()
     first = BillingIntentJournal(database)
-    prepared = first.prepare(basis, _preview(basis), _source(basis))
+    prepared = first.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
     token = _approve(first, prepared.intent_id, basis=basis)
 
     before_insert_restart = BillingIntentJournal(database)
@@ -589,9 +701,8 @@ def test_restart_unknown_no_hit_and_submitted_readback_never_reopen_attempts(
     assert repeated_insert.granted is False
     assert repeated_insert.reason == "INSERT_ALREADY_ATTEMPTED"
 
-    draft = after_insert_restart.admit_draft_readback(
-        prepared.intent_id, _draft(basis, prepared.snapshot.commercial_version)
-    )
+    acknowledgement = _acknowledged_draft(_insert_request(basis))
+    draft = after_insert_restart.admit_insert_acknowledgement(prepared.intent_id, acknowledgement)
     assert draft.admitted is True
     before_submit_restart = BillingIntentJournal(database)
     submit = before_submit_restart.claim_submit(
@@ -617,7 +728,7 @@ def test_restart_unknown_no_hit_and_submitted_readback_never_reopen_attempts(
         now=NOW,
     )
     submitted = after_submit_restart.admit_submitted_readback(
-        prepared.intent_id, _submitted(basis, prepared.snapshot.commercial_version)
+        prepared.intent_id, _submitted_readback(acknowledgement)
     )
     assert admitted_again.admitted is True
     assert repeated_submit.granted is False
@@ -633,31 +744,33 @@ def test_six_step_effect_identity_repro_holds_and_preserves_first_readbacks(
 ) -> None:
     basis = _basis()
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
     token = _approve(journal, prepared.intent_id, basis=basis)
 
-    # 1. Mark the only insert attempt.  2. Admit its first exact draft identity.
+    # 1. Mark the only insert attempt.  2. Admit its first bound native draft.
     assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
-    first_draft = _draft(basis, prepared.snapshot.commercial_version, name="PI-FIRST")
-    first = journal.admit_draft_readback(prepared.intent_id, first_draft)
+    first_draft = _acknowledged_draft(_insert_request(basis), name="PI-FIRST")
+    first = journal.admit_insert_acknowledgement(prepared.intent_id, first_draft)
     assert first.admitted is True
 
     # 3. A conflicting draft must not replace the first durable identity/evidence.
-    conflicting_draft = journal.admit_draft_readback(
+    conflicting_draft = journal.admit_insert_acknowledgement(
         prepared.intent_id,
-        replace(first_draft, draft_name="PI-OTHER"),
+        _acknowledged_draft(_insert_request(basis), name="PI-OTHER"),
     )
     assert conflicting_draft.admitted is False
-    assert conflicting_draft.reason == "DRAFT_IDENTITY_CONFLICT"
+    assert conflicting_draft.reason == "DRAFT_ACKNOWLEDGEMENT_CONFLICT"
     assert conflicting_draft.snapshot.draft_name == "PI-FIRST"
     assert conflicting_draft.snapshot.effect_conflict is True
     assert conflicting_draft.snapshot.authority_status == "CONFLICT_HOLD"
     draft_events = journal.history(prepared.intent_id)
-    assert draft_events[-2].kind == "DRAFT_READBACK_ADMITTED"
-    assert draft_events[-2].payload["name"] == "PI-FIRST"
-    assert draft_events[-1].kind == "DRAFT_READBACK_CONFLICT"
-    assert draft_events[-1].payload["incoming_proof"]["name"] == "PI-OTHER"
-    reaffirmed_draft = journal.admit_draft_readback(prepared.intent_id, first_draft)
+    assert draft_events[-2].kind == "INSERT_ACKNOWLEDGEMENT_ADMITTED"
+    assert draft_events[-2].payload["acknowledgement"]["draft_name"] == "PI-FIRST"
+    assert draft_events[-1].kind == "DRAFT_ACKNOWLEDGEMENT_CONFLICT"
+    assert draft_events[-1].payload["incoming_proof"]["draft_name"] == "PI-OTHER"
+    reaffirmed_draft = journal.admit_insert_acknowledgement(prepared.intent_id, first_draft)
     assert reaffirmed_draft.admitted is True
     assert reaffirmed_draft.snapshot.effect_conflict is True
 
@@ -679,11 +792,16 @@ def test_six_step_effect_identity_repro_holds_and_preserves_first_readbacks(
         purchase_receipt="MAT-PRE-2026-00008",
         purchase_receipt_item="068bbdr0mc",
     )
-    second = journal.prepare(second_basis, _preview(second_basis), _source(second_basis))
+    second = journal.prepare(
+        second_basis,
+        _preview(second_basis),
+        _source(second_basis),
+        insert_request=_insert_request(second_basis),
+    )
     second_token = _approve(journal, second.intent_id, basis=second_basis)
     assert _claim_insert(journal, second.intent_id, second_basis, second_token).granted is True
-    second_draft = _draft(second_basis, second.snapshot.commercial_version, name="PI-FIRST")
-    assert journal.admit_draft_readback(second.intent_id, second_draft).admitted is True
+    second_draft = _acknowledged_draft(_insert_request(second_basis), name="PI-FIRST")
+    assert journal.admit_insert_acknowledgement(second.intent_id, second_draft).admitted is True
     second_submit = journal.claim_submit(
         second.intent_id,
         case_id=second_basis.case_id,
@@ -695,36 +813,34 @@ def test_six_step_effect_identity_repro_holds_and_preserves_first_readbacks(
     assert second_submit.payload["draft_name"] == "PI-FIRST"
 
     # 5. Admit only the submitted identity named by that frozen submit payload.
-    first_submitted = journal.admit_submitted_readback(
-        second.intent_id,
-        replace(
-            _submitted(second_basis, second.snapshot.commercial_version), invoice_name="PI-FIRST"
-        ),
-    )
+    first_submitted_proof = _submitted_readback(second_draft)
+    first_submitted = journal.admit_submitted_readback(second.intent_id, first_submitted_proof)
     assert first_submitted.admitted is True
 
     # 6. A later different submitted identity is a readback conflict, never replacement.
+    conflicting_document = dict(first_submitted_proof.document)
+    conflicting_document["name"] = "PI-THIRD"
     conflicting_submitted = journal.admit_submitted_readback(
         second.intent_id,
-        replace(
-            _submitted(second_basis, second.snapshot.commercial_version), invoice_name="PI-THIRD"
+        NativeSubmittedReadback(
+            draft_name="PI-THIRD",
+            draft_document_digest=second_draft.document_digest,
+            document=conflicting_document,
         ),
     )
     assert conflicting_submitted.admitted is False
-    assert conflicting_submitted.reason == "SUBMITTED_IDENTITY_CONFLICT"
+    assert conflicting_submitted.reason == "SUBMITTED_DRAFT_DOCUMENT_MISMATCH"
     assert conflicting_submitted.snapshot.submitted_invoice_name == "PI-FIRST"
     assert conflicting_submitted.snapshot.effect_conflict is True
     assert conflicting_submitted.snapshot.authority_status == "CONFLICT_HOLD"
     submitted_events = journal.history(second.intent_id)
     assert submitted_events[-2].kind == "SUBMITTED_READBACK_ADMITTED"
-    assert submitted_events[-2].payload["name"] == "PI-FIRST"
+    assert submitted_events[-2].payload["submitted_readback"]["draft_name"] == "PI-FIRST"
     assert submitted_events[-1].kind == "SUBMITTED_READBACK_CONFLICT"
-    assert submitted_events[-1].payload["incoming_proof"]["name"] == "PI-THIRD"
+    assert submitted_events[-1].payload["incoming_proof"]["draft_name"] == "PI-THIRD"
     reaffirmed_submitted = journal.admit_submitted_readback(
         second.intent_id,
-        replace(
-            _submitted(second_basis, second.snapshot.commercial_version), invoice_name="PI-FIRST"
-        ),
+        first_submitted_proof,
     )
     assert reaffirmed_submitted.admitted is True
     assert reaffirmed_submitted.snapshot.effect_conflict is True
@@ -733,15 +849,14 @@ def test_six_step_effect_identity_repro_holds_and_preserves_first_readbacks(
 def test_submitted_readback_must_match_the_frozen_submit_draft_name(tmp_path: Path) -> None:
     basis = _basis()
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
     token = _approve(journal, prepared.intent_id, basis=basis)
     assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+    acknowledgement = _acknowledged_draft(_insert_request(basis), name="PI-FIRST")
     assert (
-        journal.admit_draft_readback(
-            prepared.intent_id,
-            _draft(basis, prepared.snapshot.commercial_version, name="PI-FIRST"),
-        ).admitted
-        is True
+        journal.admit_insert_acknowledgement(prepared.intent_id, acknowledgement).admitted is True
     )
     submit = journal.claim_submit(
         prepared.intent_id,
@@ -753,14 +868,18 @@ def test_submitted_readback_must_match_the_frozen_submit_draft_name(tmp_path: Pa
     assert submit.granted is True
     assert submit.payload["draft_name"] == "PI-FIRST"
 
+    mismatched_document = dict(_submitted_readback(acknowledgement).document)
+    mismatched_document["name"] = "PI-DIFFERENT"
     mismatched = journal.admit_submitted_readback(
         prepared.intent_id,
-        replace(
-            _submitted(basis, prepared.snapshot.commercial_version), invoice_name="PI-DIFFERENT"
+        NativeSubmittedReadback(
+            draft_name="PI-DIFFERENT",
+            draft_document_digest=acknowledgement.document_digest,
+            document=mismatched_document,
         ),
     )
     assert mismatched.admitted is False
-    assert mismatched.reason == "SUBMITTED_DRAFT_NAME_MISMATCH"
+    assert mismatched.reason == "SUBMITTED_DRAFT_DOCUMENT_MISMATCH"
     assert mismatched.snapshot.submitted_invoice_name is None
     assert mismatched.snapshot.effect_conflict is True
     assert mismatched.snapshot.authority_status == "CONFLICT_HOLD"
@@ -769,7 +888,9 @@ def test_submitted_readback_must_match_the_frozen_submit_draft_name(tmp_path: Pa
 def test_expiry_and_invalid_draft_proof_never_authorize_a_repeat_attempt(tmp_path: Path) -> None:
     basis = _basis()
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, _preview(basis), _source(basis))
+    prepared = journal.prepare(
+        basis, _preview(basis), _source(basis), insert_request=_insert_request(basis)
+    )
     token = _approve(
         journal,
         prepared.intent_id,
@@ -793,7 +914,12 @@ def test_expiry_and_invalid_draft_proof_never_authorize_a_repeat_attempt(tmp_pat
         purchase_receipt="MAT-PRE-2026-00008",
         purchase_receipt_item="068bbdr0mc",
     )
-    second = journal.prepare(second_basis, _preview(second_basis), _source(second_basis))
+    second = journal.prepare(
+        second_basis,
+        _preview(second_basis),
+        _source(second_basis),
+        insert_request=_insert_request(second_basis),
+    )
     second_token = _approve(journal, second.intent_id, basis=second_basis)
     assert _claim_insert(journal, second.intent_id, second_basis, second_token).granted is True
     invalid = journal.admit_draft_readback(
@@ -810,7 +936,7 @@ def test_expiry_and_invalid_draft_proof_never_authorize_a_repeat_attempt(tmp_pat
     assert invalid.admitted is False
     assert invalid.reason == "DRAFT_READBACK_NOT_UNIQUE"
     assert submit.granted is False
-    assert submit.reason == "DRAFT_READBACK_REQUIRED"
+    assert submit.reason == "DRAFT_ACKNOWLEDGEMENT_REQUIRED"
 
 
 def test_explicit_reprepare_versions_unattempted_intent_and_invalidates_old_token(
@@ -820,7 +946,7 @@ def test_explicit_reprepare_versions_unattempted_intent_and_invalidates_old_toke
     preview = _preview(basis)
     source = _source(basis)
     journal = _journal(tmp_path)
-    prepared = journal.prepare(basis, preview, source)
+    prepared = journal.prepare(basis, preview, source, insert_request=_insert_request(basis))
     old_token = _approve(journal, prepared.intent_id, basis=basis)
     journal.refuse(
         prepared.intent_id,
@@ -841,6 +967,7 @@ def test_explicit_reprepare_versions_unattempted_intent_and_invalidates_old_toke
         basis,
         preview,
         replacement_source,
+        insert_request=_insert_request(basis),
         now=NOW,
     )
     assert reprepared.accepted is True
@@ -867,6 +994,7 @@ def test_explicit_reprepare_versions_unattempted_intent_and_invalidates_old_toke
         basis,
         preview,
         replacement_source,
+        insert_request=_insert_request(basis),
         now=NOW,
     )
     assert blocked.accepted is False
@@ -901,3 +1029,281 @@ def test_history_keeps_immutable_basis_preview_and_source_versions(tmp_path: Pat
     assert history[-1].payload["audit_snapshot_digest"] == "audit-snapshot-v2"
     with pytest.raises(TypeError):
         snapshot.frozen_basis["gross_amount"] = "999"  # type: ignore[index]
+
+
+def test_unbound_or_corrupt_insert_binding_cannot_approve_or_claim(tmp_path: Path) -> None:
+    basis = _basis()
+    journal = _journal(tmp_path)
+    unbound = journal.prepare(basis, _preview(basis), _source(basis))
+
+    approval = journal.approve(
+        unbound.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        expires_at=NOW + timedelta(minutes=10),
+        now=NOW,
+    )
+    assert approval.granted is False
+    assert approval.reason == "INSERT_REQUEST_UNBOUND"
+    assert unbound.snapshot.insert_attempted is False
+
+    bound = journal.prepare(
+        _basis(
+            case_id="M20-R4-BILL-2",
+            bill_reference="SUP-BILL-R4-0002",
+            purchase_receipt="MAT-PRE-2026-00008",
+            purchase_receipt_item="068bbdr0mc",
+        ),
+        _preview(
+            _basis(
+                case_id="M20-R4-BILL-2",
+                bill_reference="SUP-BILL-R4-0002",
+                purchase_receipt="MAT-PRE-2026-00008",
+                purchase_receipt_item="068bbdr0mc",
+            )
+        ),
+        _source(
+            _basis(
+                case_id="M20-R4-BILL-2",
+                bill_reference="SUP-BILL-R4-0002",
+                purchase_receipt="MAT-PRE-2026-00008",
+                purchase_receipt_item="068bbdr0mc",
+            )
+        ),
+        insert_request=_insert_request(
+            _basis(
+                case_id="M20-R4-BILL-2",
+                bill_reference="SUP-BILL-R4-0002",
+                purchase_receipt="MAT-PRE-2026-00008",
+                purchase_receipt_item="068bbdr0mc",
+            )
+        ),
+    )
+    database = tmp_path / "normal-billing.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE normal_receipt_billing_intents SET insert_binding_json = ? WHERE intent_id = ?",
+            (json.dumps({"not": "a bound native request"}), bound.intent_id),
+        )
+    corrupt = journal.approve(
+        bound.intent_id,
+        case_id=bound.snapshot.case_id,
+        manager_id=MANAGER,
+        expires_at=NOW + timedelta(minutes=10),
+        now=NOW,
+    )
+    assert corrupt.granted is False
+    assert corrupt.reason == "INSERT_REQUEST_INVALID"
+    assert journal.get(bound.intent_id).insert_attempted is False
+
+
+def test_bound_request_is_durable_before_approval_and_claim_returns_only_that_request(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    request = _insert_request(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=request,
+    )
+    token = _approve(journal, prepared.intent_id, basis=basis)
+
+    request_body = request.record()["body"]
+    assert isinstance(request_body, dict)
+    request_body["bill_no"] = "MUTATED-CALLER"
+    claim = _claim_insert(journal, prepared.intent_id, basis, token)
+    assert claim.granted is True
+    assert claim.payload["native_request"]["body"]["bill_no"] == basis.bill_reference
+    assert claim.payload["request_binding"]["intent_version"] == 1
+    assert (
+        claim.payload["request_binding"]["commercial_version"]
+        == prepared.snapshot.commercial_version
+    )
+
+    reopened = BillingIntentJournal(tmp_path / "normal-billing.sqlite3")
+    history = reopened.history(prepared.intent_id)
+    assert history[0].payload["insert_binding"]["request"]["body_digest"] == request.body_digest
+    assert (
+        history[-1].payload["payload"]["native_request"]["body"]["bill_no"] == basis.bill_reference
+    )
+
+
+def test_same_source_different_bound_body_requires_a_new_version_and_invalidates_old_token(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    first_request = _insert_request(basis, remarks="mapper-remarks-a")
+    second_request = _insert_request(basis, remarks="mapper-remarks-b")
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=first_request,
+    )
+    old_token = _approve(journal, prepared.intent_id, basis=basis)
+
+    repeated = journal.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=second_request,
+    )
+    assert repeated.accepted is False
+    assert repeated.reason == "REPREPARE_REQUIRED"
+
+    journal.refuse(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        reason="bind a newly validated body",
+        now=NOW,
+    )
+    reprepared = journal.reprepare(
+        prepared.intent_id,
+        basis,
+        _preview(basis),
+        _source(basis, audit_snapshot_digest="audit-snapshot-v2"),
+        insert_request=second_request,
+        now=NOW,
+    )
+    assert reprepared.accepted is True
+    assert reprepared.snapshot.intent_version == 2
+    assert (
+        _claim_insert(journal, prepared.intent_id, basis, old_token).reason == "APPROVAL_REQUIRED"
+    )
+    new_token = _approve(journal, prepared.intent_id, basis=basis, expected_version=2)
+    new_claim = _claim_insert(journal, prepared.intent_id, basis, new_token)
+    assert new_claim.granted is True
+    assert new_claim.payload["native_request"]["body"]["remarks"] == "mapper-remarks-b"
+
+
+def test_unknown_insert_never_adopts_a_business_search_candidate_or_allows_submit(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    request = _insert_request(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=request,
+    )
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    assert _claim_insert(journal, prepared.intent_id, basis, token).granted is True
+
+    journal.record_unknown(prepared.intent_id, _readback("UNKNOWN"), now=NOW)
+    candidate = _draft(basis, prepared.snapshot.commercial_version, name="PI-CANDIDATE")
+    adopted = journal.admit_draft_readback(prepared.intent_id, candidate)
+    submit = journal.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert adopted.admitted is False
+    assert adopted.reason == "INSERT_ACKNOWLEDGEMENT_REQUIRED"
+    assert submit.granted is False
+    assert submit.reason == "DRAFT_ACKNOWLEDGEMENT_REQUIRED"
+    assert (
+        _claim_insert(journal, prepared.intent_id, basis, token).reason
+        == "INSERT_ALREADY_ATTEMPTED"
+    )
+
+
+def test_acknowledged_draft_binds_the_original_attempt_and_submit_timeout_is_read_only(
+    tmp_path: Path,
+) -> None:
+    basis = _basis()
+    request = _insert_request(basis)
+    journal = _journal(tmp_path)
+    prepared = journal.prepare(
+        basis,
+        _preview(basis),
+        _source(basis),
+        insert_request=request,
+    )
+    token = _approve(journal, prepared.intent_id, basis=basis)
+    insert = _claim_insert(journal, prepared.intent_id, basis, token)
+    assert insert.attempt_id
+
+    acknowledgement = _acknowledged_draft(request)
+    admitted = journal.admit_insert_acknowledgement(prepared.intent_id, acknowledgement)
+    assert admitted.admitted is True
+    assert admitted.snapshot.draft_name == acknowledgement.draft_name
+    submit = journal.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-a",
+        now=NOW,
+    )
+    assert submit.granted is True
+    assert submit.payload["native_request"]["body"]["doc"] == acknowledgement.document
+
+    reopened = BillingIntentJournal(tmp_path / "normal-billing.sqlite3")
+    admitted_submitted = reopened.admit_submitted_readback(
+        prepared.intent_id,
+        _submitted_readback(acknowledgement),
+    )
+    assert admitted_submitted.admitted is True
+    assert admitted_submitted.snapshot.submitted_invoice_name == acknowledgement.draft_name
+    retry = reopened.claim_submit(
+        prepared.intent_id,
+        case_id=basis.case_id,
+        manager_id=MANAGER,
+        worker_id="worker-b",
+        now=NOW,
+    )
+    assert retry.granted is False
+    assert retry.reason == "SUBMIT_ALREADY_ATTEMPTED"
+
+
+def test_two_processes_upgrade_legacy_schema_once_without_hanging(tmp_path: Path) -> None:
+    database = tmp_path / "legacy-normal-billing.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TABLE normal_receipt_billing_intents (intent_id TEXT PRIMARY KEY)"
+        )
+
+    context = get_context("fork")
+    start = context.Event()
+    parent_a, child_a = context.Pipe(duplex=False)
+    parent_b, child_b = context.Pipe(duplex=False)
+    processes = (
+        context.Process(target=_process_open_legacy_schema, args=(str(database), start, child_a)),
+        context.Process(target=_process_open_legacy_schema, args=(str(database), start, child_b)),
+    )
+    try:
+        for process in processes:
+            process.start()
+        child_a.close()
+        child_b.close()
+        start.set()
+        assert parent_a.poll(10)
+        assert parent_b.poll(10)
+        assert parent_a.recv() == (True, None)
+        assert parent_b.recv() == (True, None)
+        for process in processes:
+            process.join(timeout=5)
+            assert process.exitcode == 0
+    finally:
+        start.set()
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=5)
+        for pipe in (child_a, child_b, parent_a, parent_b):
+            pipe.close()
+
+    with sqlite3.connect(database) as connection:
+        columns = [
+            row[1]
+            for row in connection.execute("PRAGMA table_info(normal_receipt_billing_intents)")
+        ]
+    assert columns.count("insert_binding_json") == 1
