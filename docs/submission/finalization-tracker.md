@@ -4,6 +4,14 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
 
 ## Current snapshot — September 10
 
+- **Distributor handoff adapters shipped:** `eb369e301c15c82f7ecab3aba4768cb17e5ef5d7`
+  matches remote main; [CI 34529010013](https://github.com/danielwanwx/the-missing-20/actions/runs/34529010013)
+  completed successfully. Independent code GO, 60 focused tests and actual
+  Airtable target-schema readback are recorded in the
+  [adapter acceptance](../audits/2026-09-10-distributor-handoff-adapter.md).
+  Event/runtime/UI integration and actual same-case record writes are still
+  pending. This release does not certify an external business loop.
+
 - **Contract allocation slice shipped:** `51eae16a7f0fb41424733665ea1182aca95a0cfb`
   matches freshly read remote main; [CI 34527498379](https://github.com/danielwanwx/the-missing-20/actions/runs/34527498379)
   completed successfully. Independent review accepted the real Nova Pro selector

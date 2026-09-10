@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -48,6 +49,41 @@ COMPONENT_ACCEPTED_WAREHOUSE: Final = "M20 Distributor Component Accepted"
 COMPONENT_INSPECTION_WAREHOUSE: Final = "M20 Distributor Component Inspection"
 _COMPONENT_ORDER_25: Final = "REQUIRES_PROVISION_COMPONENT_ORDER_25"
 _COMPONENT_ORDER_15: Final = "REQUIRES_PROVISION_COMPONENT_ORDER_15"
+
+
+def _component_identities(instance: str | None) -> dict[str, str]:
+    """Return isolated identifiers; the existing fixture remains byte-for-byte unchanged."""
+
+    if instance is None:
+        return {
+            "case_id": COMPONENT_CASE_ID,
+            "marker": COMPONENT_MARKER,
+            "po_marker": COMPONENT_PO_MARKER,
+            "accepted_warehouse": COMPONENT_ACCEPTED_WAREHOUSE,
+            "inspection_warehouse": COMPONENT_INSPECTION_WAREHOUSE,
+            "batch_a": "M20-DIST-COMP-BATCH-A",
+            "batch_b": "M20-DIST-COMP-BATCH-B",
+            "batch_c": "M20-DIST-COMP-BATCH-C",
+            "shipment_25": f"{COMPONENT_CASE_ID}-SHIP-25",
+            "shipment_15": f"{COMPONENT_CASE_ID}-SHIP-15",
+        }
+    namespace = instance.strip()
+    if not re.fullmatch(r"[A-Z0-9][A-Z0-9-]{0,23}", namespace):
+        raise ProvisioningBlocked("instance must be uppercase letters, digits, or hyphens")
+    marker = f"M20 DIST COMPONENT {namespace} SYNTHETIC"
+    case_id = f"M20-DIST-COMPONENT-{namespace}"
+    return {
+        "case_id": case_id,
+        "marker": marker,
+        "po_marker": f"{marker} PURCHASE ORDER",
+        "accepted_warehouse": f"M20 Distributor Component {namespace} Accepted",
+        "inspection_warehouse": f"M20 Distributor Component {namespace} Inspection",
+        "batch_a": f"M20-DIST-COMP-{namespace}-BATCH-A",
+        "batch_b": f"M20-DIST-COMP-{namespace}-BATCH-B",
+        "batch_c": f"M20-DIST-COMP-{namespace}-BATCH-C",
+        "shipment_25": f"{case_id}-SHIP-25",
+        "shipment_15": f"{case_id}-SHIP-15",
+    }
 
 
 class ProvisioningBlocked(ValueError):
@@ -256,12 +292,55 @@ def _plan(po_item: Mapping[str, object], *, supplier: str, date: str) -> dict[st
 
 
 def _component_plan(
-    *, supplier: str, date: str, purchase_order: str, purchase_order_item: str
+    *,
+    supplier: str,
+    date: str,
+    purchase_order: str,
+    purchase_order_item: str,
+    instance: str | None = None,
 ) -> dict[str, object]:
     """Return the isolated batch-and-quality runtime config without a write."""
 
+    identities = _component_identities(instance)
+    accepted_warehouse = (
+        "REQUIRES_PROVISION_COMPONENT_ACCEPTED_WAREHOUSE"
+        if instance is None
+        else identities["accepted_warehouse"]
+    )
+    inspection_warehouse = (
+        "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE"
+        if instance is None
+        else identities["inspection_warehouse"]
+    )
+    allocations: list[dict[str, object]] = [
+        {"customer_order": _COMPONENT_ORDER_25, "requested_quantity": 25, "priority": 1},
+        {"customer_order": _COMPONENT_ORDER_15, "requested_quantity": 15, "priority": 2},
+    ]
+    if instance is not None:
+        allocations = [
+            {
+                "customer_order": _COMPONENT_ORDER_25,
+                "requested_quantity": 25,
+                "priority": 2,
+                "promised_delivery_at": "2026-09-11T09:00:00+00:00",
+                "customer_priority": 2,
+                "partial_dispatch": True,
+                "minimum_dispatch_quantity": 10,
+                "allow_final_remainder": True,
+            },
+            {
+                "customer_order": _COMPONENT_ORDER_15,
+                "requested_quantity": 15,
+                "priority": 1,
+                "promised_delivery_at": "2026-09-12T09:00:00+00:00",
+                "customer_priority": 1,
+                "partial_dispatch": True,
+                "minimum_dispatch_quantity": 5,
+                "allow_final_remainder": True,
+            },
+        ]
     return {
-        "case_id": COMPONENT_CASE_ID,
+        "case_id": identities["case_id"],
         "case_label": "Synthetic component count, inspection and release",
         "synthetic_input": True,
         "company": COMPANY,
@@ -273,40 +352,40 @@ def _component_plan(
         "cartons": 5,
         "purchase_order": purchase_order,
         "purchase_order_item": purchase_order_item,
-        "marker": COMPONENT_MARKER,
+        "marker": identities["marker"],
         "currency": "USD",
         "unit_rate": COMPONENT_UNIT_RATE,
         "warehouses": {
-            "accepted": "REQUIRES_PROVISION_COMPONENT_ACCEPTED_WAREHOUSE",
-            "quarantine": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
+            "accepted": accepted_warehouse,
+            "quarantine": inspection_warehouse,
         },
         "receipt_plans": [
             {
                 "lot": "LOT-A",
-                "marker": f"{COMPONENT_MARKER} LOT-A",
+                "marker": f"{identities['marker']} LOT-A",
                 "quantity": 20,
                 "cartons": 2,
                 "expected_pack_quantity": 10,
-                "warehouse": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
-                "batch_no": "M20-DIST-COMP-BATCH-A",
+                "warehouse": inspection_warehouse,
+                "batch_no": identities["batch_a"],
             },
             {
                 "lot": "LOT-B",
-                "marker": f"{COMPONENT_MARKER} LOT-B",
+                "marker": f"{identities['marker']} LOT-B",
                 "quantity": 18,
                 "cartons": 2,
                 "expected_pack_quantity": 10,
-                "warehouse": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
-                "batch_no": "M20-DIST-COMP-BATCH-B",
+                "warehouse": inspection_warehouse,
+                "batch_no": identities["batch_b"],
             },
             {
                 "lot": "LOT-C",
-                "marker": f"{COMPONENT_MARKER} LOT-C REPLACEMENT",
+                "marker": f"{identities['marker']} LOT-C REPLACEMENT",
                 "quantity": 2,
                 "cartons": 1,
                 "expected_pack_quantity": 2,
-                "warehouse": "REQUIRES_PROVISION_COMPONENT_INSPECTION_WAREHOUSE",
-                "batch_no": "M20-DIST-COMP-BATCH-C",
+                "warehouse": inspection_warehouse,
+                "batch_no": identities["batch_c"],
             },
         ],
         "lots": [
@@ -330,11 +409,9 @@ def _component_plan(
                 "replacement_for_lot": "LOT-B",
             },
         ],
-        "allocations": [
-            {"customer_order": _COMPONENT_ORDER_25, "requested_quantity": 25, "priority": 1},
-            {"customer_order": _COMPONENT_ORDER_15, "requested_quantity": 15, "priority": 2},
-        ],
+        "allocations": allocations,
         "customer_orders": [_COMPONENT_ORDER_25, _COMPONENT_ORDER_15],
+        **({"allocation_policy": {"version": "v1"}} if instance is not None else {}),
         "pick_tranches": [
             {"customer_order": _COMPONENT_ORDER_25, "lot": "LOT-A", "quantity": 20},
             {"customer_order": _COMPONENT_ORDER_25, "lot": "LOT-B", "quantity": 5},
@@ -351,7 +428,7 @@ def _component_plan(
             "native_read_enabled": True,
             "shipments": {
                 _COMPONENT_ORDER_25: {
-                    "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-25",
+                    "shipment_id_prefix": identities["shipment_25"],
                     "pickup_address": "REQUIRES_PROVISION_COMPONENT_PICKUP_ADDRESS",
                     "delivery_address": "REQUIRES_PROVISION_COMPONENT_DELIVERY_ADDRESS_25",
                     "pickup_date": date,
@@ -360,7 +437,7 @@ def _component_plan(
                     "parcel_weight": 1,
                 },
                 _COMPONENT_ORDER_15: {
-                    "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-15",
+                    "shipment_id_prefix": identities["shipment_15"],
                     "pickup_address": "REQUIRES_PROVISION_COMPONENT_PICKUP_ADDRESS",
                     "delivery_address": "REQUIRES_PROVISION_COMPONENT_DELIVERY_ADDRESS_15",
                     "pickup_date": date,
@@ -556,11 +633,13 @@ def _sales_order(
     uom: str = "Box",
     marker_prefix: str = MARKER,
     unit_rate: float = SALES_RATE,
+    delivery_date: str | None = None,
 ) -> Mapping[str, object]:
     customer_name = customer.get("name")
     if not isinstance(customer_name, str) or not customer_name:
         raise ProvisioningBlocked("customer has no stable ERP identity")
     marker = f"{marker_prefix} CUSTOMER-{priority}"
+    promised_date = delivery_date or date
 
     def matches(document: Mapping[str, object]) -> bool:
         items = document.get("items")
@@ -568,6 +647,7 @@ def _sales_order(
             document.get("company") == COMPANY
             and document.get("customer") == customer_name
             and document.get("po_no") == marker
+            and (delivery_date is None or document.get("delivery_date") == delivery_date)
             and isinstance(items, list)
             and len(items) == 1
             and isinstance(items[0], Mapping)
@@ -578,6 +658,7 @@ def _sales_order(
             and items[0].get("conversion_factor") == 1
             and items[0].get("warehouse") == warehouse
             and items[0].get("rate") == unit_rate
+            and (delivery_date is None or items[0].get("delivery_date") == delivery_date)
         )
 
     document = _single_or_create(
@@ -590,7 +671,7 @@ def _sales_order(
             "company": COMPANY,
             "customer": customer_name,
             "transaction_date": date,
-            "delivery_date": date,
+            "delivery_date": promised_date,
             "currency": "USD",
             "selling_price_list": "Standard Selling",
             "conversion_rate": 1,
@@ -606,7 +687,7 @@ def _sales_order(
                     "conversion_factor": 1,
                     "warehouse": warehouse,
                     "rate": unit_rate,
-                    "delivery_date": date,
+                    "delivery_date": promised_date,
                 }
             ],
         },
@@ -616,14 +697,21 @@ def _sales_order(
 
 
 def _component_purchase_order(
-    client: ERPNextDemoExecutor, *, supplier: str, inspection_warehouse: str, date: str
+    client: ERPNextDemoExecutor,
+    *,
+    supplier: str,
+    inspection_warehouse: str,
+    date: str,
+    instance: str | None = None,
 ) -> tuple[Mapping[str, object], Mapping[str, object]]:
     """Create or verify the one explicitly marked component PO.
 
     The deployed tenant does not expose a reliable PO remarks field, so parent
-    discovery is bounded by the verified company/supplier and each candidate is
-    reread before its item-row marker is trusted.
+    discovery is bounded by the exact instance marker.  Other historical or
+    differently namespaced component POs are not candidates.
     """
+
+    po_marker = _component_identities(instance)["po_marker"]
 
     def candidates() -> list[Mapping[str, object]]:
         query = urlencode(
@@ -651,13 +739,11 @@ def _component_purchase_order(
                 for row in items
                 if isinstance(row, Mapping) and row.get("item_code") == COMPONENT_ITEM
             ]
-            if not component_rows:
+            marked_rows = [row for row in component_rows if row.get("description") == po_marker]
+            if not marked_rows:
                 continue
-            if (
-                len(component_rows) != 1
-                or component_rows[0].get("description") != COMPONENT_PO_MARKER
-            ):
-                raise ProvisioningBlocked("component item already belongs to an unverified PO")
+            if len(component_rows) != 1 or len(marked_rows) != 1:
+                raise ProvisioningBlocked("component PO has malformed exact instance marker rows")
             matches.append(document)
         if len(matches) > 1:
             raise ProvisioningBlocked("ambiguous existing component PO")
@@ -667,14 +753,13 @@ def _component_purchase_order(
         items = order.get("items")
         if not isinstance(items, list):
             raise ProvisioningBlocked("component PO has no item rows")
-        lines = [
+        component_rows = [
             row
             for row in items
-            if isinstance(row, Mapping)
-            and row.get("item_code") == COMPONENT_ITEM
-            and row.get("description") == COMPONENT_PO_MARKER
+            if isinstance(row, Mapping) and row.get("item_code") == COMPONENT_ITEM
         ]
-        if len(lines) != 1:
+        lines = [row for row in component_rows if row.get("description") == po_marker]
+        if len(component_rows) != 1 or len(lines) != 1:
             raise ProvisioningBlocked("component PO does not have one marked item row")
         line = lines[0]
         if (
@@ -709,7 +794,7 @@ def _component_purchase_order(
                 "items": [
                     {
                         "item_code": COMPONENT_ITEM,
-                        "description": COMPONENT_PO_MARKER,
+                        "description": po_marker,
                         "qty": 40,
                         "uom": "Nos",
                         "stock_uom": "Nos",
@@ -855,18 +940,21 @@ def provision_r4(client: ERPNextDemoExecutor, *, date: str) -> dict[str, object]
     return config
 
 
-def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, object]:
+def provision_component(
+    client: ERPNextDemoExecutor, *, date: str, instance: str | None = None
+) -> dict[str, object]:
     """Provision the isolated batched component case and return its exact config."""
 
     if client._environment != "demo":
         raise ProvisioningBlocked("writes require MISSING20_ENVIRONMENT=demo")
     reference_order, _ = _po_line(client)
     supplier = _required_text(reference_order.get("supplier"), "PO16 supplier")
+    identities = _component_identities(instance)
 
     item = _component_item(client)
     item_name = _required_text(item.get("name"), "component item")
-    accepted = _warehouse(client, name=COMPONENT_ACCEPTED_WAREHOUSE)
-    inspection = _warehouse(client, name=COMPONENT_INSPECTION_WAREHOUSE)
+    accepted = _warehouse(client, name=identities["accepted_warehouse"])
+    inspection = _warehouse(client, name=identities["inspection_warehouse"])
     accepted_name = _required_text(accepted.get("name"), "component accepted warehouse")
     inspection_name = _required_text(inspection.get("name"), "component inspection warehouse")
     parameter = _component_quality_parameter(client)
@@ -879,13 +967,13 @@ def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, 
             client,
             batch_id=batch_id,
             item_code=item_name,
-            description=f"{COMPONENT_MARKER} {lot}",
+            description=f"{identities['marker']} {lot}",
             date=date,
         )
         for lot, batch_id in {
-            "LOT-A": "M20-DIST-COMP-BATCH-A",
-            "LOT-B": "M20-DIST-COMP-BATCH-B",
-            "LOT-C": "M20-DIST-COMP-BATCH-C",
+            "LOT-A": identities["batch_a"],
+            "LOT-B": identities["batch_b"],
+            "LOT-C": identities["batch_c"],
         }.items()
     }
     batch_names = {
@@ -897,12 +985,14 @@ def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, 
         supplier=supplier,
         inspection_warehouse=inspection_name,
         date=date,
+        instance=instance,
     )
     config = _component_plan(
         supplier=supplier,
         date=date,
         purchase_order=_required_text(purchase_order.get("name"), "component PO"),
         purchase_order_item=_required_text(po_item.get("name"), "component PO item"),
+        instance=instance,
     )
     config["warehouses"] = {"accepted": accepted_name, "quarantine": inspection_name}
     plans = cast(list[dict[str, object]], config["receipt_plans"])
@@ -918,24 +1008,26 @@ def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, 
         customer=customer_25,
         warehouse=accepted_name,
         quantity=25,
-        priority=1,
+        priority=2 if instance is not None else 1,
         date=date,
         item_code=item_name,
         uom="Nos",
-        marker_prefix=COMPONENT_MARKER,
+        marker_prefix=identities["marker"],
         unit_rate=COMPONENT_SALES_RATE,
+        delivery_date="2026-09-11" if instance is not None else None,
     )
     order_15 = _sales_order(
         client,
         customer=customer_15,
         warehouse=accepted_name,
         quantity=15,
-        priority=2,
+        priority=1 if instance is not None else 2,
         date=date,
         item_code=item_name,
         uom="Nos",
-        marker_prefix=COMPONENT_MARKER,
+        marker_prefix=identities["marker"],
         unit_rate=COMPONENT_SALES_RATE,
+        delivery_date="2026-09-12" if instance is not None else None,
     )
     customer_25_name = _required_text(customer_25.get("name"), "component customer 25")
     customer_15_name = _required_text(customer_15.get("name"), "component customer 15")
@@ -976,9 +1068,10 @@ def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, 
     delivery_15_name = _required_text(delivery_15.get("name"), "component delivery 15 address")
     contact_25_name = _required_text(contact_25.get("name"), "component contact 25")
     contact_15_name = _required_text(contact_15.get("name"), "component contact 15")
+    allocation_templates = cast(list[Mapping[str, object]], config["allocations"])
     config["allocations"] = [
-        {"customer_order": order_25_name, "requested_quantity": 25, "priority": 1},
-        {"customer_order": order_15_name, "requested_quantity": 15, "priority": 2},
+        {**dict(allocation_templates[0]), "customer_order": order_25_name},
+        {**dict(allocation_templates[1]), "customer_order": order_15_name},
     ]
     config["customer_orders"] = [order_25_name, order_15_name]
     config["pick_tranches"] = [
@@ -991,7 +1084,7 @@ def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, 
         "native_read_enabled": True,
         "shipments": {
             order_25_name: {
-                "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-25",
+                "shipment_id_prefix": identities["shipment_25"],
                 "pickup_address": pickup_name,
                 "delivery_address": delivery_25_name,
                 "delivery_contact": contact_25_name,
@@ -1001,7 +1094,7 @@ def provision_component(client: ERPNextDemoExecutor, *, date: str) -> dict[str, 
                 "parcel_weight": 1,
             },
             order_15_name: {
-                "shipment_id_prefix": f"{COMPONENT_CASE_ID}-SHIP-15",
+                "shipment_id_prefix": identities["shipment_15"],
                 "pickup_address": pickup_name,
                 "delivery_address": delivery_15_name,
                 "delivery_contact": contact_15_name,
@@ -1041,12 +1134,18 @@ def main() -> int:
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--date", required=True, help="ERP business date, YYYY-MM-DD")
+    parser.add_argument(
+        "--instance",
+        help="uppercase fresh component namespace; component-quality only",
+    )
     args = parser.parse_args()
     datetime.fromisoformat(f"{args.date}T00:00:00+00:00")
     if args.mode == "execute" and not args.execute:
         raise ProvisioningBlocked("--mode execute requires explicit --execute")
     if args.execute and args.mode != "execute":
         raise ProvisioningBlocked("--execute is valid only with --mode execute")
+    if args.instance is not None and args.scenario != "component-quality":
+        raise ProvisioningBlocked("--instance is valid only with --scenario component-quality")
     if args.mode == "dry":
         if args.scenario == "r4-follow-on":
             template = _plan(
@@ -1061,6 +1160,7 @@ def main() -> int:
                 date=args.date,
                 purchase_order="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER",
                 purchase_order_item="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER_ITEM",
+                instance=args.instance,
             )
             unresolved_source_fields = ["supplier"]
         value: dict[str, object] = {
@@ -1095,6 +1195,7 @@ def main() -> int:
                     date=args.date,
                     purchase_order="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER",
                     purchase_order_item="REQUIRES_PROVISION_COMPONENT_PURCHASE_ORDER_ITEM",
+                    instance=args.instance,
                 )
                 purchase_order_item = None
             value = {
@@ -1108,13 +1209,14 @@ def main() -> int:
             config = (
                 provision_r4(client, date=args.date)
                 if args.scenario == "r4-follow-on"
-                else provision_component(client, date=args.date)
+                else provision_component(client, date=args.date, instance=args.instance)
             )
             value = {
                 "mode": "execute",
                 "write_authorized": True,
                 "executed_at": datetime.now(UTC).isoformat(),
                 "scenario": args.scenario,
+                "instance": args.instance,
                 "config": config,
             }
     _write_private(args.output, value)

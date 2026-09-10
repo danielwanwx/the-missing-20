@@ -1,14 +1,14 @@
 # The Missing 20
 
-> **September 10 finalization status: core R4 demo verified; submission NOT READY.**
-> The same PO16/PR7 receiving case now has a submitted supplier invoice, PI8:
-> 1 Box / USD 50, balanced ERP accounting, unchanged stock and no payment.
-> Six actual UI turns using native Strands history passed independent semantic
-> review. This is one bounded demo, not the full repeated complex-case matrix.
-> Customer fulfillment, final video/materials and judge-access packaging remain open.
-> Historical 20-unit / USD 42,000 and September 6 results below retain their own scope.
-> See the [current finalization ledger](docs/submission/finalization-tracker.md) and
-> [R4 business and conversation audit](docs/audits/2026-09-10-r4-billing-native-dialogue-review.md).
+> **September 10 finalization status: scoped demos verified; submission NOT READY.**
+> The historical remaining-39-Box and separate 40-part component cases have native
+> ERP fulfillment evidence. The component case reached customer totals of 25/15,
+> with explicitly synthetic physical inputs and retained setup/recovery failures.
+> Contract-based Strands selection is now independently accepted on synthetic
+> inputs. Same-case distributor Airtable/Jira/Slack integration and a fresh,
+> uninterrupted business demonstration are still being completed.
+> Complex multi-turn accuracy, final video/materials and judge access remain open.
+> See the [current ledger](docs/submission/finalization-tracker.md) and [component evidence](docs/audits/2026-09-10-distributor-component-live-acceptance.md).
 
 
 **Find the gap. Prove the cause. Close it safely.**

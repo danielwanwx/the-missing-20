@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import Mapping
 from typing import Any, Protocol, cast
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 
 from the_missing_20.adapters.receiving_destinations import ReceivingAPI
 from the_missing_20.adapters.receiving_handoff import HandoffJournal
@@ -516,7 +516,13 @@ class JiraDistributorCase:
     def __init__(self, api: ReceivingAPI, project: str) -> None:
         if not re.fullmatch(r"[A-Z][A-Z0-9_]{1,20}", project):
             raise ValueError("invalid distributor Jira project")
+        url = urlsplit(api.config.jira_base_url)
+        if url.scheme != "https" or not url.hostname or not url.hostname.endswith(".atlassian.net"):
+            raise ValueError("Jira distributor browser origin must be an Atlassian tenant")
+        if url.username or url.password or url.query or url.fragment or url.path not in ("", "/"):
+            raise ValueError("Invalid Jira distributor browser origin")
         self.api, self.project = api, project
+        self.origin = api.config.jira_base_url.rstrip("/")
         self.route = "jira-distributor:" + project
 
     @staticmethod
@@ -539,6 +545,8 @@ class JiraDistributorCase:
         )
 
     def _issue(self, key: str, marker: str) -> dict[str, Any]:
+        if not re.fullmatch(re.escape(self.project) + r"-[1-9][0-9]*", key):
+            raise ValueError("Jira distributor issue is out of project")
         payload = self.api.request(
             "jira",
             "/rest/api/3/issue/"
@@ -612,6 +620,7 @@ class JiraDistributorCase:
         return {
             "provider": "Jira",
             "record_id": issue["key"],
+            "url": self.origin + "/browse/" + issue["key"],
             "status": fields.get("status", {}).get("name", "UNKNOWN"),
         }
 

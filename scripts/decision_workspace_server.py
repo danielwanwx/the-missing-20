@@ -15,6 +15,7 @@ import os
 import sys
 import time
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
@@ -36,6 +37,12 @@ from the_missing_20.adapters.ambiguous_receipt_source import (  # noqa: E402
 )
 from the_missing_20.adapters.automatic_investigation import AutomaticInvestigation  # noqa: E402
 from the_missing_20.adapters.demo_executor import ERPNextDemoExecutor  # noqa: E402
+from the_missing_20.adapters.distributor_handoff import (  # noqa: E402
+    AirtableDistributorCase,
+    CeligoDistributorSlack,
+    DistributorHandoff,
+    JiraDistributorCase,
+)
 from the_missing_20.adapters.distributor_operations import (  # noqa: E402
     DISTRIBUTOR_OPERATIONS_SCHEMA_VERSION,
     DistributorOperations,
@@ -70,7 +77,9 @@ from the_missing_20.adapters.photo_receiving import (  # noqa: E402
     PhotoReceiptERP,
     PhotoReceiving,
 )
+from the_missing_20.adapters.receiving_destinations import ReceivingAPI  # noqa: E402
 from the_missing_20.adapters.receiving_draft_worker import ReceivingDraftWorker  # noqa: E402
+from the_missing_20.adapters.receiving_handoff import HandoffJournal  # noqa: E402
 from the_missing_20.adapters.receiving_handoff_worker import ReceivingHandoffWorker  # noqa: E402
 from the_missing_20.adapters.saas_evidence import SaaSEvidenceSource  # noqa: E402
 from the_missing_20.adapters.strands_models import (  # noqa: E402
@@ -781,7 +790,159 @@ def _distributor_operations_disabled_projection() -> dict[str, object]:
         "shipments": [],
         "available_event_templates": [],
         "conversation": [],
+        "handoffs": [],
     }
+
+
+def _distributor_handoff_records(
+    handoff: DistributorHandoff | None, case_id: object
+) -> list[dict[str, object]]:
+    """Expose only this case's locally retained provider readbacks.
+
+    This reads the durable handoff journal; it never refreshes a provider and is
+    deliberately separate from source availability.
+    """
+
+    if handoff is None or not isinstance(case_id, str) or not case_id:
+        return []
+    records: list[dict[str, object]] = []
+    for row in handoff.journal.for_capture(case_id):
+        if not isinstance(row, Mapping):
+            continue
+        route = row.get("route")
+        status = row.get("status")
+        updated_at = row.get("updated_at")
+        if not all(isinstance(value, str) and value for value in (route, status, updated_at)):
+            continue
+        proof = row.get("evidence")
+        evidence = proof if isinstance(proof, Mapping) else {}
+        record_id = evidence.get("record_id")
+        url = evidence.get("url")
+        provider = evidence.get("provider")
+        retained_evidence = {
+            key: value
+            for key, value in {
+                "provider": provider if isinstance(provider, str) else None,
+                "record_id": record_id if isinstance(record_id, str) else None,
+                "url": url if isinstance(url, str) else None,
+            }.items()
+            if value is not None
+        }
+        record: dict[str, object] = {
+            "case_id": case_id,
+            "route": route,
+            "status": status,
+            "record_id": record_id if isinstance(record_id, str) else "",
+            "url": url if isinstance(url, str) else "",
+            "evidence": retained_evidence,
+            "updated_at": updated_at,
+            "retained": True,
+        }
+        failure = row.get("last_failure")
+        if isinstance(failure, Mapping):
+            record["last_failure"] = dict(failure)
+        records.append(record)
+    return records
+
+
+def _with_distributor_handoffs(
+    projection: Mapping[str, object], handoff: DistributorHandoff | None
+) -> dict[str, object]:
+    """Attach retained handoff status without refreshing any external source."""
+
+    return {
+        **dict(projection),
+        "handoffs": _distributor_handoff_records(handoff, projection.get("case_id")),
+    }
+
+
+def _retained_handoff_source(
+    handoffs: object, *, case_id: str, route_prefix: str
+) -> dict[str, object]:
+    """Keep provider readbacks explicitly retained, never current-source facts."""
+
+    records = (
+        [
+            dict(row)
+            for row in handoffs
+            if isinstance(row, Mapping)
+            and row.get("case_id") == case_id
+            and isinstance(row.get("route"), str)
+            and str(row["route"]).startswith(route_prefix)
+        ]
+        if isinstance(handoffs, list)
+        else []
+    )
+    evidence_records = [
+        record
+        for record in records
+        if isinstance(record.get("evidence"), Mapping) and record["evidence"]
+    ]
+    if not evidence_records:
+        return {
+            "status": "UNAVAILABLE",
+            "reason": "NOT_CONNECTED_FOR_DISTRIBUTOR_CASE",
+            "records": [],
+        }
+    return {
+        "status": "RETAINED",
+        "reason": "LOCAL_HANDOFF_JOURNAL_READBACKS",
+        "records": evidence_records,
+        "read_only": True,
+        "freshness": "RETAINED_NOT_REFRESHED",
+    }
+
+
+def _distributor_handoff_from_private_config(
+    path: Path, *, evidence: SaaSEvidenceSource, runtime: Path
+) -> DistributorHandoff:
+    """Build the optional demo-only handoff from an explicit private destination map."""
+
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("distributor handoff configuration is unavailable") from error
+    if not isinstance(raw, Mapping):
+        raise ValueError("distributor handoff configuration must be a JSON object")
+    required = {
+        "airtable_base_id",
+        "airtable_table_id",
+        "celigo_connection_id",
+        "celigo_import_id",
+        "jira_project_key",
+        "jira_receiving_enabled",
+        "slack_channel_id",
+    }
+    if set(raw) != required or raw.get("jira_receiving_enabled") is not True:
+        raise ValueError("distributor handoff configuration is not explicitly enabled")
+
+    def configured(name: str) -> str:
+        value = raw.get(name)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"distributor handoff {name} is missing")
+        return value.strip()
+
+    base = configured("airtable_base_id")
+    channel = configured("slack_channel_id")
+    project = configured("jira_project_key")
+    settings = evidence._config
+    if (
+        base != settings.airtable_base_id
+        or channel != settings.slack_channel_id
+        or project != settings.jira_project_key
+    ):
+        raise ValueError("distributor handoff destination scope differs from configured evidence")
+    api = ReceivingAPI(settings)
+    return DistributorHandoff(
+        HandoffJournal(runtime / "distributor-handoffs.sqlite3"),
+        airtable=AirtableDistributorCase(api, configured("airtable_table_id")),
+        jira=JiraDistributorCase(api, project),
+        slack=CeligoDistributorSlack(
+            api,
+            configured("celigo_import_id"),
+            configured("celigo_connection_id"),
+        ),
+    )
 
 
 def _fulfillment_quantity(value: object) -> Decimal | None:
@@ -941,11 +1102,7 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
         erp_facts["feasible_contract_allocation_plan"] = dict(feasible_plan)
     if isinstance(parent_purchase_order, Mapping):
         erp_facts["parent_purchase_order"] = dict(parent_purchase_order)
-    unavailable = {
-        "status": "UNAVAILABLE",
-        "reason": "NOT_CONNECTED_FOR_DISTRIBUTOR_CASE",
-        "records": [],
-    }
+    handoffs = projection.get("handoffs")
     return {
         "case_id": case_id,
         "case_class": "distributor_operations",
@@ -971,10 +1128,16 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
                     ),
                 },
                 "read_erp_evidence": erp_facts,
-                "read_airtable_evidence": dict(unavailable),
-                "read_celigo_evidence": dict(unavailable),
+                "read_airtable_evidence": _retained_handoff_source(
+                    handoffs, case_id=case_id, route_prefix="airtable-distributor:"
+                ),
+                "read_celigo_evidence": _retained_handoff_source(
+                    handoffs, case_id=case_id, route_prefix="celigo-distributor:"
+                ),
                 "read_collaboration_evidence": {
-                    **unavailable,
+                    **_retained_handoff_source(
+                        handoffs, case_id=case_id, route_prefix="jira-distributor:"
+                    ),
                     "retained_physical_events": retained_events,
                 },
             }
@@ -999,7 +1162,10 @@ def _distributor_native_allocation_selector(
 
 
 def _distributor_native_ask_turn(
-    *, settings: Settings, session_root: Path
+    *,
+    settings: Settings,
+    session_root: Path,
+    retained_handoffs: Callable[[str], list[dict[str, object]]] | None = None,
 ) -> Callable[[str, Mapping[str, object]], Mapping[str, object]]:
     """Reuse the accepted native history runner without a model fallback."""
 
@@ -1010,7 +1176,11 @@ def _distributor_native_ask_turn(
                 "detail": "Current ERP evidence is unavailable; no model request was started.",
             }
         try:
-            packet = _distributor_native_packet(projection)
+            current = dict(projection)
+            case = current.get("case_id")
+            if retained_handoffs is not None and isinstance(case, str) and case:
+                current["handoffs"] = retained_handoffs(case)
+            packet = _distributor_native_packet(current)
             case_id = str(packet["case_id"])
             native_run = run_native_receiving_turn(
                 session_root=session_root,
@@ -1089,6 +1259,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
     @property
     def distributor_operations(self) -> DistributorOperations | None:
         return self.server.distributor_operations  # type: ignore[attr-defined,no-any-return]
+
+    @property
+    def distributor_handoff(self) -> DistributorHandoff | None:
+        return getattr(self.server, "distributor_handoff", None)
 
     @property
     def case_console_source_mode(self) -> str:
@@ -1211,7 +1385,14 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                 if self.distributor_operations is None
                 else self.distributor_operations.projection()
             )
-            self._send_json(HTTPStatus.OK, {"distributor_operations": projection})
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "distributor_operations": _with_distributor_handoffs(
+                        projection, self.distributor_handoff
+                    )
+                },
+            )
             return
         if route == "/api/v1/agent-platform/normal-billing":
             if query:
@@ -1717,8 +1898,10 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "distributor operations requires an explicit private case configuration",
                 )
             action = route.removeprefix(distributor_prefix)
+            should_sync = False
             if action == "events":
                 result = operations.record_event(payload)
+                should_sync = True
             elif action == "reconcile-receive":
                 event_id = payload.get("event_id")
                 if set(payload) != {"event_id"} or not isinstance(event_id, str):
@@ -1728,6 +1911,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                         "reconcile-receive accepts only an event_id",
                     )
                 result = operations.reconcile_receive_arrival(event_id)
+                should_sync = True
             elif action == "ask":
                 question = payload.get("question")
                 if set(payload) != {"question"} or not isinstance(question, str):
@@ -1737,13 +1921,26 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                         "ask accepts only a question",
                     )
                 result = operations.ask(question)
+                should_sync = False
             else:
                 raise APIRequestError(
                     HTTPStatus.NOT_FOUND,
                     "not_found",
                     "distributor operations action was not found",
                 )
-            self._send_json(HTTPStatus.OK, {"distributor_operations": result})
+            if should_sync and self.distributor_handoff is not None:
+                # The ERP event is already durable. A provider problem must remain
+                # visible in retained handoff state, never roll that event back.
+                with suppress(OSError, TimeoutError, ValueError):
+                    self.distributor_handoff.sync(result)
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "distributor_operations": _with_distributor_handoffs(
+                        result, self.distributor_handoff
+                    )
+                },
+            )
             return
         normal_billing_prefix = "/api/v1/agent-platform/normal-billing/"
         if route.startswith(normal_billing_prefix):
@@ -2324,6 +2521,8 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         normal_billing_source: Path | None = None,
         distributor_operations: DistributorOperations | None = None,
         distributor_operations_config: Path | None = None,
+        distributor_handoff: DistributorHandoff | None = None,
+        distributor_handoff_config: Path | None = None,
     ) -> None:
         if address[0] not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("decision workspace server must bind to loopback")
@@ -2391,8 +2590,12 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
         else:
             self.normal_billing = None
         self.distributor_operations = distributor_operations
+        self.distributor_handoff = distributor_handoff
         configured_operations = distributor_operations_config or _optional_path(
             photo_values.get("MISSING20_DISTRIBUTOR_OPERATIONS_CONFIG")
+        )
+        configured_distributor_handoff = distributor_handoff_config or _optional_path(
+            photo_values.get("MISSING20_DISTRIBUTOR_HANDOFF_CONFIG")
         )
         if self.distributor_operations is None and configured_operations is not None:
             if photo_values.get("MISSING20_ENVIRONMENT", "").strip().lower() != "demo":
@@ -2419,6 +2622,9 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 _distributor_native_ask_turn(
                     settings=distributor_settings,
                     session_root=normal_billing_runtime / "distributor-native-sessions",
+                    retained_handoffs=lambda case_id: _distributor_handoff_records(
+                        self.distributor_handoff, case_id
+                    ),
                 )
                 if photo_values.get("MISSING20_NATIVE_RECEIVING_DIALOGUE") == "1"
                 and distributor_settings.agent_provider is AgentProvider.BEDROCK
@@ -2438,6 +2644,20 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 native_adapter,
                 ask_turn=distributor_ask_turn,
                 allocation_selector=distributor_allocation_selector,
+            )
+        if configured_distributor_handoff is not None and self.distributor_handoff is None:
+            if photo_values.get("MISSING20_ENVIRONMENT", "").strip().lower() != "demo":
+                raise ValueError(
+                    "distributor handoff requires the explicitly configured demo environment"
+                )
+            if self.distributor_operations is None:
+                raise ValueError(
+                    "distributor handoff requires distributor operations configuration"
+                )
+            self.distributor_handoff = _distributor_handoff_from_private_config(
+                configured_distributor_handoff,
+                evidence=self.saas_evidence,
+                runtime=normal_billing_runtime,
             )
         self.photo_receiving = PhotoReceiving(
             (runtime_directory or repository_root / ".missing20-runtime")
@@ -2620,6 +2840,11 @@ def main() -> int:
         help="private opt-in distributor case JSON with real demo-tenant operation scope",
     )
     parser.add_argument(
+        "--distributor-handoff-config",
+        type=Path,
+        help="private opt-in distributor provider destination map for the demo case",
+    )
+    parser.add_argument(
         "--runtime-directory",
         type=Path,
         default=ROOT / ".missing20-runtime",
@@ -2634,6 +2859,7 @@ def main() -> int:
             enable_normal_billing=args.enable_normal_billing,
             normal_billing_source=args.normal_billing_source,
             distributor_operations_config=args.distributor_operations_config,
+            distributor_handoff_config=args.distributor_handoff_config,
         )
     except OSError as exc:
         print(f"Decision Workspace server: BLOCKED ({exc})", file=sys.stderr)

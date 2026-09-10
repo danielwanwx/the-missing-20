@@ -140,6 +140,7 @@
       alerts: Array.isArray(source.alerts),
       events: Array.isArray(source.events),
       documents: Array.isArray(source.documents),
+      handoffs: Array.isArray(source.handoffs),
       available_event_templates: Array.isArray(source.available_event_templates),
     };
     return {
@@ -154,12 +155,74 @@
       alerts: Array.isArray(source.alerts) ? source.alerts : [],
       events: Array.isArray(source.events) ? source.events : [],
       documents: Array.isArray(source.documents) ? source.documents : [],
+      handoffs: Array.isArray(source.handoffs) ? source.handoffs : [],
       available_event_templates: normalizeTemplates(source.available_event_templates),
       conversation: Array.isArray(source.conversation)
         ? source.conversation
         : isRecord(source.conversation) ? { ...source.conversation } : {},
       _provided: provided,
     };
+  }
+
+  function handoffFailureText(value) {
+    if (typeof value === "string") return text(value);
+    if (!isRecord(value)) return "";
+    const detail = firstText(value, ["message", "detail", "reason", "error", "code"]);
+    if (detail) return detail;
+    const kind = firstText(value, ["kind"]);
+    const phase = firstText(value, ["phase"]);
+    return [kind, phase ? `phase ${phase}` : ""].filter(Boolean).join(" · ");
+  }
+
+  function handoffProvider(record, evidence) {
+    const raw = firstText(evidence, ["provider"]) || firstText(record, ["provider", "route"]);
+    const value = raw.toLowerCase();
+    if (value.includes("airtable")) return "Airtable";
+    if (value.includes("jira")) return "Jira";
+    if (value.includes("slack")) return "Slack via Celigo";
+    if (value.includes("celigo")) return "Celigo";
+    return raw ? pretty(raw) : "External record";
+  }
+
+  function normalizeHandoffs(value) {
+    if (!Array.isArray(value)) return [];
+    return value.filter(isRecord).map((record, index) => {
+      const evidence = isRecord(record.evidence) ? record.evidence : {};
+      const url = firstText(evidence, ["url", "href"]);
+      return {
+        provider: handoffProvider(record, evidence),
+        status: firstText(record, ["status", "state"]) || "Status unavailable",
+        updated_at: firstText(record, ["updated_at", "updatedAt", "readback_at"]),
+        record_id: firstText(evidence, ["record_id", "id", "key", "name"]),
+        url,
+        safe_url: safeHref(url),
+        last_failure: handoffFailureText(record.last_failure),
+        _index: index,
+      };
+    });
+  }
+
+  function groupHandoffs(value) {
+    const groups = new Map();
+    for (const handoff of normalizeHandoffs(value)) {
+      const key = handoff.provider.toLowerCase();
+      if (!groups.has(key)) groups.set(key, { provider: handoff.provider, records: [] });
+      groups.get(key).records.push(handoff);
+    }
+    return [...groups.values()].map((group) => {
+      const records = [...group.records].sort((left, right) => {
+        const leftTime = Date.parse(left.updated_at);
+        const rightTime = Date.parse(right.updated_at);
+        if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) return rightTime - leftTime;
+        return right._index - left._index;
+      });
+      return {
+        provider: group.provider,
+        latest: records[0],
+        last_verified: records.find((record) => record.status.toUpperCase() === "VERIFIED") || null,
+        records,
+      };
+    });
   }
 
   function normalizeContractPlan(value) {
@@ -291,6 +354,8 @@
     shouldPreserveTemplateFields,
     formatNumber,
     normalizeProjection,
+    normalizeHandoffs,
+    groupHandoffs,
     normalizeContractPlan,
     contractPlanRows,
     contractDecisionState,
@@ -651,6 +716,60 @@
     if (/^https?:\/\//i.test(href) || /^\/(?!\/)/.test(href) || /^#/.test(href)) return href;
     return "";
   }
+  function appendHandoffLink(parent, label, handoff) {
+    const row = document.createElement("div");
+    const href = handoff.safe_url;
+    if (href) {
+      const anchor = document.createElement("a");
+      anchor.href = href; anchor.target = "_blank"; anchor.rel = "noopener noreferrer";
+      anchor.textContent = `${label}${handoff.record_id ? ` · ${handoff.record_id}` : ""}`;
+      row.append(anchor);
+    } else {
+      row.textContent = `${label}: link unavailable`;
+    }
+    parent.append(row);
+  }
+  function renderHandoffs(next) {
+    const list = $("ops-handoffs-list");
+    if (!list) return;
+    const groups = groupHandoffs(next.handoffs);
+    setText("ops-handoffs-count", groups.length ? `${groups.length} system${groups.length === 1 ? "" : "s"}` : "No verified links");
+    if (!groups.length) {
+      list.replaceChildren(emptyList("No linked external case record verified yet."));
+      return;
+    }
+    list.replaceChildren(...groups.map((group) => {
+      const latest = group.latest;
+      const card = document.createElement("article"); card.className = "ops-handoff-card";
+      const head = document.createElement("div"); head.className = "ops-handoff-head";
+      const provider = document.createElement("strong"); provider.textContent = group.provider;
+      const badge = document.createElement("span"); badge.className = `state-badge state-${statusTone(latest.status)}`; badge.textContent = pretty(latest.status);
+      head.append(provider, badge);
+      const latestVerified = latest.status.toUpperCase() === "VERIFIED";
+      const timestamp = document.createElement("small"); timestamp.className = "ops-handoff-meta";
+      timestamp.textContent = latest.updated_at
+        ? `${latestVerified ? "Retained verification timestamp" : "Last recorded attempt"} ${formatDate(latest.updated_at)}`
+        : `${latestVerified ? "Retained verification timestamp" : "Last recorded attempt"} unavailable`;
+      const record = document.createElement("small"); record.className = "ops-handoff-record";
+      record.textContent = latest.record_id ? `Latest record ${latest.record_id}` : "Latest record ID unavailable";
+      const links = document.createElement("div"); links.className = "ops-handoff-links";
+      appendHandoffLink(links, latestVerified ? "Verified evidence" : "Latest attempt evidence", latest);
+      if (group.last_verified && group.last_verified !== latest) {
+        const history = document.createElement("p"); history.className = "ops-handoff-history";
+        history.textContent = `Last verified link is historical; latest status is ${pretty(latest.status)}.`;
+        appendHandoffLink(links, "Last verified evidence", group.last_verified);
+        card.append(head, timestamp, record, links, history);
+      } else {
+        card.append(head, timestamp, record, links);
+      }
+      if (latest.last_failure) {
+        const failure = document.createElement("p"); failure.className = "ops-handoff-failure";
+        failure.textContent = `Last failure: ${latest.last_failure}`;
+        card.append(failure);
+      }
+      return card;
+    }));
+  }
   function renderDocuments(next) {
     const list = $("ops-documents-list");
     setText("ops-documents-count", next._provided.documents ? `${next.documents.length} record${next.documents.length === 1 ? "" : "s"}` : "Unknown");
@@ -927,6 +1046,7 @@
     renderLots(next);
     renderAllocations(next);
     renderAlerts(next);
+    renderHandoffs(next);
     renderDocuments(next);
     renderEvents(next);
     if (!skipConversation) renderConversation(next);

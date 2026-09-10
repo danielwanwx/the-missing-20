@@ -8,6 +8,8 @@ const {
   conversationAnswer,
   providerLabel,
   normalizeProjection,
+  normalizeHandoffs,
+  groupHandoffs,
   normalizeContractPlan,
   contractPlanRows,
   contractDecisionState,
@@ -32,6 +34,64 @@ test('projection keeps missing source quantities unknown instead of turning them
   assert.equal(projection.quantities.received, null);
   assert.equal(projection.quantities.usable, undefined);
   assert.equal(projection._provided.quantities, true);
+});
+
+test('external handoffs group by provider and retain a verified evidence link', () => {
+  const groups = groupHandoffs([
+    {
+      route: 'airtable-distributor', status: 'VERIFIED', updated_at: '2026-09-10T10:00:00Z',
+      evidence: { provider: 'Airtable', record_id: 'rec-1', url: 'https://airtable.test/rec-1' },
+    },
+    {
+      route: 'jira:create', status: 'VERIFIED', updated_at: '2026-09-10T10:01:00Z',
+      evidence: { provider: 'Jira', record_id: 'M20-1', url: 'https://jira.test/M20-1' },
+    },
+  ]);
+  assert.deepEqual(groups.map((group) => group.provider), ['Airtable', 'Jira']);
+  assert.equal(groups[0].latest.status, 'VERIFIED');
+  assert.equal(groups[0].last_verified.safe_url, 'https://airtable.test/rec-1');
+});
+
+test('pending latest handoff keeps the prior verified link explicitly historical', () => {
+  const [group] = groupHandoffs([
+    {
+      route: 'jira:create', status: 'VERIFIED', updated_at: '2026-09-10T10:00:00Z',
+      evidence: { provider: 'Jira', record_id: 'M20-1', url: 'https://jira.test/M20-1' },
+    },
+    {
+      route: 'jira:comment', status: 'PENDING', updated_at: '2026-09-10T10:02:00Z',
+      last_failure: { message: 'readback pending' }, evidence: { provider: 'Jira', record_id: 'M20-1' },
+    },
+  ]);
+  assert.equal(group.latest.status, 'PENDING');
+  assert.equal(group.last_verified.record_id, 'M20-1');
+  assert.equal(group.last_verified.safe_url, 'https://jira.test/M20-1');
+  assert.equal(group.latest.last_failure, 'readback pending');
+});
+
+test('journal-shaped handoff failures expose phase and kind safely', () => {
+  const [handoff] = normalizeHandoffs([{
+    route: 'jira', status: 'ERROR', updated_at: '2026-09-10T10:02:00Z',
+    last_failure: { phase: 'readback', kind: 'provider_unavailable' }, evidence: { provider: 'Jira' },
+  }]);
+  assert.equal(handoff.last_failure, 'provider_unavailable · phase readback');
+});
+
+test('missing, unknown, and failed handoffs stay without a verified success link', () => {
+  assert.deepEqual(groupHandoffs(undefined), []);
+  const groups = groupHandoffs([
+    { route: 'airtable', status: 'UNKNOWN', evidence: {} },
+    { route: 'slack', status: 'ERROR', last_failure: 'provider unavailable', evidence: {} },
+  ]);
+  assert.deepEqual(groups.map((group) => group.latest.status).sort(), ['ERROR', 'UNKNOWN']);
+  assert.equal(groups.every((group) => group.last_verified === null), true);
+});
+
+test('unsafe external evidence URLs are rejected before link rendering', () => {
+  const [handoff] = normalizeHandoffs([{
+    route: 'celigo', status: 'VERIFIED', evidence: { provider: 'Celigo', url: 'javascript:alert(1)' },
+  }]);
+  assert.equal(handoff.safe_url, '');
 });
 
 const contractPlan = {
@@ -259,5 +319,6 @@ test('page exposes the guarded business loop and synthetic evidence label', () =
   assert.match(html, /Simulated scanner \/ inspection \/ carrier evidence/);
   assert.match(html, /Delivery confirmed/);
   assert.match(html, /Ask about this operation/);
+  assert.match(html, /Cross-system readback/);
   assert.match(html, /distributor-operations\.js/);
 });

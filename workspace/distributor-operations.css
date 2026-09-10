@@ -230,6 +230,18 @@
 .ops-alert-meta a, .ops-document a { color: var(--cyan); text-decoration: none; }
 .ops-alert-meta a:hover, .ops-document a:hover { text-decoration: underline; }
 
+.ops-handoff-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 15px; }
+.ops-handoff-card { min-width: 0; padding: 11px; border: 1px solid rgba(143, 185, 153, .16); border-radius: 10px; background: rgba(3, 11, 8, .34); }
+.ops-handoff-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.ops-handoff-head strong { min-width: 0; color: var(--ink); font-size: .68rem; overflow-wrap: anywhere; }
+.ops-handoff-card .state-badge { flex: 0 0 auto; }
+.ops-handoff-meta, .ops-handoff-record { display: block; margin-top: 5px; color: var(--faint); font-size: .58rem; line-height: 1.35; overflow-wrap: anywhere; }
+.ops-handoff-links { display: grid; gap: 4px; margin-top: 9px; color: var(--muted); font-size: .61rem; line-height: 1.35; }
+.ops-handoff-links a { color: var(--cyan); text-decoration: none; overflow-wrap: anywhere; }
+.ops-handoff-links a:hover { text-decoration: underline; }
+.ops-handoff-history { margin-top: 7px; color: var(--amber); font-size: .6rem; line-height: 1.35; }
+.ops-handoff-failure { margin-top: 7px; color: var(--coral); font-size: .6rem; line-height: 1.35; overflow-wrap: anywhere; }
+
 .ops-document { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding: 9px 10px; border-bottom: 1px solid rgba(143, 185, 153, .14); }
 .ops-document:last-child { border-bottom: 0; }
 .ops-document > div { min-width: 0; }
@@ -269,6 +281,7 @@
   .ops-form-row, .ops-common-fields { grid-template-columns: 1fr; }
   .ops-template-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ops-two-column, .ops-alert-list { grid-template-columns: 1fr; }
+  .ops-handoff-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
   .operations-page { padding-inline: 12px; }
@@ -279,6 +292,7 @@
   .ops-stage-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ops-stage:nth-child(3)::before, .ops-stage:nth-child(5)::before { display: none; }
   .ops-template-fields { grid-template-columns: 1fr; }
+  .ops-handoff-list { grid-template-columns: 1fr; }
   .ops-list-row { grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(64px, .65fr)); }
   .ops-list-row > div:nth-child(4) { grid-column: 2 / -1; }
   .ops-contract-row { grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(64px, .65fr)); }

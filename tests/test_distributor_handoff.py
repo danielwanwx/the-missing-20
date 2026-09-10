@@ -16,6 +16,7 @@ from the_missing_20.adapters.distributor_erp import DistributorERP
 from the_missing_20.adapters.distributor_handoff import (
     AirtableDistributorCase,
     DistributorHandoff,
+    JiraDistributorCase,
     distributor_event,
     milestone,
 )
@@ -333,3 +334,55 @@ def test_airtable_empty_alert_readback_is_verified_but_nonempty_mismatch_is_not(
     open_event = distributor_event(projection())
     assert open_event is not None
     assert target.find(open_event, "open") is None
+
+
+class JiraDistributorAPI:
+    def __init__(self) -> None:
+        self.config = SimpleNamespace(jira_base_url="https://demo.atlassian.net")
+        self.issue: dict[str, Any] | None = None
+        self.reads: list[str] = []
+
+    def request(
+        self,
+        provider: str,
+        path: str,
+        *,
+        payload: object = None,
+        method: str | None = None,
+    ) -> object:
+        assert provider == "jira"
+        assert payload is None and method is None
+        self.reads.append(path)
+        if path.startswith("/rest/api/3/search/jql?"):
+            return {"issues": [{"key": "QRC-3"}] if self.issue else [], "isLast": True}
+        if path == "/rest/api/3/issue/QRC-3?fields=project,labels,status,description":
+            assert self.issue is not None
+            return self.issue
+        raise AssertionError(path)
+
+
+def test_jira_case_readback_includes_safe_browse_url() -> None:
+    api = JiraDistributorAPI()
+    target = JiraDistributorCase(api, "QRC")  # type: ignore[arg-type]
+    event: dict[str, Any] = {
+        "case_id": "M20-DIST-CASE-1",
+        "lifecycle": "operational-exception",
+    }
+    create_event = {**event, "operation": "create"}
+    api.issue = {
+        "key": "QRC-3",
+        "fields": {
+            "project": {"key": "QRC"},
+            "labels": [target.marker(event)],
+            "status": {"name": "Open"},
+            "description": target.body(create_event, "revision-1"),
+        },
+    }
+    evidence = target.find(create_event, "revision-1")
+    assert evidence == {
+        "provider": "Jira",
+        "record_id": "QRC-3",
+        "url": "https://demo.atlassian.net/browse/QRC-3",
+        "status": "Open",
+    }
+    assert all("/browse/" not in path for path in api.reads)
