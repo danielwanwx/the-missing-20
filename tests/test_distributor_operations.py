@@ -16,6 +16,7 @@ from test_distributor_erp import r4_config as native_r4_config
 
 import scripts.decision_workspace_server as workspace_server
 from scripts.decision_workspace_server import DecisionWorkspaceHandler
+from the_missing_20.adapters.distributor_allocation import compile_plan
 from the_missing_20.adapters.distributor_erp import DistributorERP as NativeDistributorERP
 from the_missing_20.adapters.distributor_operations import (
     DistributorEventConflict,
@@ -243,6 +244,38 @@ def _r4_config() -> dict[str, object]:
             }
         },
     }
+
+
+def _contract_config() -> dict[str, object]:
+    config = _r4_config()
+    config["allocation_policy"] = {"version": "v1"}
+    config["allocations"] = [
+        {
+            "customer_order": "SO-R4-PRIORITY",
+            "requested_quantity": 24,
+            "priority": 1,
+            "promised_delivery_at": "2026-09-12T09:00:00+00:00",
+            "customer_priority": 2,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 10,
+            "allow_final_remainder": True,
+        },
+        {
+            "customer_order": "SO-R4-STANDARD",
+            "requested_quantity": 15,
+            "priority": 2,
+            "promised_delivery_at": "2026-09-11T09:00:00+00:00",
+            "customer_priority": 9,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 10,
+            "allow_final_remainder": False,
+        },
+    ]
+    config["pick_tranches"] = [
+        {"customer_order": "SO-R4-STANDARD", "lot": "R4-ARRIVAL-20", "quantity": 15},
+        {"customer_order": "SO-R4-PRIORITY", "lot": "R4-ARRIVAL-19", "quantity": 24},
+    ]
+    return config
 
 
 def _service(
@@ -1554,3 +1587,279 @@ def test_native_ask_packet_is_current_read_only_and_static_ui_files_are_allowed(
     assert workspace_server.STATIC_FILES["/operations"][0] == "distributor-operations.html"
     assert "/distributor-operations.js" in workspace_server.STATIC_FILES
     assert "/distributor-operations.css" in workspace_server.STATIC_FILES
+
+
+def test_contract_plan_selects_date_first_then_prepares_once_and_replays_read_only(
+    tmp_path: Path,
+) -> None:
+    config = _contract_config()
+    bridge = _Bridge(config)
+    selections: list[dict[str, object]] = []
+
+    def selector(plan: Mapping[str, object]) -> Mapping[str, object]:
+        selections.append(dict(plan))
+        return {
+            "plan_id": plan["plan_id"],
+            "rationale": "Earlier promised customer order is feasible.",
+            "contract_refs": ["SO-R4-PRIORITY", "SO-R4-STANDARD"],
+        }
+
+    service = DistributorOperations(
+        tmp_path / "contract.sqlite3", config, bridge, allocation_selector=selector
+    )
+    bridge.state_provider = service._latest_state
+    first = service.record_event(_r4_arrival("contract-arrival", "R4-ARRIVAL-20", 20))
+
+    assert len(selections) == 1
+    assert [kind for kind, _event, _operation in bridge.calls] == [
+        "receive_arrival",
+        "prepare_pick",
+    ]
+    prepared = bridge.calls[-1][2]
+    assert prepared["customer_order"] == "SO-R4-STANDARD"
+    event = cast(list[dict[str, object]], first["events"])[-1]
+    assert cast(dict[str, object], event["allocation_decision"])["status"] == "SELECTED"
+
+    replay = service.record_event(_r4_arrival("contract-arrival", "R4-ARRIVAL-20", 20))
+    assert replay == first
+    assert len(selections) == 1
+    assert [kind for kind, _event, _operation in bridge.calls] == [
+        "receive_arrival",
+        "prepare_pick",
+    ]
+
+    picked = service.record_event(
+        _event(
+            "contract-picked",
+            "picked",
+            customer_order="SO-R4-STANDARD",
+            lot="R4-ARRIVAL-20",
+            quantity=15,
+            pick_evidence_ref="SYN-PICK-CONTRACT-15",
+        )
+    )
+    assert picked["events"][-1]["status"] == "APPLIED"
+    assert [kind for kind, _event, _operation in bridge.calls][-3:] == [
+        "submit_pick",
+        "submit_delivery_note",
+        "create_shipment",
+    ]
+
+
+def test_contract_rejected_selection_does_not_start_pick_preparation(tmp_path: Path) -> None:
+    config = _contract_config()
+    bridge = _Bridge(config)
+    service = DistributorOperations(
+        tmp_path / "contract-rejected.sqlite3",
+        config,
+        bridge,
+        allocation_selector=lambda _plan: {
+            "plan_id": "cap-stale",
+            "rationale": "stale selection",
+            "contract_refs": ["SO-R4-PRIORITY", "SO-R4-STANDARD"],
+        },
+    )
+    bridge.state_provider = service._latest_state
+
+    result = service.record_event(_r4_arrival("contract-rejected", "R4-ARRIVAL-20", 20))
+    assert [kind for kind, _event, _operation in bridge.calls] == ["receive_arrival"]
+    assert "ALLOCATION_SELECTION_PENDING" in _codes(result)
+    assert result["events"][-1]["status"] == "APPLIED"
+
+
+@pytest.mark.parametrize(
+    "refs",
+    [
+        ["SO-R4-STANDARD"],
+        ["SO-R4-PRIORITY", "SO-R4-STANDARD", "SO-R4-STANDARD"],
+        ["SO-R4-PRIORITY", "SO-R4-STANDARD", "SO-UNKNOWN"],
+    ],
+)
+def test_contract_selection_requires_exact_unique_compiler_references(
+    tmp_path: Path, refs: list[str]
+) -> None:
+    config = _contract_config()
+    bridge = _Bridge(config)
+    calls = 0
+
+    def selector(plan: Mapping[str, object]) -> Mapping[str, object]:
+        nonlocal calls
+        calls += 1
+        return {"plan_id": plan["plan_id"], "rationale": "bad refs", "contract_refs": refs}
+
+    service = DistributorOperations(
+        tmp_path / "contract-refs.sqlite3", config, bridge, allocation_selector=selector
+    )
+    bridge.state_provider = service._latest_state
+    result = service.record_event(_r4_arrival("contract-refs", "R4-ARRIVAL-20", 20))
+
+    assert calls == 1
+    assert [kind for kind, _event, _operation in bridge.calls] == ["receive_arrival"]
+    assert "ALLOCATION_SELECTION_PENDING" in _codes(result)
+
+
+@pytest.mark.parametrize("change", ["duplicate", "insufficient_lot"])
+def test_contract_native_tranche_guard_blocks_before_selector(tmp_path: Path, change: str) -> None:
+    config = _contract_config()
+    tranches = cast(list[dict[str, object]], config["pick_tranches"])
+    if change == "duplicate":
+        tranches.append(
+            {"customer_order": "SO-R4-STANDARD", "lot": "R4-ARRIVAL-19", "quantity": 15}
+        )
+    else:
+        tranches[0]["lot"] = "R4-ARRIVAL-19"
+    bridge = _Bridge(config)
+    selections = 0
+
+    def selector(_plan: Mapping[str, object]) -> Mapping[str, object]:
+        nonlocal selections
+        selections += 1
+        raise AssertionError("selector must not be reached")
+
+    service = DistributorOperations(
+        tmp_path / f"contract-{change}.sqlite3", config, bridge, allocation_selector=selector
+    )
+    bridge.state_provider = service._latest_state
+    result = service.record_event(_r4_arrival(f"contract-{change}", "R4-ARRIVAL-20", 20))
+
+    assert selections == 0
+    assert [kind for kind, _event, _operation in bridge.calls] == ["receive_arrival"]
+    assert "ALLOCATION_PLAN_NATIVE_TRANCHE_UNSUPPORTED" in _codes(result)
+
+
+def test_contract_native_tranche_guard_conserves_collective_lot_availability(
+    tmp_path: Path,
+) -> None:
+    config = _contract_config()
+    allocations = cast(list[dict[str, object]], config["allocations"])
+    allocations[0]["requested_quantity"] = 10
+    allocations[0]["minimum_dispatch_quantity"] = 5
+    allocations[1]["requested_quantity"] = 10
+    allocations[1]["minimum_dispatch_quantity"] = 5
+    config["pick_tranches"] = [
+        {"customer_order": "SO-R4-STANDARD", "lot": "R4-ARRIVAL-20", "quantity": 10},
+        {"customer_order": "SO-R4-PRIORITY", "lot": "R4-ARRIVAL-20", "quantity": 10},
+    ]
+    service = DistributorOperations(tmp_path / "collective.sqlite3", config, None)
+    state = service._initial_state()
+    lots = cast(list[dict[str, object]], state["lots"])
+    lots[0]["usable"] = 15
+    lots[1]["usable"] = 5
+    service._recompute_allocations(state)
+
+    assert service._contract_plan_native_tranches(service._contract_plan(state), state) is None
+
+
+def test_contract_selection_is_durable_before_prepare_fault(tmp_path: Path) -> None:
+    config = _contract_config()
+
+    class CheckpointBridge(_Bridge):
+        service: DistributorOperations | None = None
+        checkpoint: dict[str, object] | None = None
+
+        def apply_operation(
+            self, config: Mapping[str, object], operation: Mapping[str, object], event_id: str
+        ) -> Mapping[str, object]:
+            if operation["kind"] == "prepare_pick":
+                assert self.service is not None
+                self.checkpoint = cast(dict[str, object], self.service._latest_state())
+                raise RuntimeError("prepare transport failed")
+            return super().apply_operation(config, operation, event_id)
+
+    bridge = CheckpointBridge(config)
+    service = DistributorOperations(
+        tmp_path / "contract-checkpoint.sqlite3",
+        config,
+        bridge,
+        allocation_selector=lambda plan: {
+            "plan_id": plan["plan_id"],
+            "rationale": "Exact candidate is feasible.",
+            "contract_refs": ["SO-R4-PRIORITY", "SO-R4-STANDARD"],
+        },
+    )
+    bridge.service = service
+    bridge.state_provider = service._latest_state
+
+    result = service.record_event(_r4_arrival("contract-checkpoint", "R4-ARRIVAL-20", 20))
+    assert result["events"][-1]["status"] == "UNKNOWN_OUTCOME"
+    assert bridge.checkpoint is not None
+    decision = cast(dict[str, object], bridge.checkpoint["allocation_decision"])
+    assert decision["status"] == "SELECTED"
+    assert cast(dict[str, object], decision["plan"])["version"] == "v1"
+    assert decision["event_id"] == "contract-checkpoint"
+
+
+def test_contract_compiler_preserves_prepared_commitment_and_allows_only_final_remainder() -> None:
+    allocations = [
+        {
+            "customer_order": "SO-A",
+            "requested_quantity": 15,
+            "dispatched": 0,
+            "promised_delivery_at": "2026-09-11T09:00:00+00:00",
+            "customer_priority": 1,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 10,
+            "allow_final_remainder": True,
+        },
+        {
+            "customer_order": "SO-B",
+            "requested_quantity": 15,
+            "dispatched": 0,
+            "promised_delivery_at": "2026-09-12T09:00:00+00:00",
+            "customer_priority": 1,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 10,
+            "allow_final_remainder": False,
+        },
+    ]
+    plan = compile_plan(
+        allocations=allocations,
+        lots=[{"usable": 20}],
+        prepared_picks=[{"customer_order": "SO-A", "remaining": 13}],
+    )
+
+    assert plan["new_quantity"] == 2
+    assert plan["rows"] == [
+        {
+            "customer_order": "SO-A",
+            "promised_delivery_at": "2026-09-11T09:00:00+00:00",
+            "customer_priority": 1,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 10,
+            "allow_final_remainder": True,
+            "prepared_commitment": 13,
+            "new_quantity": 2,
+            "quantity": 15,
+            "remaining_after_dispatch": 0,
+        },
+        {
+            "customer_order": "SO-B",
+            "promised_delivery_at": "2026-09-12T09:00:00+00:00",
+            "customer_priority": 1,
+            "partial_dispatch": True,
+            "minimum_dispatch_quantity": 10,
+            "allow_final_remainder": False,
+            "prepared_commitment": 0,
+            "new_quantity": 0,
+            "quantity": 0,
+            "remaining_after_dispatch": 15,
+        },
+    ]
+
+
+def test_contract_promises_are_timezone_normalized_and_malformed_dates_are_rejected(
+    tmp_path: Path,
+) -> None:
+    config = _contract_config()
+    allocations = cast(list[dict[str, object]], config["allocations"])
+    allocations[0]["promised_delivery_at"] = "2026-09-12T11:00:00+02:00"
+    service, _bridge = _service(tmp_path, config)
+    assert (
+        cast(list[dict[str, object]], service._config["allocations"])[0]["promised_delivery_at"]
+        == "2026-09-12T09:00:00+00:00"
+    )
+
+    malformed = _contract_config()
+    cast(list[dict[str, object]], malformed["allocations"])[0]["promised_delivery_at"] = "Sep 12"
+    with pytest.raises(ValueError, match="promised_delivery_at"):
+        DistributorOperations(tmp_path / "bad-contract.sqlite3", malformed, None)

@@ -19,6 +19,13 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Protocol, cast
 
+from the_missing_20.adapters.distributor_allocation import (
+    ContractAllocationError,
+    compile_plan,
+    contract_mode,
+    validate_contract_config,
+)
+
 DISTRIBUTOR_OPERATIONS_SCHEMA_VERSION = "missing20-distributor-operations/v1"
 _SUCCESS = frozenset({"APPLIED", "ALREADY_APPLIED"})
 _WRITE_STATUSES = _SUCCESS | frozenset({"UNKNOWN_OUTCOME", "BLOCKED"})
@@ -229,11 +236,13 @@ class DistributorOperations:
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         ask_turn: Callable[[str, Mapping[str, object]], Mapping[str, object]] | None = None,
+        allocation_selector: Callable[[Mapping[str, object]], Mapping[str, object]] | None = None,
     ) -> None:
         self._config = self._validate_config(config)
         self._erp = erp
         self._clock = clock
         self._ask_turn = ask_turn
+        self._allocation_selector = allocation_selector
         database.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(
             database, check_same_thread=False, isolation_level=None, timeout=10
@@ -696,6 +705,25 @@ class DistributorOperations:
             seen_orders.add(order)
             _quantity(row.get("requested_quantity"), "requested_quantity", positive=True)
             _whole(row.get("priority"), "priority", positive=True)
+        try:
+            validate_contract_config(normalized)
+        except ContractAllocationError as error:
+            raise ValueError(str(error)) from error
+        if contract_mode(normalized):
+            for row in allocations:
+                row["promised_delivery_at"] = _utc(
+                    row["promised_delivery_at"], "promised_delivery_at"
+                )
+            tranches = normalized.get("pick_tranches")
+            if not isinstance(tranches, list) or not tranches:
+                raise ValueError("contract allocation requires configured native pick_tranches")
+            for tranche in tranches:
+                if not isinstance(tranche, Mapping):
+                    raise ValueError("contract native pick tranche must be an object")
+                _text(tranche.get("customer_order"), "contract native pick tranche customer_order")
+                _quantity(
+                    tranche.get("quantity"), "contract native pick tranche quantity", positive=True
+                )
         for name in ("expected_at", "promised_delivery_at"):
             if name in normalized:
                 _deadline(normalized[name], name)
@@ -1079,6 +1107,17 @@ class DistributorOperations:
                     ),
                     "dispatched": 0,
                     "reservation": "LOCAL_PLAN",
+                    **(
+                        {
+                            "promised_delivery_at": row["promised_delivery_at"],
+                            "customer_priority": row["customer_priority"],
+                            "partial_dispatch": row["partial_dispatch"],
+                            "minimum_dispatch_quantity": row["minimum_dispatch_quantity"],
+                            "allow_final_remainder": row["allow_final_remainder"],
+                        }
+                        if contract_mode(self._config)
+                        else {}
+                    ),
                 }
                 for row in allocations
             ],
@@ -1800,6 +1839,25 @@ class DistributorOperations:
     def _prepare_pick(
         self, state: dict[str, object], event: Mapping[str, object]
     ) -> list[_NativeOutcome]:
+        if contract_mode(self._config):
+            plan = self._contract_plan(state)
+            if _quantity(plan["new_quantity"], "contract plan new quantity") <= 0:
+                return []
+            tranches = self._contract_plan_native_tranches(plan, state)
+            if tranches is None:
+                self._alert(
+                    state,
+                    code="ALLOCATION_PLAN_NATIVE_TRANCHE_UNSUPPORTED",
+                    message=(
+                        "The compiled contract quantities do not match configured native pick "
+                        "tranches; no pick preparation was started."
+                    ),
+                    event=event,
+                )
+                return []
+            plan = {**plan, "native_tranches": tranches}
+            if not self._select_contract_plan(state, event, plan):
+                return []
         allocations = cast(list[dict[str, object]], state["allocations"])
         prepared_rows = cast(list[dict[str, object]], state["prepared_picks"])
         already_prepared: dict[str, Decimal] = {}
@@ -1822,6 +1880,16 @@ class DistributorOperations:
             if _quantity(row["allocated"], "allocated")
             > already_prepared.get(cast(str, row["customer_order"]), Decimal())
         ]
+        if contract_mode(self._config):
+            native_tranches = cast(list[Mapping[str, object]], plan["native_tranches"])
+            lots_by_order = {
+                _text(row["customer_order"], "contract plan customer order"): _text(
+                    row["lot"], "contract plan lot"
+                )
+                for row in native_tranches
+            }
+            for row in planned:
+                row["lot"] = lots_by_order[_text(row["customer_order"], "customer_order")]
         if not planned:
             return []
         outcomes: list[_NativeOutcome] = []
@@ -1858,6 +1926,7 @@ class DistributorOperations:
                         "remaining": row["quantity"],
                         "event_id": event["event_id"],
                         "documents": _copy(prepared_outcome.documents),
+                        **({"lot": row["lot"]} if "lot" in row else {}),
                     }
                 )
             else:
@@ -1865,6 +1934,68 @@ class DistributorOperations:
         if outcomes and all(outcome.succeeded for outcome in outcomes):
             self._resolve_native_operation_alerts(state, "prepare_pick")
         return outcomes
+
+    def _contract_plan_native_tranches(
+        self, plan: Mapping[str, object], state: Mapping[str, object]
+    ) -> list[dict[str, object]] | None:
+        configured = self._config.get("pick_tranches")
+        if not isinstance(configured, list):
+            return None
+        rows = plan.get("rows")
+        if not isinstance(rows, list):
+            return None
+        selected: list[dict[str, object]] = []
+        for row in rows:
+            if not isinstance(row, Mapping):
+                return None
+            quantity = _quantity(row.get("new_quantity"), "contract plan new quantity")
+            if not quantity:
+                continue
+            matches = [
+                tranche
+                for tranche in configured
+                if isinstance(tranche, Mapping)
+                and tranche.get("customer_order") == row.get("customer_order")
+                and _quantity(tranche.get("quantity"), "configured pick tranche quantity")
+                == quantity
+            ]
+            if len(matches) != 1:
+                return None
+            tranche = matches[0]
+            lot = tranche.get("lot")
+            if not isinstance(lot, str) or not lot:
+                return None
+            selected.append(
+                {
+                    "customer_order": row["customer_order"],
+                    "quantity": _wire(quantity),
+                    "lot": lot,
+                }
+            )
+        lots = {
+            row.get("lot"): _quantity(row.get("usable"), "lot usable")
+            for row in cast(list[Mapping[str, object]], state.get("lots", []))
+            if isinstance(row.get("lot"), str)
+        }
+        committed: dict[str, Decimal] = {}
+        prepared = state.get("prepared_picks")
+        if not isinstance(prepared, list):
+            return None
+        for row in prepared:
+            if not isinstance(row, Mapping) or not isinstance(row.get("lot"), str):
+                return None
+            lot = cast(str, row["lot"])
+            committed[lot] = committed.get(lot, Decimal()) + _quantity(
+                row.get("remaining"), "prepared pick quantity"
+            )
+        for row in selected:
+            lot = cast(str, row["lot"])
+            committed[lot] = committed.get(lot, Decimal()) + _quantity(
+                row["quantity"], "contract plan tranche quantity"
+            )
+        if any(lot not in lots or quantity > lots[lot] for lot, quantity in committed.items()):
+            return None
+        return selected
 
     def _prepared_tranches(
         self, state: Mapping[str, object], order: str, quantity: Decimal
@@ -2126,6 +2257,20 @@ class DistributorOperations:
         )
 
     def _recompute_allocations(self, state: dict[str, object]) -> None:
+        if contract_mode(self._config):
+            plan = self._contract_plan(state)
+            by_order = {
+                row["customer_order"]: row for row in cast(list[Mapping[str, object]], plan["rows"])
+            }
+            for row in cast(list[dict[str, object]], state["allocations"]):
+                selected = by_order[cast(str, row["customer_order"])]
+                quantity = _quantity(selected["quantity"], "contract allocation")
+                requested = _quantity(row["requested_quantity"], "requested_quantity")
+                dispatched = _quantity(row["dispatched"], "dispatched")
+                row["allocated"] = _wire(quantity)
+                row["backordered"] = _wire(max(Decimal(), requested - dispatched - quantity))
+            state["feasible_allocation_plan"] = _copy(plan)
+            return
         lots = cast(list[dict[str, object]], state["lots"])
         available = sum((_quantity(row["usable"], "lot usable") for row in lots), Decimal())
         allocations = cast(list[dict[str, object]], state["allocations"])
@@ -2137,6 +2282,119 @@ class DistributorOperations:
             row["allocated"] = _wire(allocation)
             row["backordered"] = _wire(remaining - allocation)
             available -= allocation
+
+    def _contract_plan(self, state: Mapping[str, object]) -> dict[str, object]:
+        try:
+            return compile_plan(
+                allocations=state.get("allocations"),
+                lots=state.get("lots"),
+                prepared_picks=state.get("prepared_picks"),
+            )
+        except ContractAllocationError as error:  # validated config; malformed retained state only
+            raise RuntimeError(str(error)) from error
+
+    @staticmethod
+    def _selection_refs_are_exact(plan: Mapping[str, object], choice: Mapping[str, object]) -> bool:
+        refs = choice.get("contract_refs")
+        if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
+            return False
+        valid = {
+            row.get("customer_order")
+            for row in cast(list[Mapping[str, object]], plan.get("rows", []))
+            if isinstance(row.get("customer_order"), str)
+        }
+        return len(refs) == len(valid) and len(set(refs)) == len(refs) and set(refs) == valid
+
+    def _select_contract_plan(
+        self, state: dict[str, object], event: Mapping[str, object], plan: Mapping[str, object]
+    ) -> bool:
+        existing = state.get("allocation_decision")
+        if (
+            isinstance(existing, Mapping)
+            and existing.get("status") == "SELECTED"
+            and existing.get("plan_id") == plan.get("plan_id")
+            and existing.get("state_revision") == plan.get("state_revision")
+        ):
+            return True
+        selector = self._allocation_selector
+        if selector is None:
+            choice: Mapping[str, object] = {"plan_id": "DEFER", "rationale": "selector unavailable"}
+        else:
+            try:
+                raw = selector(plan)
+                choice = raw if isinstance(raw, Mapping) else {}
+            except Exception:
+                choice = {"plan_id": "DEFER", "rationale": "selector unavailable"}
+        plan_id = choice.get("plan_id")
+        rationale = choice.get("rationale")
+        if (
+            plan_id == plan.get("plan_id")
+            and isinstance(rationale, str)
+            and rationale.strip()
+            and self._selection_refs_are_exact(plan, choice)
+        ):
+            decision: dict[str, object] = {
+                "status": "SELECTED",
+                "case_id": self._config["case_id"],
+                "plan_id": plan_id,
+                "state_revision": plan["state_revision"],
+                "event_id": event["event_id"],
+                "rationale": rationale.strip(),
+                "contract_refs": list(cast(list[str], choice["contract_refs"])),
+                "plan": _copy(plan),
+            }
+            for field in ("provider", "usage"):
+                value = choice.get(field)
+                if isinstance(value, Mapping):
+                    decision[field] = _copy(value)
+            state["allocation_decision"] = decision
+            self._checkpoint_allocation_decision(event["event_id"], state)
+            for alert in cast(list[dict[str, object]], state["alerts"]):
+                if alert.get("code") == "ALLOCATION_SELECTION_PENDING":
+                    alert["status"] = "RESOLVED"
+            return True
+        state["allocation_decision"] = {
+            "status": "PENDING",
+            "case_id": self._config["case_id"],
+            "plan_id": plan["plan_id"],
+            "state_revision": plan["state_revision"],
+            "event_id": event["event_id"],
+            "rationale": rationale.strip()
+            if isinstance(rationale, str) and rationale.strip()
+            else "deferred",
+            "plan": _copy(plan),
+        }
+        self._checkpoint_allocation_decision(event["event_id"], state)
+        self._alert(
+            state,
+            code="ALLOCATION_SELECTION_PENDING",
+            message=(
+                "The contract allocation plan was deferred or malformed; no pick preparation "
+                "was started."
+            ),
+            event=event,
+        )
+        return False
+
+    def _checkpoint_allocation_decision(
+        self, event_id: object, state: Mapping[str, object]
+    ) -> None:
+        """Persist an accepted/deferred selection before a native prepare can begin."""
+
+        identifier = _text(event_id, "event_id")
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            updated = self._db.execute(
+                "UPDATE distributor_operation_events SET state_json=? "
+                "WHERE event_id=? AND result_json IS NULL",
+                (_encode(state), identifier),
+            ).rowcount
+            if updated != 1:
+                raise RuntimeError("allocation decision checkpoint is unavailable")
+            self._db.commit()
+        except Exception:
+            self._db.rollback()
+            raise
 
     def _recompute_quantities(self, state: dict[str, object]) -> None:
         quantities = cast(dict[str, object], state["quantities"])
@@ -2275,6 +2533,9 @@ class DistributorOperations:
             "synthetic": event["synthetic"],
             "operations": [outcome.record() for outcome in operations],
         }
+        decision = state.get("allocation_decision")
+        if isinstance(decision, Mapping) and decision.get("event_id") == event["event_id"]:
+            record["allocation_decision"] = _copy(decision)
         event_type = cast(str, event["type"])
         for field in _EVENT_BRIEF_FIELDS[event_type]:
             record[field] = _copy(event[field])

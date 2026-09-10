@@ -108,6 +108,13 @@
           </section>
           <section id="ops-orders-panel" class="ops-panel" aria-labelledby="ops-orders-title">
             <header class="ops-panel-header"><div><span class="object-label">Customer commitments</span><h2 id="ops-orders-title">Allocation and fulfillment</h2></div><span class="ops-count-label" id="ops-orders-count">Unknown</span></header>
+            <div id="ops-contract-panel" class="ops-contract-panel" hidden aria-live="polite">
+              <div class="ops-contract-header"><div><span class="object-label">Contract allocation</span><h3 id="ops-contract-title">Feasible allocation plan</h3></div><span id="ops-contract-state" class="state-badge state-amber">Decision unavailable</span></div>
+              <p id="ops-contract-note" class="ops-contract-note"></p>
+              <div id="ops-contract-meta" class="ops-contract-meta"></div>
+              <div id="ops-contract-rows" class="ops-contract-list"></div>
+              <div id="ops-contract-decision" class="ops-contract-decision"></div>
+            </div>
             <div id="ops-orders-list" class="ops-list" aria-live="polite"></div>
           </section>
         </div>

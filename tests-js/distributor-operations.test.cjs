@@ -8,6 +8,9 @@ const {
   conversationAnswer,
   providerLabel,
   normalizeProjection,
+  normalizeContractPlan,
+  contractPlanRows,
+  contractDecisionState,
   retainConversationProjection,
   shouldPreserveTemplateFields,
   deliverySummary,
@@ -29,6 +32,71 @@ test('projection keeps missing source quantities unknown instead of turning them
   assert.equal(projection.quantities.received, null);
   assert.equal(projection.quantities.usable, undefined);
   assert.equal(projection._provided.quantities, true);
+});
+
+const contractPlan = {
+  version: 'v1',
+  plan_id: 'cap-demo-1',
+  state_revision: 'rev-demo-1',
+  new_quantity: 20,
+  rows: [{
+    customer_order: 'SO-7',
+    promised_delivery_at: '2026-09-11T09:00:00+00:00',
+    customer_priority: 2,
+    partial_dispatch: true,
+    minimum_dispatch_quantity: 10,
+    allow_final_remainder: true,
+    prepared_commitment: 0,
+    new_quantity: 20,
+    quantity: 20,
+    remaining_after_dispatch: 4,
+  }],
+};
+
+test('contract projection exposes exact terms and a matching selected decision', () => {
+  const plan = normalizeContractPlan(contractPlan);
+  assert.ok(plan);
+  assert.deepEqual(contractPlanRows(plan), [{
+    customer_order: 'SO-7',
+    promised_delivery_at: '2026-09-11T09:00:00+00:00',
+    customer_priority: 2,
+    partial_dispatch: true,
+    minimum_dispatch_quantity: 10,
+    allow_final_remainder: true,
+    prepared_commitment: 0,
+    new_quantity: 20,
+    quantity: 20,
+    remaining_after_dispatch: 4,
+  }]);
+  assert.equal(contractDecisionState(plan, {
+    status: 'SELECTED', plan_id: 'cap-demo-1', state_revision: 'rev-demo-1', event_id: 'evt-1',
+  }), 'SELECTED');
+});
+
+test('pending or stale contract decisions never render as selected', () => {
+  const plan = normalizeContractPlan(contractPlan);
+  assert.equal(contractDecisionState(plan, { status: 'PENDING', plan_id: 'cap-demo-1', state_revision: 'rev-demo-1' }), 'PENDING');
+  assert.equal(contractDecisionState(plan, { status: 'SELECTED', plan_id: 'cap-other', state_revision: 'rev-demo-1' }), 'PENDING');
+  assert.equal(contractDecisionState(plan, { status: 'UNAVAILABLE' }), 'UNAVAILABLE');
+  assert.equal(contractDecisionState(plan, null), 'UNAVAILABLE');
+});
+
+test('legacy projections have no contract panel data', () => {
+  assert.equal(normalizeContractPlan({ version: 'v1', rows: [] }), null);
+  assert.equal(normalizeContractPlan({ allocations: [{ customer_order: 'SO-legacy' }] }), null);
+  assert.deepEqual(contractPlanRows(undefined), []);
+});
+
+test('contract values remain literal text for safe DOM rendering', () => {
+  const hostileOrder = '<img src=x onerror=alert(1)>';
+  const plan = normalizeContractPlan({
+    ...contractPlan,
+    rows: [{ ...contractPlan.rows[0], customer_order: hostileOrder }],
+  });
+  assert.equal(contractPlanRows(plan)[0].customer_order, hostileOrder);
+  const source = fs.readFileSync(path.join(__dirname, '../workspace/distributor-operations.js'), 'utf8');
+  assert.match(source, /order\.textContent = row\.customer_order/);
+  assert.doesNotMatch(source, /order\.innerHTML/);
 });
 
 test('projection preserves native conversation turns and unavailable status metadata', () => {

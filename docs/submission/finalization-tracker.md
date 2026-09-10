@@ -4,6 +4,16 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
 
 ## Current snapshot — September 10
 
+- **User-approved final scope and earlier delivery target:** complete and submit
+  by September 12, with final preview before public release. See the
+  [six aligned decisions](2026-09-10-approved-demo-completion.md). Contract-aware
+  agent allocation and same-case ERP/Airtable/Jira/Slack linkage are the next
+  implementation slices. Finance is limited to existing source-backed amounts
+  and simple invoice/payment state; no expanded financial workflow is requested.
+  The previous September 12–14 internal schedule below is superseded by this
+  earlier target. Current main `93cd887` passed remote CI; this does not close
+  the remaining new-case business or model acceptance.
+
 - **Read-only fulfillment facts are independently accepted; full model semantics
   remain incomplete.** Explicit per-order remaining-to-pick / dispatch / recorded
   delivery quantities corrected NovaPro's15-vs2 dispatch confusion. Three actual

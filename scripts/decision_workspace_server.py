@@ -77,6 +77,9 @@ from the_missing_20.adapters.strands_models import (  # noqa: E402
     BedrockNovaProConfig,
     BedrockNovaProFactory,
 )
+from the_missing_20.agents.distributor_allocation import (  # noqa: E402
+    select_contract_plan,
+)
 from the_missing_20.agents.photo_receiving import StrandsPhotoReader  # noqa: E402
 from the_missing_20.authority_b.models import canonical_json  # noqa: E402
 from the_missing_20.authority_b.quorum import QuorumDenied  # noqa: E402
@@ -933,6 +936,9 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
             ),
         },
     }
+    feasible_plan = projection.get("feasible_allocation_plan")
+    if isinstance(feasible_plan, Mapping):
+        erp_facts["feasible_contract_allocation_plan"] = dict(feasible_plan)
     if isinstance(parent_purchase_order, Mapping):
         erp_facts["parent_purchase_order"] = dict(parent_purchase_order)
     unavailable = {
@@ -974,6 +980,22 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
             }
         },
     }
+
+
+def _distributor_native_allocation_selector(
+    *, settings: Settings
+) -> Callable[[Mapping[str, object]], Mapping[str, object]]:
+    """Build the opt-in structured selector; this is never reached by reads or `/ask`."""
+
+    def select(plan: Mapping[str, object]) -> Mapping[str, object]:
+        return select_contract_plan(
+            plan=plan,
+            factory=BedrockNovaProFactory(
+                BedrockNovaProConfig(region=settings.aws_region, aws_profile=settings.aws_profile)
+            ),
+        )
+
+    return select
 
 
 def _distributor_native_ask_turn(
@@ -2402,11 +2424,20 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 and distributor_settings.agent_provider is AgentProvider.BEDROCK
                 else None
             )
+            distributor_allocation_selector = (
+                _distributor_native_allocation_selector(settings=distributor_settings)
+                if isinstance(raw_operations_config.get("allocation_policy"), Mapping)
+                and raw_operations_config["allocation_policy"].get("version") == "v1"
+                and photo_values.get("MISSING20_NATIVE_RECEIVING_DIALOGUE") == "1"
+                and distributor_settings.agent_provider is AgentProvider.BEDROCK
+                else None
+            )
             self.distributor_operations = DistributorOperations(
                 normal_billing_runtime / "distributor-operations.sqlite3",
                 raw_operations_config,
                 native_adapter,
                 ask_turn=distributor_ask_turn,
+                allocation_selector=distributor_allocation_selector,
             )
         self.photo_receiving = PhotoReceiving(
             (runtime_directory or repository_root / ".missing20-runtime")

@@ -162,6 +162,46 @@
     };
   }
 
+  function normalizeContractPlan(value) {
+    if (!isRecord(value) || text(value.version) !== "v1" || !text(value.plan_id) || !text(value.state_revision) || !Array.isArray(value.rows) || !value.rows.length) return null;
+    if (value.rows.some((row) => !isRecord(row) || !firstText(row, ["customer_order"]))) return null;
+    return {
+      ...value,
+      version: "v1",
+      plan_id: text(value.plan_id),
+      state_revision: text(value.state_revision),
+      rows: value.rows,
+    };
+  }
+
+  function contractPlanRows(plan) {
+    const normalized = normalizeContractPlan(plan);
+    if (!normalized) return [];
+    return normalized.rows.map((row) => ({
+      customer_order: firstText(row, ["customer_order"]),
+      promised_delivery_at: firstText(row, ["promised_delivery_at"]),
+      customer_priority: numberFrom(row.customer_priority),
+      partial_dispatch: typeof row.partial_dispatch === "boolean" ? row.partial_dispatch : null,
+      minimum_dispatch_quantity: numberFrom(row.minimum_dispatch_quantity),
+      allow_final_remainder: typeof row.allow_final_remainder === "boolean" ? row.allow_final_remainder : null,
+      prepared_commitment: numberFrom(row.prepared_commitment),
+      new_quantity: numberFrom(row.new_quantity),
+      quantity: numberFrom(row.quantity),
+      remaining_after_dispatch: numberFrom(row.remaining_after_dispatch),
+    }));
+  }
+
+  function contractDecisionState(plan, decision) {
+    const normalized = normalizeContractPlan(plan);
+    if (!normalized || !isRecord(decision)) return "UNAVAILABLE";
+    const status = text(decision.status).toUpperCase();
+    if (status === "PENDING") return "PENDING";
+    if (status !== "SELECTED") return "UNAVAILABLE";
+    return text(decision.plan_id) === normalized.plan_id && text(decision.state_revision) === normalized.state_revision
+      ? "SELECTED"
+      : "PENDING";
+  }
+
   function unwrapProjection(value) {
     if (!isRecord(value)) return null;
     for (const key of ["distributor_operations", "projection", "operation", "result"]) {
@@ -251,6 +291,9 @@
     shouldPreserveTemplateFields,
     formatNumber,
     normalizeProjection,
+    normalizeContractPlan,
+    contractPlanRows,
+    contractDecisionState,
     normalizeTemplate,
     normalizeTemplates,
     recommendedAction,
@@ -459,8 +502,86 @@
       ? `Delivery confirmed ${displayQuantity(delivery)} / ${displayQuantity(requested)}`
       : `Delivery confirmed ${displayQuantity(delivery)}`;
   }
+  function contractFlag(value, affirmative, negative) {
+    return value === true ? affirmative : value === false ? negative : "Unknown";
+  }
+  function appendContractDetail(parent, label, value) {
+    if (!value) return;
+    const row = document.createElement("div");
+    const labelNode = document.createElement("strong"); labelNode.textContent = label;
+    row.append(labelNode, document.createTextNode(value));
+    parent.append(row);
+  }
+  function renderContractAllocation(next) {
+    const panel = $("ops-contract-panel");
+    if (!panel) return;
+    const plan = normalizeContractPlan(next.feasible_allocation_plan);
+    const rows = contractPlanRows(plan);
+    if (!plan || !rows.length) {
+      panel.hidden = true;
+      $("ops-contract-rows")?.replaceChildren();
+      $("ops-contract-decision")?.replaceChildren();
+      return;
+    }
+    panel.hidden = false;
+    const state = contractDecisionState(plan, next.allocation_decision);
+    const decision = isRecord(next.allocation_decision) ? next.allocation_decision : {};
+    const rawStatus = text(decision.status).toUpperCase();
+    const badge = $("ops-contract-state");
+    if (badge) {
+      badge.className = "state-badge state-amber";
+      badge.textContent = state === "SELECTED" ? "Plan selected" : state === "PENDING" ? "Decision pending" : "Decision unavailable";
+    }
+    setText("ops-contract-note", state === "SELECTED"
+      ? "Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Selection is a decision record; it does not itself create a pick or dispatch."
+      : "Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Actual pick and dispatch evidence remains in the fulfillment rows below.");
+    const meta = $("ops-contract-meta");
+    if (meta) {
+      const unit = text(next.quantities?.uom) || "unit";
+      meta.textContent = `Contract policy v1 · Planned additional quantity ${displayQuantity(numberFrom(plan.new_quantity))} ${unit}`;
+    }
+    const list = $("ops-contract-rows");
+    if (list) {
+      list.replaceChildren(...rows.map((row) => {
+        const item = document.createElement("div"); item.className = "ops-contract-row";
+        const identity = document.createElement("div");
+        const order = document.createElement("strong"); order.textContent = row.customer_order || "Order unavailable";
+        const promise = document.createElement("small"); promise.textContent = `Promised ${row.promised_delivery_at || "Date unavailable"} · Customer priority ${displayQuantity(row.customer_priority)}`;
+        identity.append(order, promise);
+        const terms = [
+          `Minimum ${displayQuantity(row.minimum_dispatch_quantity)}`,
+          `Partial ${contractFlag(row.partial_dispatch, "Yes", "No")}`,
+          `Final remainder ${contractFlag(row.allow_final_remainder, "allowed", "not allowed")}`,
+        ].join(" · ");
+        const planned = `Total ${displayQuantity(row.quantity)} · Prepared commitment ${displayQuantity(row.prepared_commitment)} · New to prepare ${displayQuantity(row.new_quantity)}`;
+        item.append(identity, metricBlock("Contract terms", terms), metricBlock("Plan quantities", planned), metricBlock("Remaining after dispatch", displayQuantity(row.remaining_after_dispatch)));
+        return item;
+      }));
+    }
+    const decisionNode = $("ops-contract-decision");
+    if (!decisionNode) return;
+    decisionNode.className = `ops-contract-decision${state === "SELECTED" ? " is-selected" : ""}`;
+    decisionNode.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.textContent = state === "SELECTED" ? "Agent decision: plan selected" : state === "PENDING" ? "Agent decision: pending" : "Agent decision: unavailable";
+    const copy = document.createElement("p");
+    copy.textContent = state === "SELECTED"
+      ? "This plan selection does not itself create an ERP pick or dispatch."
+      : rawStatus === "SELECTED"
+        ? "The recorded selection does not match this current plan, so it is not treated as selected."
+        : "No selected decision is recorded for this plan.";
+    const details = document.createElement("div"); details.className = "ops-contract-decision-details";
+    appendContractDetail(details, "Rationale", firstText(decision, ["rationale"]));
+    const refs = Array.isArray(decision.contract_refs) ? decision.contract_refs.map((ref) => text(ref)).filter(Boolean).join(", ") : "";
+    appendContractDetail(details, "Contract refs", refs);
+    appendContractDetail(details, "Decision event", firstText(decision, ["event_id"]));
+    appendContractDetail(details, "Agent source", providerLabel(decision.provider));
+    decisionNode.append(heading, copy);
+    if (details.childNodes.length) decisionNode.append(details);
+  }
   function renderAllocations(next) {
     const list = $("ops-orders-list");
+    renderContractAllocation(next);
     setText("ops-orders-count", next._provided.allocations ? `${next.allocations.length} order${next.allocations.length === 1 ? "" : "s"}` : "Unknown");
     if (!next._provided.allocations) { list.replaceChildren(emptyList("Customer allocation data is unavailable from the current source.")); return; }
     if (!next.allocations.length) { list.replaceChildren(emptyList("No customer allocation evidence in the current operation.")); return; }
