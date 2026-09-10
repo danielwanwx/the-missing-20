@@ -1,14 +1,14 @@
 # Known Limitations — Release Review
 
-> **September 10 finalization status: scoped demos verified; submission NOT READY.**
-> The historical remaining-39-Box and separate 40-part component cases have native
-> ERP fulfillment evidence. The component case reached customer totals of 25/15,
-> with explicitly synthetic physical inputs and retained setup/recovery failures.
-> Contract-based Strands selection is now independently accepted on synthetic
-> inputs. Same-case distributor Airtable/Jira/Slack integration and a fresh,
-> uninterrupted business demonstration are still being completed.
-> Complex multi-turn accuracy, final video/materials and judge access remain open.
-> See the [current ledger](finalization-tracker.md) and [component evidence](../audits/2026-09-10-distributor-component-live-acceptance.md).
+> **September 10 finalization: the new 40-part ERP loop is complete; submission NOT READY.**
+> Fresh case PO18 reached A25/B15 dispatched and explicitly synthetic delivery
+> confirmations. The same runtime retained the Jira-link and contract-readback
+> corrections; this was a repaired continuation, not an uninterrupted first pass.
+> Three real Strands/Nova Pro contract selections and source-backed commercial
+> values are independently accepted. Complex multi-turn accuracy, a frozen final
+> rehearsal, final video/materials and judge access remain open.
+> See the [current ledger](finalization-tracker.md) and [fresh-case evidence](../audits/2026-09-10-final-component-loop-acceptance.md).
+
 
 
 The limitations below are part of the acceptance boundary and are shown deliberately.
@@ -20,9 +20,10 @@ The limitations below are part of the acceptance boundary and are shown delibera
 | AgentCore Gateway and Policy | `NOT_PROVEN` | No Gateway or Policy behavior is evidenced or claimed. |
 | Native receiving conversation | One six-turn real R4 UI sequence | Uses native SDK snapshot history and current sources before/after supplier billing. Structured citation attachments, long-chat compression and repeated held-out acceptance remain open. |
 | Supplier billing | Same R4 receipt, one disclosed synthetic USD 50 bill | PI8 covers 1 Box and is submitted/unpaid; actual GL/SLE checked independently. The other 39 Box have separate fulfillment evidence, not additional invoice coverage. Finance scope is simple source-backed display, not automated sales billing or payment. |
-| Customer-contract selection | Scoped real-model acceptance | Strands selects a supplied feasible plan using versioned date/priority/partial-shipment terms. The application calculates quantities and validates native tranches. A new uninterrupted ERP continuation remains to be verified. |
-| Distributor cross-app integration | Adapter and target schema verified | Airtable/Jira/Slack adapters passed independent code review, and the actual Distributor Cases table schema was read back. This does not prove same-case business record writes or UI integration. |
+| Customer-contract selection | Scoped real-model acceptance | Strands selects a supplied feasible plan using versioned date/priority/partial-shipment terms. The application calculates quantities and validates native tranches. Three fresh-case selections (A20, A5/B13, B2) were independently checked. The completed ERP continuation retained repairs; a frozen uninterrupted rehearsal is still pending. |
+| Distributor cross-app integration | Same-case writes and UI evidence verified | PO18 updates one Airtable case and Jira issue, with meaningful Celigo/Slack notices. Final record contents and unchanged replay are checked in the fresh-case audit; this is not production integration coverage. |
 | Re-reading the submitted invoice | Known repeat-reconciliation defect | PI8 passed the business validator again, but generated ERP metadata changed its raw digest and triggered a retained review hold. Its submission and accounting remain proved; the current UI reports the later reconciliation problem. Journal recovery is deferred. |
+| Distributor commercial evidence | Read-only real ERP and UI acceptance | PO18 line value USD160; SO11/SO12 values USD150/90. Exact linked invoice groups are missing. Order value is not revenue; no invoice creation or payment occurred. |
 | Cost accounting | Engineering estimate only | Per-run and matrix estimates are recorded in the cited artifacts. Transport cycles are not described as model calls. This is not an AWS invoice. |
 | Advisory authority | Hard boundary | Models cannot classify state, grant, execute, verify, replay, or change policy. A provider failure is visible as `DEGRADED`; it does not fabricate content or write. |
 | Production impact | Not measured | Five SaaS tenants contain purpose-built demo records, not customer production records. Delivery, billing, and USD 42,000 are observed demo-tenant accounting facts; causal revenue uplift, savings, reliability, and customer outcomes are not claimed. |

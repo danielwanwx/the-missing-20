@@ -1,27 +1,34 @@
 # The Missing 20
 
-> **September 10 finalization status: scoped demos verified; submission NOT READY.**
-> The historical remaining-39-Box and separate 40-part component cases have native
-> ERP fulfillment evidence. The component case reached customer totals of 25/15,
-> with explicitly synthetic physical inputs and retained setup/recovery failures.
-> Contract-based Strands selection is now independently accepted on synthetic
-> inputs. Same-case distributor Airtable/Jira/Slack integration and a fresh,
-> uninterrupted business demonstration are still being completed.
-> Complex multi-turn accuracy, final video/materials and judge access remain open.
-> See the [current ledger](docs/submission/finalization-tracker.md) and [component evidence](docs/audits/2026-09-10-distributor-component-live-acceptance.md).
+> **September 10 finalization: the new 40-part ERP loop is complete; submission NOT READY.**
+> Fresh case PO18 reached A25/B15 dispatched and explicitly synthetic delivery
+> confirmations. The same runtime retained the Jira-link and contract-readback
+> corrections; this was a repaired continuation, not an uninterrupted first pass.
+> Three real Strands/Nova Pro contract selections and source-backed commercial
+> values are independently accepted. Complex multi-turn accuracy, a frozen final
+> rehearsal, final video/materials and judge access remain open.
+> See the [current ledger](docs/submission/finalization-tracker.md) and [fresh-case evidence](docs/audits/2026-09-10-final-component-loop-acceptance.md).
+
 
 
 **Find the gap. Prove the cause. Close it safely.**
 
-The Missing 20 is an agentic operations control system for supply-chain teams. It
-connects fragmented evidence from ERPNext, Airtable, Celigo, Jira, and Slack; lets a
-Strands agent investigate the discrepancy; stops for a Manager only when a consequential
-recovery is ready; and verifies the result against authoritative business records.
+The Missing 20 helps parts distributors turn receiving exceptions into fulfilled
+customer orders. Operators record counts and inspection evidence; a Strands agent
+selects allocations under explicit customer contracts, and the application records
+ERP work with linked Airtable, Jira and Slack evidence through Celigo.
 
-The historical September 7 hero case starts with a 20-unit automotive controller shipment split across two
-operational truths: 12 units accepted into Stores and 8 units held for quality review.
-The downstream USD 42,000 customer order is neither delivered nor billed. No single
-system contains enough evidence to explain the situation safely.
+The current demo starts with four cartons containing only 38 of 40 ordered parts.
+Inspection holds prevent shipment of unapproved lots. The earlier customer promise
+wins the first 20 parts; a supported reinspection permits A's final 5 and B's first
+13. Two replacement parts complete B's order. Native orders reach A25/B15 shipped;
+delivery confirmations remain clearly labelled synthetic demo inputs, not physical
+proof of customer receipt. Purchasing and order values are read from ERP, with
+missing invoices shown as missing.
+
+The historical September 7 dashboard below is a separate 20-unit case: 12 accepted,
+8 held, and a USD42,000 downstream order. Its screenshot and recovery flow must not
+be confused with the current 40-part case.
 
 ![The Missing 20 verified operations dashboard](artifacts/audits/2026-09-07-role-judge-rerun/18-final-dashboard-invoice.png)
 

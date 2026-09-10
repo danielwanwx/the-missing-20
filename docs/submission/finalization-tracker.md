@@ -366,3 +366,14 @@ has 38 received/dispatched, A25/B13 dispatched, and 20 declared synthetic delive
 confirmations. Commercial evidence backend/UI passed independent review and
 actual ERP/UI checks (PO USD160, SO USD150/90, linked invoices missing); final
 2-part replacement and remaining confirmations are still being exercised.
+
+Fresh PO18 final acceptance: 19/19 events and 26/26 native operations APPLIED;
+new ERP readback confirms received/dispatched/declared-synthetic confirmation40,
+customer totals A25/B15, no missing or held quantities. Independent real-model
+and final business/external-evidence reviews returned scoped GO. Same Airtable
+record, JiraQRC3 and Celigo/Slack payloads retain final40 facts; exact last-event
+replay kept19 events and the47-row handoff journal byte-identical. This completed
+continuation retained fixes/restarts and is not a frozen first-pass acceptance.
+See docs/audits/2026-09-10-final-component-loop-acceptance.md. Finance97f4ac1 is
+remote-verified and CI34534138248 SUCCESS. Model-name clarification, complex
+multi-turn acceptance, frozen rehearsal and final public deliverables remain open.
