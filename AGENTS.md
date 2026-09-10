@@ -1,5 +1,22 @@
 # Project delivery requirements
 
+## Competition demo priority (user steering, September 9)
+
+- Prioritize one visible same-order business path through receiving, supplier
+  billing, ERP readback and useful multi-turn explanation. Reuse accepted
+  components and implement complete vertical slices.
+- The user accepts minor defects and limited rare-edge recovery for the demo.
+  Do not expand production reliability, framework abstractions, exhaustive
+  counterexamples or full-regression reruns before every small integration.
+  Keep quantities, amounts, case identity and claims about actual actions true.
+- Use focused checks and one independent review for each complete demo slice;
+  verify the real interface and external records. Broaden testing when a
+  concrete failure warrants it. Record deferred limitations without turning
+  each into a new precondition for demonstrating the business path.
+- Existing commit/push verification and protection of unrelated work still apply.
+
+## Delivery
+
 - After each completed optimization, run the relevant verification, commit the
   completed changes, and push to the project's intended Git remote. The user has
   authorized this routine delivery step; do not ask for approval each time.

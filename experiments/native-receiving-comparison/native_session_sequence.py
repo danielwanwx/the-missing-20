@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 import native_receiving_comparison as base
+from pydantic import BaseModel, Field
 from strands import Agent
 from strands.agent import AgentResult
 from strands.agent.conversation_manager import NullConversationManager
@@ -40,20 +41,41 @@ from the_missing_20.agents.live_advisory import (  # noqa: E402
 )
 from the_missing_20.ports.agent_model import AgentBudgetLedger  # noqa: E402
 
-SCHEMA_VERSION = "missing20-native-receiving-session-sequence/v1"
+SCHEMA_VERSION = "missing20-native-receiving-session-sequence/v2"
 FIXTURE_ROOT = Path("/private/tmp/m20-s2-d4-screen-v2")
 Variant = Literal["n1", "n2"]
 SEQUENCE_CAP_USD_PER_VARIANT = "0.96"
 SEQUENCE_CAP_USD_PAIR = "1.92"
-SEQUENCE_PROMPT = base.GENERIC_PROMPT.replace(
-    "Use prior human context included in the question only to resolve references.",
-    "Use native conversation history only to resolve references; current facts and authority "
-    "must come from sources returned in this turn.",
+SEQUENCE_PROMPT = " ".join(
+    (
+        "You are a read-only receiving evidence assistant. Answer the newest human question.",
+        "Use native conversation history to resolve references and retain prior human "
+        "instructions.",
+        "Prior assistant statements are claims, not current source evidence or execution "
+        "permission.",
+        "Before asserting external business facts, retrieve the current sources relevant to "
+        "those claims.",
+        "You may acknowledge an instruction without tool calls when you assert no external "
+        "business facts.",
+        "Distinguish observations from inferences and scope absence claims to the evidence "
+        "actually available.",
+        "Include units with quantities.",
+        "Cite actual record identifiers from returned evidence, not tool names or response paths.",
+        "State precisely what is unavailable when evidence is insufficient.",
+        "Do not write, approve, post, release, or execute anything.",
+    )
 )
 
 
 class SequenceError(RuntimeError):
     """The fixed native sequence cannot safely advance."""
+
+
+class SequenceAnswer(BaseModel):  # type: ignore[misc]
+    """N2's v2 output shape only; semantic review remains outside the native call."""
+
+    answer: str = Field(min_length=1, max_length=1_600)
+    citations: list[str] = Field(default_factory=list, min_length=0, max_length=8)
 
 
 def _mapping(value: object, label: str) -> dict[str, Any]:
@@ -103,8 +125,15 @@ def _source_paths(manifest_path: Path, turn: int) -> tuple[Path, Path]:
 
 
 def _ids(case_id: str, variant: Variant) -> tuple[str, str]:
-    digest = base._sha({"case_id": case_id, "variant": variant})[:24]
-    return f"m20-session-{digest}", f"m20-{variant}"
+    identity_version = SCHEMA_VERSION.rsplit("/", maxsplit=1)[-1]
+    digest = base._sha(
+        {
+            "case_id": case_id,
+            "sequence_schema_version": SCHEMA_VERSION,
+            "variant": variant,
+        }
+    )[:24]
+    return f"m20-session-{identity_version}-{digest}", f"m20-{variant}-{identity_version}"
 
 
 def _snapshot_path(root: Path, session_id: str, agent_id: str) -> Path:
@@ -122,8 +151,9 @@ def _snapshot_path(root: Path, session_id: str, agent_id: str) -> Path:
 
 def _contract(*, variant: Variant, tools: list[Any]) -> dict[str, Any]:
     source_specs = [base._copy(item.tool_spec) for item in tools]
-    n2_spec = base._copy(base.convert_pydantic_to_tool_spec(base.NarrowAnswer))
+    n2_spec = base._copy(base.convert_pydantic_to_tool_spec(SequenceAnswer))
     return {
+        "sequence_schema_version": SCHEMA_VERSION,
         "prompt": SEQUENCE_PROMPT,
         "prompt_sha256": base._sha(SEQUENCE_PROMPT),
         "model_contract": base._model_contract(),
@@ -217,7 +247,7 @@ def _agent_contract(
     expected_specs = [base._copy(item.tool_spec) for item in tools]
     if actual_specs != expected_specs or agent.tool_names != list(SOURCE_TOOL_NAMES):
         raise SequenceError("restored source-tool configuration drifted")
-    expected_model = base.NarrowAnswer if variant == "n2" else None
+    expected_model = SequenceAnswer if variant == "n2" else None
     if getattr(agent, "_default_structured_output_model", None) is not expected_model:
         raise SequenceError("restored structured-output schema drifted")
     if agent.model.stateful:
@@ -311,6 +341,7 @@ def prepare_turn(
         record: dict[str, Any] = {
             "status": "PREPARED",
             "schema_version": SCHEMA_VERSION,
+            "session_identity_schema_version": SCHEMA_VERSION,
             "turn": turn,
             "case_id": case_id,
             "question": questions[turn - 1],
@@ -345,6 +376,7 @@ def prepare_turn(
         record = {
             "status": "PREPARATION_FAILED",
             "schema_version": SCHEMA_VERSION,
+            "session_identity_schema_version": SCHEMA_VERSION,
             "turn": turn,
             "error": {"type": type(exc).__name__, "message": str(exc)},
         }
@@ -400,9 +432,14 @@ def run_turn(
     session_id: str | None = None
     snapshot_path: Path | None = None
     snapshot_hash: str | None = None
+    qualified_source_payloads_complete = False
     try:
         prepared = _load(prepared_path, "prepared turn")
-        if prepared.get("status") != "PREPARED" or prepared.get("schema_version") != SCHEMA_VERSION:
+        if (
+            prepared.get("status") != "PREPARED"
+            or prepared.get("schema_version") != SCHEMA_VERSION
+            or prepared.get("session_identity_schema_version") != SCHEMA_VERSION
+        ):
             raise SequenceError("run requires a PREPARED native sequence turn")
         turn, case_id, question = (
             prepared.get("turn"),
@@ -418,6 +455,7 @@ def run_turn(
             raise SequenceError("prepared turn lacks identity or literal question")
         if not isinstance(payloads, Mapping) or set(SOURCE_TOOL_NAMES).difference(payloads):
             raise SequenceError("prepared turn lacks all five source payloads")
+        qualified_source_payloads_complete = True
         if base._sha(payloads) != prepared.get("qualified_source_payloads_sha256"):
             raise SequenceError("prepared qualified source payloads were altered")
         _verify_prepared_fixture(prepared)
@@ -459,9 +497,13 @@ def run_turn(
                 if (
                     predecessor.get("status") != "STRUCTURAL_COMPLETE"
                     or predecessor.get("turn") != turn - 1
+                    or predecessor.get("schema_version") != SCHEMA_VERSION
+                    or predecessor.get("session_identity_schema_version") != SCHEMA_VERSION
+                    or predecessor.get("variant") != variant
+                    or predecessor.get("case_id") != case_id
                 ):
                     raise SequenceError(
-                        "candidate cannot continue after a non-complete predecessor"
+                        "candidate cannot continue after a non-complete or foreign predecessor"
                     )
                 if predecessor.get("session_id") != session_id or predecessor.get(
                     "session_contract_sha256"
@@ -485,7 +527,7 @@ def run_turn(
                     model=capturing,
                     tools=tools,
                     system_prompt=SEQUENCE_PROMPT,
-                    structured_output_model=base.NarrowAnswer if variant == "n2" else None,
+                    structured_output_model=SequenceAnswer if variant == "n2" else None,
                     conversation_manager=manager,
                     session_manager=SnapshotSessionManager(
                         session_id,
@@ -517,13 +559,9 @@ def run_turn(
                 history_after = base._copy(agent.messages)
             _verify_private_tree(session_root)
             snapshot_hash = base._file_sha(snapshot) if snapshot.is_file() else None
-            missing = [
-                name for name in SOURCE_TOOL_NAMES if name not in {item["tool"] for item in reads}
-            ]
             record = {
-                "status": "STRUCTURAL_COMPLETE" if not missing else "STRUCTURAL_FAIL",
-                "structural_reason": None if not missing else "required_source_tools_not_read",
-                "missing_source_reads": missing,
+                "status": "STRUCTURAL_COMPLETE",
+                "structural_reason": None,
                 "turn": turn,
                 "case_id": case_id,
                 "question": question,
@@ -559,9 +597,14 @@ def run_turn(
             "snapshot_sha256": snapshot_hash,
         }
     ledger_snapshot = ledger.snapshot()
+    source_tools_read = [
+        name for name in SOURCE_TOOL_NAMES if any(item.get("tool") == name for item in reads)
+    ]
+    source_tools_available = list(SOURCE_TOOL_NAMES) if qualified_source_payloads_complete else []
     record.update(
         {
             "schema_version": SCHEMA_VERSION,
+            "session_identity_schema_version": SCHEMA_VERSION,
             "variant": variant,
             "mode": "live"
             if execute_model
@@ -570,6 +613,13 @@ def run_turn(
             "logical_model_request_count": ledger_snapshot["request_count"],
             "observed_provider_attempt_count": len(attempts),
             "ledger": ledger_snapshot,
+            "qualified_source_payloads_complete": qualified_source_payloads_complete,
+            "source_tools_available": source_tools_available,
+            "source_tools_read": source_tools_read,
+            "source_tools_unread": [
+                name for name in source_tools_available if name not in source_tools_read
+            ],
+            "semantic_status": "NOT_EVALUATED",
             "elapsed_ms": round((time.monotonic() - started) * 1000),
         }
     )

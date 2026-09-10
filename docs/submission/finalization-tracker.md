@@ -2,6 +2,39 @@
 
 Updated 2026-09-09. **NOT READY.** This ledger supersedes older overall readiness wording; historical audits remain evidence for their named case/version only. Initial repository and remote main: `be419eab1d5faedfecb140fde7112a5443f9cedc` (fresh `git ls-remote`). Product baseline: `aa4966e`; subsequent commit is handoff documentation. Tracked working tree initially clean; unrelated untracked research/runtime artifacts preserved.
 
+## Current snapshot — September 9, 23:30 PDT
+
+- Latest delivered product correction: `aea8180e653b629d79aac2d15dd95e306ed43795`,
+  exact local/remote main verified. Successful repeated invoice readback now
+  retains its audit atomically and keeps SUBMITTED status across restart;
+  independent review and 228 related tests passed. No actual invoice was created.
+- Invoice inspector no longer labels aggregate receipt accounting as verified
+  invoice posting. Delivered `e47a61f`; independent review and an actual R4
+  browser reload/click passed. Full page/action acceptance remains open.
+- Native Strands v2 completed six fresh-process turns for each of two scripted
+  candidates. Standards and specification/mechanics independent reviews passed.
+  This proves the tested restoration mechanism only; no paid v2 sequence or
+  product conversation promotion yet.
+- R4 remains PO16 / PR7: 40 Box ordered, 1 Box posted, 39 outstanding, no
+  invoice. A new complete source read produced a READY synthetic USD50 bill
+  preview; UI approval/execution and exact invoice GL/SLE verification are not
+  integrated or accepted. Customer fulfillment is also still open.
+- F03 real reasoning, F05 same-order downstream closure and F06 repeated complex
+  matrix remain open. The latest bounded full Python regression timed out;
+  targeted passes do not replace it. Video and final submission are not ready.
+
+The delivery log below preserves earlier states and failures; the snapshot and
+named acceptance scopes take precedence over historical progress wording.
+
+User steering at this stage prioritizes a complete competition demo over further
+bottom-layer reliability work. Backend and UI are now assigned as one normal
+billing vertical slice using the accepted coordinator. Minor UI and rare recovery
+limitations may be deferred. Use focused slice verification, real operator flow
+and actual external evidence; do not expand another proof framework or make each
+small accessor wait for a full regression. The real-model v2 comparison is the
+next conversation gate; [offline review](../audits/2026-09-09-native-session-v2-offline-review.md)
+is accepted only in its stated mechanism scope.
+
 ## Schedule and official gates
 
 Direct official web reads on September 9, 2026: [rules](https://agentsforhumans.devpost.com/rules), [overview](https://agentsforhumans.devpost.com/), [FAQ](https://agentsforhumans.devpost.com/details/faqs). These independently verified sources supersede the Research Engine's failed claim-grounding run.

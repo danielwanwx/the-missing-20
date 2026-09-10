@@ -20,7 +20,7 @@ for path in (EXPERIMENT, ROOT / "tests"):
         sys.path.insert(0, str(path))
 
 import native_session_sequence as sequence  # noqa: E402
-from native_receiving_comparison import _file_sha, _spec_names  # noqa: E402
+from native_receiving_comparison import _file_sha, _sha, _spec_names  # noqa: E402
 from test_frozen_receiving_sdk_boundary_capture import (  # noqa: E402
     CASE_ID,
     _synthetic_erp_source,
@@ -45,6 +45,9 @@ QUESTIONS = [
 ]
 CHILD_TIMEOUT_SECONDS = 45
 SIX_TURN_STAGE_COUNT = 18  # six production prepares, then six turns for each native candidate
+READ_ONLY_ACK = (
+    "Understood. I will keep this conversation read-only and will not execute or approve anything."
+)
 
 
 def _tool_events(
@@ -89,11 +92,15 @@ class LocalSequenceModel(Model):  # type: ignore[misc]
         variant: str,
         answer: str,
         tool_id_prefix: str,
+        source_reads: list[str] | None = None,
+        citations: list[str] | None = None,
         fail_after: int | None = None,
     ) -> None:
         self.variant = variant
         self.answer = answer
         self.tool_id_prefix = tool_id_prefix
+        self.source_reads = list(SOURCE_TOOL_NAMES) if source_reads is None else list(source_reads)
+        self.citations = ["local-citation"] if citations is None else list(citations)
         self.fail_after = fail_after
         self.index = 0
         self.config = {"model_id": "local-session-test", "max_tokens": 1551, "temperature": 0}
@@ -122,8 +129,8 @@ class LocalSequenceModel(Model):  # type: ignore[misc]
         del messages, system_prompt, kwargs
         if self.fail_after is not None and self.index >= self.fail_after:
             raise RuntimeError("local partial stream failure")
-        if self.index < len(SOURCE_TOOL_NAMES):
-            name = SOURCE_TOOL_NAMES[self.index]
+        if self.index < len(self.source_reads):
+            name = self.source_reads[self.index]
             events = _tool_events(
                 name, {"query": "local current source"}, self.index, self.tool_id_prefix
             )
@@ -133,7 +140,7 @@ class LocalSequenceModel(Model):  # type: ignore[misc]
             assert len(choices) == 1
             events = _tool_events(
                 choices.pop(),
-                {"answer": self.answer, "citations": ["local-citation"]},
+                {"answer": self.answer, "citations": self.citations},
                 self.index,
                 self.tool_id_prefix,
             )
@@ -261,6 +268,8 @@ def _run(
     turn: int,
     session_root: Path,
     answer: str,
+    source_reads: list[str] | None = None,
+    citations: list[str] | None = None,
     fail_after: int | None = None,
 ) -> dict[str, Any]:
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -280,6 +289,8 @@ def _run(
             "variant": variant,
             "answer": answer,
             "tool_id_prefix": f"{variant}-turn-{turn}",
+            "source_reads": source_reads,
+            "citations": citations,
             "fail_after": fail_after,
         },
     )
@@ -296,6 +307,7 @@ def _run_six(
     """Use fresh interpreters for every native turn of one independent candidate session."""
 
     output_root.mkdir()
+    source_reads_by_turn = {2: [], 3: ["read_erp_evidence"]}
     return [
         _run(
             output_root,
@@ -303,7 +315,9 @@ def _run_six(
             variant=variant,
             turn=turn,
             session_root=session_root,
-            answer=f"actual {variant.upper()} answer turn {turn}",
+            answer=READ_ONLY_ACK if turn == 2 else f"actual {variant.upper()} answer turn {turn}",
+            source_reads=source_reads_by_turn.get(turn),
+            citations=[] if turn == 2 else None,
         )
         for turn in range(1, 7)
     ]
@@ -352,11 +366,16 @@ def test_six_fresh_processes_retain_native_history_for_both_variants(tmp_path: P
     # assertion gives the complete 18-stage proof a bounded, observable ceiling.
     assert time.monotonic() - started < SIX_TURN_STAGE_COUNT * CHILD_TIMEOUT_SECONDS
     assert all(record["status"] == "STRUCTURAL_COMPLETE" for record in n1 + n2)
+    assert all(record["semantic_status"] == "NOT_EVALUATED" for record in n1 + n2)
+    assert all(record["qualified_source_payloads_complete"] for record in n1 + n2)
+    assert all(record["source_tools_available"] == list(SOURCE_TOOL_NAMES) for record in n1 + n2)
 
     for variant, records in (("n1", n1), ("n2", n2)):
         q6_request = json.dumps(records[-1]["provider_attempts"][0]["request"]["messages"])
+        q3_request = json.dumps(records[2]["provider_attempts"][0]["request"]["messages"])
         assert f"actual {variant.upper()} answer turn 5" in q6_request
         assert QUESTIONS[1] in q6_request
+        assert READ_ONLY_ACK in q3_request
         assert records[-1]["conversation_manager"]["removed_message_count"] == 0
         assert all(
             current["history_before"] == previous["history_after"]
@@ -365,14 +384,49 @@ def test_six_fresh_processes_retain_native_history_for_both_variants(tmp_path: P
         assert _messages_have_unique_consumed_pairs(records[-1]["history_after"])
         assert "SYN-SLE-V2" in json.dumps(records[4]["tool_reads"])
         assert "SYN-SLE-V1" in json.dumps(records[4]["history_before"])
-        assert all(len(record["tool_reads"]) == 5 for record in records)
+        assert records[1]["tool_reads"] == []
+        assert records[1]["source_tools_read"] == []
+        assert records[1]["source_tools_unread"] == list(SOURCE_TOOL_NAMES)
+        assert records[2]["source_tools_read"] == ["read_erp_evidence"]
+        assert records[2]["source_tools_unread"] == [
+            name for name in SOURCE_TOOL_NAMES if name != "read_erp_evidence"
+        ]
 
     n2_history = json.dumps(n2[-1]["history_before"])
     assert n2[0]["final"]["structured_output"] == {
         "answer": "actual N2 answer turn 1",
         "citations": ["local-citation"],
     }
-    assert "NarrowAnswer" in n2_history and "local-citation" in n2_history
+    assert n2[1]["final"]["structured_output"] == {
+        "answer": READ_ONLY_ACK,
+        "citations": [],
+    }
+    assert "SequenceAnswer" in n2_history and "local-citation" in n2_history
+
+
+def test_zero_read_factual_output_is_retained_without_semantic_acceptance(tmp_path: Path) -> None:
+    """SDK completion does not turn an unsupported external claim into a semantic pass."""
+
+    manifest = _fixture(tmp_path)
+    prepared = _prepared(tmp_path, manifest, 1)
+    factual_claim = "The current posted quantity is 1 Box."
+    for variant in ("n1", "n2"):
+        record = _run(
+            tmp_path / variant,
+            prepared,
+            variant=variant,
+            turn=1,
+            session_root=tmp_path / f"{variant}-session",
+            answer=factual_claim,
+            source_reads=[],
+            citations=[],
+        )
+        assert record["status"] == "STRUCTURAL_COMPLETE"
+        assert record["semantic_status"] == "NOT_EVALUATED"
+        assert record["tool_reads"] == []
+        assert record["source_tools_read"] == []
+        assert record["source_tools_unread"] == list(SOURCE_TOOL_NAMES)
+        assert factual_claim in json.dumps(record["final"])
 
 
 def test_case_and_variant_sessions_are_isolated(tmp_path: Path) -> None:
@@ -406,6 +460,61 @@ def test_case_and_variant_sessions_are_isolated(tmp_path: Path) -> None:
     )
     assert n1["history_before"] == n2["history_before"] == foreign["history_before"] == []
     assert n1["session_id"] != n2["session_id"] != foreign["session_id"]
+    v1_n1_session = f"m20-session-{_sha({'case_id': CASE_ID, 'variant': 'n1'})[:24]}"
+    assert n1["session_id"] != v1_n1_session
+    assert n1["session_identity_schema_version"] == sequence.SCHEMA_VERSION
+
+
+def test_v1_prepared_or_predecessor_cannot_reach_the_model(tmp_path: Path) -> None:
+    manifest = _fixture(tmp_path)
+    prepared_one = _prepared(tmp_path, manifest, 1)
+    legacy_prepared = json.loads(prepared_one.read_text(encoding="utf-8"))
+    legacy_prepared["schema_version"] = "missing20-native-receiving-session-sequence/v1"
+    legacy_prepared["session_identity_schema_version"] = (
+        "missing20-native-receiving-session-sequence/v1"
+    )
+    legacy_prepared_path = _write(tmp_path / "legacy-prepared-v1.json", legacy_prepared)
+    invalid_prepared = _run(
+        tmp_path / "invalid-prepared",
+        legacy_prepared_path,
+        variant="n1",
+        turn=1,
+        session_root=tmp_path / "invalid-prepared-session",
+        answer="must not reach the model",
+    )
+
+    output_root = tmp_path / "valid"
+    first = _run(
+        output_root,
+        prepared_one,
+        variant="n1",
+        turn=1,
+        session_root=tmp_path / "valid-session",
+        answer="valid v2 first turn",
+    )
+    assert first["status"] == "STRUCTURAL_COMPLETE"
+    predecessor_path = output_root / "n1-turn-1.json"
+    legacy_predecessor = json.loads(predecessor_path.read_text(encoding="utf-8"))
+    legacy_predecessor["schema_version"] = "missing20-native-receiving-session-sequence/v1"
+    legacy_predecessor["session_identity_schema_version"] = (
+        "missing20-native-receiving-session-sequence/v1"
+    )
+    _write(predecessor_path, legacy_predecessor)
+    invalid_predecessor = _run(
+        output_root,
+        _prepared(tmp_path, manifest, 2),
+        variant="n1",
+        turn=2,
+        session_root=tmp_path / "valid-session",
+        answer="must not reach the model",
+    )
+
+    for record in (invalid_prepared, invalid_predecessor):
+        assert record["status"] == "EXECUTION_FAILED"
+        assert record["semantic_status"] == "NOT_EVALUATED"
+        assert record["sdk_invocation_count"] == 0
+        assert record["logical_model_request_count"] == 0
+        assert record["observed_provider_attempt_count"] == 0
 
 
 def test_pre_and_post_restore_contract_drift_stop_before_model(tmp_path: Path) -> None:
@@ -446,7 +555,8 @@ def test_pre_and_post_restore_contract_drift_stop_before_model(tmp_path: Path) -
         session_root=fresh / "session",
         answer="first",
     )
-    snapshot = sequence._snapshot_path(fresh / "session", second_first["session_id"], "m20-n1")
+    _session_id, agent_id = sequence._ids(CASE_ID, "n1")
+    snapshot = sequence._snapshot_path(fresh / "session", second_first["session_id"], agent_id)
     raw = json.loads(snapshot.read_text(encoding="utf-8"))
     raw["data"]["system_prompt"] = [{"text": "drift"}]
     snapshot.write_text(json.dumps(raw), encoding="utf-8")
