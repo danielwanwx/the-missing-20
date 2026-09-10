@@ -4,6 +4,16 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
 
 ## Current snapshot — September 10
 
+- **Read-only fulfillment facts are independently accepted; full model semantics
+  remain incomplete.** Explicit per-order remaining-to-pick / dispatch / recorded
+  delivery quantities corrected NovaPro's15-vs2 dispatch confusion. Three actual
+  UI follow-ups retained native history8→10→12 messages; numeric and causality
+  answers passed scoped review, but one answer inferred physical receipt from
+  synthetic POD. Nova2 was evaluated and rejected on this case; the existing
+  NovaPro model and output budget remain unchanged. See the
+  [bounded comparison and retained failures](../audits/2026-09-10-nova2-bounded-output-comparison.md).
+
+
 - **R4 distributor receiving/fulfillment is VERIFIED_IN_DEMO; the component native business flow is verified; model causality remains FAILED.** Industry research
   and the native-workflow design passed independent review and were committed as
   `04516b21c36634ccb36ca392828fef14a6c2a767`; push and fresh remote SHA matched.

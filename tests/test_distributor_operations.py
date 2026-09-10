@@ -939,6 +939,89 @@ def test_native_packet_scopes_quantity_attribution_and_inspection_evidence() -> 
         assert ("synthetic test events" in provenance["recorded_events"]) is synthetic_input
 
 
+def test_native_packet_projects_independent_per_order_fulfillment_facts() -> None:
+    projection = {
+        "case_id": "M20-DIST-FULFILLMENT-FACTS",
+        "case_label": "Fulfillment arithmetic test",
+        "quantities": {"uom": "Nos"},
+        "lots": [],
+        "allocations": [
+            {
+                "customer_order": "SO10",
+                "requested_quantity": 15,
+                "picked": 13,
+                "dispatched": 0,
+                "delivery_confirmed": 0,
+            }
+        ],
+        "documents": [],
+        "shipments": [],
+        "events": [],
+    }
+
+    packet = workspace_server._distributor_native_packet(projection)
+    facts = cast(
+        dict[str, object],
+        cast(dict[str, object], cast(dict[str, object], packet["tool_payload"])["sources"])[
+            "read_erp_evidence"
+        ],
+    )
+
+    assert facts["fulfillment_facts"] == [
+        {
+            "customer_order": "SO10",
+            "uom": "Nos",
+            "requested": 15,
+            "picked": 13,
+            "dispatched": 0,
+            "delivery_confirmed": 0,
+            "remaining_to_pick": 2,
+            "remaining_to_dispatch": 15,
+            "remaining_delivery_confirmation": 15,
+        }
+    ]
+
+
+def test_fulfillment_facts_omit_missing_invalid_or_inconsistent_counts() -> None:
+    assert (
+        workspace_server.distributor_fulfillment_facts(
+            {"uom": "Nos"},
+            [
+                {"customer_order": "SO-MISSING", "requested_quantity": 15, "dispatched": 0},
+                {
+                    "customer_order": "SO-NEGATIVE",
+                    "requested_quantity": 15,
+                    "picked": -1,
+                    "dispatched": 0,
+                    "delivery_confirmed": 0,
+                },
+                {
+                    "customer_order": "SO-OVERPICKED",
+                    "requested_quantity": 15,
+                    "picked": 16,
+                    "dispatched": 0,
+                    "delivery_confirmed": 0,
+                },
+                {
+                    "customer_order": "SO-CONFIRMED-WITHOUT-DISPATCH",
+                    "requested_quantity": 15,
+                    "picked": 15,
+                    "dispatched": 0,
+                    "delivery_confirmed": 15,
+                },
+                {
+                    "customer_order": "SO-DISPATCHED-WITHOUT-PICK",
+                    "requested_quantity": 15,
+                    "picked": 0,
+                    "dispatched": 15,
+                    "delivery_confirmed": 0,
+                },
+            ],
+        )
+        == []
+    )
+
+
 def test_component_replacement_closes_only_the_supported_parent_shortage_and_keeps_quality_facts(
     tmp_path: Path,
 ) -> None:

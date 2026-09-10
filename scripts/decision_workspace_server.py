@@ -781,6 +781,70 @@ def _distributor_operations_disabled_projection() -> dict[str, object]:
     }
 
 
+def _fulfillment_quantity(value: object) -> Decimal | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        quantity = Decimal(str(value))
+    except (ArithmeticError, ValueError):
+        return None
+    if not quantity.is_finite() or quantity < 0:
+        return None
+    return quantity
+
+
+def _fulfillment_wire(quantity: Decimal) -> int | float:
+    return int(quantity) if quantity == quantity.to_integral_value() else float(quantity)
+
+
+def distributor_fulfillment_facts(
+    quantities: object, allocations: object
+) -> list[dict[str, object]]:
+    """Derive per-order fulfillment arithmetic only when every source count is known."""
+
+    if not isinstance(quantities, Mapping) or not isinstance(allocations, list):
+        return []
+    uom = quantities.get("uom")
+    if not isinstance(uom, str) or not uom.strip():
+        return []
+    facts: list[dict[str, object]] = []
+    for allocation in allocations:
+        if not isinstance(allocation, Mapping):
+            continue
+        order = allocation.get("customer_order")
+        if not isinstance(order, str) or not order.strip():
+            continue
+        requested = _fulfillment_quantity(allocation.get("requested_quantity"))
+        picked = _fulfillment_quantity(allocation.get("picked"))
+        dispatched = _fulfillment_quantity(allocation.get("dispatched"))
+        confirmed = _fulfillment_quantity(allocation.get("delivery_confirmed"))
+        if (
+            requested is None
+            or requested <= 0
+            or picked is None
+            or dispatched is None
+            or confirmed is None
+            or any(quantity > requested for quantity in (picked, dispatched, confirmed))
+            or dispatched > picked
+            or confirmed > dispatched
+        ):
+            continue
+        facts.append(
+            {
+                "customer_order": order,
+                "uom": uom,
+                "requested": _fulfillment_wire(requested),
+                "picked": _fulfillment_wire(picked),
+                "dispatched": _fulfillment_wire(dispatched),
+                "delivery_confirmed": _fulfillment_wire(confirmed),
+                "remaining_to_pick": _fulfillment_wire(requested - picked),
+                "remaining_to_dispatch": _fulfillment_wire(requested - dispatched),
+                "remaining_delivery_confirmation": _fulfillment_wire(requested - confirmed),
+            }
+        )
+    return facts
+
+
 def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, object]:
     """Build a compact, current, read-only source packet for the native session."""
 
@@ -826,6 +890,7 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
         "case_label": projection.get("case_label"),
         "synthetic_input": synthetic_input,
         "quantities": quantities,
+        "fulfillment_facts": distributor_fulfillment_facts(quantities, allocations),
         "lots": lots,
         "allocations": allocations,
         "documents": documents,
