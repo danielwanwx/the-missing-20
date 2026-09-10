@@ -22,8 +22,8 @@ Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger
   end at zero. Three retained historical alerts still set the page stage to HOLD. Initial setup
   repairs, unknown attempts and a blocked out-of-order tranche remain disclosed.
   Component NovaPro answers still wrongly attribute the shortage to the supplier;
-  a native Nova2 comparison awaits an AWS administrator login for the explicitly
-  authorized policy. This does not block the verified native business effects.
+  Nova2 access is now verified under the application role, but its matched
+  comparison hit the 1551 output cap and produced no complete answer. This does not block the verified native business effects.
   See [component evidence](../audits/2026-09-10-distributor-component-live-acceptance.md).
   Demo Batch and Shipment API permissions were verified after adding native
   roles; no quality-stop setting was relaxed. See the

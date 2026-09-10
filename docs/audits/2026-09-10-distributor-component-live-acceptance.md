@@ -233,3 +233,21 @@ projection still has `stage=HOLD`; the final aggregate stage is not a clean gree
 screen despite the verified completed quantities. Alert lifecycle cleanup and
 unattended generic recovery are not accepted by this release. Model causality
 FAILED and pending IAM access are expressly excluded from GO.
+
+
+## Nova 2 access restored and matched comparison — September 10
+
+After the user switched the console identity, the authorized inline policy
+`Missing20Nova2LiteInference` was created on `Missing20DeveloperRole`. A fresh
+IAM API read matched the intended policy exactly. An actual Bedrock Converse
+call under `assumed-role/Missing20DeveloperRole/missing20-dev` returned `OK.`
+with 50 input / 3 output tokens and `end_turn`. The policy/access blocker is now
+resolved. Evidence: `nova2-policy-verified-probe-01.json` in the private directory.
+
+The subsequent matched Strands comparison used the retained failed conversation
+history, exact newest source input, Nova2 Lite with extended thinking off and
+the existing 1551 output cap. It raised `MaxTokensReachedException`; no complete
+answer or semantic pass was obtained. Evidence:
+`component-nova2-matched-comparison-01.json`. This is a new output-budget result,
+not an IAM failure or proof that Nova2 fixes attribution. The product remains on
+its existing model pending a separately evaluated configuration.
