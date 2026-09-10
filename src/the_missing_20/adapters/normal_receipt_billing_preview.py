@@ -24,6 +24,7 @@ EXPECTED_CURRENCY = "USD"
 EXPECTED_RATE = Decimal("50")
 
 PreviewStatus = Literal["READY", "ALREADY_SUBMITTED", "DRAFT_EXISTS", "ALREADY_BILLED", "HOLD"]
+NativeInvoiceState = Literal["MAPPED", "DRAFT", "SUBMITTED"]
 
 
 def _decimal(value: object, label: str) -> Decimal:
@@ -618,6 +619,77 @@ def _validate_mapper(
         _optional_zero(invoice, field_name, "mapped Purchase Invoice")
 
 
+def validate_native_purchase_invoice(
+    basis: SyntheticBillingBasis,
+    *,
+    purchase_order: Mapping[str, Any],
+    purchase_receipt: Mapping[str, Any],
+    document: Mapping[str, Any],
+    state: NativeInvoiceState,
+    expected_name: str | None = None,
+    expected_bill_reference: str | None = None,
+    expected_bill_date: str | None = None,
+) -> Mapping[str, Any]:
+    """Validate one native invoice document without transport or authority.
+
+    ``MAPPED`` preserves the preview's existing raw mapper admission rules.
+    Supplying both bill expectations binds a cloned mapper to the disclosed
+    synthetic bill. ``DRAFT`` and ``SUBMITTED`` require the same bill fields
+    plus their exact name and document state.
+    """
+
+    if state not in {"MAPPED", "DRAFT", "SUBMITTED"}:
+        raise ValueError("native invoice state is unsupported")
+    if (expected_bill_reference is None) != (expected_bill_date is None):
+        raise ValueError("bound native invoice requires both bill fields")
+    if expected_bill_reference not in (None, basis.bill_reference):
+        raise ValueError("bound native invoice bill reference does not match the bill basis")
+    if expected_bill_date not in (None, basis.bill_date):
+        raise ValueError("bound native invoice bill date does not match the bill basis")
+    receipt_row = _validate_sources(basis, purchase_order, purchase_receipt)
+    _validate_mapper(
+        basis,
+        document,
+        receipt_row,
+        allow_existing=state != "MAPPED",
+    )
+    if state == "MAPPED":
+        if expected_name is not None:
+            raise ValueError("MAPPED invoice cannot have an expected name")
+        if expected_bill_reference is not None:
+            _require_equal(
+                document,
+                "bill_no",
+                expected_bill_reference,
+                "bound mapped Purchase Invoice",
+            )
+            _require_equal(
+                document,
+                "bill_date",
+                expected_bill_date,
+                "bound mapped Purchase Invoice",
+            )
+        return receipt_row
+    name = _text(expected_name, "expected native invoice name")
+    if document.get("name") != name:
+        raise ValueError(f"{state} invoice name does not match the expected draft")
+    required_status = Decimal("0") if state == "DRAFT" else Decimal("1")
+    _require_number(document, "docstatus", required_status, f"{state} Purchase Invoice")
+    _require_equal(
+        document,
+        "bill_no",
+        basis.bill_reference,
+        f"{state} Purchase Invoice",
+    )
+    _require_equal(
+        document,
+        "bill_date",
+        basis.bill_date,
+        f"{state} Purchase Invoice",
+    )
+    return receipt_row
+
+
 def _is_native_receipt_return(basis: SyntheticBillingBasis, document: Mapping[str, Any]) -> bool:
     if document.get("doctype") != "Purchase Receipt":
         return False
@@ -765,8 +837,13 @@ def validate_billing_preview(
     metadata: Mapping[str, object] | None = None
     try:
         related, metadata = _related_documents(related_documents_read, basis)
-        receipt_row = _validate_sources(basis, purchase_order, purchase_receipt)
-        _validate_mapper(basis, mapped_invoice, receipt_row)
+        receipt_row = validate_native_purchase_invoice(
+            basis,
+            purchase_order=purchase_order,
+            purchase_receipt=purchase_receipt,
+            document=mapped_invoice,
+            state="MAPPED",
+        )
         effect_status, effect_reasons, names = _related_effects(basis, receipt_row, related)
     except ValueError as error:
         source_digest = _digest(
