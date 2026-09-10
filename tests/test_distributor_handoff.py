@@ -15,10 +15,13 @@ from test_distributor_operations import _r4_arrival
 from the_missing_20.adapters.distributor_erp import DistributorERP
 from the_missing_20.adapters.distributor_handoff import (
     AirtableDistributorCase,
+    CeligoDistributorSlack,
     DistributorHandoff,
     JiraDistributorCase,
+    _slack_event,
     distributor_event,
     milestone,
+    milestone_key,
 )
 from the_missing_20.adapters.distributor_operations import DistributorOperations
 from the_missing_20.adapters.receiving_handoff import HandoffJournal
@@ -189,6 +192,37 @@ def test_current_revision_updates_one_case_and_reuses_one_exception(tmp_path: Pa
     assert len(slack.sends) == 3
 
 
+def test_slack_v2_key_tracks_changed_quantity_and_replays_same_event(tmp_path: Path) -> None:
+    base_quantities = {
+        "ordered": 39,
+        "received": 20,
+        "held": 0,
+        "missing": 19,
+        "dispatched": 0,
+        "delivery_confirmed": 0,
+        "uom": "Box",
+    }
+    for changed_field, changed_value in (("received", 21), ("dispatched", 1)):
+        sync, _airtable, _jira, slack = handoff(tmp_path / changed_field)
+        first = projection(quantities=base_quantities)
+        assert sync.sync(first)["status"] == "CURRENT"
+        assert len(slack.sends) == 1
+
+        changed_quantities = {**base_quantities, changed_field: changed_value}
+        changed = projection(quantities=changed_quantities)
+        first_event = distributor_event(first)
+        changed_event = distributor_event(changed)
+        assert first_event is not None and changed_event is not None
+        assert milestone_key(first_event, "EXCEPTION_REVIEW") != milestone_key(
+            changed_event, "EXCEPTION_REVIEW"
+        )
+        assert sync.sync(changed)["status"] == "CURRENT"
+        assert len(slack.sends) == 2
+
+        assert sync.sync(changed)["status"] == "CURRENT"
+        assert len(slack.sends) == 2
+
+
 def test_unavailable_projection_has_no_provider_write(tmp_path: Path) -> None:
     sync, airtable, jira, slack = handoff(tmp_path)
     assert sync.sync(projection(available=False)) == {"status": "UNAVAILABLE", "destinations": []}
@@ -267,6 +301,59 @@ def test_completion_milestone_wins_over_retained_selected_decision() -> None:
     event = distributor_event(current)
     assert event is not None
     assert milestone(event) == "OPERATIONAL_DISPATCH_RECORDED"
+
+
+def test_slack_milestone_message_shows_quantities_and_current_selection_boundary() -> None:
+    event = distributor_event(
+        projection(
+            allocation_decision=None,
+            quantities={
+                "ordered": 39,
+                "received": 24,
+                "held": 3,
+                "missing": 15,
+                "dispatched": 9,
+                "delivery_confirmed": 4,
+                "uom": "Box",
+            },
+        )
+    )
+    assert event is not None
+    message = CeligoDistributorSlack.text(_slack_event(event, "EXCEPTION_REVIEW"), "revision-1")
+
+    assert "Operational status: EXCEPTION_REVIEW" in message
+    assert (
+        "Quantities (Box): received 24; held 3; missing 15; dispatched 9; "
+        "recorded delivery confirmation 4"
+    ) in message
+    assert "No new allocation selection in this event." in message
+    assert "No allocation decision retained." not in message
+
+
+def test_slack_text_keeps_legacy_partial_quantity_payloads_truthful() -> None:
+    legacy_exception = {
+        "case_id": "M20-DIST-LEGACY",
+        "milestone": "EXCEPTION_REVIEW",
+        "uom": "Nos",
+        "synthetic_input": True,
+        "item_identifiers": {"purchase_order": "PUR-ORD-LEGACY"},
+        "quantities": {"held": 18, "missing": 2},
+    }
+    exception_message = CeligoDistributorSlack.text(legacy_exception, "legacy-exception")
+    assert "received unavailable" in exception_message
+    assert "held 18; missing 2" in exception_message
+    assert "dispatched unavailable" in exception_message
+    assert "recorded delivery confirmation unavailable" in exception_message
+
+    legacy_dispatch = {
+        **legacy_exception,
+        "milestone": "OPERATIONAL_DISPATCH_RECORDED",
+        "quantities": {"dispatched": 20, "delivery_confirmed": 5},
+    }
+    dispatch_message = CeligoDistributorSlack.text(legacy_dispatch, "legacy-dispatch")
+    assert "received unavailable" in dispatch_message
+    assert "held unavailable; missing unavailable; dispatched 20" in dispatch_message
+    assert "recorded delivery confirmation 5" in dispatch_message
 
 
 class AirtableAPI:

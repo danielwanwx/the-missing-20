@@ -17,6 +17,15 @@ from urllib.parse import quote, urlencode, urlsplit
 from the_missing_20.adapters.receiving_destinations import ReceivingAPI
 from the_missing_20.adapters.receiving_handoff import HandoffJournal
 
+_SLACK_NOTIFICATION_CONTRACT = "m20-distributor-slack/v2"
+_SLACK_QUANTITY_FIELDS = (
+    "received",
+    "held",
+    "missing",
+    "dispatched",
+    "delivery_confirmed",
+)
+
 
 class DistributorDestination(Protocol):
     route: str
@@ -215,24 +224,25 @@ def milestone(event: Mapping[str, object]) -> str | None:
 
 
 def milestone_key(event: Mapping[str, object], mark: str) -> str:
-    """Keep Slack identity on business progress, never provider metadata or timestamps."""
+    """Keep v2 Slack identity on progress and every displayed quantity."""
 
     quantities = event.get("quantities")
     if not isinstance(quantities, Mapping):
         raise ValueError("distributor milestone quantities are malformed")
+    data: list[object] = [
+        _SLACK_NOTIFICATION_CONTRACT,
+        mark,
+        [quantities.get(key) for key in _SLACK_QUANTITY_FIELDS],
+    ]
     if mark == "ALLOCATION_SELECTED":
         decision = event.get("allocation_decision")
         if not isinstance(decision, Mapping):
             raise ValueError("distributor selected milestone lacks a decision")
-        data: object = [decision.get("plan_id"), decision.get("state_revision")]
+        data.extend([decision.get("plan_id"), decision.get("state_revision")])
     elif mark == "EXCEPTION_REVIEW":
-        data = [
-            sorted(cast(list[str], event["open_alert_codes"])),
-            quantities.get("held"),
-            quantities.get("missing"),
-        ]
+        data.append(sorted(cast(list[str], event["open_alert_codes"])))
     elif mark == "OPERATIONAL_DISPATCH_RECORDED":
-        data = [quantities.get("dispatched"), quantities.get("delivery_confirmed")]
+        pass
     else:
         raise ValueError("unknown distributor milestone")
     return hashlib.sha256(json.dumps(data, separators=(",", ":")).encode()).hexdigest()[:20]
@@ -274,6 +284,7 @@ def _slack_event(event: Mapping[str, object], mark: str) -> dict[str, object]:
         "uom": event["uom"],
         "synthetic_input": event["synthetic_input"],
         "milestone": mark,
+        "quantities": {key: quantities[key] for key in _SLACK_QUANTITY_FIELDS},
         "item_identifiers": {
             key: value
             for key, value in cast(Mapping[str, object], event["item_identifiers"]).items()
@@ -290,11 +301,8 @@ def _slack_event(event: Mapping[str, object], mark: str) -> dict[str, object]:
         }
     elif mark == "EXCEPTION_REVIEW":
         result["open_alert_codes"] = event["open_alert_codes"]
-        result["quantities"] = {key: quantities[key] for key in ("held", "missing")}
     elif mark == "OPERATIONAL_DISPATCH_RECORDED":
-        result["quantities"] = {
-            key: quantities[key] for key in ("dispatched", "delivery_confirmed")
-        }
+        pass
     else:
         raise ValueError("unknown distributor Slack milestone")
     return result
@@ -695,12 +703,30 @@ class CeligoDistributorSlack:
 
     @staticmethod
     def text(event: Mapping[str, object], key: str) -> str:
+        quantities = event.get("quantities")
+
+        def quantity_value(name: str) -> int | float | str:
+            value = quantities.get(name) if isinstance(quantities, Mapping) else None
+            return (
+                value
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+                else "unavailable"
+            )
+
         decision = event.get("allocation_decision")
-        decision_line = "No allocation decision retained."
+        decision_line = "No new allocation selection in this event."
         if isinstance(decision, Mapping):
             decision_line = (
                 f"Allocation {decision['status']}: {decision['plan_id']} / "
                 f"{', '.join(cast(list[str], decision['contract_refs']))}. {decision['rationale']}"
+            )
+        quantity_line = "Quantity snapshot unavailable in this event."
+        if isinstance(quantities, Mapping):
+            quantity_line = (
+                f"Quantities ({event['uom']}): received {quantity_value('received')}; "
+                f"held {quantity_value('held')}; missing {quantity_value('missing')}; "
+                f"dispatched {quantity_value('dispatched')}; "
+                f"recorded delivery confirmation {quantity_value('delivery_confirmed')}"
             )
         basis = (
             "Synthetic recorded operational evidence; independent physical delivery is not "
@@ -716,8 +742,10 @@ class CeligoDistributorSlack:
         )
         return (
             f"[M20 DEMO · {event['milestone']}] {event['case_id']}\n"
+            f"Operational status: {event['milestone']}\n"
             f"unit {event['uom']}\n"
             f"PO {purchase_order}\n"
+            f"{quantity_line}\n"
             f"{decision_line}\n{basis}\nEvent: {key}"
         )
 
