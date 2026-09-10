@@ -1,6 +1,6 @@
 # English operations integration review
 
-Status: scoped interface/language verification passed; release verification pending. This is a scoped interface/language review,
+Status: scoped interface/chat-language verification passed; structured-output follow-up verified locally; final remote CI pending. This is a scoped interface/language review,
 not a successful complex-conversation or submission-readiness declaration.
 
 ## Changes under review
@@ -121,3 +121,24 @@ failed current complex-conversation evaluation.
 Final independent read-only review returned GO for this scoped release, with no
 blocking defect. It specifically rechecked configured source failure versus
 unconfigured state, English rejection, and the retained semantic-failure claims.
+
+## Structured-output follow-up
+
+A final inventory identified two more displayed model-prose outlets beyond chat:
+allocation rationale and photo visibility/assessment prose. They were not guarded
+in the first commit, so its scoped GO does not establish universal agent-output
+coverage. They are corrected with the same English instruction and rejection
+boundary, preserving literal source identifiers. First slice: `d2f6200eb78fe08c9fc79fa52fc6fac8ab29ac59`,
+pushed and remote SHA verified.
+
+First-slice CI34539605310 completed SUCCESS. The follow-up preserves original
+item and lot identifiers, including non-Latin source identifiers; English-only
+applies to model-authored explanatory prose, not rewriting source evidence.
+Primary verification passed 172 focused tests across allocation, photo, operations,
+native conversation and advisory. The first local attempt could not bind the HTTP
+test socket; the loopback-enabled rerun exited 0. Ruff check/format and diff checks
+passed. No additional paid inference or business writes were performed.
+
+Independent cross-reviews returned GO for both allocation and photo changes.
+The local demo runtime was restarted with these changes, preserving its existing
+case and session storage.

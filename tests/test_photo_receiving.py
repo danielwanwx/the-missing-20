@@ -18,7 +18,7 @@ from scripts.decision_workspace_server import DecisionWorkspaceServer
 from the_missing_20.adapters.demo_executor import DemoExecutionBlocked, ERPNextDemoExecutor
 from the_missing_20.adapters.erpnext_source import ERPNextCredentials
 from the_missing_20.adapters.photo_receiving import PhotoReceiptERP, PhotoReceiving
-from the_missing_20.agents.photo_receiving import PhotoAssessment, normalize_photo
+from the_missing_20.agents.photo_receiving import PhotoAssessment, PhotoVisibility, normalize_photo
 
 
 def photo(color: str = "white") -> str:
@@ -304,6 +304,48 @@ def test_model_must_explicitly_report_visibility(tmp_path: Path) -> None:
         state = service.upload(service.create()["id"], photo())
         assert state["status"] == "UNAVAILABLE" and "count" not in state
         assert not state["stock_posted"]
+    finally:
+        service.db.close()
+
+
+@pytest.mark.parametrize(
+    ("visibility", "assessment"),
+    [
+        (
+            {"observations": ["\u53ef\u89c1\u7eb8\u7bb1"], "visibility": "clear", "next_photo": ""},
+            None,
+        ),
+        (
+            None,
+            {"objects": [{"x": 0.5, "y": 0.5, "description": "\u53ef\u89c1\u7eb8\u7bb1"}]},
+        ),
+        (None, {"issues": ["\u9700\u8981\u91cd\u62cd"]}),
+        (None, {"next_photo": "\u8bf7\u91cd\u62cd\u7167\u7247"}),
+    ],
+)
+def test_model_authored_photo_display_prose_requires_english(visibility, assessment) -> None:
+    with pytest.raises(ValueError, match="English-only"):
+        if visibility is not None:
+            PhotoVisibility.model_validate(visibility)
+        else:
+            PhotoAssessment.model_validate(result(**assessment)["assessment"])
+
+
+def test_photo_model_keeps_non_latin_source_identifiers_while_prose_is_english() -> None:
+    assessment = PhotoAssessment.model_validate(
+        result(item_code="\u5546\u54c1-42", supplier_lot="\u6279\u6b21-A")["assessment"]
+    )
+    assert assessment.item_code == "\u5546\u54c1-42"
+    assert assessment.supplier_lot == "\u6279\u6b21-A"
+
+
+def test_non_english_photo_prose_uses_existing_unavailable_flow(tmp_path: Path) -> None:
+    service = PhotoReceiving(tmp_path / "db", lambda _: result(issues=["\u9700\u8981\u91cd\u62cd"]))
+    try:
+        state = service.upload(service.create()["id"], photo())
+        assert state["status"] == "UNAVAILABLE"
+        assert "analysis" not in state
+        assert "no fallback count" in state["events"][-1]["detail"]
     finally:
         service.db.close()
 

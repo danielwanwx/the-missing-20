@@ -389,3 +389,9 @@ model itself still emitted Chinese internally. Complex same-session conversation
 FAILED real acceptance (wrong historical quantities, unavailable turns and HTTP500);
 no full dialogue or submission-readiness claim is made. Hardware voice acceptance
 remains open. See docs/audits/2026-09-10-english-operations-integration-review.md.
+
+English interface/chat slice d2f6200 is pushed, remote-verified and CI34539605310
+SUCCESS. Final outlet inventory found allocation rationale and photo prose;
+the follow-up adds English instructions and rejects non-English model prose,
+preserving source identifiers. Its 172 focused tests pass with loopback enabled.
+This does not change the failed real multi-turn semantic acceptance.

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from strands import Agent
 from strands.types.agent import Limits
 
+from the_missing_20.agents.product_language import english_product_text
 from the_missing_20.ports.agent_model import (
     AgentBudgetLedger,
     AgentModelFactory,
@@ -46,7 +47,8 @@ def select_contract_plan(
                 "You select only a supplied customer-contract allocation plan. "
                 "Do not invent quantities, alter terms, use external facts, or perform writes. "
                 "Return the exact plan_id when the fixed date-first contract policy is feasible; "
-                "otherwise return DEFER."
+                "otherwise return DEFER. Write the rationale in concise English-only product text; "
+                "do not translate or use another writing system."
             ),
             callback_handler=None,
             retry_strategy=None,
@@ -60,7 +62,8 @@ def select_contract_plan(
             structured_output_model=ContractAllocationSelection,
             structured_output_prompt=(
                 "Return only the complete ContractAllocationSelection. plan_id must be "
-                "the candidate plan_id or DEFER. Keep rationale under 60 words."
+                "the candidate plan_id or DEFER. Keep the rationale under 60 words and use "
+                "English-only product text."
             ),
             limits=Limits(
                 turns=2,
@@ -83,9 +86,10 @@ def select_contract_plan(
         provenance = getattr(factory, "provenance", None)
         observed = provenance() if callable(provenance) else {}
         provider = dict(observed) if isinstance(observed, Mapping) else {}
+    rationale = english_product_text(selected.rationale, field="allocation rationale")
     return {
         "plan_id": selected.plan_id,
-        "rationale": selected.rationale,
+        "rationale": rationale,
         "contract_refs": list(selected.contract_refs),
         "provider": provider,
         "usage": usage,

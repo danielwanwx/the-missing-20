@@ -10,10 +10,18 @@ from typing import Any, Literal
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from the_missing_20.agents.product_language import english_product_text
 from the_missing_20.config import Settings
 from the_missing_20.ports.agent_model import AgentProvider
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def _validate_optional_english_text(value: str, *, field: str) -> None:
+    """Keep optional empty model fields while rejecting non-English display prose."""
+
+    if value.strip():
+        english_product_text(value, field=field)
 
 
 class PhotoVisibility(BaseModel):
@@ -23,6 +31,13 @@ class PhotoVisibility(BaseModel):
     observations: list[str] = Field(min_length=1, max_length=6)
     visibility: Literal["clear", "occluded", "cropped", "no_goods", "unclear"]
     next_photo: str = Field(max_length=500)
+
+    @model_validator(mode="after")
+    def english_display_text(self) -> PhotoVisibility:
+        for observation in self.observations:
+            english_product_text(observation, field="photo visibility observation")
+        _validate_optional_english_text(self.next_photo, field="photo visibility next photo")
+        return self
 
 
 class VisibleObject(BaseModel):
@@ -61,6 +76,11 @@ class PhotoAssessment(BaseModel):
                     raise ValueError("duplicate or indistinguishable object positions")
         if any(len(issue) > 300 for issue in self.issues):
             raise ValueError("issue is too long")
+        for item in self.objects:
+            english_product_text(item.description, field="photo object description")
+        for issue in self.issues:
+            _validate_optional_english_text(issue, field="photo issue")
+        _validate_optional_english_text(self.next_photo, field="photo next photo")
         return self
 
 
@@ -152,7 +172,8 @@ class StrandsPhotoReader:
                 "receiving unit, not its unseen contents. visibility=clear only when all "
                 "outer receiving units are fully within the frame and unoccluded. "
                 "No receiving goods means no_goods. "
-                "For incomplete visibility, give a practical retake instruction."
+                "For incomplete visibility, give a practical retake instruction. "
+                "Return observations and retake instructions in English."
             ),
         )
         framing_prompt: list[ContentBlock] = [
@@ -230,6 +251,7 @@ class StrandsPhotoReader:
                 "Keep label-declared quantity separate from visible objects. Report visible damage "
                 "without inferring internal quality or usability. Give a specific reshoot request "
                 "for screenshots, diagrams, illustrations or images without receiving goods. "
+                "Return descriptions, issues and reshoot instructions in English. "
                 "No ERP write tools are available."
             ),
         )
