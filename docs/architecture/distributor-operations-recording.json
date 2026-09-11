@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Distributor Operations — Current 40-Part Architecture",
+    "output": "distributor-operations-recording.html",
+    "animation": "none",
+    "visual_preset": "classic",
+    "quality_profile": "showcase",
+    "viewBox": [1600, 900],
+    "views": [
+      {
+        "id": "current-case-path",
+        "label": "Current case path",
+        "focus": ["synthetic-inputs", "operations-ui", "operation-coordinator", "contract-selector", "evidence-gate", "erpnext"],
+        "note": "Follow the synthetic 40-part case from intake through validated ERP actions."
+      },
+      {
+        "id": "contract-boundary",
+        "label": "Contract boundary",
+        "focus": ["operation-coordinator", "contract-selector", "bedrock", "evidence-gate", "erpnext"],
+        "note": "The model selects a versioned option; deterministic application code controls writes."
+      },
+      {
+        "id": "fresh-read-path",
+        "label": "Fresh read path",
+        "focus": ["operations-ui", "conversation-session", "operation-coordinator", "erpnext", "celigo", "airtable", "jira", "slack"],
+        "note": "Fresh ERP · retained handoff evidence · SDK session"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "synthetic-inputs",
+      "type": "external",
+      "label": "Synthetic demo inputs",
+      "sublabel": "Operator · scanner · inspection · carrier",
+      "tag": "Explicitly synthetic",
+      "pos": [40, 360],
+      "size": [200, 84]
+    },
+    {
+      "id": "operations-ui",
+      "type": "frontend",
+      "label": "Operations UI",
+      "sublabel": "Optional English voice",
+      "tag": "Human-facing surface",
+      "pos": [290, 360],
+      "size": [200, 84]
+    },
+    {
+      "id": "operation-coordinator",
+      "type": "backend",
+      "label": "Python operation coordinator",
+      "sublabel": "Current case: 40 parts · A25 / B15",
+      "tag": "Application control",
+      "pos": [540, 360],
+      "size": [230, 90]
+    },
+    {
+      "id": "conversation-session",
+      "type": "backend",
+      "label": "Native conversation session",
+      "sublabel": "Fresh ERP · retained handoff evidence · SDK session",
+      "tag": "Read-only",
+      "pos": [540, 120],
+      "size": [260, 96]
+    },
+    {
+      "id": "contract-selector",
+      "type": "backend",
+      "label": "Strands contract selector",
+      "sublabel": "Nova Pro · versioned contracts · read-only choice",
+      "tag": "Model advises",
+      "pos": [840, 220],
+      "size": [240, 96]
+    },
+    {
+      "id": "bedrock",
+      "type": "cloud",
+      "label": "AWS Bedrock",
+      "sublabel": "Direct Nova Pro model path",
+      "tag": "Live path; AgentCore historical",
+      "pos": [1140, 220],
+      "size": [200, 84]
+    },
+    {
+      "id": "evidence-gate",
+      "type": "backend",
+      "label": "Deterministic evidence gate",
+      "sublabel": "Authorization · quantity · quality",
+      "tag": "Writes stay in app",
+      "pos": [840, 450],
+      "size": [240, 90]
+    },
+    {
+      "id": "erpnext",
+      "type": "database",
+      "label": "ERPNext",
+      "sublabel": "Validated actions + native readback",
+      "tag": "Inventory system",
+      "pos": [1140, 450],
+      "size": [220, 90]
+    },
+    {
+      "id": "celigo",
+      "type": "cloud",
+      "label": "Celigo integration",
+      "sublabel": "Single-attempt Slack import",
+      "tag": "Integration boundary",
+      "pos": [1140, 670],
+      "size": [220, 84]
+    },
+    {
+      "id": "airtable",
+      "type": "database",
+      "label": "Airtable",
+      "sublabel": "Case records",
+      "pos": [1400, 520],
+      "size": [160, 72]
+    },
+    {
+      "id": "jira",
+      "type": "external",
+      "label": "Jira",
+      "sublabel": "Exception work",
+      "pos": [1400, 630],
+      "size": [160, 72]
+    },
+    {
+      "id": "slack",
+      "type": "external",
+      "label": "Slack",
+      "sublabel": "Team visibility",
+      "pos": [1400, 740],
+      "size": [160, 72]
+    }
+  ],
+  "connections": [
+    {
+      "id": "inputs-to-ui",
+      "from": "synthetic-inputs",
+      "to": "operations-ui",
+      "label": "scan · inspect · confirm",
+      "variant": "emphasis",
+      "labelDy": 66
+    },
+    {
+      "id": "ui-to-coordinator",
+      "from": "operations-ui",
+      "to": "operation-coordinator",
+      "label": "case input / voice transcript",
+      "labelDy": 66
+    },
+    {
+      "id": "ui-to-conversation",
+      "from": "operations-ui",
+      "to": "conversation-session",
+      "label": "read-only question",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "coordinator-to-selector",
+      "from": "operation-coordinator",
+      "to": "contract-selector",
+      "label": "versioned contract options",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [700, 335]
+    },
+    {
+      "id": "selector-to-bedrock",
+      "from": "contract-selector",
+      "to": "bedrock",
+      "label": "direct Nova Pro inference",
+      "variant": "emphasis",
+      "labelDy": 72
+    },
+    {
+      "id": "selector-to-gate",
+      "from": "contract-selector",
+      "to": "evidence-gate",
+      "label": "read-only choice + evidence",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": 120,
+      "labelDy": 24
+    },
+    {
+      "id": "gate-to-erpnext",
+      "from": "evidence-gate",
+      "to": "erpnext",
+      "label": "validated ERP actions",
+      "variant": "emphasis",
+      "labelDy": -39
+    },
+    {
+      "id": "coordinator-to-airtable",
+      "from": "operation-coordinator",
+      "to": "airtable",
+      "label": "direct case update",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [[810, 405], [810, 180], [1385, 180], [1385, 556]],
+      "labelAt": [920, 150]
+    },
+    {
+      "id": "coordinator-to-jira",
+      "from": "operation-coordinator",
+      "to": "jira",
+      "label": "direct exception handoff",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [[820, 405], [820, 200], [1375, 200], [1375, 666]],
+      "labelAt": [1230, 210]
+    },
+    {
+      "id": "coordinator-to-celigo",
+      "from": "operation-coordinator",
+      "to": "celigo",
+      "label": "Slack handoff request",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "via": [[830, 405], [830, 160], [1390, 160], [1390, 800], [1250, 800]],
+      "labelAt": [1280, 145]
+    },
+    {
+      "id": "celigo-to-slack",
+      "from": "celigo",
+      "to": "slack",
+      "label": "single-attempt Slack import",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [1380, 826]
+    },
+    {
+      "id": "conversation-to-erpnext",
+      "from": "conversation-session",
+      "to": "erpnext",
+      "label": "fresh native ERP read",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [[480, 168], [20, 168], [20, 560], [1100, 560], [1100, 495]]
+    },
+    {
+      "id": "conversation-to-coordinator",
+      "from": "conversation-session",
+      "to": "operation-coordinator",
+      "label": "retained handoff journal readback",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "via": [[810, 168], [810, 500], [655, 500]],
+      "labelAt": [700, 520]
+    },
+    {
+      "id": "conversation-to-ui",
+      "from": "conversation-session",
+      "to": "operations-ui",
+      "label": "read-only answer",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Current 40-part case",
+      "items": [
+        "40 parts · A25 / B15",
+        "Synthetic inputs; delivery marked synthetic"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Decision boundary",
+      "items": [
+        "Strands chooses contracts",
+        "App validates evidence before writes"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Integration path",
+      "items": [
+        "ERPNext actions + native readback",
+        "Direct Airtable / Jira; Celigo → Slack"
+      ]
+    }
+  ]
+}

@@ -1,36 +1,29 @@
-# The Missing 20
+# LogisticPilot — The Missing 20
 
-> **September 10 finalization: the new 40-part ERP loop is complete; submission NOT READY.**
-> Fresh case PO18 reached A25/B15 dispatched and explicitly synthetic delivery
-> confirmations. The same runtime retained the Jira-link and contract-readback
-> corrections; this was a repaired continuation, not an uninterrupted first pass.
-> Three real Strands/Nova Pro contract selections and source-backed commercial
-> values are independently accepted. Complex multi-turn accuracy, a frozen final
-> rehearsal, final video/materials and judge access remain open.
-> See the [current ledger](docs/submission/finalization-tracker.md) and [fresh-case evidence](docs/audits/2026-09-10-final-component-loop-acceptance.md).
+> **September 11 status: the PO20 same-case business loop is complete; final video
+> production and Devpost upload are in progress.** The current case is
+> `M20-DIST-COMPONENT-V2-20260910` / `PUR-ORD-2026-00020`. See the [current
+> ledger](docs/submission/finalization-tracker.md) for the evidence boundary and
+> upload status.
 
 
 
-**Find the gap. Prove the cause. Close it safely.**
+**Find the gap. Prove the cause. Close the loop.**
 
-The Missing 20 helps parts distributors turn receiving exceptions into fulfilled
-customer orders. Operators record counts and inspection evidence; a Strands agent
-selects allocations under explicit customer contracts, and the application records
-ERP work with linked Airtable, Jira and Slack evidence through Celigo.
+The Missing 20 helps parts distributors turn one receiving exception into a
+reviewable fulfillment workflow. Operators record carton, quantity, lot, and
+inspection evidence; a Strands agent selects among explicit customer contracts,
+while deterministic code owns quantities, authority, ERP effects, and readback.
 
-The current demo starts with four cartons containing only 38 of 40 ordered parts.
-Inspection holds prevent shipment of unapproved lots. The earlier customer promise
-wins the first 20 parts; a supported reinspection permits A's final 5 and B's first
-13. Two replacement parts complete B's order. Native orders reach A25/B15 shipped;
-delivery confirmations remain clearly labelled synthetic demo inputs, not physical
-proof of customer receipt. Purchasing and order values are read from ERP, with
-missing invoices shown as missing.
-
-The historical September 7 dashboard below is a separate 20-unit case: 12 accepted,
-8 held, and a USD42,000 downstream order. Its screenshot and recovery flow must not
-be confused with the current 40-part case.
-
-![The Missing 20 verified operations dashboard](artifacts/audits/2026-09-07-role-judge-rerun/18-final-dashboard-invoice.png)
+The current demonstration follows isolated case
+`M20-DIST-COMPONENT-V2-20260910` on `PUR-ORD-2026-00020`: 40 parts ordered,
+received, and dispatched. LOT-A20 records 20 parts; LOT-B18 records 18 of 20 after a
+two-part shortage and sample failure, then passes a whole-lot retest; LOT-C2 records
+the two-part replacement. Shipments 16–19 dispatch 20, 5, 13, and 2 parts to fulfill
+customer commitments A25 and B15. Delivery confirmations are synthetic demo inputs,
+not independent proof that customers physically received the parts. The PO is USD160;
+customer orders are USD150 and USD90; no invoice, payment, or revenue-recognition
+claim is made.
 
 ## Why this needs an agent
 
@@ -49,7 +42,10 @@ The Strands loop performs that evidence work. Deterministic code—not the model
 state classification, action eligibility, approval binding, execution, verification,
 and replay safety.
 
-## Historical 20-unit judge path
+## Retained historical 20-unit evidence
+
+The following separately accepted September 7 case remains useful historical evidence;
+it is not connected to the current PO20 receiving path.
 
 1. **Detect** — an external demo-system change advances the source version and the
    ordered event ledger; the Dashboard never animates invented traffic.
@@ -69,44 +65,52 @@ and replay safety.
 
 ## Architecture
 
-![The Missing 20 verified agent architecture](docs/architecture/the-missing-20-live-architecture.english.jpg)
+![The Missing 20 current 40-part architecture](docs/architecture/distributor-operations-recording.visual-check.1440x900.light.png)
 
-The main path is intentionally asymmetric:
+The current recording architecture follows synthetic demo inputs—operator, scanner,
+inspection, and carrier—through the Operations UI, the Python operation coordinator,
+the Strands contract selector, the deterministic evidence gate, and validated ERPNext
+actions. The recorded English Dashboard conversation uses Strands with direct Amazon
+Bedrock Claude Opus 4.6. The coordinator sends direct
+case updates to Airtable and Jira; Celigo carries the single-attempt Slack import.
+Native conversation reads fresh ERP facts and retained handoff journal evidence through
+an SDK session and remains read-only. AgentCore is historical evidence only.
 
-- **Strands + Nova Pro** investigate, retrieve, reconcile, evaluate, and explain.
-- **Deterministic policy** independently reconstructs the admissible business facts.
-- **Manager Gate** retains the stop-or-release decision for a bound plan.
-- **Guarded Executor** owns the historical recovery write path and accepts only the approved scope and
-  idempotency key.
-- **Independent Verifier** closes the case only after authoritative ERPNext rereads,
-  Celigo receipt correlation, and ledger checks.
-- **SQLite + ordered SSE** make the workflow durable, replayable, and visible in both
-  browser views.
+The model selects a versioned contract option and supplies evidence; deterministic
+application code owns quantity checks, authorization, inventory writes, and native
+readback. The architecture represents PO20: 40 ordered, received, and dispatched,
+allocated A25/B15 through shipments 16–19 of 20, 5, 13, and 2 parts. Delivery
+confirmations are explicitly synthetic demo inputs.
 
-Explore the [interactive architecture](docs/architecture/the-missing-20-live-architecture.html)
+The earlier `docs/architecture/the-missing-20-live-architecture.english.jpg` remains
+available as a clearly labeled historical view and is not evidence for the current
+recording path.
+
+Explore the [interactive current architecture](docs/architecture/distributor-operations-recording.html),
+read the [architecture specification](docs/architecture/distributor-operations-recording.json),
 or read the [as-built architecture](docs/architecture/as-built-architecture.md). The
-AgentCore Runtime deployment is separately proven; the current local hero UI uses
-direct Strands Bedrock transport and does not pretend to route through AgentCore.
+current local hero UI uses direct Strands Bedrock transport and does not pretend to
+route through AgentCore.
 
-The following connection table describes the historical hero. The newer receiving
-flow additionally writes verified receipt notifications to Airtable and Slack through
-Celigo, and creates/resolves Jira only for relevant exceptions.
+The following connection table lists the connected systems and their evidence
+boundaries; the fresh-case audit is the authority for current record IDs and status.
 
 ## What is genuinely connected
 
 | System | Evidence or effect in the hero case | Authority |
 | --- | --- | --- |
-| ERPNext / Frappe Cloud | PO, receipt, lot, supplier invoice, customer order, delivery, sales invoice, Stock Ledger, GL | Fresh reads plus one Manager-gated demo-tenant write path |
-| Airtable | Exact-lot supplier-quality disposition | Read-only evidence |
-| Celigo | Integration attempt and independently correlated run receipt | Read-only evidence |
-| Jira | CAPA/exception ownership and workflow context | Read-only evidence |
-| Slack | Human incident context and verified notification | Read-only evidence |
-| Amazon Bedrock Nova Pro | Multi-hypothesis investigation and evidence explanation through Strands | Advisory only |
+| ERPNext / Frappe Cloud | PO, receipt, lot, supplier invoice, customer order, delivery, sales invoice, Stock Ledger, GL | Fresh reads plus deterministic application writes after evidence checks |
+| Airtable | Exact-lot supplier-quality disposition and same-case case record | Deterministic application handoff and readback |
+| Celigo | Single-attempt Slack notification import and correlated run receipt | Deterministic application handoff and readback |
+| Jira | CAPA/exception ownership and workflow context | Deterministic application handoff and readback |
+| Slack | Human incident context and verified notification | Notification through Celigo; readback verifies content |
+| Amazon Bedrock Claude Opus 4.6 | Recorded English Dashboard conversation through Strands | Advisory only |
 | Amazon Bedrock AgentCore Runtime | Separate READY deployment, invocation, logs, and role-chat proof | Read-only deployment proof |
 
-All enterprise records are purpose-built competition data. The approved ERPNext
-execution bundle writes to an isolated external demo tenant and is followed by fresh
-provider reads.
+All enterprise records are purpose-built competition data. The retained historical
+ERPNext execution bundle wrote to an isolated external demo tenant and was followed by
+fresh provider reads. Current distributor writes occur in deterministic application code
+only after evidence checks and are followed by native readback.
 No production customer data, production accuracy, AgentCore Gateway/Policy, or causal
 revenue-uplift claim is presented.
 
@@ -123,9 +127,10 @@ This is not a single prompt wrapped in a dashboard. The implementation includes:
 - case-scoped multi-turn conversation with evidence citations;
 - a hard boundary that prevents model output from becoming business-write authority.
 
-The historical September 6 real-provider evidence includes 8/8 ambiguous case variants and 15/15
-multi-turn cases (45 dialogue turns), including approve, reject, deny, and
-needs-evidence outcomes. These are bounded demo-set results, not a production SLO.
+The retained September 6 real-provider evidence includes 8/8 ambiguous case variants
+and 15/15 multi-turn cases (45 dialogue turns), including approve, reject, deny, and
+needs-evidence outcomes. These are historical bounded demo-set results, not evidence
+of a production SLO.
 
 ## Quick start — no cloud credentials required
 
@@ -190,17 +195,16 @@ make workspace-smoke
 make judge-demo
 ```
 
-Current finalization status: `make check` passed in an independent credential-free
-checkout. `make workspace-smoke` remains failed: its legacy browser contract no longer
-matches the current Case Console; replacement coverage is not yet accepted. Real
-multi-turn and current diagnosis failures are retained in the
-[finalization ledger](docs/submission/finalization-tracker.md). Passing the offline
-historical proof does not clear these gates.
+The credential-free `make check` gate is the repository quality check. Final video
+production and Devpost upload remain in progress; passing offline checks does not turn
+synthetic delivery confirmation into physical-receipt proof.
 
 Targeted proof:
 
 | Proof | Evidence |
 | --- | --- |
+| PO20 same-case fulfillment journal | [`docs/submission/video-v1/SOL-REVIEW-V2.md`](docs/submission/video-v1/SOL-REVIEW-V2.md) |
+| PO20 rehearsal and capture boundary | [`docs/submission/video-v1/REHEARSAL-V2.md`](docs/submission/video-v1/REHEARSAL-V2.md) |
 | Browser and end-to-end workflow | [`artifacts/workspace/browser-smoke-v1.json`](artifacts/workspace/browser-smoke-v1.json) |
 | Real Strands multi-case evaluation | [`artifacts/agent/2026-09-06-hybrid-loop-8-case-real.json`](artifacts/agent/2026-09-06-hybrid-loop-8-case-real.json) |
 | Human/Agent dialogue matrix | [`artifacts/agent/2026-09-06-human-agent-dialogue-matrix-final-v2.json`](artifacts/agent/2026-09-06-human-agent-dialogue-matrix-final-v2.json) |
@@ -257,7 +261,7 @@ See [known limitations](docs/submission/known-limitations.md) and
 
 ## Built with
 
-Strands Agents SDK · Amazon Bedrock Nova Pro · Amazon Bedrock AgentCore Runtime ·
+Strands Agents SDK · Amazon Bedrock Claude Opus 4.6 · Amazon Bedrock AgentCore Runtime ·
 ERPNext/Frappe Cloud · Airtable · Celigo · Jira · Slack · Python 3.12 · Pydantic ·
 SQLite · Server-Sent Events · Vanilla JavaScript/CSS
 

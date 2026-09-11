@@ -1,8 +1,26 @@
 # Finalization tracker — authoritative current ledger
 
-Updated 2026-09-10. **Core R4 demo verified; submission NOT READY.** This ledger supersedes older overall readiness wording; historical audits remain evidence for their named case/version only. Initial repository and remote main: `be419eab1d5faedfecb140fde7112a5443f9cedc` (fresh `git ls-remote`). Product baseline: `aa4966e`; subsequent commit is handoff documentation. Tracked working tree initially clean; unrelated untracked research/runtime artifacts preserved.
+Updated 2026-09-11. **PO20 same-case fulfillment is complete; final video production and Devpost upload are in progress.** Historical audits remain evidence for their named case/version only. Repository and CI status must be checked from the current branch before upload; unrelated research/runtime artifacts remain preserved.
 
-## Current snapshot — September 10
+## Current snapshot — September 11
+
+- **Current PO20 same-case fulfillment (September 11): COMPLETE.** Case
+  `M20-DIST-COMPONENT-V2-20260910` / `PUR-ORD-2026-00020` records 40 ordered,
+  received, and dispatched. LOT-A20 contributes 20; LOT-B18 contributes 18 after a
+  two-part shortage and sample failure, then passes a whole-lot retest; LOT-C2 supplies
+  the two-part replacement. Shipments 16–19 dispatch 20, 5, 13, and 2 parts to fulfill
+  A25/B15.
+  Airtable, Jira, and Slack-via-Celigo have verified same-case readbacks. All delivery
+  confirmations are synthetic business inputs, not independent proof of physical
+  receipt. The PO is USD160; customer orders are USD150 and USD90; no invoice, payment,
+  or revenue-recognition claim is made. See the [PO20 runtime audit](video-v1/SOL-REVIEW-V2.md).
+- **Current conversation evidence:** the recorded English Dashboard conversation uses
+  Strands with direct Amazon Bedrock Claude Opus 4.6 and remains read-only. Final video
+  production and Devpost upload are in progress; capture and upload status must be
+  updated from the finished assets before submission.
+
+The dated implementation entries below are retained progression records; the latest
+status block above supersedes their earlier pending wording.
 
 - **Distributor handoff adapters shipped:** `eb369e301c15c82f7ecab3aba4768cb17e5ef5d7`
   matches remote main; [CI 34529010013](https://github.com/danielwanwx/the-missing-20/actions/runs/34529010013)
@@ -123,7 +141,12 @@ Direct official web reads on September 9, 2026: [rules](https://agentsforhumans.
 
 ## Account and runtime observations
 
-Authenticated Chrome read-only inspection of entry `1162519`: **DRAFT, 3/5 steps done**. Professional Agents selected; repository URL and architecture attachment present; Builder ID field populated (private value intentionally omitted); test instructions populated; required video URL empty; optional hosted demo/blog empty. Stored description still covers the older 20-unit case and says “latest” 8/8 and 15/15 plus “only external write path”; it has not been updated in this session. No Save/Submit action taken.
+Historical September 9 authenticated Chrome read-only inspection of entry `1162519`:
+**DRAFT, 3/5 steps done**. Professional Agents selected; repository URL and
+architecture attachment present; Builder ID field populated (private value intentionally
+omitted); test instructions populated; required video URL empty; optional hosted
+demo/blog empty. The stored description then covered the older 20-unit case and had not
+been updated in that session. No Save/Submit action was taken.
 
 Process arguments verified directly: 8893 uses `.missing20-goods-date-fixed`; 8896 uses R3 and 8897 R4, both with handoffs and paused auto-prepare. R4 GET at 21:55:51Z: PO16, 40 ordered, 1 posted, 39 outstanding, no invoice, CURRENT ERP read. `physical_observation_basis=RECEIPT_CONFIRMED`: equality with posted quantity is not independent physical corroboration. No legacy runtime reset, fault injection, or business replay performed during this startup check.
 
@@ -142,7 +165,7 @@ Process arguments verified directly: 8893 uses `.missing20-goods-date-fixed`; 88
 | F07 P0 | Current pages/external UX: VERIFIED_IN_DEMO (core R4 path only) | Actual prepare/approve/execute/renewal, six chat turns, native PI8 and Accounting Ledger | Full page/menu matrix remains open. Financial badge automation and structured native citation attachments are deferred minor gaps | Product/release reviewer / core verified Sep10; remaining Sep12 |
 | F08 P0 | Claim consistency: VERIFIED_IN_DEMO (local text correction only) | README/submission/as-built text still old-case-wide claims | Historical 8/8/15/15 and 42k scoped, receiving writers disclosed. Local text independently approved; saved Devpost update/current diagram still pending | Research and baseline; release reviewer / 2h / Sep9 |
 | F09 P0 | Clean checkout/start: VERIFIED_IN_DEMO (credential-free quality gate only) | Independent public clone 0c01eaa plus exact reviewed Python candidate; cold-start review | make check: 1,566 Python / 98 JS, formatting/lint/types pass. Startup and historical judge-demo verified. Full browser smoke still fails at obsolete/mixed authority contract; tracked under F07, not covered by this pass | Release reviewer / retain exact release check / Sep12 |
-| F10 P0 | Final video/materials: BLOCKED | Devpost video empty; previous architecture attached | Record only frozen same-case working path, English ≤5 min, playable public link; final preview gate before publishing/submitting | F03–F09 and user physical input for final physical claim; primary/user / 0.5d / Sep13 |
+| F10 P0 | Final video/materials: IN_PROGRESS | PO20 same-case fulfillment is complete; final video and Devpost upload are in progress | Record only the PO20 working path in English (≤5 min) with a playable public link; complete the final preview before publishing/submitting | Primary/user / 0.5d / Sep13 |
 | F11 P1 | Business efficiency: NOT_STARTED (measurement) | No matched human control or production pilot | Same workload active time/touches/fields, all failures, wall time/token/cost; label unavailable ROI and sample limits; formulas in impact research | Frozen tasks + actual operator; impact reviewer / 0.5d / Sep12 |
 | F12 P1 | Physical final trial: BLOCKED (human evidence only) | Public p05 + typed QR are test substitutes | User's staged garage photos/label interaction remain needed for final physical claim; continue public-fixture code/tests independently | Actual user input; operator / 1h / Sep12 |
 | F13 P1 | Production suitability: DEFERRED | Single-operator local demo; no enterprise pilot | Organization authentication, durable hosting, scale, retention and operations remain pre-pilot work; user explicitly prioritizes competition delivery | Separate post-demo scope |

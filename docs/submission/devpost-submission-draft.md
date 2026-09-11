@@ -1,27 +1,24 @@
-# Devpost Submission Copy — The Missing 20
+# Devpost Submission Copy — LogisticPilot — The Missing 20
 
-> **September 9 finalization status: NOT READY.** The 20-unit / USD 42,000
-> evidence below belongs to the historical September 7 scenario. The separate
-> R4 photo-receiving case (PO16/PR7) proves one Box posted and recovered after a
-> lost acknowledgement, with verified Airtable/Slack handoffs. It has no linked
-> invoice or customer fulfillment. R3 real multi-turn receiving remains FAILED;
-> the September 6 8/8 and 15/15 results do not cover that path.
-> See the [current finalization ledger](finalization-tracker.md) and
-> [R4 scope audit](../audits/2026-09-09-r4-automatic-receiving-recovery-review.md).
+> **September 11 status: PO20 same-case fulfillment is complete.** Final video
+> production and Devpost upload are in progress; this local draft is not yet the saved
+> Devpost description. See the [current finalization ledger](finalization-tracker.md).
 
 
 **Submission:** `1162519`
-**State:** DRAFT, 3/5 steps done in authenticated Devpost on September 9; video empty; current-path acceptance and copy revision pending
+**State:** DRAFT; final video production and Devpost upload are in progress. This
+file is local and unsynced; final preview and submission have not yet been completed.
 **Track:** Professional Agents
 
-The saved Devpost description has not yet been synchronized with these scope corrections.
+This is a local draft for review. It has not been copied into Devpost and must not be
+described as submitted or publicly live until the final preview gate passes.
 
 ## Core fields
 
 | Field | Final copy |
 | --- | --- |
-| Project title | **The Missing 20 — Agents for Humans** |
-| Tagline | **Find the gap. Prove the cause. Close it safely.** |
+| Project title | **LogisticPilot — The Missing 20** |
+| Tagline | **Find the gap. Prove the cause. Close the loop.** |
 | Repository | `https://github.com/danielwanwx/the-missing-20` |
 | Video | Public YouTube/Vimeo URL, maximum five minutes — pending final production |
 | Live demo | Optional; do not add until stable and freely accessible through October 8 |
@@ -43,44 +40,43 @@ ready, and then prove the business effect against authoritative systems.
 
 ## What it does
 
-The hero case follows a 20-unit automotive controller shipment. Twelve units are
-accepted into Stores and eight are quality-held, while a downstream USD 42,000
-customer order is still undelivered and unbilled. ERPNext, Airtable, Celigo, Jira, and
-Slack each expose a different fragment; no single source contains a safe answer.
+The primary demonstration follows isolated case
+`M20-DIST-COMPONENT-V2-20260910` on purchase order `PUR-ORD-2026-00020` through
+receiving, inspection, contract allocation, fulfillment, and same-case application
+readbacks. ERPNext, Airtable, Celigo, Jira, and Slack each expose a different fragment;
+no single source contains a safe answer.
 
-The Missing 20 runs the incident through one inspectable loop:
+1. LOT-A20 records 20 parts. LOT-B18 records 18 of 20, creating a two-part shortage and
+   a sample quality failure; neither entry independently proves a carton’s contents.
+2. A whole-lot retest resolves the LOT-B18 hold. LOT-C2 records the two-part replacement.
+3. The agent’s real English Dashboard conversation uses Strands with direct Amazon
+   Bedrock Claude Opus 4.6. Deterministic code validates the customer-contract plan
+   and executes only a manager-approved operation.
+4. Native shipments 16–19 dispatch 20, 5, 13, and 2 parts to fulfill A25 and B15.
+   Same-case Airtable, Jira, and Slack-via-Celigo readbacks are verified.
+5. The final projection records 40 ordered, 40 received, and 40 dispatched. Delivery
+   confirmations are synthetic demo inputs, not independent physical-receipt proof.
+6. Finance stays source-backed: the PO is USD160; customer orders are USD150 and
+   USD90; no invoice, payment, or revenue-recognition claim is made.
 
-1. An external demo-system change advances a semantic source version and the ordered
-   event ledger. The Dashboard does not generate decorative traffic.
-2. A Strands agent runs six bounded read/reconciliation tools, compares competing
-   causes, and streams its evidence, SDK hooks, latency, tokens, and typed result.
-3. The operator asks multi-turn questions and opens the exact source records cited by
-   the Agent.
-4. Deterministic application code reconstructs the business facts and decides whether
-   any bounded recovery is admissible.
-5. One Manager approves or rejects a packet bound to the current case, evidence tuple,
-   plan digest, scope, source versions, and idempotency key.
-6. The guarded executor performs only the approved ERPNext demo-tenant write.
-7. Fresh ERPNext and Celigo reads verify the outcome. Deterministic regression tests
-   separately cover duplicate-effect protection; the live capture proves one
-   Manager-approved bounded execution bundle producing the captured record set.
+## Retained historical evidence
 
-The verified result is concrete: 20/20 units delivered, Sales Order
-`SAL-ORD-2026-00006`, Delivery Note `MAT-DN-2026-00001`, Sales Invoice
-`ACC-SINV-2026-00006`, USD 42,000 observed billed revenue, balanced Stock/GL entries,
-and an independently correlated Celigo receipt.
-
-![The Missing 20 architecture](https://raw.githubusercontent.com/danielwanwx/the-missing-20/main/docs/architecture/the-missing-20-live-architecture.english.jpg)
+The separately accepted September 7 case records a 12/8 accepted-versus-held split
+and a USD42,000 order-to-billing effect. Its [historical audit](../../artifacts/audits/2026-09-07-current-hero-proof.json)
+and [claim matrix](evidence-matrix.md) remain available as named evidence; they are
+historical evidence only; they do not change PO20 delivery, invoice, payment, or
+revenue claims.
 
 ## How we built it
 
 ### Strands investigation layer
 
-The agent layer uses the Strands Agents SDK with Amazon Bedrock Nova Pro. It includes
-a bounded orchestrator, scoped source tools, structured/typed advisory output,
-competing hypotheses, synthesis and evaluator feedback, evidence handoffs, and SDK
-lifecycle hooks that drive the visible Investigation flight recorder. The same case
-scope powers a multi-turn evidence conversation.
+The agent layer uses the Strands Agents SDK with direct Amazon Bedrock Claude Opus
+4.6 for the recorded English Dashboard conversation. It includes a bounded
+orchestrator, scoped source tools, structured/typed advisory output, competing
+hypotheses, synthesis and evaluator feedback, evidence handoffs, and SDK lifecycle
+hooks that drive the visible Investigation flight recorder. The same case scope powers
+a multi-turn evidence conversation.
 
 The historical September 6 real-provider evaluation covers 8/8 ambiguous case variants and 15/15
 multi-turn cases (45 dialogue turns), including recovery-ready, reconcile-only, deny,
@@ -117,23 +113,40 @@ AgentCore Gateway or Policy.
 The architecture is designed around one non-negotiable boundary: probabilistic
 investigation must never silently become operational authority.
 
+The current recording architecture follows synthetic demo inputs—operator, scanner,
+inspection, and carrier—through the Operations UI, the Python operation coordinator,
+the Strands contract selector, the deterministic evidence gate, and validated ERPNext
+actions. The recorded English Dashboard conversation uses Strands with direct Amazon
+Bedrock Claude Opus 4.6. The coordinator sends direct
+case updates to Airtable and Jira; Celigo carries the single-attempt Slack import.
+Native conversation reads fresh ERP facts and retained handoff journal evidence through
+an SDK session and remains read-only. AgentCore is historical evidence only.
+
 Read the diagram from left to right:
 
-- Operations Command Center admits a case and renders ordered backend state.
-- Decision Workspace API coordinates source versions, durable case state, and SSE.
-- Strands retrieves evidence from ERPNext, Airtable, Celigo, Jira, and Slack and calls
-  Nova Pro for evidence-grounded investigation.
-- Deterministic Policy validates the facts and creates an eligible bounded plan.
-- Manager Gate preserves the consequential human decision.
-- Guarded Executor performs the exact idempotent ERPNext demo-tenant execution bundle.
-- Independent Verifier rereads authoritative state, checks Celigo and accounting
-  evidence, and records a durable Resolution Packet.
+- The Operations UI accepts the synthetic case input and optional English voice
+  transcript.
+- The Python operation coordinator sends versioned contract options to the read-only
+  Strands selector, which uses Claude Opus 4.6 through direct AWS Bedrock transport.
+- The deterministic evidence gate checks authorization, quantity, and quality before
+  the application performs validated ERPNext actions and native readback.
+- The coordinator sends direct same-case updates to Airtable and Jira; a single-attempt
+  Celigo import carries the Slack notification.
+- The native conversation session reads fresh ERP facts and retained handoff journal
+  evidence through the SDK and returns read-only answers. The current 40-part case is allocated A25/B15, with
+  delivery confirmations explicitly labelled synthetic.
 
 Canonical static diagram:
-`docs/architecture/the-missing-20-live-architecture.english.jpg`
+`docs/architecture/distributor-operations-recording.visual-check.1440x900.light.png`
 
 Interactive diagram:
-`docs/architecture/the-missing-20-live-architecture.html`
+`docs/architecture/distributor-operations-recording.html`
+
+Specification:
+`docs/architecture/distributor-operations-recording.json`
+
+Historical diagram:
+`docs/architecture/the-missing-20-live-architecture.english.jpg`
 
 ## Challenges we ran into
 
@@ -166,16 +179,17 @@ run restore the same authoritative state instead of reconstructing a cosmetic su
 
 ## Accomplishments that we are proud of
 
-- A real Manager-gated write to an external ERPNext demo tenant, followed by fresh
-  document, Stock Ledger, and GL reads.
-- A historical order-to-billing outcome (no cash collection proof) with exact Sales Order, Delivery Note, Sales
-  Invoice, Celigo receipt, and observed USD 42,000 billing evidence.
+- PO20 fulfillment of 40 received and dispatched parts across four native shipments,
+  with A25/B15 allocation and same-case cross-app readbacks.
+- Synthetic delivery confirmations clearly separated from independent physical-receipt
+  proof, and finance claims limited to the USD160 PO and USD150/USD90 customer orders.
 - Six real Strands source/reconciliation tools, typed output, evaluator feedback, and
-  22 visible SDK lifecycle events in the verified hero run.
-- Multi-turn, evidence-cited human/Agent conversation that cannot mutate business
-  state.
-- Eight real-provider scenario variants and fifteen multi-turn cases, including
-  approve, reject, deny, and insufficient-evidence behavior.
+  22 visible SDK lifecycle events in the retained historical hero run.
+- A case-scoped, English human/Agent conversation through Strands and direct Bedrock
+  that cannot mutate business state.
+- Retained bounded results from eight real-provider scenario variants and fifteen
+  multi-turn cases, including approve, reject, deny, and insufficient-evidence
+  behavior.
 - Fail-closed degraded and invalid states plus regression-tested idempotency.
 - A responsive product UI and an independently validated interactive architecture.
 
@@ -209,7 +223,7 @@ boundary. “Know when to stop” is both a product behavior and a safety proper
 ## Built with
 
 - Strands Agents SDK
-- Amazon Bedrock Nova Pro
+- Amazon Bedrock Claude Opus 4.6
 - Amazon Bedrock AgentCore Runtime
 - ERPNext / Frappe Cloud
 - Airtable, Celigo, Jira, and Slack
