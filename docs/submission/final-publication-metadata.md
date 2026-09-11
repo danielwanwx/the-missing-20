@@ -7,6 +7,25 @@ This file is the final copy source for a public video and Devpost form. It refle
 completed PO20 same-case demo only. Historical PO18/PO19 records remain historical
 evidence and must not be used as the primary story.
 
+## Local publication assets
+
+Upload these repository-local JPEGs to Devpost after final preview:
+
+| Use | Exact local upload path |
+| --- | --- |
+| Devpost 3:2 hero | `docs/submission/media/logisticpilot-devpost-hero-3x2.jpg` |
+| Gallery: Dashboard | `docs/submission/media/logisticpilot-gallery-dashboard-3x2.jpg` |
+| Gallery: Agent conversation | `docs/submission/media/logisticpilot-gallery-agent-3x2.jpg` |
+| Gallery: Architecture | `docs/submission/media/logisticpilot-gallery-architecture-3x2.jpg` |
+
+Each JPEG is 1500 × 1000 pixels (3:2). The final normalized MP4 is a local artifact,
+not a repository asset and not yet a public video:
+
+`/Users/danielwan/Documents/Hackathon/Agents-for-Humans/the-missing-20-film/composition/renders/logisticpilot-final-picture-lock-264.1s.mp4`
+
+It is 264.2 seconds, 1920 × 1080, H.264/AAC. Upload or publish it only after the final
+video review in the checklist below.
+
 ## YouTube metadata
 
 ### Title
