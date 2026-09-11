@@ -16,6 +16,7 @@ import sys
 import time
 from collections.abc import Callable, Mapping
 from contextlib import suppress
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
@@ -83,8 +84,11 @@ from the_missing_20.adapters.receiving_handoff import HandoffJournal  # noqa: E4
 from the_missing_20.adapters.receiving_handoff_worker import ReceivingHandoffWorker  # noqa: E402
 from the_missing_20.adapters.saas_evidence import SaaSEvidenceSource  # noqa: E402
 from the_missing_20.adapters.strands_models import (  # noqa: E402
+    OPUS46_MODEL_ID,
     BedrockNovaProConfig,
     BedrockNovaProFactory,
+    BedrockOpus46Config,
+    BedrockOpus46Factory,
 )
 from the_missing_20.agents.distributor_allocation import (  # noqa: E402
     select_contract_plan,
@@ -113,7 +117,7 @@ from the_missing_20.live_sources import (  # noqa: E402
     LiveSourcePoller,
     LiveSourceRegistry,
 )
-from the_missing_20.ports.agent_model import AgentProvider  # noqa: E402
+from the_missing_20.ports.agent_model import AgentModelFactory, AgentProvider  # noqa: E402
 from the_missing_20.ports.enterprise_systems import EnterprisePreconditionFailed  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,6 +126,9 @@ NORMAL_BILLING_R4_SOURCE = Path("/private/tmp/m20-r4-billing-source-current-read
 NORMAL_BILLING_OPERATOR_ID = "M20 Demo Manager"
 NORMAL_BILLING_APPROVAL_TTL = timedelta(minutes=10)
 _DISTRIBUTOR_NATIVE_EVENT_LIMIT = 64
+_DISTRIBUTOR_MODEL_ENV = "MISSING20_DISTRIBUTOR_MODEL"
+_DISTRIBUTOR_NOVA_VALUES = frozenset({"nova", "nova-pro", "us.amazon.nova-pro-v1:0"})
+_DISTRIBUTOR_OPUS46_ALIAS = "opus46"
 STATIC_ROOT = ROOT / "workspace"
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -1160,17 +1167,80 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
     }
 
 
+def _distributor_model_selection(configured_model: object | None) -> str:
+    """Parse the distributor selection without silently choosing a fallback model."""
+
+    if configured_model is None:
+        selected = "nova"
+    elif isinstance(configured_model, str):
+        selected = configured_model.strip().lower()
+    else:
+        raise ValueError(f"{_DISTRIBUTOR_MODEL_ENV} must be a supported model name")
+    if not selected or selected in _DISTRIBUTOR_NOVA_VALUES:
+        return "nova"
+    if selected in {_DISTRIBUTOR_OPUS46_ALIAS, OPUS46_MODEL_ID}:
+        return "opus46"
+    raise ValueError(
+        f"{_DISTRIBUTOR_MODEL_ENV} must be Nova (the default) or "
+        f"{OPUS46_MODEL_ID} ({_DISTRIBUTOR_OPUS46_ALIAS})"
+    )
+
+
+def _distributor_model_factory(
+    *, settings: Settings, configured_model: object | None
+) -> AgentModelFactory:
+    """Create one operations factory for the selected invocation."""
+
+    selected = _distributor_model_selection(configured_model)
+    if selected == "nova":
+        return BedrockNovaProFactory(
+            BedrockNovaProConfig(region=settings.aws_region, aws_profile=settings.aws_profile)
+        )
+    if selected == "opus46":
+        config = BedrockOpus46Config(region=settings.aws_region, aws_profile=settings.aws_profile)
+        budget_cap = min(config.budget.incremental_cost_cap_usd, settings.max_aws_spend_usd)
+        return BedrockOpus46Factory(
+            replace(
+                config,
+                budget=replace(
+                    config.budget,
+                    incremental_cost_cap_usd=budget_cap,
+                    cumulative_cost_cap_usd=budget_cap,
+                ),
+            )
+        )
+    raise AssertionError("validated distributor model selection was not recognized")
+
+
+def _distributor_session_namespace(factory: AgentModelFactory) -> str | None:
+    """Reserve a distinct persisted conversation namespace for an alternate model."""
+
+    namespace = getattr(factory, "session_namespace", None)
+    if namespace is None:
+        return None
+    if namespace == "opus46":
+        return namespace
+    raise ValueError("distributor model factory lacks an approved session namespace")
+
+
 def _distributor_native_allocation_selector(
-    *, settings: Settings
+    *,
+    settings: Settings,
+    configured_model: object | None = None,
+    factory: AgentModelFactory | None = None,
 ) -> Callable[[Mapping[str, object]], Mapping[str, object]]:
     """Build the opt-in structured selector; this is never reached by reads or `/ask`."""
 
+    if factory is not None and configured_model is not None:
+        raise ValueError("distributor selector accepts a factory or a model selection, not both")
+
     def select(plan: Mapping[str, object]) -> Mapping[str, object]:
+        selected_factory = factory or _distributor_model_factory(
+            settings=settings, configured_model=configured_model
+        )
         return select_contract_plan(
             plan=plan,
-            factory=BedrockNovaProFactory(
-                BedrockNovaProConfig(region=settings.aws_region, aws_profile=settings.aws_profile)
-            ),
+            factory=selected_factory,
         )
 
     return select
@@ -1180,9 +1250,14 @@ def _distributor_native_ask_turn(
     *,
     settings: Settings,
     session_root: Path,
+    configured_model: object | None = None,
+    factory: AgentModelFactory | None = None,
     retained_handoffs: Callable[[str], list[dict[str, object]]] | None = None,
 ) -> Callable[[str, Mapping[str, object]], Mapping[str, object]]:
     """Reuse the accepted native history runner without a model fallback."""
+
+    if factory is not None and configured_model is not None:
+        raise ValueError("distributor ask accepts a factory or a model selection, not both")
 
     def ask(question: str, projection: Mapping[str, object]) -> Mapping[str, object]:
         if projection.get("available") is not True:
@@ -1197,19 +1272,26 @@ def _distributor_native_ask_turn(
                 current["handoffs"] = retained_handoffs(case)
             packet = _distributor_native_packet(current)
             case_id = str(packet["case_id"])
+            selected_factory = factory or _distributor_model_factory(
+                settings=settings, configured_model=configured_model
+            )
+            model_namespace = _distributor_session_namespace(selected_factory)
+            runtime_instance_id = (
+                f"distributor-operations:{case_id}"
+                if model_namespace is None
+                else f"distributor-operations:{model_namespace}:{case_id}"
+            )
+            conversation_id = (
+                "operator" if model_namespace is None else f"{model_namespace}:operator"
+            )
             native_run = run_native_receiving_turn(
                 session_root=session_root,
-                runtime_instance_id=f"distributor-operations:{case_id}",
+                runtime_instance_id=runtime_instance_id,
                 case_id=case_id,
-                conversation_id="operator",
+                conversation_id=conversation_id,
                 packet=packet,
                 question=question,
-                factory=BedrockNovaProFactory(
-                    BedrockNovaProConfig(
-                        region=settings.aws_region,
-                        aws_profile=settings.aws_profile,
-                    )
-                ),
+                factory=selected_factory,
             )
         except (
             NativeReceivingDialogueError,
@@ -2665,10 +2747,14 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 NativeDistributorERP(photo_client) if photo_client is not None else None
             )
             distributor_settings = Settings.from_env(photo_values)
+            distributor_model_selection = _distributor_model_selection(
+                photo_values.get(_DISTRIBUTOR_MODEL_ENV)
+            )
             distributor_ask_turn = (
                 _distributor_native_ask_turn(
                     settings=distributor_settings,
                     session_root=normal_billing_runtime / "distributor-native-sessions",
+                    configured_model=distributor_model_selection,
                     retained_handoffs=lambda case_id: _distributor_handoff_records(
                         self.distributor_handoff, case_id
                     ),
@@ -2678,7 +2764,10 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 else None
             )
             distributor_allocation_selector = (
-                _distributor_native_allocation_selector(settings=distributor_settings)
+                _distributor_native_allocation_selector(
+                    settings=distributor_settings,
+                    configured_model=distributor_model_selection,
+                )
                 if isinstance(raw_operations_config.get("allocation_policy"), Mapping)
                 and raw_operations_config["allocation_policy"].get("version") == "v1"
                 and photo_values.get("MISSING20_NATIVE_RECEIVING_DIALOGUE") == "1"

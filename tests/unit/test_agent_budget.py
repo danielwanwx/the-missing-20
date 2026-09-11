@@ -10,7 +10,12 @@ import pytest
 from strands.models import BedrockModel
 
 from the_missing_20.adapters.strands_models import BudgetedModel
-from the_missing_20.ports.agent_model import AgentBudget, AgentBudgetExceeded, AgentBudgetLedger
+from the_missing_20.ports.agent_model import (
+    MAX_OUTPUT_TOKENS_PER_REQUEST,
+    AgentBudget,
+    AgentBudgetExceeded,
+    AgentBudgetLedger,
+)
 
 
 class FakeProvider:
@@ -42,6 +47,13 @@ class FakeProvider:
                 }
             }
         }
+
+
+def test_per_request_output_ceiling_preserves_default_and_allows_supported_override() -> None:
+    assert AgentBudget().max_output_tokens_per_request == MAX_OUTPUT_TOKENS_PER_REQUEST == 1_551
+    assert AgentBudget(max_output_tokens_per_request=3_072).max_output_tokens_per_request == 3_072
+    with pytest.raises(ValueError, match="supported cap"):
+        AgentBudget(max_output_tokens_per_request=4_097)
 
 
 async def _consume(model: BudgetedModel) -> None:

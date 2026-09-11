@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from copy import deepcopy
+from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -21,6 +23,11 @@ from the_missing_20.adapters.distributor_erp import DistributorERP as NativeDist
 from the_missing_20.adapters.distributor_operations import (
     DistributorEventConflict,
     DistributorOperations,
+)
+from the_missing_20.adapters.strands_models import (
+    OPUS46_MODEL_ID,
+    BedrockNovaProFactory,
+    BedrockOpus46Factory,
 )
 from the_missing_20.config import Settings
 from the_missing_20.ports.agent_model import AgentProvider
@@ -1717,9 +1724,134 @@ def test_native_ask_packet_is_current_read_only_and_static_ui_files_are_allowed(
         "records": [],
     }
     assert observed["runtime_instance_id"] == "distributor-operations:M20-DIST-R4-FOLLOW-ON"
+    assert observed["conversation_id"] == "operator"
     assert workspace_server.STATIC_FILES["/operations"][0] == "distributor-operations.html"
     assert "/distributor-operations.js" in workspace_server.STATIC_FILES
     assert "/distributor-operations.css" in workspace_server.STATIC_FILES
+
+
+def test_distributor_model_selection_is_explicit_and_opus_history_is_isolated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = Settings(agent_provider=AgentProvider.BEDROCK)
+    assert isinstance(
+        workspace_server._distributor_model_factory(settings=settings, configured_model=None),
+        BedrockNovaProFactory,
+    )
+    opus_factory = workspace_server._distributor_model_factory(
+        settings=settings, configured_model="opus46"
+    )
+    assert isinstance(opus_factory, BedrockOpus46Factory)
+    assert opus_factory.config.model_id == OPUS46_MODEL_ID
+    assert opus_factory.config.max_tokens == 3_072
+    assert opus_factory.config.budget.max_requests == 16
+    assert opus_factory.provenance()["cost_attribution"] == {
+        "currency": "USD",
+        "input_usd_per_million_tokens": "5.5",
+        "output_usd_per_million_tokens": "27.5",
+        "per_turn_output_token_cap": 3_072,
+        "request_count_cap": 16,
+        "aggregate_cost_cap_usd": "3.00",
+    }
+    bounded_opus_factory = workspace_server._distributor_model_factory(
+        settings=replace(settings, max_aws_spend_usd=Decimal("0.39")),
+        configured_model="opus46",
+    )
+    assert bounded_opus_factory.provenance()["cost_attribution"]["aggregate_cost_cap_usd"] == "0.39"
+    assert isinstance(
+        workspace_server._distributor_model_factory(
+            settings=settings, configured_model=OPUS46_MODEL_ID
+        ),
+        BedrockOpus46Factory,
+    )
+    with pytest.raises(ValueError, match="MISSING20_DISTRIBUTOR_MODEL"):
+        workspace_server._distributor_model_factory(settings=settings, configured_model="opus")
+
+    service, _bridge = _service(tmp_path, _r4_config())
+    observed: dict[str, object] = {}
+
+    def fake_native_run(**kwargs: object) -> SimpleNamespace:
+        observed.update(kwargs)
+        return SimpleNamespace(
+            answer="The source has no dispatched quantity.",
+            provider={"provider": "test"},
+            session_id="native-session-test",
+        )
+
+    monkeypatch.setattr(workspace_server, "run_native_receiving_turn", fake_native_run)
+    ask_turn = workspace_server._distributor_native_ask_turn(
+        settings=settings,
+        session_root=tmp_path / "native-sessions",
+        factory=opus_factory,
+    )
+    assert ask_turn("What is dispatched?", service.projection())["status"] == "COMPLETE"
+    assert observed["factory"] is opus_factory
+    assert observed["runtime_instance_id"] == "distributor-operations:opus46:M20-DIST-R4-FOLLOW-ON"
+    assert observed["conversation_id"] == "opus46:operator"
+
+
+def test_distributor_allocation_selector_builds_the_selected_factory_per_operation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(agent_provider=AgentProvider.BEDROCK)
+    created: list[BedrockOpus46Factory] = []
+    observed: dict[str, object] = {}
+
+    def fresh_opus_factory(**_kwargs: object) -> BedrockOpus46Factory:
+        factory = BedrockOpus46Factory()
+        created.append(factory)
+        return factory
+
+    def fake_select_contract_plan(
+        *, plan: Mapping[str, object], factory: object
+    ) -> Mapping[str, object]:
+        observed["factory"] = factory
+        return {"plan_id": plan["plan_id"]}
+
+    monkeypatch.setattr(workspace_server, "_distributor_model_factory", fresh_opus_factory)
+    monkeypatch.setattr(workspace_server, "select_contract_plan", fake_select_contract_plan)
+    selector = workspace_server._distributor_native_allocation_selector(
+        settings=settings, configured_model="opus46"
+    )
+    assert selector({"plan_id": "plan-1"}) == {"plan_id": "plan-1"}
+    assert selector({"plan_id": "plan-2"}) == {"plan_id": "plan-2"}
+    assert len(created) == 2
+    assert observed["factory"] is created[-1]
+
+
+def test_distributor_ask_builds_a_fresh_selected_factory_per_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = Settings(agent_provider=AgentProvider.BEDROCK)
+    service, _bridge = _service(tmp_path, _r4_config())
+    created: list[BedrockOpus46Factory] = []
+    used: list[object] = []
+
+    def fresh_opus_factory(**_kwargs: object) -> BedrockOpus46Factory:
+        factory = BedrockOpus46Factory()
+        created.append(factory)
+        return factory
+
+    def fake_native_run(**kwargs: object) -> SimpleNamespace:
+        used.append(kwargs["factory"])
+        return SimpleNamespace(
+            answer="The source has no dispatched quantity.",
+            provider={"provider": "test"},
+            session_id="native-session-test",
+        )
+
+    monkeypatch.setattr(workspace_server, "_distributor_model_factory", fresh_opus_factory)
+    monkeypatch.setattr(workspace_server, "run_native_receiving_turn", fake_native_run)
+    ask_turn = workspace_server._distributor_native_ask_turn(
+        settings=settings,
+        session_root=tmp_path / "native-sessions",
+        configured_model="opus46",
+    )
+    assert ask_turn("What is dispatched?", service.projection())["status"] == "COMPLETE"
+    assert ask_turn("What is dispatched?", service.projection())["status"] == "COMPLETE"
+    assert used == created
+    assert len(created) == 2
+    assert created[0] is not created[1]
 
 
 def test_native_operations_answer_rejects_non_english_model_prose(

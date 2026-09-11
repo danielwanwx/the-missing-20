@@ -17,6 +17,7 @@ MAX_REQUESTS = 40
 MAX_INPUT_TOKENS = 400_000
 MAX_OUTPUT_TOKENS = 62_040
 MAX_OUTPUT_TOKENS_PER_REQUEST = 1_551
+MAX_SUPPORTED_OUTPUT_TOKENS_PER_REQUEST = 4_096
 PRIOR_ESTIMATED_COST_USD = Decimal("0.0814368")
 INCREMENTAL_COST_CAP_USD = Decimal("0.5185632")
 CUMULATIVE_COST_CAP_USD = Decimal("0.60")
@@ -97,8 +98,8 @@ class AgentBudget:
             raise ValueError("max_output_tokens exceeds the frozen output-token cap")
         if self.max_output_tokens_per_request <= 0:
             raise ValueError("max_output_tokens_per_request must be positive")
-        if self.max_output_tokens_per_request > MAX_OUTPUT_TOKENS_PER_REQUEST:
-            raise ValueError("per-request output ceiling exceeds the frozen cap")
+        if self.max_output_tokens_per_request > MAX_SUPPORTED_OUTPUT_TOKENS_PER_REQUEST:
+            raise ValueError("per-request output ceiling exceeds the supported cap")
         object.__setattr__(self, "prior_cost_usd", Decimal(str(self.prior_cost_usd)))
         object.__setattr__(
             self,

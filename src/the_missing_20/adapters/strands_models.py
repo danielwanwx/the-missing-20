@@ -8,6 +8,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel
@@ -283,7 +284,7 @@ class BudgetedModel(Model):
         if (
             isinstance(max_tokens, int)
             and not isinstance(max_tokens, bool)
-            and max_tokens > MAX_OUTPUT_TOKENS_PER_REQUEST
+            and max_tokens > self.ledger.budget.max_output_tokens_per_request
         ):
             raise AgentBudgetExceeded("model max_tokens exceeds the frozen per-request cap")
         self._delegate.update_config(**model_config)
@@ -529,6 +530,55 @@ class BedrockNovaProConfig:
             raise ValueError("max_tokens exceeds the frozen output-token budget")
         if self.max_tokens > self.budget.max_output_tokens_per_request:
             raise ValueError("max_tokens exceeds the frozen per-request output ceiling")
+        if self.temperature != 0:
+            raise ValueError("temperature is frozen at zero")
+
+
+OPUS46_MODEL_ID = "us.anthropic.claude-opus-4-6-v1"
+OPUS46_INPUT_PRICE_PER_MILLION_USD = Decimal("5.5")
+OPUS46_OUTPUT_PRICE_PER_MILLION_USD = Decimal("27.5")
+OPUS46_MAX_OUTPUT_TOKENS_PER_TURN = 3_072
+OPUS46_MAX_TURNS = 16
+OPUS46_AGGREGATE_COST_CAP_USD = Decimal("3.00")
+
+
+def _opus46_budget() -> AgentBudget:
+    """Return the separate, bounded budget for the opt-in Opus operations path."""
+
+    return AgentBudget(
+        max_requests=OPUS46_MAX_TURNS,
+        max_input_tokens=400_000,
+        max_output_tokens=OPUS46_MAX_OUTPUT_TOKENS_PER_TURN * OPUS46_MAX_TURNS,
+        max_output_tokens_per_request=OPUS46_MAX_OUTPUT_TOKENS_PER_TURN,
+        prior_cost_usd=Decimal("0"),
+        incremental_cost_cap_usd=OPUS46_AGGREGATE_COST_CAP_USD,
+        cumulative_cost_cap_usd=OPUS46_AGGREGATE_COST_CAP_USD,
+        input_price_per_token=OPUS46_INPUT_PRICE_PER_MILLION_USD / Decimal("1000000"),
+        output_price_per_token=OPUS46_OUTPUT_PRICE_PER_MILLION_USD / Decimal("1000000"),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class BedrockOpus46Config:
+    """Explicit, bounded configuration for the opt-in distributor Opus path."""
+
+    model_id: str = OPUS46_MODEL_ID
+    region: str = "us-west-2"
+    max_tokens: int = OPUS46_MAX_OUTPUT_TOKENS_PER_TURN
+    temperature: float = 0.0
+    streaming: bool = False
+    budget: AgentBudget = _opus46_budget()
+    aws_profile: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.model_id != OPUS46_MODEL_ID:
+            raise ValueError("distributor Opus selection only permits Claude Opus 4.6")
+        if self.region != "us-west-2":
+            raise ValueError("Bedrock distributor operations are restricted to us-west-2")
+        if self.max_tokens <= 0 or self.max_tokens > self.budget.max_output_tokens:
+            raise ValueError("max_tokens exceeds the distributor Opus output-token budget")
+        if self.max_tokens > self.budget.max_output_tokens_per_request:
+            raise ValueError("max_tokens exceeds the distributor Opus per-turn output ceiling")
         if self.temperature != 0:
             raise ValueError("temperature is frozen at zero")
 
@@ -1217,6 +1267,70 @@ class BedrockNovaProFactory(AgentModelFactory):
         )
         # Nova rejects the optional Bedrock ``strict`` tool field.  Do not pass it;
         # deterministic Pydantic validation remains the harness boundary.
+        model = BedrockModel(
+            boto_session=session,
+            model_id=self.config.model_id,
+            temperature=self.config.temperature,
+            max_tokens=self.config.max_tokens,
+            streaming=self.config.streaming,
+            use_native_token_count=False,
+        )
+        return BudgetedModel(model, self.ledger)
+
+
+class BedrockOpus46Factory(AgentModelFactory):
+    """Create only the explicitly selected, bounded Bedrock Opus 4.6 model."""
+
+    provider = AgentProvider.BEDROCK
+    session_namespace = "opus46"
+
+    def __init__(
+        self,
+        config: BedrockOpus46Config | None = None,
+        ledger: AgentBudgetLedger | None = None,
+    ) -> None:
+        self.config = config or BedrockOpus46Config()
+        self.ledger = ledger or AgentBudgetLedger(self.config.budget)
+
+    def provenance(self) -> dict[str, Any]:
+        """Return configuration attribution, including the conservative cost basis."""
+
+        budget = self.ledger.budget
+        return {
+            "mode": AgentProvider.BEDROCK.value,
+            "provider": AgentProvider.BEDROCK.value,
+            "model": self.config.model_id,
+            "region": self.config.region,
+            "transport": "strands_bedrock_model",
+            "cost_attribution": {
+                "currency": "USD",
+                "input_usd_per_million_tokens": str(
+                    float(budget.input_price_per_token * Decimal("1000000"))
+                ),
+                "output_usd_per_million_tokens": str(
+                    float(budget.output_price_per_token * Decimal("1000000"))
+                ),
+                "per_turn_output_token_cap": budget.max_output_tokens_per_request,
+                "request_count_cap": budget.max_requests,
+                "aggregate_cost_cap_usd": str(budget.incremental_cost_cap_usd),
+            },
+        }
+
+    def create(
+        self,
+        *,
+        stage: AgentStage,
+        output_payload: dict[str, Any],
+        tool_plan: tuple[dict[str, Any], ...] = (),
+    ) -> Any:
+        del stage, output_payload, tool_plan
+        require_strands()
+        import boto3
+
+        session = boto3.Session(
+            profile_name=self.config.aws_profile,
+            region_name=self.config.region,
+        )
         model = BedrockModel(
             boto_session=session,
             model_id=self.config.model_id,
