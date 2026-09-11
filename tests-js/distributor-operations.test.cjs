@@ -35,6 +35,12 @@ const {
   recommendedAction,
   proposalActionDetail,
   approvalReadback,
+  conversationInferenceCapability,
+  retainedEvidenceLabel,
+  erpEvidenceSourceLabel,
+  sourceAwareErpText,
+  freshActionsAllowed,
+  isRetainedEvidence,
   statusTone,
   deliveryCompletionLabel,
   normalizeFinancials,
@@ -66,6 +72,22 @@ test('applied proposal keeps approval evidence after projection refresh', () => 
   }), null);
 });
 
+test('retained manager recovery copy confirms a recorded completion without fresh execution', () => {
+  const retained = { status: 'RETAINED_AS_OF', as_of: '2026-09-11T05:52:37.405823Z' };
+  assert.equal(
+    proposalActionDetail({ status: 'PENDING_MANAGER_APPROVAL', evidence_mode: retained }, retained),
+    'Recorded completion awaiting confirmation',
+  );
+  assert.equal(
+    proposalActionDetail({ status: 'APPLIED' }, retained),
+    'Recorded completion confirmed',
+  );
+  assert.match(
+    fs.readFileSync(path.join(__dirname, '../workspace/distributor-operations.js'), 'utf8'),
+    /Reading retained accepted evidence…/,
+  );
+});
+
 test('projection keeps missing source quantities unknown instead of turning them into zero', () => {
   const projection = normalizeProjection({
     available: true,
@@ -87,6 +109,27 @@ test('configured source failure stays distinct from a disabled operation', () =>
     alerts: [{ code: 'SOURCE_UNAVAILABLE', status: 'OPEN' }],
   }), 'SOURCE_UNAVAILABLE');
   assert.equal(projectionSourceState({ available: false, case_id: '', stage: 'DISABLED' }), 'DISABLED');
+});
+
+test('retained evidence is labeled with its as-of time and does not claim a live source refresh', () => {
+  const label = retainedEvidenceLabel({ status: 'RETAINED_AS_OF', as_of: '2026-09-11T05:52:37.405823Z' });
+  assert.match(label, /^Retained accepted evidence · as of .+ · read-only Agent available when configured$/);
+  assert.equal(conversationInferenceCapability({ conversation: { inference_capability: 'AVAILABLE' } }), 'live inference available');
+  assert.match(retainedEvidenceLabel(
+    { status: 'RETAINED_AS_OF', as_of: '2026-09-11T05:52:37.405823Z' },
+    { conversation: { inference_capability: 'AVAILABLE' } },
+  ), /live inference available$/);
+  assert.equal(retainedEvidenceLabel({ status: 'CURRENT', as_of: '2026-09-11T05:52:37.405823Z' }), '');
+  assert.equal(isRetainedEvidence({ status: 'RETAINED_AS_OF' }), true);
+  assert.equal(isRetainedEvidence({ status: 'CURRENT' }), false);
+  assert.equal(erpEvidenceSourceLabel({ status: 'RETAINED_AS_OF' }), 'retained accepted ERP evidence');
+  assert.equal(erpEvidenceSourceLabel({ status: 'CURRENT' }), 'current ERP source');
+  assert.equal(sourceAwareErpText('Current ERP source returned the case.', { status: 'RETAINED_AS_OF' }), 'retained accepted ERP evidence returned the case.');
+  const html = fs.readFileSync(path.join(__dirname, '../workspace/distributor-operations.html'), 'utf8');
+  assert.match(html, /ops-ask-link[\s\S]*?<span>Agent board<\/span>/);
+  assert.match(html, /<span class="object-label">Agent<\/span><h2 id="ops-chat-title">Agent board<\/h2>/);
+  assert.match(html, /distributor-operations\.js\?v=20260911-video-v2/);
+  assert.match(html, /data-ops-view-link="dashboard"/);
 });
 
 test('external handoffs group by provider and retain a verified evidence link', () => {
@@ -260,6 +303,16 @@ test('pending allocation action disables only the matching in-flight review', ()
   });
   assert.equal(otherCase.disabled, false);
   assert.equal(otherCase.in_flight, false);
+
+  const retained = pendingAllocationActionState({ ...projection, actions_enabled: false }, null);
+  assert.equal(retained.eligible, false);
+  assert.equal(retained.disabled, true);
+});
+
+test('fresh event actions require an explicitly enabled action surface', () => {
+  assert.equal(freshActionsAllowed({ actions_enabled: true }), true);
+  assert.equal(freshActionsAllowed({ actions_enabled: false }), false);
+  assert.equal(freshActionsAllowed({}), true);
 });
 
 test('allocation retry feedback uses the submitted row and keeps dispatch separate', () => {

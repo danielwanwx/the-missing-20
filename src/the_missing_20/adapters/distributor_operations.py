@@ -240,12 +240,14 @@ class DistributorOperations:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         ask_turn: Callable[[str, Mapping[str, object]], Mapping[str, object]] | None = None,
         allocation_selector: Callable[[Mapping[str, object]], Mapping[str, object]] | None = None,
+        retained_projection: bool = False,
     ) -> None:
         self._config = self._validate_config(config)
         self._erp = erp
         self._clock = clock
         self._ask_turn = ask_turn
         self._allocation_selector = allocation_selector
+        self._retained_projection = retained_projection
         database.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(
             database, check_same_thread=False, isolation_level=None, timeout=10
@@ -277,6 +279,12 @@ class DistributorOperations:
         )
         self._lock = RLock()
 
+    @property
+    def retained_projection(self) -> bool:
+        """Whether this instance serves durable evidence without live ERP reads."""
+
+        return self._retained_projection
+
     def close(self) -> None:
         with self._lock:
             self._db.close()
@@ -285,6 +293,13 @@ class DistributorOperations:
         """Return a current read-only projection; a source poll never writes."""
 
         with self._lock:
+            if self._retained_projection:
+                state, retained_at = self._latest_state_with_recorded_at()
+                return self._projection(
+                    state or self._initial_state(),
+                    {"source_status": "RETAINED"},
+                    retained_at=retained_at,
+                )
             source = self._read_source()
             state = self._latest_state() or self._initial_state()
             state, source = self._merge_source(state, source)
@@ -293,6 +308,7 @@ class DistributorOperations:
     def record_event(self, event: Mapping[str, object]) -> dict[str, object]:
         """Retain one physical event and run only its allowed native consequences."""
 
+        self._require_live_operations()
         validated = self._validate_event(event)
         event_id = cast(str, validated["event_id"])
         encoded = _encode(validated)
@@ -364,6 +380,7 @@ class DistributorOperations:
         deliberately not a count, identity, inspection, or model conclusion.
         """
 
+        self._require_live_operations()
         if set(request) != {"attachment_id", "image", "media_type"}:
             raise ValueError("photo attachment accepts attachment_id, image, and media_type only")
         attachment_id = _text(request.get("attachment_id"), "attachment_id")
@@ -437,6 +454,7 @@ class DistributorOperations:
     def prepare_event_proposal(self, request: Mapping[str, object]) -> dict[str, object]:
         """Store a non-mutating, source-fresh proposal for manager review."""
 
+        self._require_live_operations()
         allowed = {"proposal_id", "case_id", "event", "source", "photo_attachment_id"}
         if set(request) - allowed or not {"proposal_id", "case_id", "event", "source"}.issubset(
             request
@@ -566,7 +584,10 @@ class DistributorOperations:
             ) = cast(tuple[str, str, str | None, str, str | None, str | None, str | None], row)
             event = _decoded(event_json, "proposal event")
             if stored_result is not None:
-                return self._projection_from_record(stored_result)
+                result = self._projection_from_record(stored_result)
+                if self._retained_projection:
+                    self._mark_retained_projection(result, self._latest_state_with_recorded_at()[1])
+                return result
             recovered = self._db.execute(
                 "SELECT result_json FROM distributor_operation_events WHERE event_id=?",
                 (event["event_id"],),
@@ -601,7 +622,10 @@ class DistributorOperations:
                     "WHERE proposal_id=?",
                     (_encode(result), recorded_manager, approved_at, proposal_id),
                 )
+                if self._retained_projection:
+                    self._mark_retained_projection(result, self._latest_state_with_recorded_at()[1])
                 return result
+            self._require_live_operations()
             if stored_revision != revision:
                 raise ValueError(
                     "proposal revision is stale; review the current case before approval"
@@ -662,6 +686,7 @@ class DistributorOperations:
         prepare-pick call.
         """
 
+        self._require_live_operations()
         if set(request) != {"retry_id", "pending_event_id"}:
             raise ValueError("retry accepts only retry_id and pending_event_id")
         retry_id = _text(request.get("retry_id"), "retry_id")
@@ -774,6 +799,7 @@ class DistributorOperations:
     def reconcile_receive_arrival(self, event_id: str) -> dict[str, object]:
         """Admit an exact submitted receipt for the latest unknown arrival without retrying it."""
 
+        self._require_live_operations()
         identifier = _text(event_id, "event_id")
         with self._lock:
             state = self._latest_state()
@@ -1757,8 +1783,12 @@ class DistributorOperations:
         return now.isoformat()
 
     def _latest_state(self) -> dict[str, object] | None:
+        state, _recorded_at = self._latest_state_with_recorded_at()
+        return state
+
+    def _latest_state_with_recorded_at(self) -> tuple[dict[str, object] | None, str | None]:
         row = self._db.execute(
-            "SELECT state_json FROM ("
+            "SELECT state_json, recorded_at FROM ("
             "SELECT state_json, recorded_at, rowid, 0 AS source_order "
             "FROM distributor_operation_events WHERE state_json IS NOT NULL "
             "UNION ALL "
@@ -1766,7 +1796,16 @@ class DistributorOperations:
             "FROM distributor_allocation_retries WHERE state_json IS NOT NULL"
             ") ORDER BY recorded_at DESC, source_order DESC, rowid DESC LIMIT 1"
         ).fetchone()
-        return _decoded(cast(str, row[0]), "state") if row is not None else None
+        if row is None:
+            return None, None
+        state_json, recorded_at = cast(tuple[str, str], row)
+        return _decoded(state_json, "state"), recorded_at
+
+    def _require_live_operations(self) -> None:
+        if self._retained_projection:
+            raise ValueError(
+                "retained projection is read-only; live source evidence is required for this action"
+            )
 
     def _pending_allocation_retry_projection(self, retry_id: str) -> dict[str, object]:
         projection = self.projection()
@@ -3342,12 +3381,16 @@ class DistributorOperations:
         return "APPLIED"
 
     def _projection(
-        self, state: Mapping[str, object], source: Mapping[str, object]
+        self,
+        state: Mapping[str, object],
+        source: Mapping[str, object],
+        *,
+        retained_at: str | None = None,
     ) -> dict[str, object]:
         result = cast(dict[str, object], _copy(state))
         result["schema_version"] = DISTRIBUTOR_OPERATIONS_SCHEMA_VERSION
         result["purchase_order"] = self._config["purchase_order"]
-        result["available"] = source["source_status"] == "CURRENT"
+        result["available"] = source["source_status"] == "CURRENT" or retained_at is not None
         result["documents"] = _documents(result.get("documents"))
         result["conversation"] = list(cast(list[object], result.get("conversation", [])))
         event_briefs = self._event_briefs(result.get("events"))
@@ -3361,9 +3404,13 @@ class DistributorOperations:
             "inspection_criteria": _copy(policy.get("inspection_criteria") or {}),
         }
         alerts = cast(list[dict[str, object]], result["alerts"])
-        if source["source_status"] != "CURRENT" and not any(
-            alert.get("code") == "SOURCE_UNAVAILABLE" and alert.get("derived") is True
-            for alert in alerts
+        if (
+            retained_at is None
+            and source["source_status"] != "CURRENT"
+            and not any(
+                alert.get("code") == "SOURCE_UNAVAILABLE" and alert.get("derived") is True
+                for alert in alerts
+            )
         ):
             alerts.append(
                 {
@@ -3378,7 +3425,9 @@ class DistributorOperations:
             )
         self._deadline_alerts(result, alerts)
         result["stage"] = self._stage(result, alerts)
-        result["available_event_templates"] = self._event_templates()
+        result["available_event_templates"] = (
+            [] if retained_at is not None else self._event_templates()
+        )
         self._add_photo_attachments(result)
         proposal = self._current_proposal()
         if proposal is not None:
@@ -3391,7 +3440,31 @@ class DistributorOperations:
         result.pop("source_status", None)
         result.pop("source_error", None)
         result.pop("source_observation", None)
+        if retained_at is not None:
+            self._mark_retained_projection(result, retained_at)
         return result
+
+    @staticmethod
+    def _mark_retained_projection(result: dict[str, object], retained_at: str | None) -> None:
+        result["available"] = retained_at is not None
+        result["actions_enabled"] = False
+        result["live_source"] = False
+        result["available_event_templates"] = []
+        result["evidence_mode"] = {
+            "status": "RETAINED_AS_OF"
+            if retained_at is not None
+            else "RETAINED_EVIDENCE_UNAVAILABLE",
+            "as_of": retained_at,
+            "message": (
+                "Retained durable evidence as of the recorded time; live ERP was not queried "
+                "and operations are disabled."
+                if retained_at is not None
+                else (
+                    "No durable evidence is available; live ERP was not queried and "
+                    "operations are disabled."
+                )
+            ),
+        }
 
     def _current_proposal(self) -> dict[str, object] | None:
         row = self._db.execute(

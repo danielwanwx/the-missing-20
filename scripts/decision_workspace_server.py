@@ -2086,7 +2086,12 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     "not_found",
                     "distributor operations action was not found",
                 )
-            if should_sync and self.distributor_handoff is not None:
+            if (
+                should_sync
+                and self.distributor_handoff is not None
+                and getattr(self.server, "distributor_handoff_sync_enabled", True)
+                and not getattr(operations, "retained_projection", False)
+            ):
                 # The ERP event is already durable. A provider problem must remain
                 # visible in retained handoff state, never roll that event back.
                 with suppress(OSError, TimeoutError, ValueError):
@@ -2757,6 +2762,9 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
             self.normal_billing = None
         self.distributor_operations = distributor_operations
         self.distributor_handoff = distributor_handoff
+        self.distributor_handoff_sync_enabled = (
+            photo_values.get("MISSING20_DISTRIBUTOR_HANDOFF_SYNC", "1") != "0"
+        )
         configured_operations = distributor_operations_config or _optional_path(
             photo_values.get("MISSING20_DISTRIBUTOR_OPERATIONS_CONFIG")
         )
@@ -2817,6 +2825,9 @@ class DecisionWorkspaceServer(ThreadingHTTPServer):
                 native_adapter,
                 ask_turn=distributor_ask_turn,
                 allocation_selector=distributor_allocation_selector,
+                retained_projection=(
+                    photo_values.get("MISSING20_DISTRIBUTOR_RETAINED_PROJECTION", "0") == "1"
+                ),
             )
         if configured_distributor_handoff is not None and self.distributor_handoff is None:
             if photo_values.get("MISSING20_ENVIRONMENT", "").strip().lower() != "demo":

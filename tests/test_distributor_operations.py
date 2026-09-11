@@ -287,11 +287,19 @@ def _contract_config() -> dict[str, object]:
 
 
 def _service(
-    tmp_path: Path, config: dict[str, object] | None = None
+    tmp_path: Path,
+    config: dict[str, object] | None = None,
+    *,
+    retained_projection: bool = False,
 ) -> tuple[DistributorOperations, _Bridge]:
     configured = config or _component_config()
     bridge = _Bridge(configured)
-    service = DistributorOperations(tmp_path / "distributor-operations.sqlite3", configured, bridge)
+    service = DistributorOperations(
+        tmp_path / "distributor-operations.sqlite3",
+        configured,
+        bridge,
+        retained_projection=retained_projection,
+    )
     bridge.state_provider = service._latest_state
     return service, bridge
 
@@ -1683,6 +1691,84 @@ def test_same_case_proposal_is_non_mutating_then_manager_approval_applies_once(
     assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
     assert service.approve_event_proposal(approval) == applied
     assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+
+
+def test_retained_projection_uses_durable_evidence_without_erp_reads_or_new_actions(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path)
+    event = _arrival("retained-arrival", lot="LOT-A", cartons=2, observed=20)
+    applied = service.record_event(event)
+    proposal = service.prepare_event_proposal(
+        {
+            "proposal_id": "retained-arrival",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "event": event,
+            "source": "OPERATOR_DECLARED",
+        }
+    )
+    revision = cast(Mapping[str, object], proposal["prepared_proposal"])["state_revision"]
+
+    retained = DistributorOperations(
+        tmp_path / "distributor-operations.sqlite3",
+        bridge.config,
+        bridge,
+        retained_projection=True,
+    )
+    reads_before = bridge.reads
+    projection = retained.projection()
+
+    assert projection["available"] is True
+    assert projection["actions_enabled"] is False
+    assert projection["live_source"] is False
+    assert cast(Mapping[str, object], projection["evidence_mode"])["status"] == "RETAINED_AS_OF"
+    assert cast(Mapping[str, object], projection["evidence_mode"])["as_of"]
+    assert cast(Mapping[str, object], projection["quantities"])["received"] == 20
+    assert (
+        cast(Mapping[str, object], projection["prepared_proposal"])["proposal_id"]
+        == "retained-arrival"
+    )
+    assert projection["available_event_templates"] == []
+    assert bridge.reads == reads_before
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+
+    recovered = retained.approve_event_proposal(
+        {
+            "proposal_id": "retained-arrival",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "state_revision": revision,
+            "manager_id": "Recording Manager",
+        }
+    )
+    assert cast(Mapping[str, object], recovered["approval_evidence"])["recovered"] is True
+    assert bridge.reads == reads_before
+    reloaded_approval = retained.approve_event_proposal(
+        {
+            "proposal_id": "retained-arrival",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "state_revision": revision,
+            "manager_id": "Recording Manager",
+        }
+    )
+    assert (
+        cast(Mapping[str, object], reloaded_approval["evidence_mode"])["status"] == "RETAINED_AS_OF"
+    )
+    assert bridge.reads == reads_before
+
+    with pytest.raises(ValueError, match="retained projection is read-only"):
+        retained.record_event(_arrival("blocked-arrival", lot="LOT-A", cartons=2, observed=20))
+    with pytest.raises(ValueError, match="retained projection is read-only"):
+        retained.prepare_event_proposal(
+            {
+                "proposal_id": "blocked-proposal",
+                "case_id": "M20-DIST-COMPONENT-01",
+                "event": _arrival("blocked-proposal-event", lot="LOT-A", cartons=2, observed=20),
+                "source": "OPERATOR_DECLARED",
+            }
+        )
+    assert bridge.reads == reads_before
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+    assert cast(Mapping[str, object], applied["quantities"])["received"] == 20
 
 
 def test_proposal_rejects_stale_case_and_manual_photo_stays_unanalyzed(tmp_path: Path) -> None:

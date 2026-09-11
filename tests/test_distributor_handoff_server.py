@@ -62,6 +62,10 @@ class Operations:
         self.reconciliations.append(event_id)
         return deepcopy(self.current)
 
+    def approve_event_proposal(self, request: dict[str, object]) -> dict[str, object]:
+        self.events.append(request)
+        return deepcopy(self.current)
+
     def ask(self, question: str) -> dict[str, object]:
         self.questions.append(question)
         return {**deepcopy(self.current), "conversation": {"status": "COMPLETE"}}
@@ -185,6 +189,20 @@ def test_provider_failure_keeps_the_erp_response_and_retained_failure_visible() 
     handoffs = cast(list[dict[str, object]], result(sent)["handoffs"])
     assert handoffs[1]["status"] == "PENDING"
     assert handoffs[1]["last_failure"] == {"phase": "lookup", "kind": "provider_unavailable"}
+
+
+def test_sync_safety_flag_keeps_retained_handoffs_visible_after_approval() -> None:
+    operations, outbound = Operations(), Handoff()
+    current, sent = handler(operations, outbound)
+    current.server.distributor_handoff_sync_enabled = False
+
+    current._v1_post(
+        "/api/v1/distributor-operations/approve-proposal",
+        {"proposal_id": "recovered-arrival"},
+    )
+
+    assert outbound.calls == []
+    assert len(cast(list[object], result(sent)["handoffs"])) == 2
 
 
 def test_packet_keeps_only_matching_case_provider_readbacks_as_retained() -> None:

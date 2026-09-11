@@ -142,3 +142,15 @@ passed. No additional paid inference or business writes were performed.
 Independent cross-reviews returned GO for both allocation and photo changes.
 The local demo runtime was restarted with these changes, preserving its existing
 case and session storage.
+
+## Subsequent source-contract correction
+
+The recording-readiness investigation found that LOT-B's raw `expected_quantity`
+was 18 because it represented the planned receipt; its separate package declaration
+was two cartons at ten parts each (nominal 20). Therefore the earlier turn-4
+criticism of the phrase "expected 18" is too broad: it is valid for the receipt
+plan, but must not be confused with nominal packaging. Preserve the answer and
+reassess that distinction explicitly. This correction does not turn missing
+terminal answers, HTTP500, or unsupported causal alternatives into successful
+multi-turn acceptance. Follow-up code 569f684 was remote-verified and its complete
+CI34540020175 succeeded; the pending-CI wording above records the earlier checkpoint.

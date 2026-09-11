@@ -82,6 +82,39 @@
     if (!Number.isFinite(parsed)) return "Time unavailable";
     return new Date(parsed).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
+  const isRetainedEvidence = (value) => text(value?.status).toUpperCase() === "RETAINED_AS_OF";
+  const conversationInferenceCapability = (value) => {
+    const records = [];
+    if (isRecord(value)) {
+      records.push(value);
+      if (isRecord(value.conversation)) records.push(value.conversation);
+    }
+    for (const record of records) {
+      const candidate = record.inference_capability
+        ?? record.conversation_capability
+        ?? record.live_inference
+        ?? record.capability;
+      const state = isRecord(candidate) ? (candidate.status ?? candidate.state ?? candidate.value) : candidate;
+      if (state === true || /^(AVAILABLE|LIVE|READY|ENABLED|TRUE)$/i.test(text(state))) return "live inference available";
+    }
+    return "";
+  };
+  const retainedEvidenceLabel = (value, conversation = null) => {
+    if (!isRecord(value)) return "";
+    const asOf = text(value.as_of);
+    if (!isRetainedEvidence(value) || !asOf || !Number.isFinite(Date.parse(asOf))) return "";
+    return `Retained accepted evidence · as of ${formatDate(asOf)} · ${conversationInferenceCapability(conversation) || "read-only Agent available when configured"}`;
+  };
+  const erpEvidenceSourceLabel = (value) => isRetainedEvidence(value)
+    ? "retained accepted ERP evidence"
+    : "current ERP source";
+  const freshActionsAllowed = (value) => value?.actions_enabled !== false;
+  const sourceAwareErpText = (value, evidenceMode) => {
+    const source = erpEvidenceSourceLabel(evidenceMode);
+    return text(value)
+      .replace(/current ERP source/gi, source)
+      .replace(/current source/gi, source);
+  };
   const pretty = (value) => text(value).replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
   function canonicalType(value) {
@@ -258,12 +291,13 @@
     };
   }
 
-  function financialStatusMessage(status, kind = "") {
+  function financialStatusMessage(status, kind = "", evidenceMode = null) {
     const label = kind ? `${kind} invoice` : "Invoice";
+    const source = erpEvidenceSourceLabel(evidenceMode);
     const normalized = text(status).toUpperCase();
-    if (normalized === "CURRENT") return "Current ERP source returned invoice records.";
-    if (normalized === "MISSING") return `No ${label.toLowerCase()} linked in the current ERP source.`;
-    return `${label} data is unavailable from the current ERP source.`;
+    if (normalized === "CURRENT") return `${source[0].toUpperCase()}${source.slice(1)} returned invoice records.`;
+    if (normalized === "MISSING") return `No ${label.toLowerCase()} linked in the ${source}.`;
+    return `${label} data is unavailable from the ${source}.`;
   }
 
   function formatMoney(value, currency) {
@@ -461,7 +495,7 @@
   function pendingAllocationActionState(projectionValue, action, { sourceReady = true, panelVisible = true } = {}) {
     const eligibility = pendingAllocationEligibility(projectionValue);
     const contractState = contractPanelState(projectionValue?.feasible_allocation_plan, projectionValue?.allocation_decision);
-    const eligible = Boolean(projectionValue?.available === true && contractState === "PENDING"
+    const eligible = Boolean(projectionValue?.available === true && freshActionsAllowed(projectionValue) && contractState === "PENDING"
       && eligibility.eligible && sourceReady && panelVisible);
     const matches = Boolean(isRecord(action)
       && text(action.caseId) === text(projectionValue?.case_id)
@@ -741,6 +775,12 @@
     retainConversationProjection,
     shouldPreserveTemplateFields,
     formatNumber,
+    isRetainedEvidence,
+    conversationInferenceCapability,
+    retainedEvidenceLabel,
+    erpEvidenceSourceLabel,
+    sourceAwareErpText,
+    freshActionsAllowed,
     normalizeProjection,
     normalizeHandoffs,
     groupHandoffs,
@@ -812,6 +852,11 @@
     if (dot) dot.className = `status-dot status-dot-${tone}`;
   }
   function renderRefreshState({ retryPending = false } = {}) {
+    const retainedLabel = retainedEvidenceLabel(projection?.evidence_mode, projection);
+    if (retainedLabel) {
+      setText("ops-refresh-state", retainedLabel);
+      return;
+    }
     const prefix = retryPending ? "Source retry pending · " : "Last successful source refresh · ";
     const value = lastProjectionAt ? formatDate(lastProjectionAt) : "none yet";
     setText("ops-refresh-state", `${prefix}${value}`);
@@ -829,13 +874,16 @@
       disabled.querySelector("p").textContent = "No quantities, allocation, benchmark, or delivery state are inferred until the source responds.";
     }
     updateEventButton();
+    syncFreshEventControls(projection);
     updateAskButton();
   }
   function clearSourceError() {
     sourceState.hidden = true;
-    setConnection("Live source", "lime");
+    const retained = Boolean(retainedEvidenceLabel(projection?.evidence_mode, projection));
+    setConnection(retained ? "Retained evidence" : "Live source", retained ? "cyan" : "lime");
     renderRefreshState();
     updateEventButton();
+    syncFreshEventControls(projection);
     updateAskButton();
   }
   function displayQuantity(value) { return finite(value) ? formatNumber(value) : "Unknown"; }
@@ -882,12 +930,13 @@
   }
   function renderBenchmark(next) {
     const benchmark = fulfillmentBenchmark(next);
+    const sourceLabel = erpEvidenceSourceLabel(next?.evidence_mode);
     const grid = $("ops-benchmark-grid");
     const badge = $("ops-benchmark-state");
     if (!grid || !badge) return;
     if (benchmark.status !== "CURRENT") {
       badge.className = "state-badge state-neutral"; badge.textContent = "Comparison unavailable";
-      setText("ops-benchmark-note", `${benchmark.reason} Historical, industry, and savings baselines are unavailable.`);
+      setText("ops-benchmark-note", `${sourceAwareErpText(benchmark.reason, next?.evidence_mode)} Historical, industry, and savings baselines are unavailable.`);
       grid.replaceChildren(emptyList("No comparable current-case benchmark is available.")); return;
     }
     badge.className = "state-badge state-cyan"; badge.textContent = "Current case only";
@@ -904,7 +953,7 @@
       card("Native dispatch", benchmark.dispatched, "Recorded dispatch"),
       card("Recorded delivery confirmation", benchmark.confirmed, benchmark.synthetic ? "Synthetic recorded event; not independently verified receipt" : "Recorded event"),
     );
-    setText("ops-benchmark-note", `Source: current ERP case · Sample: one configured operation · Historical, industry, and savings baselines are unavailable.`);
+    setText("ops-benchmark-note", `Source: ${sourceLabel} · Sample: one configured operation · Historical, industry, and savings baselines are unavailable.`);
   }
 
   function allocationPicked(next) {
@@ -977,29 +1026,170 @@
     }));
   }
 
+  function requestedOpsView() {
+    const requested = text(new URLSearchParams(window.location.search).get("view")).toLowerCase();
+    if (["dashboard", "agent", "operations"].includes(requested)) return requested;
+    const hash = text(window.location.hash).toLowerCase();
+    if (hash === "#ops-chat-panel" || hash === "#ops-evidence-panel") return "agent";
+    if (["#ops-flow-panel", "#ops-alerts-panel", "#ops-details", "#ops-documents-panel", "#ops-handoffs-panel"].includes(hash)) return "operations";
+    return "dashboard";
+  }
+
+  function setOpsView(view, { scrollTarget = "" } = {}) {
+    const normalized = ["dashboard", "agent", "operations"].includes(view) ? view : "dashboard";
+    document.body.dataset.opsView = normalized;
+    document.querySelectorAll("[data-ops-view-link]").forEach((link) => {
+      const selected = link.dataset.opsViewLink === normalized;
+      link.classList.toggle("is-selected", selected);
+      if (selected) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+    if (scrollTarget) {
+      window.requestAnimationFrame(() => $(scrollTarget)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  }
+
+  function viewForOpsTarget(target) {
+    return target === "ops-chat-panel" || target === "ops-evidence-panel" ? "agent" : "operations";
+  }
+
+  function focusOpsTarget(target) {
+    const node = $(target);
+    if (!node) return;
+    setOpsView(viewForOpsTarget(target), { scrollTarget: target });
+  }
+
+  function networkNode({ key, icon, label, detail, target, alert = false, className = "" }) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `ops-network-node ${className}`.trim();
+    button.dataset.networkKey = key;
+    if (alert) button.classList.add("is-alert");
+    const iconNode = document.createElement("i");
+    iconNode.className = `ph ${icon}`;
+    iconNode.setAttribute("aria-hidden", "true");
+    const copy = document.createElement("span");
+    const title = document.createElement("strong"); title.textContent = label;
+    const meta = document.createElement("span"); meta.textContent = detail;
+    copy.append(title, meta);
+    button.append(iconNode, copy);
+    if (target) button.addEventListener("click", () => focusOpsTarget(target));
+    return button;
+  }
+
   function renderOverview(next) {
     const graph = $("ops-overview-graph");
     if (!graph) return;
-    const alerts = activeAlertStages(next);
-    const nodes = [
-      { key: "evidence", label: "Operator evidence", detail: `${next.events.length} retained event${next.events.length === 1 ? "" : "s"}`, target: "ops-evidence-panel" },
-      { key: "agent", label: "Read-only agent", detail: "Explains current case", target: "ops-chat-panel" },
-      { key: "commitments", label: "Customer commitments", detail: `${next.allocations.length} order${next.allocations.length === 1 ? "" : "s"}`, target: "ops-orders-panel" },
-      { key: "action", label: "Manager-approved action", detail: proposalActionDetail(next.prepared_proposal), target: "ops-evidence-panel" },
-      { key: "erp", label: "Native ERP readback", detail: `${next.documents.length} document${next.documents.length === 1 ? "" : "s"}`, target: "ops-documents-panel" },
+    const activeAlerts = next.alerts.filter((alert) => !isResolvedAlert(alert));
+    const incidentAlerts = next.alerts.filter(isRecord);
+    const handoffGroups = groupHandoffs(next.handoffs);
+    const groupFor = (needle) => handoffGroups.find((group) => group.provider.toLowerCase().includes(needle));
+    const statusFor = (needle) => {
+      const group = groupFor(needle);
+      return group?.latest?.status ? pretty(group.latest.status) : "No readback";
+    };
+    const sources = [
+      { key: "erp", icon: "ph-buildings", label: "ERPNext", detail: `${next.documents.length} record${next.documents.length === 1 ? "" : "s"}`, target: "ops-documents-panel", alert: Boolean(incidentAlerts.length && next.documents.length) },
+      { key: "airtable", icon: "ph-table", label: "Airtable", detail: statusFor("airtable"), target: "ops-handoffs-panel" },
+      { key: "jira", icon: "ph-kanban", label: "Jira", detail: statusFor("jira"), target: "ops-handoffs-panel", alert: Boolean(incidentAlerts.length && groupFor("jira")) },
+      { key: "celigo", icon: "ph-arrows-left-right", label: "Celigo", detail: statusFor("celigo"), target: "ops-handoffs-panel" },
+      { key: "slack", icon: "ph-chat-circle-text", label: "Slack", detail: statusFor("slack"), target: "ops-handoffs-panel" },
     ];
-    const hasAlert = Object.keys(alerts).length > 0;
-    graph.replaceChildren(...nodes.map((node, index) => {
-      const button = document.createElement("button"); button.type = "button"; button.className = "ops-overview-node";
-      if (hasAlert && (node.key === "evidence" || node.key === "action")) button.classList.add("is-alert");
-      button.innerHTML = `<strong>${node.label}</strong><span>${node.detail}</span>${index < nodes.length - 1 ? '<i class="ph ph-arrow-right" aria-hidden="true"></i>' : ""}`;
-      button.addEventListener("click", () => $(node.target)?.scrollIntoView({ behavior: "smooth", block: "start" }));
-      return button;
-    }));
+    const network = document.createElement("div"); network.className = "ops-network";
+    const sourceColumn = document.createElement("div"); sourceColumn.className = "ops-network-column";
+    const sourceKicker = document.createElement("span"); sourceKicker.className = "ops-network-kicker"; sourceKicker.textContent = "Source systems";
+    const sourceStack = document.createElement("div"); sourceStack.className = "ops-network-source-stack";
+    sources.forEach((source) => sourceStack.append(networkNode({ ...source, className: "ops-network-source" })));
+    sourceColumn.append(sourceKicker, sourceStack);
+
+    const agentColumn = document.createElement("div"); agentColumn.className = "ops-network-column ops-network-agent-wrap";
+    const agentKicker = document.createElement("span"); agentKicker.className = "ops-network-kicker"; agentKicker.textContent = "Reasoning layer";
+    const agentProvider = firstProvider(next, ["conversation_provider", "provider", "model"])
+      || firstProvider(next.conversation, ["provider_label", "provider", "model"])
+      || "Native bridge —";
+    const agent = networkNode({ key: "agent", icon: "ph-sparkle", label: "Agent board", detail: agentProvider, target: "ops-chat-panel", className: "ops-network-agent" });
+    agentColumn.append(agentKicker, agent);
+    if (incidentAlerts.length) {
+      const incident = document.createElement("div"); incident.className = "ops-network-incident";
+      const incidentIcon = document.createElement("i"); incidentIcon.className = "ph ph-warning"; incidentIcon.setAttribute("aria-hidden", "true");
+      const incidentAlert = activeAlerts[0] || incidentAlerts.find((alert) => /LOT|BATCH|SHORT|MISMATCH|QUALITY|INSPECTION/i.test(firstText(alert, ["code", "kind", "message", "detail"]))) || incidentAlerts[0];
+      const incidentCode = firstText(incidentAlert, ["code", "kind"]) || "Incident evidence";
+      incident.append(incidentIcon, document.createTextNode(`${incidentCode} · ${activeAlerts.length ? "open · evidence highlighted" : "resolved · evidence aligned"}`));
+      agentColumn.append(incident);
+    }
+
+    const managerColumn = document.createElement("div"); managerColumn.className = "ops-network-column ops-network-manager-wrap";
+    const managerKicker = document.createElement("span"); managerKicker.className = "ops-network-kicker"; managerKicker.textContent = "Control";
+    const proposalStatus = firstText(next.prepared_proposal, ["status"]);
+    const managerDetail = proposalStatus ? proposalActionDetail(next.prepared_proposal, next.evidence_mode) : isRetainedEvidence(next.evidence_mode) ? "Recorded completion · manager confirmation" : "Bounded action · manager approval";
+    const manager = networkNode({ key: "manager", icon: "ph-shield-check", label: "Manager gate", detail: managerDetail, target: "ops-evidence-panel", className: "ops-network-manager" });
+    managerColumn.append(managerKicker, manager);
+    network.append(sourceColumn, agentColumn, managerColumn);
+    graph.replaceChildren(network);
     setText("ops-overview-case", `${next.case_id || "Case unavailable"} · ${next.purchase_order || "PO unavailable"}`);
-    setText("ops-overview-copy", hasAlert
-      ? "Open alert highlighted: inspect its evidence before preparing an operation."
-      : "Current case graph from operator evidence through read-only explanation, commitments, approval, native ERP, and readback.");
+    setText("ops-alert-focus-link", next._provided.alerts && activeAlerts.length === 0 ? "Review resolved incident" : "Focus active alert");
+    setText("ops-overview-copy", activeAlerts.length ? "Open incident evidence is highlighted." : incidentAlerts.length ? "Resolved incident evidence is retained." : "Source records flow into read-only reasoning and manager control.");
+  }
+
+  function renderSignalSources(next) {
+    const list = $("ops-signal-source-list");
+    if (!list) return;
+    const groups = groupHandoffs(next.handoffs);
+    const groupFor = (needle) => groups.find((group) => group.provider.toLowerCase().includes(needle));
+    const documentRecord = next.documents.find((record) => isRecord(record)) || null;
+    const entries = [
+      {
+        label: "ERPNext",
+        detail: documentRecord ? firstText(documentRecord, ["name", "record_id", "id"]) || "PO20 document" : "No linked document",
+        status: documentRecord ? "VERIFIED" : "NO READBACK",
+      },
+      ...[["Airtable", "airtable"], ["Jira", "jira"], ["Celigo", "celigo"], ["Slack", "slack"]].map(([label, needle]) => {
+        const group = groupFor(needle);
+        return {
+          label,
+          detail: group?.latest?.record_id || group?.latest?.status ? group.latest.record_id || "Readback recorded" : "No readback",
+          status: group?.latest?.status ? pretty(group.latest.status) : "NO READBACK",
+        };
+      }),
+    ];
+    const linked = entries.filter((entry) => entry.status !== "NO READBACK").length;
+    setText("ops-signal-source-count", `${linked} linked · ${entries.length} systems`);
+    list.replaceChildren(...entries.map((entry) => {
+      const row = document.createElement("div"); row.className = "ops-signal-source";
+      const identity = document.createElement("div");
+      const title = document.createElement("strong"); title.textContent = entry.label;
+      const detail = document.createElement("small"); detail.textContent = entry.detail;
+      identity.append(title, detail);
+      const status = document.createElement("span"); status.className = `ops-signal-source-status${entry.status === "NO READBACK" ? " is-muted" : ""}`; status.textContent = entry.status;
+      row.append(identity, status);
+      return row;
+    }));
+  }
+
+  function renderAgentTools(next) {
+    const list = $("ops-agent-tools");
+    if (!list) return;
+    const groups = groupHandoffs(next.handoffs);
+    const recordsAvailable = next.documents.length > 0;
+    const collaborationAvailable = groups.length > 0;
+    const tools = [
+      ["read_control_context", next.available ? "READ" : "UNAVAILABLE"],
+      ["read_erp_evidence", recordsAvailable ? "READ" : "MISSING"],
+      ["read_collaboration_evidence", collaborationAvailable ? "READ" : "NOT NEEDED"],
+      ["manager_gate", isRetainedEvidence(next.evidence_mode) ? "CONFIRM" : "REVIEW"],
+    ];
+    list.replaceChildren(...tools.map(([label, status]) => {
+      const row = document.createElement("div"); row.className = "ops-agent-tool";
+      const name = document.createElement("span"); name.textContent = label;
+      const state = document.createElement("small"); state.textContent = status;
+      row.append(name, state);
+      return row;
+    }));
+    const activity = $("ops-agent-activity-copy");
+    if (!activity) return;
+    const latestEvent = [...next.events].reverse().find((event) => isRecord(event));
+    const latestCopy = latestEvent ? eventSummary(latestEvent, next) : "No source events recorded";
+    activity.textContent = `${next.events.length} source event${next.events.length === 1 ? "" : "s"} · ${latestCopy}`;
   }
 
   function metricBlock(label, value, className = "") {
@@ -1016,8 +1206,9 @@
   }
   function renderLots(next) {
     const list = $("ops-lots-list");
+    const sourceLabel = erpEvidenceSourceLabel(next?.evidence_mode);
     setText("ops-lots-count", next._provided.lots ? `${next.lots.length} lot${next.lots.length === 1 ? "" : "s"}` : "Unknown");
-    if (!next._provided.lots) { list.replaceChildren(emptyList("Lot and inspection data is unavailable from the current source.")); return; }
+    if (!next._provided.lots) { list.replaceChildren(emptyList(`Lot and inspection data is unavailable from the ${sourceLabel}.`)); return; }
     if (!next.lots.length) { list.replaceChildren(emptyList("No lot records in the current operation.")); return; }
     list.replaceChildren(...next.lots.map((lot) => {
       const row = document.createElement("div"); row.className = "ops-list-row";
@@ -1163,10 +1354,11 @@
   }
   function renderAllocations(next) {
     const list = $("ops-orders-list");
+    const sourceLabel = erpEvidenceSourceLabel(next?.evidence_mode);
     renderContractAllocation(next);
     const allocationPending = pendingAllocationEligibility(next).status === "PENDING";
     setText("ops-orders-count", next._provided.allocations ? `${next.allocations.length} order${next.allocations.length === 1 ? "" : "s"}` : "Unknown");
-    if (!next._provided.allocations) { list.replaceChildren(emptyList("Customer allocation data is unavailable from the current source.")); return; }
+    if (!next._provided.allocations) { list.replaceChildren(emptyList(`Customer allocation data is unavailable from the ${sourceLabel}.`)); return; }
     if (!next.allocations.length) { list.replaceChildren(emptyList("No customer allocation evidence in the current operation.")); return; }
     list.replaceChildren(...next.allocations.map((allocation) => {
       const row = document.createElement("div"); row.className = "ops-list-row";
@@ -1196,6 +1388,7 @@
 
   function renderAlerts(next) {
     const list = $("ops-alerts-list");
+    const sourceLabel = erpEvidenceSourceLabel(next?.evidence_mode);
     const alerts = next.alerts.filter((alert) => !isResolvedAlert(alert));
     const resolved = next.alerts.filter((alert) => isResolvedAlert(alert));
     const history = $("ops-resolved-alerts");
@@ -1211,7 +1404,7 @@
         row.append(code, detail); return row;
       }));
     }
-    if (!next._provided.alerts) { list.replaceChildren(emptyList("Manager alert data is unavailable from the current source.")); return; }
+    if (!next._provided.alerts) { list.replaceChildren(emptyList(`Manager alert data is unavailable from the ${sourceLabel}.`)); return; }
     if (!alerts.length) { list.replaceChildren(emptyList("No active manager alerts in the current projection.")); return; }
     list.replaceChildren(...alerts.map((alert) => {
       const card = document.createElement("article"); card.className = "ops-alert-card";
@@ -1304,9 +1497,10 @@
   }
   function renderDocuments(next) {
     const list = $("ops-documents-list");
+    const sourceLabel = erpEvidenceSourceLabel(next?.evidence_mode);
     setText("ops-documents-count", next._provided.documents ? `${next.documents.length} record${next.documents.length === 1 ? "" : "s"}` : "Unknown");
-    if (!next._provided.documents) { list.replaceChildren(emptyList("Native ERP document data is unavailable from the current source.")); return; }
-    if (!next.documents.length) { list.replaceChildren(emptyList("No linked ERP documents in the current source.")); return; }
+    if (!next._provided.documents) { list.replaceChildren(emptyList(`Native ERP document data is unavailable from the ${sourceLabel}.`)); return; }
+    if (!next.documents.length) { list.replaceChildren(emptyList(`No linked ERP documents in the ${sourceLabel}.`)); return; }
     list.replaceChildren(...next.documents.map((documentRecord) => {
       const row = document.createElement("div"); row.className = "ops-document";
       const body = document.createElement("div");
@@ -1379,7 +1573,7 @@
     return card;
   }
 
-  function renderInvoiceGroup(parent, title, group, unit) {
+  function renderInvoiceGroup(parent, title, group, unit, evidenceMode = null) {
     const section = document.createElement("section"); section.className = "ops-financial-group";
     const heading = document.createElement("div"); heading.className = "ops-financial-group-heading";
     const titleNode = document.createElement("strong"); titleNode.textContent = title;
@@ -1388,11 +1582,13 @@
     badge.textContent = pretty(group.status);
     heading.append(titleNode, badge);
     const note = document.createElement("p"); note.className = "ops-financial-note";
+    const sourceLabel = erpEvidenceSourceLabel(evidenceMode);
+    const sourceSentence = `${sourceLabel[0].toUpperCase()}${sourceLabel.slice(1)}`;
     note.textContent = group.status === "CURRENT" && group.records.length
-      ? "Invoice records read from the current ERP source."
+      ? `Invoice records read from the ${sourceLabel}.`
       : group.status === "CURRENT"
-        ? "Current ERP source returned no invoice records."
-        : financialStatusMessage(group.status, title.startsWith("Sales") ? "Sales" : "Purchase");
+        ? `${sourceSentence} returned no invoice records.`
+        : financialStatusMessage(group.status, title.startsWith("Sales") ? "Sales" : "Purchase", evidenceMode);
     section.append(heading, note);
     if (group.status === "CURRENT" && group.records.length) {
       const records = document.createElement("div"); records.className = "ops-financial-records";
@@ -1410,6 +1606,7 @@
       return;
     }
     const financials = normalizeFinancials(next.financials);
+    const sourceLabel = erpEvidenceSourceLabel(next?.evidence_mode);
     panel.hidden = false;
     const status = $("ops-financials-status");
     if (status) {
@@ -1417,14 +1614,14 @@
       status.textContent = pretty(financials.status);
     }
     setText("ops-financials-note", financials.status === "CURRENT"
-      ? "Commercial records are read from the current ERP source. Sales order line amounts are order values; they are not revenue. Invoice totals and outstanding amounts are invoice-level amounts."
-      : "Commercial evidence is unavailable from the current ERP source. No amounts are inferred.");
+      ? `Commercial records are read from the ${sourceLabel}. Sales order line amounts are order values; they are not revenue. Invoice totals and outstanding amounts are invoice-level amounts.`
+      : `Commercial evidence is unavailable from the ${sourceLabel}. No amounts are inferred.`);
     const orders = $("ops-financial-orders");
     const invoices = $("ops-financial-invoices");
     orders.replaceChildren(); invoices.replaceChildren();
     if (financials.status !== "CURRENT") {
-      orders.append(emptyList("Source order lines are unavailable from the current ERP source."));
-      invoices.append(emptyList("Invoice records are unavailable from the current ERP source."));
+      orders.append(emptyList(`Source order lines are unavailable from the ${sourceLabel}.`));
+      invoices.append(emptyList(`Invoice records are unavailable from the ${sourceLabel}.`));
       return;
     }
     const unit = text(next.quantities?.uom) || "units";
@@ -1435,14 +1632,14 @@
       const name = firstText(order.document, ["name", "record_id", "id"]) || "Sales order";
       orders.append(financialOrderCard(order, `Sales order · ${name}`, unit));
     }
-    if (!orders.childNodes.length) orders.append(emptyList("No source order lines returned from the current ERP source."));
-    renderInvoiceGroup(invoices, "Purchase invoices", financials.purchase_invoices, unit);
+    if (!orders.childNodes.length) orders.append(emptyList(`No source order lines returned from the ${sourceLabel}.`));
+    renderInvoiceGroup(invoices, "Purchase invoices", financials.purchase_invoices, unit, next.evidence_mode);
     if (financials.sales_invoices.length) {
       for (const row of financials.sales_invoices) {
-        renderInvoiceGroup(invoices, `Sales invoices · ${row.customer_order || "Order unavailable"}`, normalizeInvoiceGroup(row), unit);
+        renderInvoiceGroup(invoices, `Sales invoices · ${row.customer_order || "Order unavailable"}`, normalizeInvoiceGroup(row), unit, next.evidence_mode);
       }
     } else {
-      invoices.append(emptyList("No sales invoice groups returned from the current ERP source."));
+      invoices.append(emptyList(`No sales invoice groups returned from the ${sourceLabel}.`));
     }
   }
 
@@ -1569,7 +1766,8 @@
     const provider = firstProvider(conversation, ["provider_label", "provider", "model"])
       || firstProvider(next, ["conversation_provider", "provider", "model"])
       || (/UNAVAILABLE|ERROR|FAILED|DISABLED/.test(status) ? "Unavailable" : "Native bridge —");
-    const context = firstText(conversation, ["context_label", "context", "source_summary"]) || firstText(next, ["conversation_context"]) || "Current operation source";
+    const sourceLabel = erpEvidenceSourceLabel(next?.evidence_mode);
+    const context = firstText(conversation, ["context_label", "context", "source_summary"]) || firstText(next, ["conversation_context"]) || sourceLabel;
     setText("ops-chat-provider", provider);
     setText("ops-chat-context", context);
     const answerNode = $("ops-chat-answer"); answerNode.classList.remove("is-error");
@@ -1646,7 +1844,8 @@
       selectedTemplate = match;
       renderTemplateSummary(match);
     } else if (match) renderTemplateFields(match); else renderTemplateFields(null);
-    templateSelect.disabled = !next.available_event_templates.length || !next.available;
+    templateSelect.disabled = !next.available_event_templates.length || !next.available || !freshActionsAllowed(next);
+    syncFreshEventControls(next);
     updateEventButton();
   }
   function readTemplateValues() {
@@ -1654,7 +1853,15 @@
   }
   function updateEventButton() {
     const button = $("ops-process-event");
-    if (button) button.disabled = processingEvent || !projection?.available || !selectedTemplate || !sourceState?.hidden;
+    if (button) button.disabled = processingEvent || !projection?.available || !freshActionsAllowed(projection) || !selectedTemplate || !sourceState?.hidden;
+  }
+  function syncFreshEventControls(next = projection) {
+    const form = $("ops-event-form");
+    if (!form) return;
+    const enabled = Boolean(next?.available === true && freshActionsAllowed(next) && sourceState?.hidden);
+    form.querySelectorAll("input, select, button").forEach((control) => { control.disabled = !enabled; });
+    const select = $("ops-template-select");
+    if (select) select.disabled = !enabled || !Array.isArray(next?.available_event_templates) || !next.available_event_templates.length;
   }
 
   function proposalSourceLabel(source) {
@@ -1663,11 +1870,12 @@
       : "Operator-declared event; the agent did not create it.";
   }
 
-  function proposalActionDetail(proposal) {
+  function proposalActionDetail(proposal, evidenceMode = null) {
     if (!isRecord(proposal)) return "No pending proposal";
     const status = text(proposal.status).toUpperCase();
-    if (status === "APPLIED") return "Approved operation applied";
-    if (status === "PENDING_MANAGER_APPROVAL") return "Proposal awaiting manager review";
+    const retained = isRetainedEvidence(evidenceMode || proposal.evidence_mode);
+    if (status === "APPLIED") return retained ? "Recorded completion confirmed" : "Approved operation applied";
+    if (status === "PENDING_MANAGER_APPROVAL") return retained ? "Recorded completion awaiting confirmation" : "Proposal awaiting manager review";
     return status ? `Proposal status: ${pretty(status)}` : "Proposal status unavailable";
   }
 
@@ -1687,12 +1895,26 @@
     const button = $("ops-approve-proposal");
     if (!panel || !button) return;
     const proposal = preparedProposal;
+    const retained = isRetainedEvidence(next?.evidence_mode);
+    setText("ops-manager-gate-label", retained ? "Recorded completion" : "Manager gate");
+    setText("ops-evidence-title", retained ? "Confirm recorded completion" : "Process evidence");
+    setText("ops-evidence-copy", retained
+      ? "Review the recorded completion and confirm the exact retained case revision."
+      : "Prepare one bounded action from operator-declared evidence, then confirm the exact case revision.");
+    setText("ops-gate-note", retained
+      ? "Manager confirmation recovers a recorded completed event; it does not create a fresh native operation."
+      : "Manager approval stays bounded to the prepared case revision.");
+    setText("ops-proposal-label", retained ? "Recorded completion" : "Manager approval");
+    setText("ops-proposal-title", retained ? "Confirm recorded completion" : "Prepared same-case operation");
+    setText("ops-approve-label", retained ? "Confirm recorded completion" : "Approve and execute");
     const readback = $("ops-approval-readback");
     const approval = approvalReadback(next);
     if (readback) {
       readback.hidden = !approval;
       readback.textContent = approval
-        ? `Approved by ${text(approval.manager_id) || "manager unavailable"} at ${formatDate(approval.approved_at)} · ${text(approval.event_id) || "event unavailable"}${approval.recovered === true ? " · recovered from retained event result" : ""}.`
+        ? retained
+          ? `Recorded completion confirmed by ${text(approval.manager_id) || "manager unavailable"} at ${formatDate(approval.approved_at)} · ${text(approval.event_id) || "event unavailable"}${approval.recovered === true ? " · recovered from retained event result" : ""}.`
+          : `Approved by ${text(approval.manager_id) || "manager unavailable"} at ${formatDate(approval.approved_at)} · ${text(approval.event_id) || "event unavailable"}${approval.recovered === true ? " · recovered from retained event result" : ""}.`
         : "";
     }
     panel.hidden = !proposal || text(proposal.status) === "APPLIED" || text(proposal.case_id) && text(proposal.case_id) !== text(next?.case_id);
@@ -1701,8 +1923,11 @@
     const fields = Object.entries(event)
       .filter(([key]) => !["event_id", "type", "occurred_at", "synthetic"].includes(key))
       .map(([key, value]) => `${pretty(key)}: ${Array.isArray(value) ? value.join(", ") : String(value)}`);
-    setText("ops-proposal-summary", `${text(proposal.case_id) || text(next?.case_id)} · PO ${text(proposal.purchase_order) || text(next?.purchase_order) || "unavailable"} · ${pretty(event.type || "operation")}. ${fields.join(" · ")}. ${proposalSourceLabel(proposal.source)} Approval checks this exact current-case revision before one native execution.`);
-    button.disabled = processingEvent || !next?.available || !sourceState?.hidden || !text($("ops-manager-id")?.value);
+    const actionCopy = retained
+      ? "This confirms a recorded completed event; no new native execution is attempted."
+      : "Approval checks this exact current-case revision before one native execution.";
+    setText("ops-proposal-summary", `${text(proposal.case_id) || text(next?.case_id)} · PO ${text(proposal.purchase_order) || text(next?.purchase_order) || "unavailable"} · ${pretty(event.type || "operation")}. ${fields.join(" · ")}. ${proposalSourceLabel(proposal.source)} ${actionCopy}`);
+    button.disabled = processingEvent || !next?.available || !sourceState?.hidden || !text($("ops-manager-id")?.value) || (!retained && !freshActionsAllowed(next));
   }
 
   function photoAttachmentList(next) {
@@ -1748,6 +1973,7 @@
   }
 
   async function uploadSelectedPhoto() {
+    if (!freshActionsAllowed(projection)) throw new Error("Fresh event controls are disabled for this retained operation.");
     if (!selectedPhoto) return "";
     const file = selectedPhoto;
     if (!/image\/(jpeg|png)/.test(file.type)) throw new Error("Choose a JPEG or PNG photo.");
@@ -1830,7 +2056,7 @@
   async function reviewPendingAllocation() {
     const source = projection;
     const eligibility = pendingAllocationEligibility(source);
-    if (!source?.available || !sourceState?.hidden || !eligibility.eligible
+    if (!source?.available || !freshActionsAllowed(source) || !sourceState?.hidden || !eligibility.eligible
       || contractPanelState(source.feasible_allocation_plan, source.allocation_decision) !== "PENDING") return;
     let action = pendingAllocationAction;
     const sameAction = action
@@ -1855,7 +2081,7 @@
     if (action.inFlight) return;
     const request = pendingAllocationRequest(source, action.retryId);
     if (!request) {
-      setAllocationFeedback("Pending allocation review is unavailable from the current source.", "error", {
+      setAllocationFeedback(`Pending allocation review is unavailable from the ${erpEvidenceSourceLabel(source?.evidence_mode)}.`, "error", {
         caseId: action.caseId, pendingEventId: action.pendingEventId,
       });
       return;
@@ -1940,6 +2166,7 @@
         setConnection("Disabled", "amber");
       }
       updateEventButton();
+      syncFreshEventControls(next);
       updateAskButton();
       return;
     }
@@ -1949,6 +2176,8 @@
     renderQuantities(next);
     renderStages(next);
     renderOverview(next);
+    renderSignalSources(next);
+    renderAgentTools(next);
     renderBenchmark(next);
     renderTemplates(next, { resetFields: resetEventFields || caseChanged });
     renderLots(next);
@@ -1993,12 +2222,20 @@
   }
 
   templateSelect.addEventListener("change", () => {
+    if (!freshActionsAllowed(projection)) {
+      templateSelect.value = "";
+      renderTemplateFields(null);
+      return;
+    }
     const template = projection?.available_event_templates.find((item) => item.type === templateSelect.value) || null;
     renderTemplateFields(template);
   });
   $("ops-event-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (processingEvent || !selectedTemplate) return;
+    if (processingEvent || !selectedTemplate || !freshActionsAllowed(projection)) {
+      if (!freshActionsAllowed(projection)) setFeedback("Fresh event controls are disabled for this retained operation.", "error");
+      return;
+    }
     processingEvent = true; updateEventButton(); setFeedback("Preparing the operator-declared event for manager approval…");
     try {
       const payload = buildEventPayload({
@@ -2039,6 +2276,10 @@
     const file = event.target.files?.[0] || null;
     resetSelectedPhoto();
     if (!file) return;
+    if (!freshActionsAllowed(projection)) {
+      setFeedback("Fresh event controls are disabled for this retained operation.", "error");
+      return;
+    }
     if (!/image\/(jpeg|png)/.test(file.type) || file.size <= 0 || file.size > 5_000_000) {
       setFeedback("Choose a JPEG or PNG photo smaller than 5 MB.", "error"); return;
     }
@@ -2051,9 +2292,13 @@
   $("ops-approve-proposal")?.addEventListener("click", async () => {
     const proposal = preparedProposal;
     const managerId = text($("ops-manager-id")?.value);
-    if (!proposal || !managerId || processingEvent) return;
+    const retained = isRetainedEvidence(projection?.evidence_mode);
+    if (!proposal || !managerId || processingEvent || (!retained && !freshActionsAllowed(projection))) return;
     processingEvent = true; renderPreparedProposal(projection);
-    const feedback = $("ops-proposal-feedback"); feedback.className = "ops-feedback"; feedback.textContent = "Checking the current case and executing one approved operation…";
+    const feedback = $("ops-proposal-feedback"); feedback.className = "ops-feedback";
+    feedback.textContent = retained
+      ? "Checking retained evidence and confirming the recorded completed event…"
+      : "Checking the current case and executing one approved operation…";
     try {
       const response = await requestJSON(`${API_PATH}/approve-proposal`, {
         method: "POST",
@@ -2063,15 +2308,45 @@
       preparedProposal = null;
       if (next) renderProjection(next, { resetEventFields: true });
       resetSelectedPhoto();
-      feedback.className = "ops-feedback is-success"; feedback.textContent = "Manager approval recorded. Native operation result and same-case readback are shown below.";
+      feedback.className = "ops-feedback is-success";
+      feedback.textContent = retained
+        ? "Recorded completed event confirmed. Retained evidence and same-case readback are shown below."
+        : "Manager approval recorded. Native operation result and same-case readback are shown below.";
       void refresh({ silent: true });
     } catch (error) {
-      feedback.className = "ops-feedback is-error"; feedback.textContent = error.message || "Approved operation could not execute.";
+      feedback.className = "ops-feedback is-error";
+      feedback.textContent = retained
+        ? "Recorded completion confirmation could not be recorded; retained evidence remains unchanged."
+        : error.message || "Approved operation could not execute.";
     } finally {
       processingEvent = false; renderPreparedProposal(projection);
     }
   });
   $("ops-retry").addEventListener("click", () => { void refresh(); });
+  document.querySelectorAll("[data-ops-view-link]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      const view = text(link.dataset.opsViewLink) || "dashboard";
+      const url = new URL(link.href, window.location.href);
+      window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      setOpsView(view, { scrollTarget: text(url.hash).replace(/^#/, "") });
+    });
+  });
+  document.querySelectorAll(".ops-overview-links a").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      const target = text(link.getAttribute("href")).replace(/^#/, "");
+      if (!target) return;
+      const url = new URL(window.location.href);
+      url.searchParams.set("view", viewForOpsTarget(target));
+      url.hash = target;
+      window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      focusOpsTarget(target);
+    });
+  });
+  window.addEventListener("popstate", () => setOpsView(requestedOpsView()));
+  window.addEventListener("hashchange", () => setOpsView(requestedOpsView()));
+  setOpsView(requestedOpsView());
   function initializeVoiceControls() {
     const recognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
     voiceController = createVoiceController({
@@ -2099,7 +2374,9 @@
     if (!question || asking || !projection?.available) return;
     asking = true; $("ops-ask-submit").disabled = true; $("ops-ask-submit").textContent = "Asking…";
     const answerNode = $("ops-chat-answer"); answerNode.classList.remove("is-error");
-    const waiting = document.createElement("p"); waiting.textContent = "Reading the current operation source…"; answerNode.replaceChildren(waiting);
+    const waiting = document.createElement("p"); waiting.textContent = isRetainedEvidence(projection?.evidence_mode)
+      ? "Reading retained accepted evidence…"
+      : "Reading the current operation source…"; answerNode.replaceChildren(waiting);
     try {
       const response = await requestJSON(`${API_PATH}/ask`, { method: "POST", body: JSON.stringify({ question }) });
       const next = unwrapProjection(response);
