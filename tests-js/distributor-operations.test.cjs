@@ -14,6 +14,14 @@ const {
   contractPlanRows,
   contractDecisionState,
   contractPanelState,
+  pendingAllocationEligibility,
+  pendingAllocationRequest,
+  normalizeAllocationRetries,
+  allocationRetryForDecision,
+  dispatchEligibilityText,
+  allocationReviewOutcome,
+  pendingAllocationActionState,
+  shouldRetainPendingAllocationRetry,
   fulfillmentBenchmark,
   activeAlertStages,
   flowStageFacts,
@@ -166,6 +174,156 @@ test('a zero additional current plan keeps an earlier selection as historical ev
   assert.equal(contractPanelState(completePlan, {
     status: 'SELECTED', plan_id: 'cap-earlier', state_revision: 'rev-earlier', event_id: 'evt-earlier',
   }), 'COMPLETE');
+});
+
+test('pending allocation review uses only the pending decision event and an idempotency ID', () => {
+  const projection = {
+    case_id: 'CASE-ALLOCATION-1',
+    allocation_decision: { status: 'PENDING', event_id: 'pending-source-event-12', pending_event_id: 'wrong-field' },
+    events: [{ event_id: 'unrelated-event-1' }],
+  };
+  assert.deepEqual(pendingAllocationEligibility(projection), {
+    status: 'PENDING', pending_event_id: 'pending-source-event-12', eligible: true, reason: '',
+  });
+  assert.deepEqual(pendingAllocationRequest(projection, 'retry-uuid-1'), {
+    retry_id: 'retry-uuid-1', pending_event_id: 'pending-source-event-12',
+  });
+  assert.equal(pendingAllocationRequest({ allocation_decision: { status: 'PENDING', pending_event_id: 'wrong-field' }, events: [{ event_id: 'event-1' }] }, 'retry-uuid-2'), null);
+  assert.equal(pendingAllocationRequest({ allocation_decision: { status: 'SELECTED', event_id: 'selected-event' }, events: [{ event_id: 'event-2' }] }, 'retry-uuid-3'), null);
+});
+
+test('allocation retry readback stays separate and matches the decision source', () => {
+  const projection = {
+    allocation_decision: { status: 'PENDING', event_id: 'pending-event-12' },
+    events: [{ event_id: 'pending-event-12', status: 'BLOCKED' }],
+    allocation_retries: [
+      { retry_id: 'retry-1', pending_event_id: 'other-event', status: 'FAILED' },
+      { retry_id: 'retry-2', pending_event_id: 'pending-event-12', status: 'PENDING', operations: [{ status: 'BLOCKED' }] },
+    ],
+  };
+  assert.equal(allocationRetryForDecision(projection).retry_id, 'retry-2');
+  assert.equal(allocationRetryForDecision(projection).status, 'PENDING');
+  assert.equal(normalizeAllocationRetries(projection.allocation_retries).length, 2);
+  assert.equal(allocationRetryForDecision({ allocation_decision: { status: 'PENDING', event_id: 'pending-event-12' }, events: [{ event_id: 'pending-event-12' }] }), null);
+});
+
+test('pending allocation action disables only the matching in-flight review', () => {
+  const projection = {
+    available: true,
+    case_id: 'CASE-ALLOCATION-1',
+    feasible_allocation_plan: contractPlan,
+    allocation_decision: { status: 'PENDING', event_id: 'pending-event-12' },
+  };
+  const inFlight = pendingAllocationActionState(projection, {
+    caseId: 'CASE-ALLOCATION-1', pendingEventId: 'pending-event-12', inFlight: true,
+  });
+  assert.equal(inFlight.eligible, true);
+  assert.equal(inFlight.in_flight, true);
+  assert.equal(inFlight.disabled, true);
+  assert.match(inFlight.label, /Reviewing/);
+
+  const ready = pendingAllocationActionState(projection, {
+    caseId: 'CASE-ALLOCATION-1', pendingEventId: 'pending-event-12', inFlight: false,
+  });
+  assert.equal(ready.eligible, true);
+  assert.equal(ready.in_flight, false);
+  assert.equal(ready.disabled, false);
+  assert.equal(ready.label, 'Review pending allocation');
+
+  const otherCase = pendingAllocationActionState(projection, {
+    caseId: 'CASE-OTHER', pendingEventId: 'pending-event-12', inFlight: true,
+  });
+  assert.equal(otherCase.disabled, false);
+  assert.equal(otherCase.in_flight, false);
+});
+
+test('allocation retry feedback uses the submitted row and keeps dispatch separate', () => {
+  const base = {
+    available: true,
+    case_id: 'CASE-ALLOCATION-1',
+    feasible_allocation_plan: contractPlan,
+    allocation_decision: { status: 'SELECTED', event_id: 'pending-event-12' },
+  };
+  const applied = allocationReviewOutcome({
+    ...base,
+    allocation_retries: [{
+      retry_id: 'retry-applied', pending_event_id: 'pending-event-12', status: 'APPLIED',
+      operations: [{ kind: 'prepare_pick', status: 'APPLIED' }],
+    }],
+  }, 'retry-applied');
+  assert.equal(applied.status, 'APPLIED');
+  assert.equal(applied.tone, 'success');
+  assert.match(applied.message, /verified pick preparation/);
+  assert.match(applied.message, /Dispatch remains a separate step/);
+  assert.doesNotMatch(applied.message, /No pick/);
+
+  const blocked = allocationReviewOutcome({
+    ...base,
+    allocation_retries: [{
+      retry_id: 'retry-blocked', pending_event_id: 'pending-event-12', status: 'BLOCKED',
+      operations: [{ kind: 'prepare_pick', status: 'BLOCKED' }],
+    }],
+  }, 'retry-blocked');
+  assert.equal(blocked.tone, 'error');
+  assert.doesNotMatch(blocked.message, /verified pick preparation/);
+
+  const unknown = allocationReviewOutcome({
+    ...base,
+    allocation_retries: [{
+      retry_id: 'retry-unknown', pending_event_id: 'pending-event-12', status: 'UNKNOWN_OUTCOME',
+    }],
+  }, 'retry-unknown');
+  assert.equal(unknown.tone, 'error');
+  assert.doesNotMatch(unknown.message, /verified pick preparation/);
+
+  const pending = allocationReviewOutcome({
+    ...base,
+    allocation_retries: [{ retry_id: 'retry-pending', pending_event_id: 'pending-event-12', status: 'PENDING' }],
+  }, 'retry-pending');
+  assert.equal(pending.tone, 'error');
+  assert.match(pending.message, /not confirmed/);
+
+  const unavailable = allocationReviewOutcome({
+    ...base,
+    allocation_retries: [{ retry_id: 'retry-unavailable', pending_event_id: 'pending-event-12', status: 'UNAVAILABLE' }],
+  }, 'retry-unavailable');
+  assert.equal(unavailable.tone, 'error');
+  assert.doesNotMatch(unavailable.message, /verified pick preparation/);
+
+  const missingSubmittedRow = allocationReviewOutcome({
+    ...base,
+    allocation_retries: [{ retry_id: 'older', pending_event_id: 'pending-event-12', status: 'APPLIED' }],
+  }, 'retry-that-was-submitted');
+  assert.equal(missingSubmittedRow.status, 'UNKNOWN_OUTCOME');
+  assert.equal(missingSubmittedRow.tone, 'error');
+});
+
+test('allocation retry fallback uses the latest matching action and known outcomes release its ID', () => {
+  const projection = {
+    allocation_decision: { status: 'PENDING', event_id: 'pending-event-12' },
+    allocation_retries: [
+      { retry_id: 'retry-old', pending_event_id: 'pending-event-12', status: 'BLOCKED' },
+      { retry_id: 'retry-latest', pending_event_id: 'pending-event-12', status: 'PENDING' },
+    ],
+  };
+  assert.equal(allocationRetryForDecision(projection).retry_id, 'retry-latest');
+  assert.equal(shouldRetainPendingAllocationRetry(null, 'UNKNOWN_OUTCOME'), true);
+  for (const status of ['APPLIED', 'PENDING', 'UNAVAILABLE', 'BLOCKED']) {
+    assert.equal(shouldRetainPendingAllocationRetry(null, status), false, status);
+  }
+  assert.equal(shouldRetainPendingAllocationRetry({ status: 503 }, ''), true);
+  assert.equal(shouldRetainPendingAllocationRetry({ status: 409 }, ''), false);
+});
+
+test('dispatch eligibility is rendered as an explicit source-backed term', () => {
+  assert.equal(dispatchEligibilityText('NO_DISPATCH_REMAINING'), 'No dispatch remains for this order');
+  assert.equal(dispatchEligibilityText('FINAL_REMAINDER_ALLOWED'), 'Eligible for an allowed final remainder');
+  assert.equal(dispatchEligibilityText('MEETS_MINIMUM'), 'Meets the minimum dispatch quantity');
+  const [row] = contractPlanRows({
+    ...contractPlan,
+    rows: [{ ...contractPlan.rows[0], dispatch_eligibility: 'NO_DISPATCH_REMAINING' }],
+  });
+  assert.equal(row.dispatch_eligibility, 'NO_DISPATCH_REMAINING');
 });
 
 test('current-case benchmark compares only source-backed commitments and recorded completion', () => {
@@ -488,4 +646,8 @@ test('page exposes the guarded business loop and synthetic evidence label', () =
   assert.ok(html.indexOf('id="ops-chat-panel"') < html.indexOf('id="ops-evidence-panel"'));
   assert.match(html, /href="#ops-chat-panel"/);
   assert.match(html, /distributor-operations\.js/);
+  assert.match(html, /ops-quantity-allocated-label/);
+  const javascript = fs.readFileSync(path.join(__dirname, '../workspace/distributor-operations.js'), 'utf8');
+  assert.match(javascript, /reselect-pending-allocation/);
+  assert.match(javascript, /Review pending allocation/);
 });

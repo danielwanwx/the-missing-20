@@ -220,6 +220,14 @@ def compile_plan(
         ):
             new_quantity = Decimal()
         available -= new_quantity
+        if remaining == 0:
+            eligibility = "NO_DISPATCH_REMAINING"
+        elif new_quantity == 0:
+            eligibility = "NOT_EXECUTABLE"
+        elif new_quantity < minimum:
+            eligibility = "FINAL_REMAINDER_ALLOWED"
+        else:
+            eligibility = "MEETS_MINIMUM"
         rows.append(
             {
                 "customer_order": order,
@@ -229,13 +237,40 @@ def compile_plan(
                 "minimum_dispatch_quantity": _wire(minimum),
                 "allow_final_remainder": term["allow_final_remainder"],
                 "prepared_commitment": _wire(fixed),
+                "remaining_to_dispatch_before_new": _wire(remaining - fixed),
                 "new_quantity": _wire(new_quantity),
                 "quantity": _wire(fixed + new_quantity),
                 "remaining_after_dispatch": _wire(remaining - fixed - new_quantity),
+                "dispatch_candidate": new_quantity > 0,
+                "dispatch_eligibility": eligibility,
             }
         )
     revision = state_revision(lots=lots, allocations=allocations, prepared_picks=prepared_picks)
-    identity = {"version": CONTRACT_ALLOCATION_VERSION, "state_revision": revision, "rows": rows}
+    # Keep v1 plan IDs tied to executable quantities and fixed terms. The
+    # source-derived display/selection labels above must not change a prepared
+    # plan identity by themselves.
+    identity = {
+        "version": CONTRACT_ALLOCATION_VERSION,
+        "state_revision": revision,
+        "rows": [
+            {
+                key: row[key]
+                for key in (
+                    "customer_order",
+                    "promised_delivery_at",
+                    "customer_priority",
+                    "partial_dispatch",
+                    "minimum_dispatch_quantity",
+                    "allow_final_remainder",
+                    "prepared_commitment",
+                    "new_quantity",
+                    "quantity",
+                    "remaining_after_dispatch",
+                )
+            }
+            for row in rows
+        ],
+    }
     plan_id = (
         "cap-"
         + hashlib.sha256(

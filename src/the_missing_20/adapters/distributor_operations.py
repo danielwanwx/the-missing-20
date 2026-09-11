@@ -12,7 +12,7 @@ import json
 import math
 import sqlite3
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from pathlib import Path
@@ -252,6 +252,11 @@ class DistributorOperations:
             "(event_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, result_json TEXT, "
             "state_json TEXT, recorded_at TEXT NOT NULL)"
         )
+        self._db.execute(
+            "CREATE TABLE IF NOT EXISTS distributor_allocation_retries "
+            "(retry_id TEXT PRIMARY KEY, pending_event_id TEXT NOT NULL, result_json TEXT, "
+            "state_json TEXT, recorded_at TEXT NOT NULL)"
+        )
         self._lock = RLock()
 
     def close(self) -> None:
@@ -295,7 +300,7 @@ class DistributorOperations:
                     "INSERT INTO distributor_operation_events "
                     "(event_id, payload_json, result_json, state_json, recorded_at) "
                     "VALUES (?, ?, NULL, NULL, ?)",
-                    (event_id, encoded, self._now().isoformat()),
+                    (event_id, encoded, self._next_recorded_at()),
                 )
                 self._db.commit()
             except Exception:
@@ -333,6 +338,123 @@ class DistributorOperations:
                 self._db.rollback()
                 raise
             return projection
+
+    def retry_pending_allocation(self, request: Mapping[str, object]) -> dict[str, object]:
+        """Re-evaluate one retained pending allocation without replaying a physical event.
+
+        The retry row is durable before selector or ERP work starts. Replaying its
+        ``retry_id`` returns the completed result and never starts another native
+        prepare-pick call.
+        """
+
+        if set(request) != {"retry_id", "pending_event_id"}:
+            raise ValueError("retry accepts only retry_id and pending_event_id")
+        retry_id = _text(request.get("retry_id"), "retry_id")
+        pending_event_id = _text(request.get("pending_event_id"), "pending_event_id")
+        with self._lock:
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                existing = self._db.execute(
+                    "SELECT pending_event_id, result_json FROM distributor_allocation_retries "
+                    "WHERE retry_id=?",
+                    (retry_id,),
+                ).fetchone()
+                if existing is not None:
+                    stored_pending, stored_result = cast(tuple[str, str | None], existing)
+                    if stored_pending != pending_event_id:
+                        raise DistributorEventConflict(
+                            "A duplicate allocation retry ID has different input."
+                        )
+                    self._db.commit()
+                    if stored_result is not None:
+                        return self._projection_from_record(stored_result)
+                    return self._pending_allocation_retry_projection(retry_id)
+
+                retained = self._latest_state()
+                if retained is None:
+                    raise ValueError("No retained allocation decision can be retried.")
+                decision = retained.get("allocation_decision")
+                if not (
+                    isinstance(decision, Mapping)
+                    and decision.get("status") == "PENDING"
+                    and decision.get("event_id") == pending_event_id
+                ):
+                    raise ValueError("The requested allocation decision is not pending.")
+                self._db.execute(
+                    "INSERT INTO distributor_allocation_retries "
+                    "(retry_id, pending_event_id, result_json, state_json, recorded_at) "
+                    "VALUES (?, ?, NULL, NULL, ?)",
+                    (retry_id, pending_event_id, self._next_recorded_at()),
+                )
+                self._db.commit()
+            except Exception:
+                self._db.rollback()
+                raise
+
+            source = self._read_source()
+            state = self._latest_state() or self._initial_state()
+            state, source = self._merge_source(state, source)
+            event = self._allocation_retry_event(state, retry_id, pending_event_id)
+            action = self._append_allocation_retry(state, retry_id, pending_event_id)
+            if source["source_status"] != "CURRENT":
+                self._alert(
+                    state,
+                    code="SOURCE_UNAVAILABLE",
+                    message="Current ERP evidence is unavailable; no native operation was started.",
+                    event=event,
+                    error_code=cast(str, source.get("source_error") or "ERP_SOURCE_UNAVAILABLE"),
+                )
+                action.update(
+                    {"status": "UNAVAILABLE", "reason": "ERP_SOURCE_UNAVAILABLE", "operations": []}
+                )
+                return self._complete_allocation_retry(retry_id, state, source)
+
+            self._recompute_allocations(state)
+            plan = self._contract_plan(state)
+            action.update(
+                {
+                    "plan_id": plan["plan_id"],
+                    "state_revision": plan["state_revision"],
+                    "plan_rows": _copy(plan["rows"]),
+                }
+            )
+            if _quantity(plan["new_quantity"], "contract plan new quantity") <= 0:
+                action.update(
+                    {
+                        "status": "BLOCKED",
+                        "reason": "NO_EXECUTABLE_DISPATCH_CANDIDATE",
+                        "operations": [],
+                    }
+                )
+                return self._complete_allocation_retry(retry_id, state, source)
+            if self._contract_plan_native_tranches(plan, state) is None:
+                action.update(
+                    {
+                        "status": "BLOCKED",
+                        "reason": "ALLOCATION_PLAN_NATIVE_TRANCHE_UNSUPPORTED",
+                        "operations": [],
+                    }
+                )
+                return self._complete_allocation_retry(retry_id, state, source)
+
+            outcomes = self._prepare_pick(
+                state,
+                event,
+                resolve_pending_event_id=pending_event_id,
+                retry_id=retry_id,
+            )
+            action["operations"] = [outcome.record() for outcome in outcomes]
+            decision = state.get("allocation_decision")
+            if isinstance(decision, Mapping) and decision.get("status") == "PENDING":
+                action.update({"status": "PENDING", "reason": "ALLOCATION_SELECTION_PENDING"})
+            elif outcomes and all(outcome.succeeded for outcome in outcomes):
+                action["status"] = "APPLIED"
+            elif any(outcome.status == "UNKNOWN_OUTCOME" for outcome in outcomes):
+                action["status"] = "UNKNOWN_OUTCOME"
+            else:
+                action["status"] = "BLOCKED"
+            self._recompute_quantities(state)
+            return self._complete_allocation_retry(retry_id, state, source)
 
     def reconcile_receive_arrival(self, event_id: str) -> dict[str, object]:
         """Admit an exact submitted receipt for the latest unknown arrival without retrying it."""
@@ -1280,6 +1402,7 @@ class DistributorOperations:
             "documents": [],
             "shipments": {},
             "prepared_picks": [],
+            "allocation_retries": [],
             "conversation": [],
             "financials": {"status": "UNAVAILABLE", "reason": "FINANCIAL_NOT_PROVIDED"},
             "source_status": "UNAVAILABLE",
@@ -1299,12 +1422,115 @@ class DistributorOperations:
             )
         return _whole(self._config["cartons"], "cartons", positive=True)
 
+    def _next_recorded_at(self) -> str:
+        """Return a cross-table ordering timestamp even when the configured clock is fixed."""
+
+        row = self._db.execute(
+            "SELECT MAX(recorded_at) FROM ("
+            "SELECT recorded_at FROM distributor_operation_events "
+            "UNION ALL SELECT recorded_at FROM distributor_allocation_retries"
+            ")"
+        ).fetchone()
+        now = self._now()
+        if row is not None and isinstance(row[0], str):
+            try:
+                prior = datetime.fromisoformat(row[0].replace("Z", "+00:00"))
+            except ValueError:  # pragma: no cover - corrupt local store only
+                prior = now
+            if prior >= now:
+                now = prior + timedelta(microseconds=1)
+        return now.isoformat()
+
     def _latest_state(self) -> dict[str, object] | None:
         row = self._db.execute(
-            "SELECT state_json FROM distributor_operation_events WHERE state_json IS NOT NULL "
-            "ORDER BY rowid DESC LIMIT 1"
+            "SELECT state_json FROM ("
+            "SELECT state_json, recorded_at, rowid, 0 AS source_order "
+            "FROM distributor_operation_events WHERE state_json IS NOT NULL "
+            "UNION ALL "
+            "SELECT state_json, recorded_at, rowid, 1 AS source_order "
+            "FROM distributor_allocation_retries WHERE state_json IS NOT NULL"
+            ") ORDER BY recorded_at DESC, source_order DESC, rowid DESC LIMIT 1"
         ).fetchone()
         return _decoded(cast(str, row[0]), "state") if row is not None else None
+
+    def _pending_allocation_retry_projection(self, retry_id: str) -> dict[str, object]:
+        projection = self.projection()
+        projection["stage"] = "HOLD"
+        projection["alerts"] = [
+            *cast(list[object], projection["alerts"]),
+            {
+                "code": "ALLOCATION_RETRY_OUTCOME_UNKNOWN",
+                "status": "OPEN",
+                "message": (
+                    "This retained allocation retry has no completed native outcome; "
+                    "it will not be retried."
+                ),
+                "retry_id": retry_id,
+            },
+        ]
+        return projection
+
+    def _allocation_retry_event(
+        self, state: Mapping[str, object], retry_id: str, pending_event_id: str
+    ) -> dict[str, object]:
+        events = state.get("events")
+        for raw in events if isinstance(events, list) else []:
+            if isinstance(raw, Mapping) and raw.get("event_id") == pending_event_id:
+                evidence_ref = raw.get("evidence_ref")
+                synthetic = raw.get("synthetic")
+                return {
+                    "event_id": retry_id,
+                    "evidence_ref": evidence_ref
+                    if isinstance(evidence_ref, str)
+                    else f"retained:{pending_event_id}",
+                    "synthetic": synthetic
+                    if type(synthetic) is bool
+                    else self._config["synthetic_input"],
+                }
+        return {
+            "event_id": retry_id,
+            "evidence_ref": f"retained:{pending_event_id}",
+            "synthetic": self._config["synthetic_input"],
+        }
+
+    @staticmethod
+    def _append_allocation_retry(
+        state: dict[str, object], retry_id: str, pending_event_id: str
+    ) -> dict[str, object]:
+        retries = state.get("allocation_retries")
+        if not isinstance(retries, list):
+            retries = []
+            state["allocation_retries"] = retries
+        action: dict[str, object] = {
+            "retry_id": retry_id,
+            "pending_event_id": pending_event_id,
+            "status": "PENDING",
+            "operations": [],
+        }
+        retries.append(action)
+        return action
+
+    def _complete_allocation_retry(
+        self,
+        retry_id: str,
+        state: Mapping[str, object],
+        source: Mapping[str, object],
+    ) -> dict[str, object]:
+        projection = self._projection(state, source)
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            updated = self._db.execute(
+                "UPDATE distributor_allocation_retries SET result_json=?, state_json=? "
+                "WHERE retry_id=? AND result_json IS NULL",
+                (_encode(projection), _encode(state), retry_id),
+            ).rowcount
+            if updated != 1:
+                raise RuntimeError("allocation retry completion is unavailable")
+            self._db.commit()
+        except Exception:
+            self._db.rollback()
+            raise
+        return projection
 
     def _projection_from_record(self, record: str) -> dict[str, object]:
         return _decoded(record, "event result")
@@ -1998,7 +2224,12 @@ class DistributorOperations:
         )
 
     def _prepare_pick(
-        self, state: dict[str, object], event: Mapping[str, object]
+        self,
+        state: dict[str, object],
+        event: Mapping[str, object],
+        *,
+        resolve_pending_event_id: str | None = None,
+        retry_id: str | None = None,
     ) -> list[_NativeOutcome]:
         if contract_mode(self._config):
             plan = self._contract_plan(state)
@@ -2017,7 +2248,13 @@ class DistributorOperations:
                 )
                 return []
             plan = {**plan, "native_tranches": tranches}
-            if not self._select_contract_plan(state, event, plan):
+            if not self._select_contract_plan(
+                state,
+                event,
+                plan,
+                retry_id=retry_id,
+                pending_event_id=resolve_pending_event_id,
+            ):
                 return []
         allocations = cast(list[dict[str, object]], state["allocations"])
         prepared_rows = cast(list[dict[str, object]], state["prepared_picks"])
@@ -2094,6 +2331,9 @@ class DistributorOperations:
                 self._native_alert(state, event, prepared_outcome, None)
         if outcomes and all(outcome.succeeded for outcome in outcomes):
             self._resolve_native_operation_alerts(state, "prepare_pick")
+            self._resolve_pending_allocation_alert(
+                state, resolve_pending_event_id or _text(event["event_id"], "event_id")
+            )
         return outcomes
 
     def _contract_plan_native_tranches(
@@ -2459,15 +2699,65 @@ class DistributorOperations:
         refs = choice.get("contract_refs")
         if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
             return False
-        valid = {
-            row.get("customer_order")
-            for row in cast(list[Mapping[str, object]], plan.get("rows", []))
-            if isinstance(row.get("customer_order"), str)
-        }
+        rows = plan.get("rows")
+        if not isinstance(rows, list):
+            return False
+        try:
+            valid = {
+                row.get("customer_order")
+                for row in rows
+                if isinstance(row, Mapping)
+                and isinstance(row.get("customer_order"), str)
+                and _quantity(row.get("new_quantity"), "contract plan new quantity") > 0
+            }
+        except ValueError:
+            return False
         return len(refs) == len(valid) and len(set(refs)) == len(refs) and set(refs) == valid
 
+    @staticmethod
+    def _selection_audit(choice: Mapping[str, object]) -> dict[str, object]:
+        """Retain bounded structured selection fields without storing arbitrary model output."""
+
+        plan_id = choice.get("plan_id")
+        rationale = choice.get("rationale")
+        refs = choice.get("contract_refs")
+        return {
+            "plan_id": plan_id.strip()
+            if isinstance(plan_id, str) and len(plan_id) <= 128
+            else None,
+            "rationale": (
+                rationale.strip()
+                if isinstance(rationale, str) and len(rationale.strip()) <= 480
+                else None
+            ),
+            "contract_refs": (
+                [ref.strip() for ref in refs if isinstance(ref, str) and ref.strip()][:16]
+                if isinstance(refs, list)
+                else []
+            ),
+        }
+
+    def _selection_validation_failures(
+        self, plan: Mapping[str, object], choice: Mapping[str, object]
+    ) -> list[str]:
+        failures: list[str] = []
+        if choice.get("plan_id") != plan.get("plan_id"):
+            failures.append("PLAN_ID_MISMATCH_OR_DEFERRED")
+        rationale = choice.get("rationale")
+        if not isinstance(rationale, str) or not rationale.strip() or len(rationale.strip()) > 480:
+            failures.append("RATIONALE_INVALID")
+        if not self._selection_refs_are_exact(plan, choice):
+            failures.append("EXECUTABLE_CONTRACT_REFS_INVALID")
+        return failures
+
     def _select_contract_plan(
-        self, state: dict[str, object], event: Mapping[str, object], plan: Mapping[str, object]
+        self,
+        state: dict[str, object],
+        event: Mapping[str, object],
+        plan: Mapping[str, object],
+        *,
+        retry_id: str | None = None,
+        pending_event_id: str | None = None,
     ) -> bool:
         existing = state.get("allocation_decision")
         if (
@@ -2488,66 +2778,78 @@ class DistributorOperations:
                 choice = {"plan_id": "DEFER", "rationale": "selector unavailable"}
         plan_id = choice.get("plan_id")
         rationale = choice.get("rationale")
-        if (
-            plan_id == plan.get("plan_id")
-            and isinstance(rationale, str)
-            and rationale.strip()
-            and self._selection_refs_are_exact(plan, choice)
-        ):
+        validation_failures = self._selection_validation_failures(plan, choice)
+        decision_event_id = pending_event_id or _text(event["event_id"], "event_id")
+        if not validation_failures:
             decision: dict[str, object] = {
                 "status": "SELECTED",
                 "case_id": self._config["case_id"],
                 "plan_id": plan_id,
                 "state_revision": plan["state_revision"],
-                "event_id": event["event_id"],
-                "rationale": rationale.strip(),
+                "event_id": decision_event_id,
+                "rationale": cast(str, rationale).strip(),
                 "contract_refs": list(cast(list[str], choice["contract_refs"])),
                 "plan": _copy(plan),
+                "selection": self._selection_audit(choice),
             }
+            if retry_id is not None:
+                decision["retry_id"] = retry_id
             for field in ("provider", "usage"):
                 value = choice.get(field)
                 if isinstance(value, Mapping):
                     decision[field] = _copy(value)
             state["allocation_decision"] = decision
-            self._checkpoint_allocation_decision(event["event_id"], state)
-            for alert in cast(list[dict[str, object]], state["alerts"]):
-                if alert.get("code") == "ALLOCATION_SELECTION_PENDING":
-                    alert["status"] = "RESOLVED"
+            self._checkpoint_allocation_decision(event["event_id"], state, retry_id=retry_id)
             return True
-        state["allocation_decision"] = {
+        decision = {
             "status": "PENDING",
             "case_id": self._config["case_id"],
             "plan_id": plan["plan_id"],
             "state_revision": plan["state_revision"],
-            "event_id": event["event_id"],
+            "event_id": decision_event_id,
             "rationale": rationale.strip()
-            if isinstance(rationale, str) and rationale.strip()
+            if isinstance(rationale, str) and rationale.strip() and len(rationale.strip()) <= 480
             else "deferred",
             "plan": _copy(plan),
+            "selection": self._selection_audit(choice),
+            "validation_failures": validation_failures,
         }
-        self._checkpoint_allocation_decision(event["event_id"], state)
-        self._alert(
-            state,
-            code="ALLOCATION_SELECTION_PENDING",
-            message=(
-                "The contract allocation plan was deferred or malformed; no pick preparation "
-                "was started."
-            ),
-            event=event,
-        )
+        if retry_id is not None:
+            decision["retry_id"] = retry_id
+        for field in ("provider", "usage"):
+            value = choice.get(field)
+            if isinstance(value, Mapping):
+                decision[field] = _copy(value)
+        state["allocation_decision"] = decision
+        self._checkpoint_allocation_decision(event["event_id"], state, retry_id=retry_id)
+        if retry_id is None:
+            self._alert(
+                state,
+                code="ALLOCATION_SELECTION_PENDING",
+                message=(
+                    "The contract allocation plan was deferred or malformed; no pick preparation "
+                    "was started."
+                ),
+                event=event,
+            )
         return False
 
     def _checkpoint_allocation_decision(
-        self, event_id: object, state: Mapping[str, object]
+        self, event_id: object, state: Mapping[str, object], *, retry_id: str | None = None
     ) -> None:
         """Persist an accepted/deferred selection before a native prepare can begin."""
 
-        identifier = _text(event_id, "event_id")
+        identifier = _text(retry_id or event_id, "allocation selection checkpoint ID")
+        table = (
+            "distributor_allocation_retries"
+            if retry_id is not None
+            else "distributor_operation_events"
+        )
+        key = "retry_id" if retry_id is not None else "event_id"
         self._db.execute("BEGIN IMMEDIATE")
         try:
             updated = self._db.execute(
-                "UPDATE distributor_operation_events SET state_json=? "
-                "WHERE event_id=? AND result_json IS NULL",
+                f"UPDATE {table} SET state_json=? WHERE {key}=? AND result_json IS NULL",
                 (_encode(state), identifier),
             ).rowcount
             if updated != 1:
@@ -2556,6 +2858,16 @@ class DistributorOperations:
         except Exception:
             self._db.rollback()
             raise
+
+    @staticmethod
+    def _resolve_pending_allocation_alert(state: dict[str, object], event_id: str) -> None:
+        for alert in cast(list[dict[str, object]], state["alerts"]):
+            if (
+                alert.get("code") == "ALLOCATION_SELECTION_PENDING"
+                and alert.get("event_id") == event_id
+                and alert.get("status") == "OPEN"
+            ):
+                alert["status"] = "RESOLVED"
 
     def _recompute_quantities(self, state: dict[str, object]) -> None:
         quantities = cast(dict[str, object], state["quantities"])

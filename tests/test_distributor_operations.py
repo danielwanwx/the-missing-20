@@ -1765,7 +1765,7 @@ def test_contract_plan_selects_date_first_then_prepares_once_and_replays_read_on
         return {
             "plan_id": plan["plan_id"],
             "rationale": "Earlier promised customer order is feasible.",
-            "contract_refs": ["SO-R4-PRIORITY", "SO-R4-STANDARD"],
+            "contract_refs": ["SO-R4-STANDARD"],
         }
 
     service = DistributorOperations(
@@ -1820,7 +1820,7 @@ def test_contract_rejected_selection_does_not_start_pick_preparation(tmp_path: P
         allocation_selector=lambda _plan: {
             "plan_id": "cap-stale",
             "rationale": "stale selection",
-            "contract_refs": ["SO-R4-PRIORITY", "SO-R4-STANDARD"],
+            "contract_refs": ["SO-R4-STANDARD"],
         },
     )
     bridge.state_provider = service._latest_state
@@ -1834,9 +1834,9 @@ def test_contract_rejected_selection_does_not_start_pick_preparation(tmp_path: P
 @pytest.mark.parametrize(
     "refs",
     [
-        ["SO-R4-STANDARD"],
-        ["SO-R4-PRIORITY", "SO-R4-STANDARD", "SO-R4-STANDARD"],
-        ["SO-R4-PRIORITY", "SO-R4-STANDARD", "SO-UNKNOWN"],
+        ["SO-R4-PRIORITY"],
+        ["SO-R4-STANDARD", "SO-R4-STANDARD"],
+        ["SO-R4-STANDARD", "SO-UNKNOWN"],
     ],
 )
 def test_contract_selection_requires_exact_unique_compiler_references(
@@ -1938,7 +1938,7 @@ def test_contract_selection_is_durable_before_prepare_fault(tmp_path: Path) -> N
         allocation_selector=lambda plan: {
             "plan_id": plan["plan_id"],
             "rationale": "Exact candidate is feasible.",
-            "contract_refs": ["SO-R4-PRIORITY", "SO-R4-STANDARD"],
+            "contract_refs": ["SO-R4-STANDARD"],
         },
     )
     bridge.service = service
@@ -1992,9 +1992,12 @@ def test_contract_compiler_preserves_prepared_commitment_and_allows_only_final_r
             "minimum_dispatch_quantity": 10,
             "allow_final_remainder": True,
             "prepared_commitment": 13,
+            "remaining_to_dispatch_before_new": 2,
             "new_quantity": 2,
             "quantity": 15,
             "remaining_after_dispatch": 0,
+            "dispatch_candidate": True,
+            "dispatch_eligibility": "FINAL_REMAINDER_ALLOWED",
         },
         {
             "customer_order": "SO-B",
@@ -2004,9 +2007,12 @@ def test_contract_compiler_preserves_prepared_commitment_and_allows_only_final_r
             "minimum_dispatch_quantity": 10,
             "allow_final_remainder": False,
             "prepared_commitment": 0,
+            "remaining_to_dispatch_before_new": 15,
             "new_quantity": 0,
             "quantity": 0,
             "remaining_after_dispatch": 15,
+            "dispatch_candidate": False,
+            "dispatch_eligibility": "NOT_EXECUTABLE",
         },
     ]
 
@@ -2027,3 +2033,196 @@ def test_contract_promises_are_timezone_normalized_and_malformed_dates_are_rejec
     cast(list[dict[str, object]], malformed["allocations"])[0]["promised_delivery_at"] = "Sep 12"
     with pytest.raises(ValueError, match="promised_delivery_at"):
         DistributorOperations(tmp_path / "bad-contract.sqlite3", malformed, None)
+
+
+def _pending_remainder_service(tmp_path: Path) -> tuple[DistributorOperations, _Bridge]:
+    """Persist the B2/A0 regression state without inventing another physical event."""
+
+    config = _contract_config()
+    allocations = cast(list[dict[str, object]], config["allocations"])
+    allocations[0]["requested_quantity"] = 24
+    allocations[1]["requested_quantity"] = 15
+    allocations[1]["minimum_dispatch_quantity"] = 5
+    allocations[1]["allow_final_remainder"] = True
+    config["pick_tranches"] = [
+        {"customer_order": "SO-R4-STANDARD", "lot": "R4-ARRIVAL-20", "quantity": 2}
+    ]
+    bridge = _Bridge(config)
+    service = DistributorOperations(tmp_path / "pending-remainder.sqlite3", config, bridge)
+    bridge.state_provider = service._latest_state
+    state = service._initial_state()
+    lots = cast(list[dict[str, object]], state["lots"])
+    lots[0].update({"received": 20, "usable": 2, "held": 0, "status": "USABLE"})
+    lots[1].update({"received": 19, "usable": 0, "held": 0, "status": "DISPATCHED"})
+    rows = cast(list[dict[str, object]], state["allocations"])
+    rows[0]["dispatched"] = 24
+    rows[1]["dispatched"] = 13
+    service._recompute_allocations(state)
+    service._recompute_quantities(state)
+    pending_event = _event(
+        "pending-remainder-selection",
+        "inspection",
+        lot="R4-ARRIVAL-20",
+        result="PASS",
+        scope="WHOLE_LOT",
+        metric="visual_check",
+        measured=1,
+        sample_quantity=1,
+        inspection_report_ref="SYN-R4-REMAINDER-INSPECTION",
+    )
+    state["events"] = [
+        {
+            "event_id": pending_event["event_id"],
+            "type": pending_event["type"],
+            "status": "APPLIED",
+            "occurred_at": pending_event["occurred_at"],
+            "evidence_ref": pending_event["evidence_ref"],
+            "synthetic": pending_event["synthetic"],
+            "operations": [],
+        }
+    ]
+    plan = service._contract_plan(state)
+    state["allocation_decision"] = {
+        "status": "PENDING",
+        "case_id": config["case_id"],
+        "plan_id": plan["plan_id"],
+        "state_revision": plan["state_revision"],
+        "event_id": pending_event["event_id"],
+        "rationale": "The prior selection had incomplete references.",
+        "plan": plan,
+        "selection": {"plan_id": plan["plan_id"], "rationale": "old", "contract_refs": []},
+        "validation_failures": ["EXECUTABLE_CONTRACT_REFS_INVALID"],
+    }
+    state["alerts"] = [
+        {
+            "code": "ALLOCATION_SELECTION_PENDING",
+            "status": "OPEN",
+            "message": (
+                "The contract allocation plan was deferred or malformed; "
+                "no pick preparation was started."
+            ),
+            "event_id": pending_event["event_id"],
+            "evidence_ref": pending_event["evidence_ref"],
+            "synthetic": True,
+        }
+    ]
+    service._db.execute(
+        "INSERT INTO distributor_operation_events "
+        "(event_id, payload_json, result_json, state_json, recorded_at) VALUES (?, ?, ?, ?, ?)",
+        (
+            pending_event["event_id"],
+            json.dumps(pending_event, sort_keys=True, separators=(",", ":")),
+            "{}",
+            json.dumps(state, sort_keys=True, separators=(",", ":")),
+            pending_event["occurred_at"],
+        ),
+    )
+    return service, bridge
+
+
+def test_pending_contract_reselection_uses_only_executable_b2_reference_and_replays(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _pending_remainder_service(tmp_path)
+    selections: list[Mapping[str, object]] = []
+
+    def selector(plan: Mapping[str, object]) -> Mapping[str, object]:
+        selections.append(plan)
+        return {
+            "plan_id": plan["plan_id"],
+            "rationale": "The remaining B quantity is an allowed final remainder.",
+            "contract_refs": ["SO-R4-STANDARD"],
+        }
+
+    service._allocation_selector = selector
+    request = {"retry_id": "retry-remainder-b2", "pending_event_id": "pending-remainder-selection"}
+    result = service.retry_pending_allocation(request)
+
+    assert len(selections) == 1
+    plan_rows = cast(list[dict[str, object]], selections[0]["rows"])
+    priority = next(row for row in plan_rows if row["customer_order"] == "SO-R4-PRIORITY")
+    standard = next(row for row in plan_rows if row["customer_order"] == "SO-R4-STANDARD")
+    assert priority["remaining_to_dispatch_before_new"] == priority["new_quantity"] == 0
+    assert priority["dispatch_candidate"] is False
+    assert priority["dispatch_eligibility"] == "NO_DISPATCH_REMAINING"
+    assert standard["new_quantity"] == 2
+    assert standard["dispatch_eligibility"] == "FINAL_REMAINDER_ALLOWED"
+    assert [kind for kind, event_id, _operation in bridge.calls] == ["prepare_pick"]
+    assert bridge.calls[0][1] == "retry-remainder-b2"
+    assert bridge.calls[0][2]["customer_order"] == "SO-R4-STANDARD"
+    retry = cast(list[dict[str, object]], result["allocation_retries"])[-1]
+    assert retry["status"] == "APPLIED"
+    assert (
+        next(
+            alert
+            for alert in cast(list[dict[str, object]], result["alerts"])
+            if alert["code"] == "ALLOCATION_SELECTION_PENDING"
+        )["status"]
+        == "RESOLVED"
+    )
+
+    assert service.retry_pending_allocation(request) == result
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["prepare_pick"]
+
+    handler = cast(Any, object.__new__(DecisionWorkspaceHandler))
+    handler.server = SimpleNamespace(distributor_operations=service)
+    sent: list[object] = []
+    handler._send_json = lambda _status, value: sent.append(value)
+    handler._v1_post("/api/v1/distributor-operations/reselect-pending-allocation", request)
+    assert cast(dict[str, object], sent[-1])["distributor_operations"] == {**result, "handoffs": []}
+
+    continued = service.record_event(
+        _event(
+            "picked-after-retry",
+            "picked",
+            customer_order="SO-R4-STANDARD",
+            lot="R4-ARRIVAL-20",
+            quantity=2,
+            pick_evidence_ref="SYN-R4-PICK-2",
+        )
+    )
+    assert continued["events"][-1]["event_id"] == "picked-after-retry"
+    assert continued["events"][-1]["status"] == "APPLIED"
+    assert [kind for kind, _event_id, _operation in bridge.calls] == [
+        "prepare_pick",
+        "submit_pick",
+        "submit_delivery_note",
+        "create_shipment",
+    ]
+
+
+def test_pending_contract_reselection_keeps_origin_alert_open_when_prepare_is_blocked(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _pending_remainder_service(tmp_path)
+    bridge.statuses["prepare_pick"] = "BLOCKED"
+    service._allocation_selector = lambda plan: {
+        "plan_id": plan["plan_id"],
+        "rationale": "The remaining B quantity is an allowed final remainder.",
+        "contract_refs": ["SO-R4-STANDARD"],
+    }
+
+    result = service.retry_pending_allocation(
+        {"retry_id": "retry-remainder-blocked", "pending_event_id": "pending-remainder-selection"}
+    )
+
+    retry = cast(list[dict[str, object]], result["allocation_retries"])[-1]
+    assert retry["status"] == "BLOCKED"
+    assert (
+        next(
+            alert
+            for alert in cast(list[dict[str, object]], result["alerts"])
+            if alert["code"] == "ALLOCATION_SELECTION_PENDING"
+        )["status"]
+        == "OPEN"
+    )
+    assert (
+        service.retry_pending_allocation(
+            {
+                "retry_id": "retry-remainder-blocked",
+                "pending_event_id": "pending-remainder-selection",
+            }
+        )
+        == result
+    )
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["prepare_pick"]

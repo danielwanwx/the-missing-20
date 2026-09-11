@@ -1943,6 +1943,21 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
                     )
                 result = operations.reconcile_receive_arrival(event_id)
                 should_sync = True
+            elif action == "reselect-pending-allocation":
+                retry_id = payload.get("retry_id")
+                pending_event_id = payload.get("pending_event_id")
+                if (
+                    set(payload) != {"retry_id", "pending_event_id"}
+                    or not isinstance(retry_id, str)
+                    or not isinstance(pending_event_id, str)
+                ):
+                    raise APIRequestError(
+                        HTTPStatus.BAD_REQUEST,
+                        "invalid_distributor_operations_request",
+                        "reselect-pending-allocation accepts only retry_id and pending_event_id",
+                    )
+                result = operations.retry_pending_allocation(payload)
+                should_sync = True
             elif action == "ask":
                 question = payload.get("question")
                 if set(payload) != {"question"} or not isinstance(question, str):
@@ -2417,6 +2432,7 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             "/api/v1/agent-platform/normal-billing/reconcile",
             "/api/v1/distributor-operations/events",
             "/api/v1/distributor-operations/reconcile-receive",
+            "/api/v1/distributor-operations/reselect-pending-allocation",
             "/api/v1/distributor-operations/ask",
         }
         if route not in allowed_routes and not route.startswith("/api/v1/incidents/"):

@@ -307,18 +307,22 @@
   function contractPlanRows(plan) {
     const normalized = normalizeContractPlan(plan);
     if (!normalized) return [];
-    return normalized.rows.map((row) => ({
-      customer_order: firstText(row, ["customer_order"]),
-      promised_delivery_at: firstText(row, ["promised_delivery_at"]),
-      customer_priority: numberFrom(row.customer_priority),
-      partial_dispatch: typeof row.partial_dispatch === "boolean" ? row.partial_dispatch : null,
-      minimum_dispatch_quantity: numberFrom(row.minimum_dispatch_quantity),
-      allow_final_remainder: typeof row.allow_final_remainder === "boolean" ? row.allow_final_remainder : null,
-      prepared_commitment: numberFrom(row.prepared_commitment),
-      new_quantity: numberFrom(row.new_quantity),
-      quantity: numberFrom(row.quantity),
-      remaining_after_dispatch: numberFrom(row.remaining_after_dispatch),
-    }));
+    return normalized.rows.map((row) => {
+      const dispatchEligibility = firstText(row, ["dispatch_eligibility"]);
+      return {
+        customer_order: firstText(row, ["customer_order"]),
+        promised_delivery_at: firstText(row, ["promised_delivery_at"]),
+        customer_priority: numberFrom(row.customer_priority),
+        partial_dispatch: typeof row.partial_dispatch === "boolean" ? row.partial_dispatch : null,
+        minimum_dispatch_quantity: numberFrom(row.minimum_dispatch_quantity),
+        allow_final_remainder: typeof row.allow_final_remainder === "boolean" ? row.allow_final_remainder : null,
+        prepared_commitment: numberFrom(row.prepared_commitment),
+        new_quantity: numberFrom(row.new_quantity),
+        quantity: numberFrom(row.quantity),
+        remaining_after_dispatch: numberFrom(row.remaining_after_dispatch),
+        ...(dispatchEligibility ? { dispatch_eligibility: dispatchEligibility } : {}),
+      };
+    });
   }
 
   function contractDecisionState(plan, decision) {
@@ -337,6 +341,146 @@
     if (!normalized) return "UNAVAILABLE";
     if (numberFrom(normalized.new_quantity) === 0) return "COMPLETE";
     return contractDecisionState(normalized, decision);
+  }
+
+  function pendingAllocationEligibility(projectionValue) {
+    const decision = isRecord(projectionValue?.allocation_decision) ? projectionValue.allocation_decision : {};
+    const status = text(decision.status).toUpperCase();
+    if (status !== "PENDING") {
+      return {
+        status,
+        pending_event_id: "",
+        eligible: false,
+        reason: status ? "Only a pending allocation decision can be reviewed." : "No pending allocation decision is recorded.",
+      };
+    }
+    const pendingEventId = text(decision.event_id);
+    return {
+      status,
+      pending_event_id: pendingEventId,
+      eligible: Boolean(pendingEventId),
+      reason: pendingEventId ? "" : "Pending allocation review is unavailable because the source event ID is missing.",
+    };
+  }
+
+  function pendingAllocationRequest(projectionValue, retryId) {
+    const eligibility = pendingAllocationEligibility(projectionValue);
+    const id = text(retryId);
+    if (!eligibility.eligible || !id) return null;
+    return { retry_id: id, pending_event_id: eligibility.pending_event_id };
+  }
+
+  function normalizeAllocationRetries(value) {
+    if (!Array.isArray(value)) return [];
+    return value.filter(isRecord).map((retry, index) => ({
+      ...retry,
+      retry_id: text(retry.retry_id),
+      pending_event_id: text(retry.pending_event_id),
+      status: text(retry.status) || "Status unavailable",
+      plan_id: text(retry.plan_id),
+      state_revision: text(retry.state_revision),
+      operations: Array.isArray(retry.operations) ? retry.operations : [],
+      _index: index,
+    })).filter((retry) => retry.retry_id || retry.pending_event_id);
+  }
+
+  function allocationRetryForDecision(projectionValue, submittedRetryId = "") {
+    if (!isRecord(projectionValue) || !isRecord(projectionValue.allocation_decision)) return null;
+    const decision = projectionValue.allocation_decision;
+    const retries = normalizeAllocationRetries(projectionValue.allocation_retries);
+    const requestedRetryId = text(submittedRetryId);
+    if (requestedRetryId) return retries.find((retry) => retry.retry_id === requestedRetryId) || null;
+    const decisionRetryId = text(decision.retry_id);
+    if (decisionRetryId) return retries.find((retry) => retry.retry_id === decisionRetryId) || null;
+    const pendingEventId = text(decision.event_id);
+    return [...retries].reverse().find((retry) => pendingEventId && retry.pending_event_id === pendingEventId) || null;
+  }
+
+  function dispatchEligibilityText(value) {
+    const source = text(value).toUpperCase();
+    const labels = {
+      FINAL_REMAINDER_ALLOWED: "Eligible for an allowed final remainder",
+      MEETS_MINIMUM: "Meets the minimum dispatch quantity",
+      NO_DISPATCH_REMAINING: "No dispatch remains for this order",
+      NOT_EXECUTABLE: "Not executable from the current stock",
+    };
+    return labels[source] || (source ? `Source status: ${pretty(source)}` : "");
+  }
+
+  function allocationReviewOutcome(projectionValue, submittedRetryId) {
+    const retry = allocationRetryForDecision(projectionValue, submittedRetryId);
+    if (!retry) {
+      return {
+        status: "UNKNOWN_OUTCOME",
+        tone: "error",
+        message: "Pending allocation review outcome is unavailable. No pick or dispatch claim can be made.",
+      };
+    }
+    const status = text(retry.status).toUpperCase();
+    const decisionStatus = text(projectionValue?.allocation_decision?.status).toUpperCase();
+    const operationStatuses = retry.operations
+      .filter(isRecord)
+      .map((operation) => text(operation.status).toUpperCase());
+    if (status === "UNKNOWN_OUTCOME" || operationStatuses.includes("UNKNOWN_OUTCOME")) {
+      return {
+        status,
+        tone: "error",
+        message: "Pending allocation review has an unknown native outcome. No pick or dispatch claim can be made; review the source before retrying.",
+      };
+    }
+    if (status === "BLOCKED" || operationStatuses.includes("BLOCKED")) {
+      return {
+        status,
+        tone: "error",
+        message: "Pending allocation review was blocked before completion. Dispatch remains separate; review the source before continuing.",
+      };
+    }
+    if (status === "APPLIED") {
+      return {
+        status,
+        tone: "success",
+        message: decisionStatus === "SELECTED"
+          ? "Pending allocation review selected the plan and verified pick preparation. Dispatch remains a separate step."
+          : "Pending allocation review verified pick preparation. Dispatch remains a separate step.",
+      };
+    }
+    if (status === "PENDING") {
+      return {
+        status,
+        tone: "error",
+        message: "Pending allocation review remains pending. Pick preparation is not confirmed.",
+      };
+    }
+    return {
+      status: status || "UNKNOWN_OUTCOME",
+      tone: "error",
+      message: `Pending allocation review returned ${pretty(status || "an unknown status")}. No pick or dispatch claim can be made.`,
+    };
+  }
+
+  function pendingAllocationActionState(projectionValue, action, { sourceReady = true, panelVisible = true } = {}) {
+    const eligibility = pendingAllocationEligibility(projectionValue);
+    const contractState = contractPanelState(projectionValue?.feasible_allocation_plan, projectionValue?.allocation_decision);
+    const eligible = Boolean(projectionValue?.available === true && contractState === "PENDING"
+      && eligibility.eligible && sourceReady && panelVisible);
+    const matches = Boolean(isRecord(action)
+      && text(action.caseId) === text(projectionValue?.case_id)
+      && text(action.pendingEventId) === eligibility.pending_event_id);
+    const inFlight = Boolean(eligible && matches && action.inFlight === true);
+    return {
+      eligible,
+      in_flight: inFlight,
+      disabled: !eligible || inFlight,
+      label: inFlight ? "Reviewing pending allocation…" : "Review pending allocation",
+    };
+  }
+
+  function shouldRetainPendingAllocationRetry(requestError, outcomeStatus = "") {
+    if (requestError) {
+      const status = Number(requestError.status);
+      return !(Number.isFinite(status) && status >= 400 && status < 500);
+    }
+    return text(outcomeStatus).toUpperCase() === "UNKNOWN_OUTCOME";
   }
 
   function allocationQuantity(allocation, keys) {
@@ -408,6 +552,14 @@
       return { current: finite(current) ? `${formatNumber(current)} usable now` : "Inspection status unknown", cumulative: "Quality evidence", complete: stageProof(next, stage) };
     }
     if (stage.key === "allocation") {
+      const pending = pendingAllocationEligibility(next);
+      if (pending.status === "PENDING") {
+        return {
+          current: finite(current) ? `${formatNumber(current)} proposed` : "Proposed allocation quantity unknown",
+          cumulative: "Decision pending · no allocation prepared",
+          complete: false,
+        };
+      }
       const target = fulfillmentBenchmark(next);
       if (target.status === "CURRENT" && target.dispatched >= target.target) return { current: "No stock awaiting allocation", cumulative: `${formatNumber(target.target)} / ${formatNumber(target.target)} committed`, complete: true };
       return { current: finite(current) ? `${formatNumber(current)} allocated now` : "Allocation status unknown", cumulative: stage.detail, complete: stageProof(next, stage) };
@@ -600,6 +752,14 @@
     contractPlanRows,
     contractDecisionState,
     contractPanelState,
+    pendingAllocationEligibility,
+    pendingAllocationRequest,
+    normalizeAllocationRetries,
+    allocationRetryForDecision,
+    dispatchEligibilityText,
+    allocationReviewOutcome,
+    pendingAllocationActionState,
+    shouldRetainPendingAllocationRetry,
     fulfillmentBenchmark,
     activeAlertStages,
     flowStageFacts,
@@ -633,6 +793,8 @@
   let lastProjectionAt = "";
   let retainedConversation = null;
   let voiceController = null;
+  let pendingAllocationAction = null;
+  let allocationFeedback = null;
 
   function setText(id, value) {
     const node = $(id);
@@ -698,14 +860,17 @@
   function renderQuantities(next) {
     const q = next.quantities || {};
     const unit = text(q.uom) || "Unit not confirmed";
+    const allocationPending = pendingAllocationEligibility(next).status === "PENDING";
     const cartons = cartonsSummary(q.cartons);
     const cartonsNode = $("ops-quantity-cartons");
     const cartonsCard = document.querySelector('[data-quantity-card="cartons"]');
     if (cartonsNode) cartonsNode.textContent = cartons;
     cartonsCard?.classList.toggle("is-unknown", cartons === "Unknown");
     for (const key of ["ordered", "received", "usable", "held", "missing", "allocated", "dispatched", "delivery_confirmed"]) {
-      setQuantityCard(key, quantity(next, key), key === "delivery_confirmed" ? "explicit event" : unit);
+      setQuantityCard(key, quantity(next, key), key === "delivery_confirmed" ? "explicit event" : key === "allocated" && allocationPending ? "proposed plan" : unit);
     }
+    const allocatedLabel = $("ops-quantity-allocated-label");
+    if (allocatedLabel) allocatedLabel.textContent = allocationPending ? "Proposed allocation" : "Allocated";
     setText("ops-uom-note", text(q.uom)
       ? `Parts are shown in stock UOM ${q.uom}; cartons remain a separate outer-package observation.`
       : "Stock UOM is not confirmed; cartons and part quantities remain separate observations.");
@@ -881,16 +1046,19 @@
     const state = contractPanelState(plan, next.allocation_decision);
     const decision = isRecord(next.allocation_decision) ? next.allocation_decision : {};
     const rawStatus = text(decision.status).toUpperCase();
+    const pending = pendingAllocationEligibility(next);
+    const retry = allocationRetryForDecision(next);
     const badge = $("ops-contract-state");
     if (badge) {
       badge.className = `state-badge state-${state === "SELECTED" ? "cyan" : state === "COMPLETE" ? "lime" : "amber"}`;
       badge.textContent = state === "SELECTED" ? "Plan selected" : state === "COMPLETE" ? "Current plan complete" : state === "PENDING" ? "Decision pending" : "Decision unavailable";
     }
+    const candidateRule = "Minimum dispatch quantities apply only to positive new candidates; an order with no dispatch remaining does not block other candidates.";
     setText("ops-contract-note", state === "COMPLETE"
       ? "No additional allocation is currently needed. Any retained selection below is historical evidence; pick and dispatch facts remain in the fulfillment rows."
       : state === "SELECTED"
-      ? "Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Selection is a decision record; it does not itself create a pick or dispatch."
-      : "Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Actual pick and dispatch evidence remains in the fulfillment rows below.");
+      ? `Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Selection is a decision record; it does not itself create a pick or dispatch. ${candidateRule}`
+      : `Date first; customer priority breaks ties. The server calculated this feasible plan from the contract terms. Actual pick and dispatch evidence remains in the fulfillment rows below. ${candidateRule}`);
     const meta = $("ops-contract-meta");
     if (meta) {
       const unit = text(next.quantities?.uom) || "unit";
@@ -908,7 +1076,8 @@
           `Minimum ${displayQuantity(row.minimum_dispatch_quantity)}`,
           `Partial ${contractFlag(row.partial_dispatch, "Yes", "No")}`,
           `Final remainder ${contractFlag(row.allow_final_remainder, "allowed", "not allowed")}`,
-        ].join(" · ");
+          row.dispatch_eligibility ? `Dispatch ${dispatchEligibilityText(row.dispatch_eligibility)}` : "",
+        ].filter(Boolean).join(" · ");
         const planned = `Total ${displayQuantity(row.quantity)} · Prepared commitment ${displayQuantity(row.prepared_commitment)} · New to prepare ${displayQuantity(row.new_quantity)}`;
         item.append(identity, metricBlock("Contract terms", terms), metricBlock("Plan quantities", planned), metricBlock("Remaining after dispatch", displayQuantity(row.remaining_after_dispatch)));
         return item;
@@ -922,24 +1091,50 @@
     heading.textContent = state === "SELECTED" ? "Agent decision: plan selected" : state === "COMPLETE" ? "Retained historical selection" : state === "PENDING" ? "Agent decision: pending" : "Agent decision: unavailable";
     const copy = document.createElement("p");
     copy.textContent = state === "COMPLETE"
-      ? rawStatus === "SELECTED" ? "This selection belongs to an earlier fulfilled plan. The current feasible plan has zero additional quantity." : "The current feasible plan has zero additional quantity."
+      ? rawStatus === "SELECTED" ? "This is an earlier selection; the current feasible plan has no additional quantity to prepare." : "The current feasible plan has no additional quantity to prepare."
       : state === "SELECTED"
       ? "This plan selection does not itself create an ERP pick or dispatch."
+      : state === "PENDING"
+      ? "The source has a feasible proposal, but no allocation decision was selected or prepared. Review the pending decision before any pick or dispatch."
       : rawStatus === "SELECTED"
         ? "The recorded selection does not match this current plan, so it is not treated as selected."
         : "No selected decision is recorded for this plan.";
     const details = document.createElement("div"); details.className = "ops-contract-decision-details";
+    if (state === "PENDING") {
+      appendContractDetail(details, "Eligibility", pending.eligible ? "Review required · source event is available" : pending.reason);
+    }
     appendContractDetail(details, "Rationale", firstText(decision, ["rationale"]));
     const refs = Array.isArray(decision.contract_refs) ? decision.contract_refs.map((ref) => text(ref)).filter(Boolean).join(", ") : "";
     appendContractDetail(details, "Contract refs", refs);
     appendContractDetail(details, "Decision event", firstText(decision, ["event_id"]));
     appendContractDetail(details, "Agent source", providerLabel(decision.provider));
+    if (retry) appendContractDetail(details, "Review status", pretty(retry.status));
     decisionNode.append(heading, copy);
     if (details.childNodes.length) decisionNode.append(details);
+
+    const action = document.createElement("div");
+    action.id = "ops-pending-allocation-action";
+    action.className = "ops-pending-allocation-action";
+    const actionButton = document.createElement("button");
+    actionButton.id = "ops-reselect-pending-allocation";
+    actionButton.className = "button button-primary";
+    actionButton.type = "button";
+    actionButton.innerHTML = '<i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><span data-allocation-action-label>Review pending allocation</span>';
+    actionButton.addEventListener("click", () => { void reviewPendingAllocation(); });
+    action.append(actionButton);
+    decisionNode.append(action);
+    const feedback = document.createElement("p");
+    feedback.id = "ops-allocation-feedback";
+    feedback.className = "ops-feedback";
+    feedback.setAttribute("role", "status");
+    feedback.setAttribute("aria-live", "polite");
+    decisionNode.append(feedback);
+    updatePendingAllocationAction(next);
   }
   function renderAllocations(next) {
     const list = $("ops-orders-list");
     renderContractAllocation(next);
+    const allocationPending = pendingAllocationEligibility(next).status === "PENDING";
     setText("ops-orders-count", next._provided.allocations ? `${next.allocations.length} order${next.allocations.length === 1 ? "" : "s"}` : "Unknown");
     if (!next._provided.allocations) { list.replaceChildren(emptyList("Customer allocation data is unavailable from the current source.")); return; }
     if (!next.allocations.length) { list.replaceChildren(emptyList("No customer allocation evidence in the current operation.")); return; }
@@ -957,14 +1152,14 @@
       const status = firstText(allocation, ["status", "phase"]) || "Status unavailable";
       const first = document.createElement("div");
       const title = document.createElement("strong"); title.textContent = order;
-      const note = document.createElement("small"); note.textContent = `${customer ? `${customer} · ` : ""}${allocationLabel(allocation)} · ${status}`;
+      const note = document.createElement("small"); note.textContent = `${customer ? `${customer} · ` : ""}${allocationPending ? "Proposed allocation" : allocationLabel(allocation)} · ${status}`;
       first.append(title, note);
       const outbound = [
         finite(picked) ? `Picked ${displayQuantity(picked)}` : pickedEvidenceRecorded(next, order) ? "Picked recorded" : "Picked unknown",
         finite(dispatched) ? `Dispatched ${displayQuantity(dispatched)}` : "Dispatched unknown",
         deliverySummary(delivery, requested),
       ].join(" · ");
-      row.append(first, metricBlock("Allocated", displayQuantity(allocated), allocated > 0 ? "is-positive" : ""), metricBlock("Backorder", displayQuantity(backorder), backorder > 0 ? "is-alert" : ""), metricBlock("Outbound evidence", outbound));
+      row.append(first, metricBlock(allocationPending ? "Proposed" : "Allocated", displayQuantity(allocated), allocated > 0 ? "is-positive" : ""), metricBlock("Backorder", displayQuantity(backorder), backorder > 0 ? "is-alert" : ""), metricBlock("Outbound evidence", outbound));
       return row;
     }));
   }
@@ -1439,6 +1634,132 @@
     const node = $("ops-event-feedback"); node.className = `ops-feedback${tone ? ` is-${tone}` : ""}`; node.textContent = message;
   }
 
+  function createPendingAllocationRetryId() {
+    const cryptoApi = typeof globalThis !== "undefined" ? globalThis.crypto : null;
+    if (cryptoApi && typeof cryptoApi.randomUUID === "function") return cryptoApi.randomUUID();
+    throw new Error("Pending allocation review is unavailable because this browser cannot create a request ID.");
+  }
+
+  function setAllocationFeedback(message, tone = "", context = {}) {
+    allocationFeedback = {
+      caseId: text(context.caseId) || text(projection?.case_id),
+      pendingEventId: text(context.pendingEventId) || pendingAllocationEligibility(projection).pending_event_id,
+      message: text(message),
+      tone,
+    };
+    updatePendingAllocationAction(projection);
+  }
+
+  function updatePendingAllocationAction(next = projection) {
+    const shell = $("ops-pending-allocation-action");
+    const button = $("ops-reselect-pending-allocation");
+    const feedback = $("ops-allocation-feedback");
+    if (!shell || !button) return;
+    const panel = $("ops-contract-panel");
+    const actionState = pendingAllocationActionState(next, pendingAllocationAction, {
+      sourceReady: Boolean(sourceState?.hidden),
+      panelVisible: Boolean(panel && !panel.hidden),
+    });
+    shell.hidden = !actionState.eligible;
+    button.disabled = actionState.disabled;
+    const label = button.querySelector("[data-allocation-action-label]");
+    if (label) label.textContent = actionState.label;
+    if (feedback) {
+      const showFeedback = Boolean(allocationFeedback && allocationFeedback.caseId === text(next?.case_id));
+      feedback.hidden = !showFeedback;
+      feedback.className = `ops-feedback ops-allocation-feedback${showFeedback && allocationFeedback.tone ? ` is-${allocationFeedback.tone}` : ""}`;
+      feedback.textContent = showFeedback ? allocationFeedback.message : "";
+    }
+  }
+
+  function syncPendingAllocationState(next, caseChanged = false) {
+    const eligibility = pendingAllocationEligibility(next);
+    if (caseChanged) {
+      pendingAllocationAction = null;
+      allocationFeedback = null;
+      return;
+    }
+    if (pendingAllocationAction && pendingAllocationAction.caseId !== text(next?.case_id)) pendingAllocationAction = null;
+    if (pendingAllocationAction && eligibility.status === "PENDING" && eligibility.pending_event_id
+      && pendingAllocationAction.pendingEventId !== eligibility.pending_event_id) pendingAllocationAction = null;
+    if (pendingAllocationAction && !pendingAllocationAction.inFlight && eligibility.status !== "PENDING") pendingAllocationAction = null;
+    if (allocationFeedback && allocationFeedback.caseId !== text(next?.case_id)) allocationFeedback = null;
+    if (allocationFeedback && eligibility.status === "PENDING" && eligibility.pending_event_id
+      && allocationFeedback.pendingEventId && allocationFeedback.pendingEventId !== eligibility.pending_event_id) allocationFeedback = null;
+  }
+
+  async function reviewPendingAllocation() {
+    const source = projection;
+    const eligibility = pendingAllocationEligibility(source);
+    if (!source?.available || !sourceState?.hidden || !eligibility.eligible
+      || contractPanelState(source.feasible_allocation_plan, source.allocation_decision) !== "PENDING") return;
+    let action = pendingAllocationAction;
+    const sameAction = action
+      && action.caseId === text(source.case_id)
+      && action.pendingEventId === eligibility.pending_event_id;
+    if (!sameAction) {
+      try {
+        action = {
+          caseId: text(source.case_id),
+          pendingEventId: eligibility.pending_event_id,
+          retryId: createPendingAllocationRetryId(),
+          inFlight: false,
+        };
+        pendingAllocationAction = action;
+      } catch (error) {
+        setAllocationFeedback(error.message || "Pending allocation review is unavailable.", "error", {
+          caseId: text(source.case_id), pendingEventId: eligibility.pending_event_id,
+        });
+        return;
+      }
+    }
+    if (action.inFlight) return;
+    const request = pendingAllocationRequest(source, action.retryId);
+    if (!request) {
+      setAllocationFeedback("Pending allocation review is unavailable from the current source.", "error", {
+        caseId: action.caseId, pendingEventId: action.pendingEventId,
+      });
+      return;
+    }
+    action.inFlight = true;
+    updatePendingAllocationAction(source);
+    let requestError = null;
+    try {
+      const response = await requestJSON(`${API_PATH}/reselect-pending-allocation`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      });
+      const responseProjection = unwrapProjection(response);
+      if (responseProjection) renderProjection(responseProjection);
+    } catch (error) {
+      requestError = error;
+    }
+    const sourceRefresh = await refresh({ silent: true });
+    if (requestError) {
+      const detail = requestError.status
+        ? `Pending allocation review was rejected: ${requestError.message || "the source rejected the request"}.`
+        : "Pending allocation review could not be confirmed. The same request ID will be reused if you retry.";
+      setAllocationFeedback(
+        sourceRefresh === false ? `${detail} Source refresh also failed.` : detail,
+        "error",
+        { caseId: action.caseId, pendingEventId: action.pendingEventId },
+      );
+    } else {
+      const outcome = allocationReviewOutcome(projection, action.retryId);
+      setAllocationFeedback(
+        sourceRefresh === false ? `${outcome.message} Source refresh failed; retry the source connection before continuing.` : outcome.message,
+        outcome.tone,
+        { caseId: action.caseId, pendingEventId: action.pendingEventId },
+      );
+    }
+    if (pendingAllocationAction === action) {
+      action.inFlight = false;
+      const outcomeStatus = requestError ? "" : allocationReviewOutcome(projection, action.retryId).status;
+      if (!shouldRetainPendingAllocationRetry(requestError, outcomeStatus)) pendingAllocationAction = null;
+    }
+    updatePendingAllocationAction(projection);
+  }
+
   function renderProjection(value, { skipConversation = asking, resetEventFields = false } = {}) {
     const normalized = normalizeProjection(value);
     const retained = retainConversationProjection(normalized, retainedConversation);
@@ -1446,6 +1767,7 @@
     retainedConversation = retained.memory;
     const previousCaseId = projection?.case_id;
     const caseChanged = Boolean(previousCaseId && next.case_id && previousCaseId !== next.case_id);
+    syncPendingAllocationState(next, caseChanged);
     projection = next;
     if (next.available) {
       lastProjectionAt = new Date().toISOString();
@@ -1510,7 +1832,7 @@
     return payload;
   }
   async function refresh({ silent = false, periodic = false } = {}) {
-    if (loading) { if (!periodic) refreshQueued = true; return; }
+    if (loading) { if (!periodic) refreshQueued = true; return null; }
     loading = true;
     if (!silent && !projection) setConnection("Connecting", "cyan");
     try {
@@ -1518,8 +1840,10 @@
       const next = unwrapProjection(payload);
       if (!next) throw new Error("The source returned no distributor operation projection.");
       renderProjection(next);
+      return true;
     } catch (error) {
       showSourceError(error);
+      return false;
     } finally {
       loading = false;
       if (refreshQueued) { refreshQueued = false; void refresh({ silent: true }); }

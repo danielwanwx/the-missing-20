@@ -58,12 +58,14 @@ def select_contract_plan(
             "Current verified candidate (all quantities are application-calculated):\n"
             + json.dumps(plan, sort_keys=True, ensure_ascii=False)
             + "\nReturn ContractAllocationSelection now. contract_refs must be exact "
-            "customer_order identifiers from candidate rows.",
+            "customer_order identifiers from rows where dispatch_candidate is true. "
+            "NO_DISPATCH_REMAINING rows do not block another executable candidate.",
             structured_output_model=ContractAllocationSelection,
             structured_output_prompt=(
                 "Return only the complete ContractAllocationSelection. plan_id must be "
                 "the candidate plan_id or DEFER. Keep the rationale under 60 words and use "
-                "English-only product text."
+                "English-only product text. A FINAL_REMAINDER_ALLOWED row may be selected "
+                "below its minimum dispatch quantity."
             ),
             limits=Limits(
                 turns=2,
