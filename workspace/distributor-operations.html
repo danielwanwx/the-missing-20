@@ -15,12 +15,12 @@
     <a class="skip-link" href="#main-content">Skip to operations</a>
 
     <header class="topbar ops-topbar">
-      <a class="brand" href="/?view=dashboard" aria-label="The Missing 20 dashboard">
+      <a class="brand" href="/operations#ops-overview" aria-label="Current distributor dashboard">
         <span class="brand-mark" aria-hidden="true"><i class="ph-bold ph-cube"></i></span>
         <strong>The Missing 20</strong>
       </a>
       <nav class="view-tabs" aria-label="Workspace views">
-        <a class="view-tab" href="/?view=dashboard"><i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboard</span></a>
+        <a class="view-tab" href="/operations#ops-overview"><i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboard</span></a>
         <a class="view-tab is-selected" href="/operations" aria-current="page"><i class="ph ph-package" aria-hidden="true"></i><span>Operations</span></a>
         <a class="view-tab ops-ask-link" href="#ops-chat-panel"><i class="ph ph-chat-circle-dots" aria-hidden="true"></i><span>Ask agent</span></a>
       </nav>
@@ -62,6 +62,12 @@
       </section>
 
       <div id="ops-content" hidden>
+        <section id="ops-overview" class="ops-panel ops-overview" aria-labelledby="ops-overview-title">
+          <header class="ops-panel-header"><div><span class="object-label">Same-case dashboard</span><h2 id="ops-overview-title">Evidence to readback</h2></div><span id="ops-overview-case" class="ops-mono">Loading case</span></header>
+          <p id="ops-overview-copy" class="ops-panel-copy">Current case graph from operator evidence through native ERP readback.</p>
+          <div id="ops-overview-graph" class="ops-overview-graph" aria-label="Same-case operation graph"></div>
+          <div class="ops-overview-links"><a href="#ops-alerts-panel">Focus active alert</a><a href="#ops-chat-panel">Ask the read-only agent</a><a href="#ops-evidence-panel">Review or prepare evidence</a></div>
+        </section>
         <section id="ops-flow-panel" class="ops-panel ops-flow-panel" aria-labelledby="ops-flow-title">
           <header class="ops-panel-header">
             <div><span class="object-label">Current source projection</span><h2 id="ops-flow-title">Order to delivery</h2></div>
@@ -117,7 +123,7 @@
             <div><span class="object-label">Operator input</span><h2 id="ops-evidence-title">Process evidence</h2></div>
             <span class="ops-synthetic-badge"><i class="ph ph-flask" aria-hidden="true"></i>Simulated scanner / inspection / carrier evidence</span>
           </header>
-          <p class="ops-panel-copy">Choose a declared template, review its meaningful fields, then submit exactly that synthetic event. This creates no physical test, carrier booking, or customer message.</p>
+          <p class="ops-panel-copy">Choose an operator-declared template, review its fields, and prepare it for manager approval. Preparing and asking the agent do not write to ERP.</p>
           <form id="ops-event-form" novalidate>
             <div class="ops-form-row ops-template-row">
               <label class="ops-field ops-field-wide" for="ops-template-select">Evidence template<select id="ops-template-select" required><option value="">Choose an approved event…</option></select></label>
@@ -126,10 +132,23 @@
             <div id="ops-template-fields" class="ops-template-fields" aria-live="polite"></div>
             <div class="ops-form-row ops-common-fields">
               <label class="ops-field" for="ops-evidence-ref">Evidence ID<input id="ops-evidence-ref" name="evidence_ref" type="text" maxlength="180" placeholder="e.g. scanner-run-04" required /></label>
-              <div class="ops-recording-note"><span class="object-label">Recorded when submitted</span><strong>Server timestamp</strong><small>Event IDs are generated only when you press Process evidence.</small></div>
+              <div class="ops-recording-note"><span class="object-label">Provenance</span><strong>Operator-declared evidence</strong><small>The agent can explain current evidence but does not create this event.</small></div>
             </div>
-            <div class="ops-form-actions"><button id="ops-process-event" class="button button-primary" type="submit" disabled><i class="ph ph-play-circle" aria-hidden="true"></i>Process evidence</button><span id="ops-event-feedback" class="ops-feedback" role="status" aria-live="polite"></span></div>
+            <div class="ops-photo-input"><label class="ops-field" for="ops-photo-file">Optional same-case photo<input id="ops-photo-file" type="file" accept="image/jpeg,image/png" /></label><p>Manual attachment only. It is not analyzed or used to infer a count, identity, or inspection result.</p><div id="ops-photo-preview" class="ops-photo-preview" hidden></div></div>
+            <div class="ops-form-actions"><button id="ops-process-event" class="button button-primary" type="submit" disabled><i class="ph ph-clipboard-text" aria-hidden="true"></i>Prepare for approval</button><span id="ops-event-feedback" class="ops-feedback" role="status" aria-live="polite"></span></div>
           </form>
+          <section id="ops-proposal-panel" class="ops-proposal-panel" hidden aria-live="polite" aria-labelledby="ops-proposal-title">
+            <div><span class="object-label">Manager approval</span><h3 id="ops-proposal-title">Prepared same-case operation</h3><p id="ops-proposal-summary"></p></div>
+            <label class="ops-field" for="ops-manager-id">Manager identity<input id="ops-manager-id" type="text" maxlength="180" autocomplete="name" placeholder="Enter the approving manager" /></label>
+            <div class="ops-form-actions"><button id="ops-approve-proposal" class="button button-primary" type="button"><i class="ph ph-check-circle" aria-hidden="true"></i>Approve and execute</button><span id="ops-proposal-feedback" class="ops-feedback" role="status"></span></div>
+          </section>
+          <p id="ops-approval-readback" class="ops-approval-readback" hidden></p>
+        </section>
+
+        <section id="ops-photos-panel" class="ops-panel" aria-labelledby="ops-photos-title">
+          <header class="ops-panel-header"><div><span class="object-label">Same-case evidence</span><h2 id="ops-photos-title">Attached photos</h2></div><span id="ops-photos-count" class="ops-count-label">No photos</span></header>
+          <p class="ops-panel-copy">Photos are retained as operator-attached evidence. No image recognition claim is made here.</p>
+          <div id="ops-photos-list" class="ops-photos-list" aria-live="polite"></div>
         </section>
 
         <div class="ops-two-column">

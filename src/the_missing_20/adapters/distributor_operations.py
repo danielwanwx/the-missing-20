@@ -8,10 +8,13 @@ Delivery Note or Shipment into proof of customer delivery.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import math
 import sqlite3
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
@@ -257,6 +260,21 @@ class DistributorOperations:
             "(retry_id TEXT PRIMARY KEY, pending_event_id TEXT NOT NULL, result_json TEXT, "
             "state_json TEXT, recorded_at TEXT NOT NULL)"
         )
+        self._db.execute(
+            "CREATE TABLE IF NOT EXISTS distributor_operation_proposals "
+            "(proposal_id TEXT PRIMARY KEY, case_id TEXT NOT NULL, event_json TEXT NOT NULL, "
+            "source TEXT NOT NULL, attachment_id TEXT, state_revision TEXT NOT NULL, "
+            "result_json TEXT, manager_id TEXT, approved_at TEXT, recorded_at TEXT NOT NULL)"
+        )
+        for column in ("manager_id TEXT", "approved_at TEXT"):
+            with suppress(sqlite3.OperationalError):
+                self._db.execute(f"ALTER TABLE distributor_operation_proposals ADD COLUMN {column}")
+        self._db.execute(
+            "CREATE TABLE IF NOT EXISTS distributor_operation_attachments "
+            "(attachment_id TEXT PRIMARY KEY, case_id TEXT NOT NULL, media_type TEXT NOT NULL, "
+            "image BLOB NOT NULL, digest TEXT NOT NULL, proposal_id TEXT, event_id TEXT, "
+            "recorded_at TEXT NOT NULL)"
+        )
         self._lock = RLock()
 
     def close(self) -> None:
@@ -338,6 +356,303 @@ class DistributorOperations:
                 self._db.rollback()
                 raise
             return projection
+
+    def attach_photo(self, request: Mapping[str, object]) -> dict[str, object]:
+        """Retain a manual same-case photo without interpreting its contents.
+
+        The attachment is evidence for a later operator-declared event.  It is
+        deliberately not a count, identity, inspection, or model conclusion.
+        """
+
+        if set(request) != {"attachment_id", "image", "media_type"}:
+            raise ValueError("photo attachment accepts attachment_id, image, and media_type only")
+        attachment_id = _text(request.get("attachment_id"), "attachment_id")
+        media_type = _text(request.get("media_type"), "media_type").lower()
+        raw_image = request.get("image")
+        if media_type not in {"image/jpeg", "image/png"} or not isinstance(raw_image, str):
+            raise ValueError("photo attachment must be a JPEG or PNG image")
+        try:
+            image = base64.b64decode(raw_image.encode("ascii"), validate=True)
+        except (UnicodeEncodeError, binascii.Error) as error:
+            raise ValueError("photo attachment image must be base64") from error
+        if not image or len(image) > 5_000_000:
+            raise ValueError("photo attachment must be between 1 byte and 5 MB")
+        signatures = {
+            "image/jpeg": b"\xff\xd8\xff",
+            "image/png": b"\x89PNG\r\n\x1a\n",
+        }
+        if not image.startswith(signatures[media_type]):
+            raise ValueError("photo attachment media type does not match image bytes")
+        digest = sha256(image).hexdigest()
+        with self._lock:
+            existing = self._db.execute(
+                "SELECT case_id, media_type, digest FROM distributor_operation_attachments "
+                "WHERE attachment_id=?",
+                (attachment_id,),
+            ).fetchone()
+            if existing is not None:
+                case_id, stored_type, stored_digest = cast(tuple[str, str, str], existing)
+                if (case_id, stored_type, stored_digest) != (
+                    self._config["case_id"],
+                    media_type,
+                    digest,
+                ):
+                    raise DistributorEventConflict(
+                        "A duplicate photo attachment ID has different input."
+                    )
+            else:
+                self._db.execute(
+                    "INSERT INTO distributor_operation_attachments "
+                    "(attachment_id, case_id, media_type, image, digest, proposal_id, "
+                    "event_id, recorded_at) "
+                    "VALUES (?, ?, ?, ?, ?, NULL, NULL, ?)",
+                    (
+                        attachment_id,
+                        self._config["case_id"],
+                        media_type,
+                        image,
+                        digest,
+                        self._next_recorded_at(),
+                    ),
+                )
+            projection = self.projection()
+            projection["latest_photo_attachment"] = self._attachment_metadata(attachment_id)
+            return projection
+
+    def photo(self, attachment_id: str) -> tuple[bytes, str]:
+        """Return only a photo attached to this configured case."""
+
+        identifier = _text(attachment_id, "attachment_id")
+        with self._lock:
+            row = self._db.execute(
+                "SELECT image, media_type FROM distributor_operation_attachments "
+                "WHERE attachment_id=? AND case_id=?",
+                (identifier, self._config["case_id"]),
+            ).fetchone()
+            if row is None:
+                raise ValueError("photo attachment is unavailable for this case")
+            image, media_type = cast(tuple[bytes, str], row)
+            return image, media_type
+
+    def prepare_event_proposal(self, request: Mapping[str, object]) -> dict[str, object]:
+        """Store a non-mutating, source-fresh proposal for manager review."""
+
+        allowed = {"proposal_id", "case_id", "event", "source", "photo_attachment_id"}
+        if set(request) - allowed or not {"proposal_id", "case_id", "event", "source"}.issubset(
+            request
+        ):
+            raise ValueError(
+                "proposal requires proposal_id, case_id, event, source, and optional "
+                "photo_attachment_id"
+            )
+        proposal_id = _text(request.get("proposal_id"), "proposal_id")
+        case_id = _text(request.get("case_id"), "case_id")
+        if case_id != self._config["case_id"]:
+            raise ValueError("proposal case does not match the configured operation")
+        source = _text(request.get("source"), "proposal source")
+        if source not in {"OPERATOR_DECLARED", "RETAINED_ALLOCATION_RECOMMENDATION"}:
+            raise ValueError("proposal source is not supported")
+        raw_event = request.get("event")
+        if not isinstance(raw_event, Mapping):
+            raise ValueError("proposal event must be an object")
+        event = self._validate_event(raw_event)
+        attachment_id = request.get("photo_attachment_id")
+        if attachment_id is not None:
+            attachment_id = _text(attachment_id, "photo_attachment_id")
+        encoded_event = _encode(event)
+        with self._lock:
+            source_facts = self._read_source()
+            state = self._latest_state() or self._initial_state()
+            state, source_facts = self._merge_source(state, source_facts)
+            if source_facts["source_status"] != "CURRENT":
+                raise ValueError("current ERP evidence is unavailable; no proposal can be prepared")
+            revision = self._proposal_revision(state, source_facts)
+            existing = self._db.execute(
+                "SELECT case_id, event_json, source, attachment_id, state_revision, result_json, "
+                "manager_id, approved_at "
+                "FROM distributor_operation_proposals WHERE proposal_id=?",
+                (proposal_id,),
+            ).fetchone()
+            if existing is not None:
+                (
+                    stored_case,
+                    stored_event,
+                    stored_source,
+                    stored_attachment,
+                    stored_revision,
+                    stored_result,
+                    stored_manager,
+                    stored_approved_at,
+                ) = cast(
+                    tuple[str, str, str, str | None, str, str | None, str | None, str | None],
+                    existing,
+                )
+                if (stored_case, stored_event, stored_source, stored_attachment) != (
+                    case_id,
+                    encoded_event,
+                    source,
+                    attachment_id,
+                ):
+                    raise DistributorEventConflict("A duplicate proposal ID has different input.")
+                proposal = self._proposal_record(
+                    proposal_id,
+                    stored_revision,
+                    event,
+                    source,
+                    attachment_id,
+                    stored_result,
+                    stored_manager,
+                    stored_approved_at,
+                )
+                return self._with_proposal(self._projection(state, source_facts), proposal)
+            if attachment_id is not None:
+                self._require_unbound_attachment(attachment_id)
+            self._db.execute(
+                "INSERT INTO distributor_operation_proposals "
+                "(proposal_id, case_id, event_json, source, attachment_id, state_revision, "
+                "result_json, recorded_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
+                (
+                    proposal_id,
+                    case_id,
+                    encoded_event,
+                    source,
+                    attachment_id,
+                    revision,
+                    self._next_recorded_at(),
+                ),
+            )
+            if attachment_id is not None:
+                self._db.execute(
+                    "UPDATE distributor_operation_attachments SET proposal_id=? "
+                    "WHERE attachment_id=?",
+                    (proposal_id, attachment_id),
+                )
+            proposal = self._proposal_record(
+                proposal_id, revision, event, source, attachment_id, None, None, None
+            )
+            return self._with_proposal(self._projection(state, source_facts), proposal)
+
+    def approve_event_proposal(self, request: Mapping[str, object]) -> dict[str, object]:
+        """Apply one prepared proposal exactly once after an explicit manager decision."""
+
+        if set(request) != {"proposal_id", "case_id", "state_revision", "manager_id"}:
+            raise ValueError(
+                "approval requires proposal_id, case_id, state_revision, and manager_id"
+            )
+        proposal_id = _text(request.get("proposal_id"), "proposal_id")
+        case_id = _text(request.get("case_id"), "case_id")
+        revision = _text(request.get("state_revision"), "state_revision")
+        manager_id = _text(request.get("manager_id"), "manager_id")
+        if case_id != self._config["case_id"]:
+            raise ValueError("approval case does not match the configured operation")
+        with self._lock:
+            row = self._db.execute(
+                "SELECT event_json, source, attachment_id, state_revision, result_json, "
+                "manager_id, approved_at "
+                "FROM distributor_operation_proposals WHERE proposal_id=? AND case_id=?",
+                (proposal_id, case_id),
+            ).fetchone()
+            if row is None:
+                raise ValueError("prepared proposal is unavailable for this case")
+            (
+                event_json,
+                source,
+                attachment_id,
+                stored_revision,
+                stored_result,
+                stored_manager,
+                stored_approved_at,
+            ) = cast(tuple[str, str, str | None, str, str | None, str | None, str | None], row)
+            event = _decoded(event_json, "proposal event")
+            if stored_result is not None:
+                return self._projection_from_record(stored_result)
+            recovered = self._db.execute(
+                "SELECT result_json FROM distributor_operation_events WHERE event_id=?",
+                (event["event_id"],),
+            ).fetchone()
+            if recovered is not None and recovered[0] is not None:
+                result = self._projection_from_record(cast(str, recovered[0]))
+                approved_at = stored_approved_at or self._next_recorded_at()
+                recorded_manager = stored_manager or manager_id
+                result["approval_evidence"] = {
+                    "proposal_id": proposal_id,
+                    "case_id": case_id,
+                    "manager_id": recorded_manager,
+                    "approved_at": approved_at,
+                    "source": source,
+                    "event_id": event["event_id"],
+                    "recovered": True,
+                }
+                result["prepared_proposal"] = {
+                    "proposal_id": proposal_id,
+                    "case_id": case_id,
+                    "purchase_order": self._config["purchase_order"],
+                    "event": _copy(event),
+                    "source": source,
+                    "photo_attachment_id": attachment_id,
+                    "state_revision": stored_revision,
+                    "status": "APPLIED",
+                    "approval": {"manager_id": recorded_manager, "approved_at": approved_at},
+                }
+                self._db.execute(
+                    "UPDATE distributor_operation_proposals SET result_json=?, manager_id=?, "
+                    "approved_at=? "
+                    "WHERE proposal_id=?",
+                    (_encode(result), recorded_manager, approved_at, proposal_id),
+                )
+                return result
+            if stored_revision != revision:
+                raise ValueError(
+                    "proposal revision is stale; review the current case before approval"
+                )
+            source_facts = self._read_source()
+            state = self._latest_state() or self._initial_state()
+            state, source_facts = self._merge_source(state, source_facts)
+            if (
+                source_facts["source_status"] != "CURRENT"
+                or self._proposal_revision(state, source_facts) != revision
+            ):
+                raise ValueError("proposal is stale; current ERP evidence changed before approval")
+            result = self.record_event(event)
+            approved_at = self._next_recorded_at()
+            if attachment_id is not None:
+                self._db.execute(
+                    "UPDATE distributor_operation_attachments SET event_id=? "
+                    "WHERE attachment_id=? AND proposal_id=?",
+                    (event["event_id"], attachment_id, proposal_id),
+                )
+                self._add_photo_attachments(result)
+            self._db.execute(
+                "UPDATE distributor_operation_proposals SET result_json=?, manager_id=?, "
+                "approved_at=? "
+                "WHERE proposal_id=? AND result_json IS NULL",
+                (_encode(result), manager_id, approved_at, proposal_id),
+            )
+            result["approval_evidence"] = {
+                "proposal_id": proposal_id,
+                "case_id": case_id,
+                "manager_id": manager_id,
+                "approved_at": approved_at,
+                "source": source,
+                "event_id": event["event_id"],
+            }
+            result["prepared_proposal"] = {
+                "proposal_id": proposal_id,
+                "case_id": case_id,
+                "purchase_order": self._config["purchase_order"],
+                "event": _copy(event),
+                "source": source,
+                "photo_attachment_id": attachment_id,
+                "state_revision": revision,
+                "status": "APPLIED",
+                "approval": {"manager_id": manager_id, "approved_at": approved_at},
+            }
+            self._db.execute(
+                "UPDATE distributor_operation_proposals SET result_json=? WHERE proposal_id=?",
+                (_encode(result), proposal_id),
+            )
+            return result
 
     def retry_pending_allocation(self, request: Mapping[str, object]) -> dict[str, object]:
         """Re-evaluate one retained pending allocation without replaying a physical event.
@@ -3031,6 +3346,7 @@ class DistributorOperations:
     ) -> dict[str, object]:
         result = cast(dict[str, object], _copy(state))
         result["schema_version"] = DISTRIBUTOR_OPERATIONS_SCHEMA_VERSION
+        result["purchase_order"] = self._config["purchase_order"]
         result["available"] = source["source_status"] == "CURRENT"
         result["documents"] = _documents(result.get("documents"))
         result["conversation"] = list(cast(list[object], result.get("conversation", [])))
@@ -3063,11 +3379,145 @@ class DistributorOperations:
         self._deadline_alerts(result, alerts)
         result["stage"] = self._stage(result, alerts)
         result["available_event_templates"] = self._event_templates()
+        self._add_photo_attachments(result)
+        proposal = self._current_proposal()
+        if proposal is not None:
+            result["prepared_proposal"] = {
+                **proposal,
+                "case_id": result.get("case_id"),
+                "purchase_order": result["purchase_order"],
+            }
         result.pop("prepared_picks", None)
         result.pop("source_status", None)
         result.pop("source_error", None)
         result.pop("source_observation", None)
         return result
+
+    def _current_proposal(self) -> dict[str, object] | None:
+        row = self._db.execute(
+            "SELECT proposal_id, event_json, source, attachment_id, state_revision, result_json, "
+            "manager_id, approved_at FROM distributor_operation_proposals WHERE case_id=? "
+            "ORDER BY recorded_at DESC, rowid DESC LIMIT 1",
+            (self._config["case_id"],),
+        ).fetchone()
+        if row is None:
+            return None
+        (
+            proposal_id,
+            event_json,
+            source,
+            attachment_id,
+            revision,
+            result_json,
+            manager_id,
+            approved_at,
+        ) = cast(tuple[str, str, str, str | None, str, str | None, str | None, str | None], row)
+        return self._proposal_record(
+            proposal_id,
+            revision,
+            _decoded(event_json, "proposal event"),
+            source,
+            attachment_id,
+            result_json,
+            manager_id,
+            approved_at,
+        )
+
+    def _proposal_revision(self, state: Mapping[str, object], source: Mapping[str, object]) -> str:
+        """Bind approval to the exact current case facts without exposing mutable internals."""
+
+        return sha256(
+            _encode(
+                {
+                    "case_id": self._config["case_id"],
+                    "state": state,
+                    "source": source,
+                }
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def _attachment_metadata(self, attachment_id: str) -> dict[str, object]:
+        row = self._db.execute(
+            "SELECT attachment_id, media_type, digest, proposal_id, event_id, recorded_at "
+            "FROM distributor_operation_attachments WHERE attachment_id=? AND case_id=?",
+            (attachment_id, self._config["case_id"]),
+        ).fetchone()
+        if row is None:
+            raise ValueError("photo attachment is unavailable for this case")
+        identifier, media_type, digest, proposal_id, event_id, recorded_at = cast(
+            tuple[str, str, str, str | None, str | None, str], row
+        )
+        return {
+            "attachment_id": identifier,
+            "media_type": media_type,
+            "digest": digest,
+            "proposal_id": proposal_id,
+            "event_id": event_id,
+            "recorded_at": recorded_at,
+            "source": "OPERATOR_ATTACHED_PHOTO",
+            "interpretation": "NOT_ANALYZED",
+        }
+
+    def _add_photo_attachments(self, projection: dict[str, object]) -> None:
+        rows = self._db.execute(
+            "SELECT attachment_id FROM distributor_operation_attachments WHERE case_id=? "
+            "ORDER BY recorded_at, attachment_id",
+            (self._config["case_id"],),
+        ).fetchall()
+        projection["photo_attachments"] = [
+            self._attachment_metadata(cast(str, row[0])) for row in rows
+        ]
+
+    def _require_unbound_attachment(self, attachment_id: str) -> None:
+        row = self._db.execute(
+            "SELECT case_id, proposal_id, event_id FROM distributor_operation_attachments "
+            "WHERE attachment_id=?",
+            (attachment_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("photo attachment is unavailable for this case")
+        case_id, proposal_id, event_id = cast(tuple[str, str | None, str | None], row)
+        if case_id != self._config["case_id"] or proposal_id is not None or event_id is not None:
+            raise ValueError("photo attachment is already associated with another operation")
+
+    @staticmethod
+    def _proposal_record(
+        proposal_id: str,
+        state_revision: str,
+        event: Mapping[str, object],
+        source: str,
+        attachment_id: str | None,
+        result_json: str | None,
+        manager_id: str | None,
+        approved_at: str | None,
+    ) -> dict[str, object]:
+        return {
+            "proposal_id": proposal_id,
+            "state_revision": state_revision,
+            "event": _copy(event),
+            "source": source,
+            "photo_attachment_id": attachment_id,
+            "status": "APPLIED" if result_json is not None else "PENDING_MANAGER_APPROVAL",
+            "read_only_agent_context": source == "RETAINED_ALLOCATION_RECOMMENDATION",
+            "approval": (
+                {"manager_id": manager_id, "approved_at": approved_at}
+                if manager_id is not None and approved_at is not None
+                else None
+            ),
+        }
+
+    @staticmethod
+    def _with_proposal(
+        projection: dict[str, object], proposal: Mapping[str, object]
+    ) -> dict[str, object]:
+        return {
+            **projection,
+            "prepared_proposal": {
+                **_copy(proposal),
+                "case_id": projection.get("case_id"),
+                "purchase_order": projection.get("purchase_order"),
+            },
+        }
 
     def _event_briefs(self, raw_events: object) -> list[dict[str, object]]:
         if not isinstance(raw_events, list):

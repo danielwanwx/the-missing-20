@@ -33,6 +33,8 @@ const {
   arrivalQuantitySummary,
   unwrapProjection,
   recommendedAction,
+  proposalActionDetail,
+  approvalReadback,
   statusTone,
   deliveryCompletionLabel,
   normalizeFinancials,
@@ -40,6 +42,29 @@ const {
   financialOrderSummary,
   invoiceRecordSummary,
 } = require('../workspace/distributor-operations.js');
+
+test('applied proposal keeps approval evidence after projection refresh', () => {
+  const applied = {
+    prepared_proposal: {
+      status: 'APPLIED',
+      event: { event_id: 'evt-1' },
+      approval: {
+        manager_id: 'Operations Manager',
+        approved_at: '2026-09-10T12:00:00Z',
+      },
+    },
+  };
+
+  assert.equal(proposalActionDetail(applied.prepared_proposal), 'Approved operation applied');
+  assert.deepEqual(approvalReadback(applied), {
+    manager_id: 'Operations Manager',
+    approved_at: '2026-09-10T12:00:00Z',
+    event_id: 'evt-1',
+  });
+  assert.equal(approvalReadback({
+    prepared_proposal: { status: 'PENDING_MANAGER_APPROVAL', approval: { manager_id: 'M' } },
+  }), null);
+});
 
 test('projection keeps missing source quantities unknown instead of turning them into zero', () => {
   const projection = normalizeProjection({
@@ -642,6 +667,10 @@ test('page exposes the guarded business loop and synthetic evidence label', () =
   assert.match(html, /Historical, industry, and savings baselines are unavailable/);
   assert.match(html, /Dictate in English/);
   assert.match(html, /Dictation only fills the question/);
+  assert.match(html, /Manager approval/);
+  assert.match(html, /Operator-declared evidence/);
+  assert.match(html, /Manual attachment only\. It is not analyzed/);
+  assert.match(html, /Approve and execute/);
   assert.match(html, /ops-resolved-alerts/);
   assert.ok(html.indexOf('id="ops-chat-panel"') < html.indexOf('id="ops-evidence-panel"'));
   assert.match(html, /href="#ops-chat-panel"/);
@@ -649,5 +678,7 @@ test('page exposes the guarded business loop and synthetic evidence label', () =
   assert.match(html, /ops-quantity-allocated-label/);
   const javascript = fs.readFileSync(path.join(__dirname, '../workspace/distributor-operations.js'), 'utf8');
   assert.match(javascript, /reselect-pending-allocation/);
+  assert.match(javascript, /prepare-proposal/);
+  assert.match(javascript, /approve-proposal/);
   assert.match(javascript, /Review pending allocation/);
 });

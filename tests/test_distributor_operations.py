@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from collections.abc import Mapping
 from copy import deepcopy
@@ -1638,6 +1639,88 @@ def test_http_projection_and_event_route_use_the_same_service(tmp_path: Path) ->
     )
     event_projection = cast(dict[str, object], sent[-1])["distributor_operations"]
     assert isinstance(event_projection, dict) and event_projection["quantities"]["received"] == 20
+
+
+def test_same_case_proposal_is_non_mutating_then_manager_approval_applies_once(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path)
+    event = _arrival("proposal-arrival", lot="LOT-A", cartons=2, observed=20)
+    prepared = service.prepare_event_proposal(
+        {
+            "proposal_id": "proposal-arrival",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "event": event,
+            "source": "OPERATOR_DECLARED",
+        }
+    )
+
+    proposal = cast(Mapping[str, object], prepared["prepared_proposal"])
+    assert proposal["status"] == "PENDING_MANAGER_APPROVAL"
+    assert proposal["source"] == "OPERATOR_DECLARED"
+    assert cast(Mapping[str, object], prepared["quantities"])["received"] == 0
+    assert bridge.calls == []
+    reloaded = service.projection()
+    reloaded_proposal = cast(Mapping[str, object], reloaded["prepared_proposal"])
+    assert reloaded_proposal["proposal_id"] == "proposal-arrival"
+
+    approval = {
+        "proposal_id": "proposal-arrival",
+        "case_id": "M20-DIST-COMPONENT-01",
+        "state_revision": proposal["state_revision"],
+        "manager_id": "Operations Manager",
+    }
+    applied = service.approve_event_proposal(approval)
+    assert cast(Mapping[str, object], applied["quantities"])["received"] == 20
+    assert cast(Mapping[str, object], applied["approval_evidence"]) == {
+        "proposal_id": "proposal-arrival",
+        "case_id": "M20-DIST-COMPONENT-01",
+        "manager_id": "Operations Manager",
+        "approved_at": cast(Mapping[str, object], applied["approval_evidence"])["approved_at"],
+        "source": "OPERATOR_DECLARED",
+        "event_id": "proposal-arrival",
+    }
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+    assert service.approve_event_proposal(approval) == applied
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
+
+
+def test_proposal_rejects_stale_case_and_manual_photo_stays_unanalyzed(tmp_path: Path) -> None:
+    service, bridge = _service(tmp_path)
+    image = base64.b64encode(b"\x89PNG\r\n\x1a\nmanual-evidence").decode("ascii")
+    attachment = service.attach_photo(
+        {
+            "attachment_id": "manual-photo-a",
+            "media_type": "image/png",
+            "image": image,
+        }
+    )
+    photo = cast(list[Mapping[str, object]], attachment["photo_attachments"])[0]
+    assert photo["source"] == "OPERATOR_ATTACHED_PHOTO"
+    assert photo["interpretation"] == "NOT_ANALYZED"
+    assert service.photo("manual-photo-a") == (base64.b64decode(image), "image/png")
+
+    prepared = service.prepare_event_proposal(
+        {
+            "proposal_id": "proposal-photo-a",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "event": _arrival("proposal-photo-event", lot="LOT-A", cartons=2, observed=20),
+            "source": "OPERATOR_DECLARED",
+            "photo_attachment_id": "manual-photo-a",
+        }
+    )
+    proposal = cast(Mapping[str, object], prepared["prepared_proposal"])
+    service.record_event(_arrival("intervening-arrival", lot="LOT-A", cartons=2, observed=20))
+    with pytest.raises(ValueError, match="stale"):
+        service.approve_event_proposal(
+            {
+                "proposal_id": "proposal-photo-a",
+                "case_id": "M20-DIST-COMPONENT-01",
+                "state_revision": proposal["state_revision"],
+                "manager_id": "Operations Manager",
+            }
+        )
+    assert [kind for kind, _event_id, _operation in bridge.calls] == ["receive_arrival"]
 
 
 def test_receive_reconciliation_admits_exact_submitted_receipt_without_replaying_event(

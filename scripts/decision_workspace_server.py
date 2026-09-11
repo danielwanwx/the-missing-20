@@ -1813,6 +1813,29 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         route = parsed.path
         query = parse_qs(parsed.query, keep_blank_values=True)
+        if route == "/api/v1/distributor-operations/photo":
+            try:
+                if set(query) != {"id"} or len(query["id"]) != 1:
+                    raise ValueError("photo requires one attachment id")
+                operations = self.distributor_operations
+                if operations is None:
+                    raise ValueError(
+                        "distributor operations requires an explicit private case configuration"
+                    )
+                image, media_type = operations.photo(query["id"][0])
+                self._send(HTTPStatus.OK, image, media_type)
+            except ValueError as exc:
+                self._send_api_error(HTTPStatus.NOT_FOUND, "distributor_photo_not_found", str(exc))
+            return
+        if (
+            route in {"/", "/index.html"}
+            and query.get("view") == ["dashboard"]
+            and self.distributor_operations is not None
+        ):
+            self.send_response(HTTPStatus.FOUND)
+            self.send_header("Location", "/operations#ops-overview")
+            self.end_headers()
+            return
         if route in {
             "/api/v1/photo-receiving",
             "/api/v1/photo-receiving/image",
@@ -2014,6 +2037,13 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             should_sync = False
             if action == "events":
                 result = operations.record_event(payload)
+                should_sync = True
+            elif action == "photo":
+                result = operations.attach_photo(payload)
+            elif action == "prepare-proposal":
+                result = operations.prepare_event_proposal(payload)
+            elif action == "approve-proposal":
+                result = operations.approve_event_proposal(payload)
                 should_sync = True
             elif action == "reconcile-receive":
                 event_id = payload.get("event_id")
@@ -2513,6 +2543,9 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             "/api/v1/agent-platform/normal-billing/execute",
             "/api/v1/agent-platform/normal-billing/reconcile",
             "/api/v1/distributor-operations/events",
+            "/api/v1/distributor-operations/photo",
+            "/api/v1/distributor-operations/prepare-proposal",
+            "/api/v1/distributor-operations/approve-proposal",
             "/api/v1/distributor-operations/reconcile-receive",
             "/api/v1/distributor-operations/reselect-pending-allocation",
             "/api/v1/distributor-operations/ask",
@@ -2543,7 +2576,11 @@ class DecisionWorkspaceHandler(BaseHTTPRequestHandler):
             payload = self._read_json(
                 allow_empty=route.endswith("/start") or route.endswith("/diagnose"),
                 max_bytes=7_100_000
-                if route == "/api/v1/photo-receiving/upload"
+                if route
+                in {
+                    "/api/v1/photo-receiving/upload",
+                    "/api/v1/distributor-operations/photo",
+                }
                 else MAX_REQUEST_BYTES,
             )
             self._v1_post(route, payload)

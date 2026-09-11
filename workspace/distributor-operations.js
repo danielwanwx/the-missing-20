@@ -686,7 +686,7 @@
     return "Review the evidence and affected customer orders before changing the operation.";
   }
 
-  function buildEventPayload({ type, values = {}, evidenceRef, now, eventId }) {
+  function buildEventPayload({ type, values = {}, evidenceRef, now, eventId, synthetic = true }) {
     const eventType = canonicalType(type);
     if (!eventType) throw new Error("Choose a supported evidence template.");
     const commonEvidence = text(evidenceRef);
@@ -696,7 +696,7 @@
       type: eventType,
       occurred_at: text(now) || new Date().toISOString(),
       evidence_ref: commonEvidence,
-      synthetic: true,
+      synthetic: synthetic === true,
     };
     const fields = {};
     for (const definition of FIELD_DEFS[eventType]) {
@@ -773,6 +773,8 @@
     deliveryCompletionLabel,
     unwrapProjection,
     projectionSourceState,
+    proposalActionDetail,
+    approvalReadback,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = exported;
   if (typeof window !== "undefined") window.Missing20DistributorOperations = exported;
@@ -795,6 +797,9 @@
   let voiceController = null;
   let pendingAllocationAction = null;
   let allocationFeedback = null;
+  let preparedProposal = null;
+  let selectedPhoto = null;
+  let photoPreviewUrl = "";
 
   function setText(id, value) {
     const node = $(id);
@@ -970,6 +975,31 @@
       }
       return item;
     }));
+  }
+
+  function renderOverview(next) {
+    const graph = $("ops-overview-graph");
+    if (!graph) return;
+    const alerts = activeAlertStages(next);
+    const nodes = [
+      { key: "evidence", label: "Operator evidence", detail: `${next.events.length} retained event${next.events.length === 1 ? "" : "s"}`, target: "ops-evidence-panel" },
+      { key: "agent", label: "Read-only agent", detail: "Explains current case", target: "ops-chat-panel" },
+      { key: "commitments", label: "Customer commitments", detail: `${next.allocations.length} order${next.allocations.length === 1 ? "" : "s"}`, target: "ops-orders-panel" },
+      { key: "action", label: "Manager-approved action", detail: proposalActionDetail(next.prepared_proposal), target: "ops-evidence-panel" },
+      { key: "erp", label: "Native ERP readback", detail: `${next.documents.length} document${next.documents.length === 1 ? "" : "s"}`, target: "ops-documents-panel" },
+    ];
+    const hasAlert = Object.keys(alerts).length > 0;
+    graph.replaceChildren(...nodes.map((node, index) => {
+      const button = document.createElement("button"); button.type = "button"; button.className = "ops-overview-node";
+      if (hasAlert && (node.key === "evidence" || node.key === "action")) button.classList.add("is-alert");
+      button.innerHTML = `<strong>${node.label}</strong><span>${node.detail}</span>${index < nodes.length - 1 ? '<i class="ph ph-arrow-right" aria-hidden="true"></i>' : ""}`;
+      button.addEventListener("click", () => $(node.target)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      return button;
+    }));
+    setText("ops-overview-case", `${next.case_id || "Case unavailable"} · ${next.purchase_order || "PO unavailable"}`);
+    setText("ops-overview-copy", hasAlert
+      ? "Open alert highlighted: inspect its evidence before preparing an operation."
+      : "Current case graph from operator evidence through read-only explanation, commitments, approval, native ERP, and readback.");
   }
 
   function metricBlock(label, value, className = "") {
@@ -1626,6 +1656,115 @@
     const button = $("ops-process-event");
     if (button) button.disabled = processingEvent || !projection?.available || !selectedTemplate || !sourceState?.hidden;
   }
+
+  function proposalSourceLabel(source) {
+    return text(source) === "RETAINED_ALLOCATION_RECOMMENDATION"
+      ? "Retained allocation recommendation; it does not write."
+      : "Operator-declared event; the agent did not create it.";
+  }
+
+  function proposalActionDetail(proposal) {
+    if (!isRecord(proposal)) return "No pending proposal";
+    const status = text(proposal.status).toUpperCase();
+    if (status === "APPLIED") return "Approved operation applied";
+    if (status === "PENDING_MANAGER_APPROVAL") return "Proposal awaiting manager review";
+    return status ? `Proposal status: ${pretty(status)}` : "Proposal status unavailable";
+  }
+
+  function approvalReadback(next) {
+    const direct = isRecord(next?.approval_evidence) ? next.approval_evidence : null;
+    if (direct) return direct;
+    const proposal = isRecord(next?.prepared_proposal) ? next.prepared_proposal : null;
+    const approval = isRecord(proposal?.approval) ? proposal.approval : null;
+    if (!approval || text(proposal?.status).toUpperCase() !== "APPLIED") return null;
+    return { ...approval, event_id: firstText(proposal.event, ["event_id"]) };
+  }
+
+  function renderPreparedProposal(next) {
+    const incoming = isRecord(next?.prepared_proposal) ? next.prepared_proposal : null;
+    if (incoming && text(incoming.proposal_id)) preparedProposal = incoming;
+    const panel = $("ops-proposal-panel");
+    const button = $("ops-approve-proposal");
+    if (!panel || !button) return;
+    const proposal = preparedProposal;
+    const readback = $("ops-approval-readback");
+    const approval = approvalReadback(next);
+    if (readback) {
+      readback.hidden = !approval;
+      readback.textContent = approval
+        ? `Approved by ${text(approval.manager_id) || "manager unavailable"} at ${formatDate(approval.approved_at)} · ${text(approval.event_id) || "event unavailable"}${approval.recovered === true ? " · recovered from retained event result" : ""}.`
+        : "";
+    }
+    panel.hidden = !proposal || text(proposal.status) === "APPLIED" || text(proposal.case_id) && text(proposal.case_id) !== text(next?.case_id);
+    if (panel.hidden) return;
+    const event = isRecord(proposal.event) ? proposal.event : {};
+    const fields = Object.entries(event)
+      .filter(([key]) => !["event_id", "type", "occurred_at", "synthetic"].includes(key))
+      .map(([key, value]) => `${pretty(key)}: ${Array.isArray(value) ? value.join(", ") : String(value)}`);
+    setText("ops-proposal-summary", `${text(proposal.case_id) || text(next?.case_id)} · PO ${text(proposal.purchase_order) || text(next?.purchase_order) || "unavailable"} · ${pretty(event.type || "operation")}. ${fields.join(" · ")}. ${proposalSourceLabel(proposal.source)} Approval checks this exact current-case revision before one native execution.`);
+    button.disabled = processingEvent || !next?.available || !sourceState?.hidden || !text($("ops-manager-id")?.value);
+  }
+
+  function photoAttachmentList(next) {
+    return Array.isArray(next?.photo_attachments) ? next.photo_attachments.filter(isRecord) : [];
+  }
+
+  function renderPhotos(next) {
+    const list = $("ops-photos-list");
+    if (!list) return;
+    const photos = photoAttachmentList(next);
+    setText("ops-photos-count", photos.length ? `${photos.length} photo${photos.length === 1 ? "" : "s"}` : "No photos");
+    if (!photos.length) { list.replaceChildren(emptyList("No same-case photos have been attached.")); return; }
+    list.replaceChildren(...photos.map((photo) => {
+      const card = document.createElement("article"); card.className = "ops-photo-card";
+      const preview = document.createElement("button"); preview.type = "button"; preview.className = "ops-photo-open";
+      const image = document.createElement("img");
+      image.src = `${API_PATH}/photo?id=${encodeURIComponent(text(photo.attachment_id))}`;
+      image.alt = "Operator-attached operational evidence; not analyzed";
+      image.loading = "lazy"; preview.append(image);
+      preview.setAttribute("aria-label", "Expand attached photo");
+      preview.addEventListener("click", () => {
+        const expanded = card.classList.toggle("is-expanded");
+        preview.setAttribute("aria-label", expanded ? "Collapse attached photo" : "Expand attached photo");
+      });
+      const copy = document.createElement("div");
+      const title = document.createElement("strong"); title.textContent = text(photo.event_id) ? `Associated with ${text(photo.event_id)}` : text(photo.proposal_id) ? "Prepared for manager approval" : "Unassociated operator attachment";
+      const detail = document.createElement("small"); detail.textContent = `Manual photo · ${text(photo.interpretation) === "NOT_ANALYZED" ? "not analyzed" : "status unavailable"} · ${formatDate(photo.recorded_at)}`;
+      copy.append(title, detail); card.append(preview, copy); return card;
+    }));
+  }
+
+  function resetSelectedPhoto() {
+    selectedPhoto = null;
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    photoPreviewUrl = "";
+    const input = $("ops-photo-file"); if (input) input.value = "";
+    const preview = $("ops-photo-preview"); if (preview) { preview.hidden = true; preview.replaceChildren(); }
+  }
+
+  function attachmentId() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    throw new Error("This browser cannot create an attachment ID.");
+  }
+
+  async function uploadSelectedPhoto() {
+    if (!selectedPhoto) return "";
+    const file = selectedPhoto;
+    if (!/image\/(jpeg|png)/.test(file.type)) throw new Error("Choose a JPEG or PNG photo.");
+    if (file.size <= 0 || file.size > 5_000_000) throw new Error("Choose a photo smaller than 5 MB.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+    const encoded = btoa(binary);
+    const id = attachmentId();
+    const response = await requestJSON(`${API_PATH}/photo`, {
+      method: "POST", body: JSON.stringify({ attachment_id: id, image: encoded, media_type: file.type }),
+    });
+    const next = unwrapProjection(response); if (next) renderProjection(next);
+    return id;
+  }
   function updateAskButton() {
     const button = $("ops-ask-submit");
     if (button) button.disabled = asking || !projection?.available || !sourceState?.hidden;
@@ -1809,6 +1948,7 @@
     clearSourceError();
     renderQuantities(next);
     renderStages(next);
+    renderOverview(next);
     renderBenchmark(next);
     renderTemplates(next, { resetFields: resetEventFields || caseChanged });
     renderLots(next);
@@ -1818,6 +1958,8 @@
     renderDocuments(next);
     renderFinancials(next);
     renderEvents(next);
+    renderPhotos(next);
+    renderPreparedProposal(next);
     if (!skipConversation) renderConversation(next);
     updateEventButton();
   }
@@ -1857,7 +1999,7 @@
   $("ops-event-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (processingEvent || !selectedTemplate) return;
-    processingEvent = true; updateEventButton(); setFeedback("Processing the declared synthetic event…");
+    processingEvent = true; updateEventButton(); setFeedback("Preparing the operator-declared event for manager approval…");
     try {
       const payload = buildEventPayload({
         type: selectedTemplate.type,
@@ -1865,17 +2007,68 @@
         evidenceRef: $("ops-evidence-ref").value,
         now: new Date().toISOString(),
         eventId: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined,
+        synthetic: projection?.synthetic_input === true,
       });
-      const response = await requestJSON(`${API_PATH}/events`, { method: "POST", body: JSON.stringify(payload) });
+      const photoAttachmentId = await uploadSelectedPhoto();
+      const response = await requestJSON(`${API_PATH}/prepare-proposal`, {
+        method: "POST",
+        body: JSON.stringify({
+          proposal_id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : attachmentId(),
+          case_id: projection.case_id,
+          event: payload,
+          source: "OPERATOR_DECLARED",
+          ...(photoAttachmentId ? { photo_attachment_id: photoAttachmentId } : {}),
+        }),
+      });
       const next = unwrapProjection(response);
-      if (next) renderProjection(next, { resetEventFields: true });
+      if (next) renderProjection(next);
       else if (selectedTemplate) renderTemplateFields(selectedTemplate);
-      setFeedback("Evidence processed. The projection and alerts were refreshed.", "success");
+      const approvalFeedback = $("ops-proposal-feedback");
+      if (approvalFeedback) {
+        approvalFeedback.className = "ops-feedback";
+        approvalFeedback.textContent = "";
+      }
+      setFeedback("Proposal prepared. A manager must approve this exact case revision before it can execute.", "success");
+    } catch (error) {
+      setFeedback(error.message || "Evidence proposal could not be prepared.", "error");
+    } finally {
+      processingEvent = false; updateEventButton(); renderPreparedProposal(projection);
+    }
+  });
+  $("ops-photo-file")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0] || null;
+    resetSelectedPhoto();
+    if (!file) return;
+    if (!/image\/(jpeg|png)/.test(file.type) || file.size <= 0 || file.size > 5_000_000) {
+      setFeedback("Choose a JPEG or PNG photo smaller than 5 MB.", "error"); return;
+    }
+    selectedPhoto = file; photoPreviewUrl = URL.createObjectURL(file);
+    const preview = $("ops-photo-preview"); const image = document.createElement("img");
+    image.src = photoPreviewUrl; image.alt = "Selected manual evidence photo; not analyzed";
+    preview.replaceChildren(image, Object.assign(document.createElement("span"), { textContent: "Manual attachment; not analyzed." })); preview.hidden = false;
+  });
+  $("ops-manager-id")?.addEventListener("input", () => renderPreparedProposal(projection));
+  $("ops-approve-proposal")?.addEventListener("click", async () => {
+    const proposal = preparedProposal;
+    const managerId = text($("ops-manager-id")?.value);
+    if (!proposal || !managerId || processingEvent) return;
+    processingEvent = true; renderPreparedProposal(projection);
+    const feedback = $("ops-proposal-feedback"); feedback.className = "ops-feedback"; feedback.textContent = "Checking the current case and executing one approved operation…";
+    try {
+      const response = await requestJSON(`${API_PATH}/approve-proposal`, {
+        method: "POST",
+        body: JSON.stringify({ proposal_id: proposal.proposal_id, case_id: projection.case_id, state_revision: proposal.state_revision, manager_id: managerId }),
+      });
+      const next = unwrapProjection(response);
+      preparedProposal = null;
+      if (next) renderProjection(next, { resetEventFields: true });
+      resetSelectedPhoto();
+      feedback.className = "ops-feedback is-success"; feedback.textContent = "Manager approval recorded. Native operation result and same-case readback are shown below.";
       void refresh({ silent: true });
     } catch (error) {
-      setFeedback(error.message || "Evidence could not be processed.", "error");
+      feedback.className = "ops-feedback is-error"; feedback.textContent = error.message || "Approved operation could not execute.";
     } finally {
-      processingEvent = false; updateEventButton();
+      processingEvent = false; renderPreparedProposal(projection);
     }
   });
   $("ops-retry").addEventListener("click", () => { void refresh(); });
