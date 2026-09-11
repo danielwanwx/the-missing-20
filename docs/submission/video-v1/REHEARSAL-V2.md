@@ -1,12 +1,12 @@
 # V2 recording rehearsal — live acceptance ledger
 
-Status: IN PROGRESS. Full film is not cleared for recording or synthesis. The user approved the minimal same-order bridge after the first live inspection exposed separate dashboard and distributor workflows.
+Status: SAME-ORDER BUSINESS REHEARSAL PASSED. Full-film capture and synthesis are not complete; the remaining recording gates are listed below. The user approved the minimal same-order bridge after the first live inspection exposed separate dashboard and distributor workflows.
 
 ## Scope and boundaries
 
 Rehearse the actual UI, English conversation, source evidence, proposed action, approval, execution and native readback before recording. Preserve completed PO19. New isolated case target: `M20-DIST-COMPONENT-V2-20260910`. Code implementation uses supervised Terra High. All acceptance is scoped to the filmed path, not a claim of defect-free production behavior.
 
-## Initial live observations
+## Initial live observations (historical; superseded by the live run below)
 
 | Recording point | Actual observation | Acceptance |
 | --- | --- | --- |
@@ -57,4 +57,44 @@ Rehearse the actual UI, English conversation, source evidence, proposed action, 
 
 Remaining: LOT-B count/quality exception and release, replacement LOT-C, remaining A5/B15 fulfillment, fresh native SaaS final-state views, AWS request correlation, accurate architecture and final recording approval.
 
+## Complex-case continuation
+
+- LOT-B's two cartons contained a declared 18 parts instead of 20. The application raised `PARTS_SHORTAGE` for 2 and `QUALITY_EVIDENCE_REQUIRED` for 18. Native receipt: `MAT-PRE-2026-00020`.
+- A 2-piece sample at 10.3 mm produced rejected inspection `MAT-QA-2026-00015` and held all 18 LOT-B parts. No inference that all 18 pieces were defective was made.
+- Third real English question: “All four original cartons have arrived. Can we now fulfill the remaining five parts for the first customer and fifteen for the second? Explain the shortage and quality constraints in three short sentences.” The answer correctly distinguished 4 cartons from 38 received parts, 2 missing, 18 held and zero usable; it explicitly distinguished sample failure from proof that every held unit was defective. It was longer than the requested three short sentences, so concision is not a passed claim.
+- The native Strands snapshot contains 6 persisted messages: 3 user and 3 assistant messages, after the full-page navigations and intervening operational events. Snapshot remains private under the V2 runtime's `distributor-native-sessions` directory.
+- Declared whole-lot reinspection of 18 pieces at 10 mm produced accepted `MAT-QA-2026-00016`, release `MAT-STE-2026-00017` and a real Opus-selected A5/B13 plan. A5 correctly used the permitted final-remainder exception to its minimum dispatch quantity.
+- Replacement LOT-C arrived as one carton containing 2 parts: `MAT-PRE-2026-00021`. Missing quantity became zero. Accepted inspection `MAT-QA-2026-00017` and release `MAT-STE-2026-00018` made all remaining stock usable. The next real Opus selection added only B2 while retaining existing prepared commitments. Three unique selection records total an application-estimated USD0.0704165; chat and Codex usage are excluded.
+- Browser approval dispatched A's remaining 5 as `MAT-DN-2026-00019` / `SHIPMENT-00017`, and B's first 13 as `MAT-DN-2026-00020` / `SHIPMENT-00018`. Last B2 dispatch is executing. The current completed dispatch total is 38, not 40, until its result is verified.
+- Airtable's actual expanded V2 record independently showed 38 received, 18 held, 2 missing, 20 dispatched and 20 recorded delivery confirmations during the quality-hold phase, with matching native record links. Dashboard screenshot inspection confirmed visible shortage and quality-stage highlights; photo expansion also rendered the actual image.
+- Release evidence: `a8c5fa6c65eabc93abac7146059097bff6a1ff67` matches remote `main`. GitHub's actual Actions page shows [CI run 85](https://github.com/danielwanwx/the-missing-20/actions/runs/34563848269) completed successfully in 2m48s. CLI lacked authentication and the connector returned no runs; the native GitHub page supplied the CI verification.
+
+Remaining at this checkpoint: final B2 dispatch; pickup and delivery confirmations for shipments 17, 18 and the final shipment; final native SaaS/ERP state; optional AWS request correlation or truthful application-trace fallback; architecture/shot-plan alignment and film clearance.
+
 Record exact case/document IDs, real prompts and answers, model usage, proposal provenance, approval and execution results, and same-case source readback. Retain failures. Check actual exported footage for readability and English content. Replace script outcome placeholders only from those results. Do not count historical evidence, local tests or a partial UI pass as full rehearsal completion.
+
+
+## Final shipment checkpoint
+
+- All four picks and native dispatches completed through the approved browser flow: A20 / DN18 / Shipment16; A5 / DN19 / Shipment17; B13 / DN20 / Shipment18; B2 / DN21 / Shipment19. Full document prefixes are retained in the event sections and source links.
+- Pickup and explicit synthetic delivery confirmations completed for Shipments16,17,18. Shipment19 pickup completed as event `V2-20260910-carrier-b2`; its final delivery proposal is being prepared. At this checkpoint the verified total is 40 dispatched and 38 delivery-confirmed.
+- Native Airtable detail view independently shows 40 received, zero held, zero missing, 40 dispatched and 38 confirmations. Native Jira QRC-5 shows Done with the matching PO20 and A25/B15 allocation records. Exception resolution is distinct from final delivery confirmation.
+- Native ERP customer B order `SAL-ORD-2026-00016` shows To Bill, 15 Nos at USD6, total USD90, advance paid USD0. Order value is not invoiced or recognized revenue. No invoice was created by this rehearsal.
+
+
+## Final acceptance — PO20 business loop
+
+- Final approved event `V2-20260910-delivery-b2` completed for `SHIPMENT-00019`. Actual browser Activity retains all 19 events. Current dashboard: **40 ordered, 40 received, 40 dispatched, 40 synthetic delivery-confirmed, zero held, zero missing, zero open alerts**. A fulfilled 25; B fulfilled 15. The final dashboard screenshot was visually inspected, including the completed stage graph and same-case identifiers.
+- Actual Airtable expanded record `rec5JyeUJ1iFbNbSO` was refreshed after final execution: **40 / 0 / 0 / 40 / 40** for received / held / missing / dispatched / confirmations. Native Jira `QRC-5` remains Done. Actual Slack web UI shows the matching final quantities in [the final Celigo-coordinated update](https://miss-20.slack.com/archives/C0BUNV20J6Q/p1789105956484039).
+- Native ERP A order `SAL-ORD-2026-00015` independently shows 25 Nos / USD150 / To Bill / USD0 advance. B order shows 15 Nos / USD90 / To Bill / USD0 advance. Final native delivery note `MAT-DN-2026-00021` shows 2 Nos / USD12 / To Bill. These are submitted operational records and order values, not payment or recognized revenue.
+- Three real English dialogue turns and three real Bedrock Opus contract selections passed the factual checks described above. A retained historical answer reflects its original quality-hold state; it must not be presented as a fresh answer after final completion. No additional inference was spent on final carrier/delivery events.
+- See `SOL-REVIEW-V2.md` for the independent final journal audit. Focused tests and successful CI remain scoped code evidence; the native UI run supplies business acceptance.
+
+## Remaining recording gates
+
+1. Preserve this completed PO20 case. The rehearsal inspected UI states but did not produce continuous raw video of every transition. Do not manufacture a pending incident from the completed state. A fresh externally written recording case requires its own explicit scope authorization; the existing approval covered V2.
+2. Replace the old architecture presentation's Nova Pro / AgentCore wording with the truthful four-step diagram specified in `STORYBOARD-V2.md`; current runtime is Strands with Bedrock Opus 4.6.
+3. AWS logging is enabled and API-verified, but Chrome still reports a signed-out session and no invocation event has been correlated. Use the storyboard's truthful application-trace alternative unless exact request telemetry is verified. Do not film the settings page as execution proof.
+4. Final capture must establish readable crops, actual click/approval transitions, real English dialogue, photo provenance, and the impact ending. Optional microphone dictation has not been accepted as a recording claim. Full video/audio composition and exported-film review are still outstanding.
+
+The completed rehearsal supports proceeding to a scoped recording session; it does not certify a finished film, production reliability, or a competition award.

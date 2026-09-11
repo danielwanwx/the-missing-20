@@ -71,3 +71,27 @@ The cut is ready for another strict review only when it contains one named case 
 **Still unresolved before the claims can pass:** the eligible primary case is not yet named; its photograph, quantities, prompts, answers, proposal, approval, execution, allocation, and final state have not been captured and matched; the Bedrock request correlation or accurately described application trace has not been shown; and final-export readability, latency treatment, identifiers, simulated-data labels, and the 4:30 runtime remain unverified. Scene 09's bracketed outcome line must be replaced with the selected case's actual result before voice generation.
 
 The script therefore has strong award-level potential on all five criteria, with its former case-coherence and timing risks materially reduced. The decisive next review must judge the recorded causal chain, not infer success from these instructions, and no contest outcome can be guaranteed.
+
+## Editorial re-review addendum — observed bridge semantics
+
+**Verdict:** The changed timed scenes are judge-facing and coherent, with **one stale evidence-contract sentence to fix**. The script now accurately separates the roles: the read-only agent explains source facts and selects a contract plan; the operator prepares a declared event; the manager reviews its exact case, order, lot, and quantity; and the application executes the approved action and reads back the result. The third prompt also correctly distinguishes a pick from dispatch or delivery evidence.
+
+Scene 04's revised narration is truthful about the photograph sitting alongside declared fields and the rehearsal note correctly rejects any extraction claim. However, the earlier Story and evidence contract still says, “show the actual image and retained extraction.” That phrase conflicts with this same-case bridge, which retains a manual attachment and performs no image analysis.
+
+**Required replacement:**
+
+> “Photographs are manually attached evidence assets: show the actual image and retained attachment metadata. Do not claim extraction, barcode decoding, count, identity, or inspection inference in this same-case workflow. If a separate extraction is shown, run and record it and label the transition explicitly.”
+
+With that edit, no further editorial blocker appears in the changed scenes. The reported PO20 state—40 received, 40 dispatched, allocated A25/B15—and the retained three-turn Opus/Strands conversation support the planned narrative, but remaining simulated delivery events, final footage, trace correlation, readable holds, exact identifiers, final voice, and runtime still require review. This addendum does not clear the rehearsal, capture, or full film.
+
+## Final independent runtime audit — PO20 operational journal
+
+**Operational verdict:** **The isolated same-case journal passes the bounded fulfillment audit.** This finding is based only on read-only inspection of `/private/tmp/m20-v2-config.json` and `/private/tmp/m20-v2-runtime/distributor-operations.sqlite3`. It clears the retained PO20 operational facts for use in the script; it does not clear the rehearsal, capture, cross-SaaS footage, agent transcript, AWS trace, or full film.
+
+The configured case is `M20-DIST-COMPONENT-V2-20260910` on purchase order `PUR-ORD-2026-00020`, with customer commitments of 25 and 15. The final retained projection records 40 ordered, 40 received, 40 dispatched, and 40 synthetically delivery-confirmed. The allocation readback is exactly A25/B15. Four distinct shipment records carry 20, 5, 13, and 2 parts: `SHIPMENT-00016` and `SHIPMENT-00017` total 25 for `SAL-ORD-2026-00015`; `SHIPMENT-00018` and `SHIPMENT-00019` total 15 for `SAL-ORD-2026-00016`. Every shipment has one retained carrier-pickup event and one retained delivery event. The last event is `V2-20260910-delivery-b2` for `SHIPMENT-00019`, and its result raises delivery confirmation from 38 to 40.
+
+The journal contains 19 event IDs and 19 distinct proposal-to-event records, with no pending event or proposal result and no missing manager/timestamp approval attribution. Event IDs are unique; all four picked events map to four distinct native shipment records; the retained pickup/delivery pairs occur once per shipment. This evidence shows no duplicate replay in the local journal. It does not independently prove that an external provider could never duplicate an effect, so final footage should use the verified native document identifiers rather than a broader exactly-once claim.
+
+The final internal alert history contains five resolved alerts and no open alert; the projected stage is `DELIVERY_CONFIRMED`. One manual photo attachment is bound to this case, proposal, and event. The corrected storyboard language—manual image plus retained attachment metadata, with no image-analysis or extraction claim—matches that evidence.
+
+The operations journal's final state does not retain the reported six conversation messages. The reported three real Opus turns through native Strands therefore remain separate browser/capture evidence, as do the reported Jira, Airtable, Slack/Celigo, and native-document views. The film may state 40 received, A25/B15 dispatched, and 40 **synthetic delivery confirmations** once the matching identifiers are visible; it must not convert those confirmations into a claim of verified physical delivery. Full-film acceptance still depends on the final captured causal chain, legibility, trace wording, narration, and runtime.

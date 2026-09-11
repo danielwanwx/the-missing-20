@@ -8,7 +8,7 @@ Audience: a parts distributor's operations manager. Question: what can we safely
 
 One primary case must connect discovery, conversation, proposal, approval where required, execution, and source verification. PO19 has completed fulfillment evidence (40 received, A25/B15 dispatched); it is not a pending incident. Select and name a genuinely eligible case before filming new discovery and approval. Do not splice a different case's result into that approval. Use a photograph linked to that case; separate-case material belongs in supplementary footage. Case selection is an unresolved capture prerequisite, not an already satisfied claim. All outcome narration must be locked to that case's actual records before voice generation.
 
-Show a concise early label: `Demo scenario with simulated business records.` Label synthetic delivery confirmation at the outcome. Photographs are evidence assets: show the actual image and retained extraction; claim a new extraction only when run and recorded. Preserve sources and record identifiers. Use real English requests and verbatim answers, not scripted model answers. The user requests a real conversation; plan one three-turn recording, avoiding exploratory paid reruns. No inference is executed by this script-writing step.
+Show a concise early label: `Demo scenario with simulated business records.` Label synthetic delivery confirmation at the outcome. Photographs are manually attached evidence assets: show the actual image and retained attachment metadata. Do not claim image analysis, extraction, barcode decoding, count, identity, or inspection inference in this same-case workflow. Preserve sources and record identifiers. Use real English requests and verbatim answers, not scripted model answers. The user requests a real conversation; plan one three-turn recording, avoiding exploratory paid reruns. No inference is executed by this script-writing step.
 
 Architecture graphic: receiving evidence and connected records → application agent orchestration using Strands and Amazon Bedrock → tool/application execution → ERP and SaaS readback. Identify deterministic application-owned handoffs accurately. Match the current deployed paths; do not draw unsupported AWS services. An AWS settings page alone is not proof of the recorded request; use matching invocation telemetry if available.
 
@@ -17,7 +17,7 @@ Architecture graphic: receiving evidence and connected records → application a
 ### 01 — 0:00–0:18 — Product first
 Picture: clean full dashboard. Give the viewer three seconds to orient to source rail, operational graph, and agent panel. Move toward a real exception node and click it. No dense table opening.
 
-Voice: “One shipment. Conflicting counts, quality evidence, and customer promises. The agent investigates what can safely ship, prepares a resolution, and checks the resulting records across the connected business apps.”
+Voice: “One purchase order. Conflicting counts, quality evidence, and customer promises. The agent investigates what can ship and selects a plan against the customer contracts. Approved actions flow into the connected business apps, with records the manager can inspect.”
 
 ### 02 — 0:18–0:30 — Establish the scenario
 Picture: receiving evidence, ordered quantity, and customer commitments from the named primary case. Concise simulated-records label. Use only its actual quantities.
@@ -30,9 +30,11 @@ Picture: four-step architecture diagram. Animate one route through actual compon
 Voice: “Strands and Amazon Bedrock power the agent's investigation. It uses tools to inspect connected records and prepare a response. The application executes business actions and reads back the resulting records.”
 
 ### 04 — 0:42–1:05 — Inspect physical evidence
-Picture: open the selected box photograph; magnify visible label, barcode or lot text; click through to actual retained fields and linked receipt. Maintain an explicit case badge. Do not imply a barcode was decoded if the record only contains OCR or manual input.
+Picture: open the selected box photograph; show the actual visible box, then magnify the separately declared lot and quantity fields and click through to the linked receipt. The selected p05 fixture has no readable barcode or parts to count. Maintain an explicit case badge. Do not imply a barcode was decoded if the record only contains OCR or manual input.
 
-Voice: “Start with the receiving evidence. Open the photograph, inspect its label, and follow the captured information into the receipt and lot record. The manager can inspect the evidence behind the operational state.”
+Voice: “Start with the receiving evidence. The photograph sits alongside the declared carton count, part count, and lot. Follow those observations into the receipt and inspection record, keeping the evidence behind each decision visible.”
+
+Rehearsal finding: the distributor bridge retains a manual photo attachment. It does not perform image extraction. Use the actual photo expansion and declared-input fields; do not narrate automatic barcode, part-count, or quality recognition in this same-case shot. The existing public box fixture requires its source credit in the video description or credits.
 
 ### 05 — 1:05–1:50 — Let the agent work
 Picture: actually enter question one, show tool activity, hold its answer, then enter the follow-up. Highlight one conclusion and its source rather than asking the viewer to read paragraphs. Capture actual latency; label materially compressed waits.
@@ -40,7 +42,7 @@ Picture: actually enter question one, show tool activity, hold its answer, then 
 English requests, adapted to the selected case's actual state:
 1. “What is preventing this order from being fulfilled? Check the receiving and quality evidence.”
 2. “Given the customer contracts, what can we ship now, and what still needs to be resolved?”
-3. “Prepare the resolution and show me what will change in each connected app.”
+3. “Does that pick prove dispatch or delivery, and what evidence is still needed?”
 
 Voice, leaving space for visible interaction: “Ask the question an operations manager would ask. The agent checks the evidence, then connects the exception to customer commitments. A follow-up stays within the same order: what can ship now, and what still needs to be resolved?”
 
@@ -54,9 +56,9 @@ Voice when correlation is visible: “This is the Bedrock invocation for that an
 Fallback voice for an application trace only: “This is the application's recorded invocation trace for the investigation we just saw.” Use exactly one version matching the actual footage.
 
 ### 07 — 2:00–2:40 — Evidence becomes approved action
-Picture: enter request three; open the real proposed changes and their policy basis. Pause over the actual approval control, click once, retain the execution-to-readback transition for that same incident. Allocate at least ten seconds to the outcome evidence.
+Picture: show the retained agent-selected contract plan, then prepare the corresponding operator-declared event in the actual form. Open its exact case, order, lot and quantity fields. Pause over the actual approval control, click once, retain the execution-to-readback transition for that same incident. Allocate at least ten seconds to the outcome evidence. Chat remains read-only; do not imply it filled or executed this form.
 
-Voice: “The proposed resolution makes the next steps explicit, including the customer terms that constrain shipment. Where approval is required, the manager reviews the proposal and approves it. The application carries out the approved action and checks the resulting state.”
+Voice: “The selected plan makes the customer terms explicit. The operator records the evidence for the next step, and the manager reviews the exact order, lot, and quantity before approval. The application carries out that approved action and checks the resulting state.”
 
 ### 08 — 2:40–3:20 — Follow the work across apps
 Picture: product action → actual ERP document → Jira exception → Airtable operating record → Slack update through Celigo → verified readback. About 7–9 seconds per meaningful record; matching identifiers anchor cuts. Show a Celigo execution screen only when it matches this operation.
@@ -81,9 +83,9 @@ Internal impact note: the closing is conditional on capturing that actual loop. 
 
 | Claim | Evidence required | Treatment |
 | --- | --- | --- |
-| Agent investigates and prepares action | Actual prompts, tool results, sourced proposal | Show in scenes 05–07; revise to match capture |
+| Agent explains evidence and selects a contract plan | Actual prompts, source facts, retained model selection | Show in scenes 05–07; distinguish the operator-prepared event |
 | Application coordinates and verifies changes | Same-operation native records and readback | Scenes 07–08; distinguish agent reasoning from application execution |
-| A25/B15 and 40 dispatched | Matching PO19 fulfillment records | Demonstrated scenario result, not a benchmark or physical-delivery proof |
+| A25/B15 and 40 dispatched | Matching PO20 rehearsal fulfillment records; match the chosen recording case before filming | Demonstrated scenario result, not a benchmark or physical-delivery proof |
 | Less reconciliation and duplicate entry | Visible tasks performed by workflow instead of operator | Potential benefit; no measured reduction claim |
 | Faster decisions and greater exception capacity | Future measured baseline/run comparison | Potential impact only; no ROI or throughput number |
 
