@@ -1,7 +1,7 @@
 # Final publication metadata — LogisticPilot — The Missing 20
 
-Status: prepared for review. The video is not published, and the Devpost entry is not
-submitted.
+Status: **READY_FOR_FINAL_PUBLICATION_CONFIRMATION**. The final film independently
+passed review; it is not yet published, and the Devpost entry is not submitted.
 
 This file is the final copy source for a public video and Devpost form. It reflects the
 completed PO20 same-case demo only. Historical PO18/PO19 records remain historical
@@ -21,10 +21,12 @@ Upload these repository-local JPEGs to Devpost after final preview:
 Each JPEG is 1500 × 1000 pixels (3:2). The final normalized MP4 is a local artifact,
 not a repository asset and not yet a public video:
 
-`/Users/danielwan/Documents/Hackathon/Agents-for-Humans/the-missing-20-film/composition/renders/logisticpilot-final-picture-lock-264.1s.mp4`
+`/Users/danielwan/Documents/Hackathon/Agents-for-Humans/the-missing-20-film/composition/renders/logisticpilot-final-proof-gap-fixed-264.1s.mp4`
 
-It is 264.2 seconds, 1920 × 1080, H.264/AAC. Upload or publish it only after the final
-video review in the checklist below.
+Independent review marked this file **PASS** with no material blockers: 264.20 seconds,
+1920 × 1080 at 30 fps, English-only audio, -16.0 LUFS, and -1.5 dBTP. See the
+[final film review](video-v1/SOL-FINAL-FILM-REVIEW.md). Upload or publish it only after
+the final publication confirmation in the checklist below.
 
 ## YouTube metadata
 
@@ -70,7 +72,7 @@ Source code and documentation: https://github.com/danielwanwx/the-missing-20
 | Track | `Professional Agents` |
 | Project description | Paste the reviewed copy from [`devpost-submission-draft.md`](devpost-submission-draft.md). |
 | Repository | `https://github.com/danielwanwx/the-missing-20` |
-| Video | Paste the public YouTube or Vimeo URL only after the final exported film has been reviewed. The video must be five minutes or shorter. |
+| Video | The reviewed local film is ready for upload. Paste its verified public YouTube or Vimeo URL only after final publication confirmation. |
 | Live demo | Leave blank unless a stable, freely accessible demo is independently verified through the judging period. |
 | AWS Builder ID | Enter in Devpost only. Do not add an account email or Builder ID to the repository. |
 | Testing instructions | Paste the exact instructions below. |
@@ -131,16 +133,16 @@ describe it as the current Dashboard execution path.
 
 ### Video and public access
 
-- [ ] Export the final English video and verify it is five minutes or shorter.
-- [ ] Review the exported video at normal playback speed for readable case, lot,
-  shipment, approval, and source-readback details.
-- [ ] Verify the video uses the PO20 story only: `M20-DIST-COMPONENT-V2-20260910` /
+- [x] Export the final English video and verify it is five minutes or shorter.
+- [x] Independently review the exported video for readable case, lot, shipment,
+  approval, and source-readback details; the verdict is PASS with no material blockers.
+- [x] Verify the video uses the PO20 story only: `M20-DIST-COMPONENT-V2-20260910` /
   `PUR-ORD-2026-00020`, 40 ordered/received/dispatched, and A25/B15 through
   Shipments 16–19.
-- [ ] Keep the photo language truthful: it is a manual attachment with no recognition,
+- [x] Keep the photo language truthful: it is a manual attachment with no recognition,
   count, QR, quality, or provenance extraction claim.
-- [ ] State that delivery confirmations are synthetic and do not prove physical receipt.
-- [ ] State the USD160 PO and USD150/USD90 customer-order values without claiming an
+- [x] State that delivery confirmations are synthetic and do not prove physical receipt.
+- [x] State the USD160 PO and USD150/USD90 customer-order values without claiming an
   invoice, payment, or recognized revenue.
 - [ ] Upload the final video as public or unlisted according to the competition's
   access rules, then verify it plays without creator login.

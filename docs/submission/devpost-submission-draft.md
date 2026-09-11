@@ -1,17 +1,19 @@
 # Devpost Submission Copy — LogisticPilot — The Missing 20
 
-> **September 11 status: PO20 same-case fulfillment is complete.** Final video
-> production and Devpost upload are in progress; this local draft is not yet the saved
-> Devpost description. See the [current finalization ledger](finalization-tracker.md).
+> **September 11 status: READY_FOR_FINAL_PUBLICATION_CONFIRMATION.** PO20 same-case
+> fulfillment is complete and the final English film independently passed review. This
+> local draft is not yet the saved Devpost description, and the project is neither
+> published nor submitted. See the [current finalization ledger](finalization-tracker.md).
 
 
 **Submission:** `1162519`
-**State:** DRAFT; final video production and Devpost upload are in progress. This
-file is local and unsynced; final preview and submission have not yet been completed.
+**State:** READY_FOR_FINAL_PUBLICATION_CONFIRMATION; the reviewed final film is ready
+for upload, while the Devpost preview, entrant attestation, and submission remain
+pending. This file is local and unsynced.
 **Track:** Professional Agents
 
 This is a local draft for review. It has not been copied into Devpost and must not be
-described as submitted or publicly live until the final preview gate passes.
+described as submitted or publicly live until final publication confirmation.
 
 ## Core fields
 
@@ -20,7 +22,7 @@ described as submitted or publicly live until the final preview gate passes.
 | Project title | **LogisticPilot — The Missing 20** |
 | Tagline | **Find the gap. Prove the cause. Close the loop.** |
 | Repository | `https://github.com/danielwanwx/the-missing-20` |
-| Video | Public YouTube/Vimeo URL, maximum five minutes — pending final production |
+| Video | Reviewed final English film (264.20 seconds); paste a verified public YouTube/Vimeo URL only after final publication confirmation |
 | Live demo | Optional; do not add until stable and freely accessible through October 8 |
 | AWS Builder ID | Enter directly in Devpost; never store the account email in the repository |
 

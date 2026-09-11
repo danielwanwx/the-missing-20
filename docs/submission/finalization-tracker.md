@@ -1,6 +1,9 @@
 # Finalization tracker — authoritative current ledger
 
-Updated 2026-09-11. **PO20 same-case fulfillment is complete; final video production and Devpost upload are in progress.** Historical audits remain evidence for their named case/version only. Repository and CI status must be checked from the current branch before upload; unrelated research/runtime artifacts remain preserved.
+Updated 2026-09-11. **READY_FOR_FINAL_PUBLICATION_CONFIRMATION.** PO20 same-case
+fulfillment is complete, and the final English film independently passed review. Public
+video upload, Devpost preview, entrant attestation, and publication/submission remain
+pending. Historical audits remain evidence for their named case/version only.
 
 ## Current snapshot — September 11
 
@@ -14,10 +17,15 @@ Updated 2026-09-11. **PO20 same-case fulfillment is complete; final video produc
   confirmations are synthetic business inputs, not independent proof of physical
   receipt. The PO is USD160; customer orders are USD150 and USD90; no invoice, payment,
   or revenue-recognition claim is made. See the [PO20 runtime audit](video-v1/SOL-REVIEW-V2.md).
-- **Current conversation evidence:** the recorded English Dashboard conversation uses
-  Strands with direct Amazon Bedrock Claude Opus 4.6 and remains read-only. Final video
-  production and Devpost upload are in progress; capture and upload status must be
-  updated from the finished assets before submission.
+- **Final film review: PASS.** The independently reviewed local film is 264.20 seconds,
+  1920 × 1080 at 30 fps, English-only, -16.0 LUFS, and -1.5 dBTP, with no material
+  blockers. It shows current PO20 only, including native ERP customer order
+  `SAL-ORD-2026-00015` (A25 / USD150), `SAL-ORD-2026-00016` (B15 / USD90), and
+  same-case Slack via the verified Celigo route record `1789105956.484039`. The recorded
+  English Dashboard conversation uses Strands with direct Amazon Bedrock Claude Opus
+  4.6 and remains read-only. See the [final film review](video-v1/SOL-FINAL-FILM-REVIEW.md).
+  The film is not yet public; Devpost preview, entrant attestation, and final
+  publication/submission confirmation remain pending.
 
 The dated implementation entries below are retained progression records; the latest
 status block above supersedes their earlier pending wording.
@@ -165,7 +173,7 @@ Process arguments verified directly: 8893 uses `.missing20-goods-date-fixed`; 88
 | F07 P0 | Current pages/external UX: VERIFIED_IN_DEMO (core R4 path only) | Actual prepare/approve/execute/renewal, six chat turns, native PI8 and Accounting Ledger | Full page/menu matrix remains open. Financial badge automation and structured native citation attachments are deferred minor gaps | Product/release reviewer / core verified Sep10; remaining Sep12 |
 | F08 P0 | Claim consistency: VERIFIED_IN_DEMO (local text correction only) | README/submission/as-built text still old-case-wide claims | Historical 8/8/15/15 and 42k scoped, receiving writers disclosed. Local text independently approved; saved Devpost update/current diagram still pending | Research and baseline; release reviewer / 2h / Sep9 |
 | F09 P0 | Clean checkout/start: VERIFIED_IN_DEMO (credential-free quality gate only) | Independent public clone 0c01eaa plus exact reviewed Python candidate; cold-start review | make check: 1,566 Python / 98 JS, formatting/lint/types pass. Startup and historical judge-demo verified. Full browser smoke still fails at obsolete/mixed authority contract; tracked under F07, not covered by this pass | Release reviewer / retain exact release check / Sep12 |
-| F10 P0 | Final video/materials: IN_PROGRESS | PO20 same-case fulfillment is complete; final video and Devpost upload are in progress | Record only the PO20 working path in English (≤5 min) with a playable public link; complete the final preview before publishing/submitting | Primary/user / 0.5d / Sep13 |
+| F10 P0 | Final video/materials: READY_FOR_FINAL_PUBLICATION_CONFIRMATION | Independent final-film PASS: PO20 only, 264.20s / 1920×1080 / 30fps, English-only, -16.0 LUFS, -1.5 dBTP; no material blockers | Upload the reviewed film, verify the public link and Devpost preview, complete entrant attestation, then obtain final publication/submission confirmation | Primary/user / final gate |
 | F11 P1 | Business efficiency: NOT_STARTED (measurement) | No matched human control or production pilot | Same workload active time/touches/fields, all failures, wall time/token/cost; label unavailable ROI and sample limits; formulas in impact research | Frozen tasks + actual operator; impact reviewer / 0.5d / Sep12 |
 | F12 P1 | Physical final trial: BLOCKED (human evidence only) | Public p05 + typed QR are test substitutes | User's staged garage photos/label interaction remain needed for final physical claim; continue public-fixture code/tests independently | Actual user input; operator / 1h / Sep12 |
 | F13 P1 | Production suitability: DEFERRED | Single-operator local demo; no enterprise pilot | Organization authentication, durable hosting, scale, retention and operations remain pre-pilot work; user explicitly prioritizes competition delivery | Separate post-demo scope |
