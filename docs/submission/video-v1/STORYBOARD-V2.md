@@ -37,7 +37,7 @@ Voice: “Start with the receiving evidence. The photograph sits alongside the d
 Rehearsal finding: the distributor bridge retains a manual photo attachment. It does not perform image extraction. Use the actual photo expansion and declared-input fields; do not narrate automatic barcode, part-count, or quality recognition in this same-case shot. The existing public box fixture requires its source credit in the video description or credits.
 
 ### 05 — 1:05–1:50 — Let the agent work
-Picture: actually enter question one, show tool activity, hold its answer, then enter the follow-up. Highlight one conclusion and its source rather than asking the viewer to read paragraphs. Capture actual latency; label materially compressed waits.
+Picture: actually enter question one, show tool activity, hold its answer, then enter the follow-up. Highlight one conclusion and its source rather than asking the viewer to read paragraphs. Record the complete real-time wait for each answer; do not accelerate or replace the answer-generating sequence. Preserve continuous raw footage. Use editorial cuts between completed operations only, with clear time-jump labels where needed.
 
 English requests, adapted to the selected case's actual state:
 1. “What is preventing this order from being fulfilled? Check the receiving and quality evidence.”
@@ -100,3 +100,13 @@ If existing comparable measurements are available, use only a defined task, base
 - Preserve raw capture and shot provenance. Check every narrated assertion against the final footage, not merely this plan.
 - Full film acceptance requires a coherent case transition, real multi-turn interaction, actual approval/execution/readback, legible native-app records, honest input provenance, and a complete impact ending within 5:00.
 - A script review evaluates the pitch and capture plan. It cannot certify the unrecorded workflow or predict a prize. User reviews the revised direction before full production.
+
+
+## Real-time recording contract — user update
+
+- Capture actual English typing, Send, the full wait, and the returned answer in one continuous take. Follow-up questions use the same conversation. No prewritten assistant responses or substituted historical answers.
+- Preserve a full-length real-time evidence recording. The submission cut targets 4:30 and must stay within the competition limit; include fewer complete interaction sequences if necessary rather than speeding up the agent's response. Longer evidence footage can accompany the submission where allowed. Do not claim the whole 19-event rehearsal fits in four minutes in real time.
+- For the recorded invocation, show application request time/model and the matching AWS event when readable. Inspect request ID, timestamp, model, and matching prompt/response content; a settings screen alone is insufficient. Keep unrelated account details and credentials outside the shot.
+- For an approved action, show the same case and operation identifiers in the application, native ERP document activity (creation/submission by the integration user), Airtable record history or current readback, Jira activity, and the actual Slack update. Preserve each system's timestamp rather than implying instantaneous synchronization.
+- Use the concise English provenance caption: **“Simulated business scenario. Live Bedrock inference and real writes to connected demo systems.”** The transactions are actual persisted demo-tenant records; they are not independently verified real-customer business or physical deliveries.
+- While waiting for the model, narration may explain the evidence being checked, but must not announce an answer before the actual response. Zooms emphasize observed content and preserve the causal order.

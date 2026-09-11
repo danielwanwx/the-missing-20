@@ -98,3 +98,10 @@ Record exact case/document IDs, real prompts and answers, model usage, proposal 
 4. Final capture must establish readable crops, actual click/approval transitions, real English dialogue, photo provenance, and the impact ending. Optional microphone dictation has not been accepted as a recording claim. Full video/audio composition and exported-film review are still outstanding.
 
 The completed rehearsal supports proceeding to a scoped recording session; it does not certify a finished film, production reliability, or a competition award.
+
+
+## AWS login recheck and real-time recording preference
+
+Chrome was freshly navigated to CloudWatch after the user reported missing20-dev login. The console now confirms that IAM identity; the prior signed-out condition is superseded. The invocation log group loads, but its Log streams panel explicitly denies `logs:DescribeLogStreams` on `/missing20/demo/bedrock-invocations`. No request event has yet been read or correlated. Administrator assistance is requested for log-group read access; no IAM change was performed in this recheck.
+
+The storyboard now requires continuous real-time typing, waiting, and answer capture, with actual ERP/SaaS evidence. A fresh V3 write scope remains awaiting explicit approval. No new external business records or paid model calls were made in this planning update.
