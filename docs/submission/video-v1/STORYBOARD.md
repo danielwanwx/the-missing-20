@@ -3,9 +3,11 @@
 Status: first reviewable script framework; not recorded or rendered.
 Target: 4:50, English narration and captions, 16:9, 1920×1080 delivery, 30 fps.
 Audience: Agents for Humans judges and a parts distributor's warehouse/operations manager.
-Core message: Turn fragmented receiving evidence into a reviewable customer-fulfillment outcome across systems.
+Core message: An agent connects SaaS evidence, discovers operational exceptions, recommends a resolution, and coordinates verified action with manager approval where required.
 
 ## Creative direction
+
+**Editorial update:** Lead with agent capability, cross-SaaS coordination, and the manager's outcome. Spoken narration is a product story, not an audit report. Keep technical caveats and capture checks in production notes; retain concise demo/case labels where needed to identify the footage. The dramatic center is a real manager-approval interaction followed by its actual execution and verification. Do not manufacture the interaction or join unrelated before/after states into one incident.
 
 Open on the manager's dilemma, then let the product provide the evidence. The recurring visual motif is a customer commitment of 40 parts: 20 + 18 received, a quality exception, a separate replacement of 2, and customer fulfillment of 25 + 15. This is an editorial diagram of recorded events, not a fabricated live UI state.
 
@@ -36,7 +38,7 @@ All shot timings below include transitions. Exact timing will be locked after a 
 
 **Picture:** Full PO19 operations view, then a deliberate left-to-right crop: quantities and process diagram, customer commitments, evidence/history. Brief dashboard navigation insert only if its different case badge remains visible; no old revenue figures.
 
-**Voiceover:** “The manager starts with a readable view of the order: what was received, what is held, what can ship, and which commitments remain. This walkthrough follows a completed demo case, with real records in isolated ERP and collaboration systems.”
+**Voiceover:** “The agent brings receipt, quality, and customer commitments into one workspace. The manager can see the exception, follow its evidence across business systems, and focus on the decision that moves the operation forward.”
 
 **Proof:** Main PO19 badge and source status. Dashboard insert is a feature overview, not the PO19 source.
 
@@ -60,7 +62,7 @@ All shot timings below include transitions. Exact timing will be locked after a 
 
 **Picture:** Left: recorded failed sample and resolved hold. Right: rejected Quality Inspection, then accepted whole-lot reinspection. Annotate the source value 10.3 against 9.9–10.1 only when visible in the verified record. Amber highlight follows the evidence, then release state.
 
-**Voiceover:** “Quantity is only half the decision. A failed sample placed the second lot on hold. A later whole-lot reinspection supported release. A failed sample is not proof that every part was defective, and the system keeps the original failure alongside the later result.”
+**Voiceover:** “The workflow also responds to quality evidence. A failed sample places the lot on hold and makes the exception visible. When whole-lot reinspection supports release, the recorded state advances, with both the original inspection and the resolution linked to the lot.”
 
 **Proof:** Inspection scope, actual document IDs, recorded measurements. Do not animate the current zero-alert page into a false live failure.
 
@@ -76,9 +78,9 @@ All shot timings below include transitions. Exact timing will be locked after a 
 
 **Picture:** Match-cut from fulfillment row to actual ERPNext Pick List, Delivery Note and Shipment. Final remainder: Pick `STO-PICK-2026-00015`, Delivery Note `MAT-DN-2026-00017`, Shipment `SHIPMENT-00015`, quantity 2. Fullscreen one useful document crop, not a list of API responses.
 
-**Voiceover:** “The result is visible in native ERP documents: pick lists, delivery notes, and shipments. The final two-part remainder has its own records. We verify the source state after the action, rather than treating an agent's explanation as proof that inventory moved.”
+**Voiceover:** “The workflow turns the selected plan into native ERP records: pick lists, delivery notes, and shipments. The final two-part remainder has its own documents. A source readback confirms the resulting state and connects the action to its business outcome.”
 
-### 08 · 2:38–3:14 · Cross-app proof, not logos
+### 08 · 2:38–3:14 · One resolution across connected SaaS apps
 
 **Picture:** Three 9-second match-cut pairs plus a 6-second Celigo segment, with 3 seconds reserved for transitions within this 36-second shot. Left stays on the PO19 handoff card; right opens the actual linked application. Airtable `recWHcDEadZrLyRBI`; Jira `QRC-4`; Slack message `1789088499.513429`. Celigo: show its matching integration execution if directly available; otherwise retain the accurate `Slack via Celigo` route and journal evidence, with an on-screen `Retained route verification · execution screen not shown` label, not an unrelated run.
 
@@ -88,37 +90,39 @@ All shot timings below include transitions. Exact timing will be locked after a 
 
 ### 09 · 3:14–3:29 · Commercial clarity
 
-**Picture:** Fullscreen commercial panel, then crop purchase order USD160 and customer order values USD150 / USD90. Hold the visible missing-invoice state briefly.
+**Picture:** Fullscreen commercial panel, then crop purchase order USD160 and customer order values USD150 / USD90. Keep the source billing status visible without making it the narrative focus.
 
-**Voiceover:** “Commercial records stay precise: a hundred and sixty dollars in purchase-order value, and two customer orders totaling two hundred and forty. Invoices are missing in this case. Order value is not revenue.”
+**Voiceover:** “The commercial view connects operations to the order: a hundred and sixty dollars in purchase-order value and two customer orders totaling two hundred and forty, alongside their current billing status.”
 
-### 10 · 3:29–3:59 · Show the agent's judgment
+### 10 · 3:29–3:49 · Show the agent's judgment
 
 **Picture:** Distinct title `Prior model evaluation · PO18`. Show verbatim readable excerpts from actual English Q1 and Q4 reports, with question, answer, model and recorded status. Emphasize the answer separating recorded confirmations from physical receipt. Brief return to the current English voice controls as an interface insert, without synthesized audio pretending to be a live agent response.
 
-**Voiceover:** “In a separate recorded model evaluation, we asked the agent to explain the receipt history and what delivery confirmations actually prove. The English answers distinguish recorded events from independently verified physical receipt. These are captured Bedrock answers, not a live query in this take. That distinction matters when people act on an answer.”
+**Voiceover:** “The agent also explains its findings in English. Here, captured questions and answers connect the receipt history with delivery evidence, giving the manager a clear explanation to support the next decision.”
 
 **Editing rule:** Use original answer text, visually excerpted with an ellipsis where cut. Never rewrite an answer and present it as model output. Exclude the failed Q5 timeline enumeration and out-of-scope Chinese stress question.
 
-### 11 · 3:59–4:23 · Make the engineering inspectable
+### 11 · 3:49–4:23 · The manager approves; the workflow resolves
 
-**Picture:** Planned separate investigation-workspace capture, pending runtime/source verification: left source rail and highlighted graph node; center findings/timeline; right selected context, tools/execution log and manager decision panel. Then a compact accurate architecture card: `Strands + Bedrock → evidence + contract decision → application execution → ERP readback + external handoffs`.
+**Picture:** A separate manager-gated incident, with its own case badge throughout. Make this the hero interaction. Left: the actual source graph and implicated node. Right: evidence-backed findings and the prepared recovery proposal. Use the real `Approve & execute` control (`platform-approve-execute`) on the platform workspace; if using the legacy decision view, preserve its actual separate Prepare / Manager / Execute steps.
 
-**Voiceover:** “Behind the interface, Strands coordinates evidence tools and Bedrock reasoning. The investigation workspace exposes sources, findings, and execution history. Contract-constrained fulfillment and manager-gated recovery are distinct paths. The important boundary is visible: a proposed answer is separate from an applied action and its verified result.”
+**Mouse choreography, within 34 seconds:** 0–7s show the exception and linked findings; 7–14s crop the proposed action and case details; 14–18s move the cursor naturally, pause over the real approval button, then click once; 18–27s show actual execution activity; 27–34s hold the verified outcome and corresponding source record. Label a time-compressed wait if editing removes a material execution delay. A mouse controlled by the recorder represents the demo manager; it must activate the actual application control.
 
-**Capture gate:** The older manager-gated recovery workspace is a separate feature demonstration. Do not imply the PO19 allocation required that manager approval, or show AgentCore deployment as the current direct Bedrock runtime.
+**Voiceover:** “For an incident that requires approval, the agent assembles the evidence and recommends a recovery. The manager reviews the proposed action and clicks Approve and execute. The system carries out the approved plan, checks the resulting records, and reports the verified outcome. Strands and Bedrock connect the investigation to a coordinated resolution across the business systems.”
+
+**Capture gate (internal):** Before capture, select one genuinely pending, eligible manager-gated demo incident and verify its prepared action. Record the real approval and resulting readback once, or use retained footage of that same actual interaction. Do not click approval on the already completed PO19 case, redraw a button, fabricate a status change, or join another case's result to this click. If neither an eligible case nor actual retained footage exists, prepare this shot before filming; an animated cursor alone does not fulfill it. Any new paid model invocation remains subject to the agreed recording budget. Keep the separate case badge visible, then explicitly return to PO19 in shot 12. Current direct Bedrock transport remains accurately attributed.
 
 ### 12 · 4:23–4:40 · Close the business loop
 
 **Picture:** Return to PO19 full-screen; emphasize 40 received, 40 dispatched, A25/B15, no current hold/shortage, and current-case completion bars. Keep `Synthetic delivery confirmations` visible. Show resolved evidence history, not a claim that no exception ever occurred.
 
-**Voiceover:** “Back in our case: forty received, forty dispatched, customer commitments fulfilled in the recorded workflow, and no remaining stock hold or shortage. The complete history stays available, including the exception and recovery. Delivery confirmations here are simulated evidence.”
+**Voiceover:** “Back in the fulfillment case: forty received, forty dispatched, and both customer commitments completed in the recorded workflow. The manager can move from the outcome to the supporting ERP documents, exception history, and connected team records.”
 
 ### 13 · 4:40–4:50 · A memorable promise
 
 **Picture:** Product mark, readable repository address, three restrained verbs: `Receive. Resolve. Fulfill.` Keep the live product as the background instead of a generic technology animation.
 
-**Voiceover:** “The Missing 20 helps parts distributors turn scattered operational evidence into a clear, reviewable fulfillment outcome. Receive. Resolve. Fulfill.”
+**Voiceover:** “The Missing 20 connects your business apps, investigates exceptions, and coordinates their resolution. Receive. Resolve. Fulfill.”
 
 ## Complete frontend and app coverage map
 
@@ -129,7 +133,7 @@ Coverage means each user-facing capability has a deliberate visual slot, not eve
 | Dashboard, supply-chain flow, system health, exception node highlight | 02, 11 | Separate feature demo; inspect actual state; do not synthesize healthy/red states |
 | Left source rail / inventory / source cards | 02, 11 | Visible source and case labels |
 | Center investigation map, findings and lifecycle | 11 | Retained case; capture pending runtime/source check; highlight only an actual selected node |
-| Right context, conversation, activity/tools and decision panels | 10, 11 | Real retained context/trace; no new investigation |
+| Right context, conversation, activity/tools and decision panels | 10, 11 | Actual proposal, real approval click, execution and same-incident readback; see shot 11 capture gate |
 | Reconciliation timeline, graphs and evidence history | 04, 11 | Recorded sequence; earlier case distinctly labelled |
 | Operations quantity grid and stage flow | 02, 04, 12 | Current PO19 |
 | Current-case benchmark diagram / completion bars | 12 | 40/40 source-backed; never industry/savings benchmark |
@@ -157,12 +161,12 @@ Coverage means each user-facing capability has a deliberate visual slot, not eve
 6. Add English captions from final audio, subtle transitions and optional properly licensed low-level music. As creative targets, keep narration intelligible, avoid crowded captions, and leave records readable for several seconds.
 7. Review the actual rendered video: duration, English text/audio, legibility, matching case IDs, factual narration, source labels, no exposed credentials, no invented live responses. Then preview the final public version before upload/submission.
 
-## Capture gaps to resolve before calling the film complete
+## Internal capture preparation — not voiceover
 
 - PO19 live operations view is verified; initial load can be slow.
 - External record identifiers/readbacks are verified, but every native-app shot must be framed and captured.
-- Matching Celigo execution screen has not been capture-verified.
-- Earlier dashboard/investigation and photo-receiving inserts need a clean runtime/case check before filming.
+- Frame the matching Celigo execution screen or use the accurately labelled retained route evidence.
+- Verify the dashboard/investigation and photo-receiving inserts, and prepare the actual eligible manager-approval incident or locate its retained interaction footage.
 - English voice-control activation and playback are not yet verified in the final footage; interface visibility alone does not establish them.
 - No actual film, ElevenLabs audio, captions, public upload, or final submission exists from this script step.
 
