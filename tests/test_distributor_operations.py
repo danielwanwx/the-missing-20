@@ -1834,13 +1834,26 @@ def test_distributor_model_selection_is_explicit_and_opus_history_is_isolated(
         "output_usd_per_million_tokens": "27.5",
         "per_turn_output_token_cap": 3_072,
         "request_count_cap": 16,
-        "aggregate_cost_cap_usd": "3.00",
+        "aggregate_cost_cap_usd": "5.00",
     }
     bounded_opus_factory = workspace_server._distributor_model_factory(
         settings=replace(settings, max_aws_spend_usd=Decimal("0.39")),
         configured_model="opus46",
     )
     assert bounded_opus_factory.provenance()["cost_attribution"]["aggregate_cost_cap_usd"] == "0.39"
+    ten_dollar_opus_factory = workspace_server._distributor_model_factory(
+        settings=replace(settings, max_aws_spend_usd=Decimal("10.00")),
+        configured_model="opus46",
+    )
+    assert (
+        ten_dollar_opus_factory.provenance()["cost_attribution"]["aggregate_cost_cap_usd"]
+        == "10.00"
+    )
+    capped_opus_factory = workspace_server._distributor_model_factory(
+        settings=replace(settings, max_aws_spend_usd=Decimal("20.00")),
+        configured_model="opus46",
+    )
+    assert capped_opus_factory.provenance()["cost_attribution"]["aggregate_cost_cap_usd"] == "10.00"
     assert isinstance(
         workspace_server._distributor_model_factory(
             settings=settings, configured_model=OPUS46_MODEL_ID
