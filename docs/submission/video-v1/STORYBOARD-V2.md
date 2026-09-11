@@ -37,7 +37,7 @@ Voice: “Start with the receiving evidence. The photograph sits alongside the d
 Rehearsal finding: the distributor bridge retains a manual photo attachment. It does not perform image extraction. Use the actual photo expansion and declared-input fields; do not narrate automatic barcode, part-count, or quality recognition in this same-case shot. The existing public box fixture requires its source credit in the video description or credits.
 
 ### 05 — 1:05–1:50 — Let the agent work
-Picture: actually enter question one, show tool activity, hold its answer, then enter the follow-up. Highlight one conclusion and its source rather than asking the viewer to read paragraphs. Record the complete real-time wait for each answer; do not accelerate or replace the answer-generating sequence. Preserve continuous raw footage. Use editorial cuts between completed operations only, with clear time-jump labels where needed.
+Picture: actually enter question one, show tool activity, hold its answer, then enter the follow-up. Highlight one conclusion and its source rather than asking the viewer to read paragraphs. Preserve continuous raw footage of the complete wait. The submission may excerpt the genuine interaction and omit waiting time with a visible time-jump label. Never fabricate streaming: show token streaming only if the actual product produces it; otherwise show real processing and the returned answer.
 
 English requests, adapted to the selected case's actual state:
 1. “What is preventing this order from being fulfilled? Check the receiving and quality evidence.”
@@ -93,7 +93,7 @@ If existing comparable measurements are available, use only a defined task, base
 
 ## Visual direction and recording acceptance
 
-- Full view → smooth push-in → actual click/expansion → stable readable hold → pull back. Typical enlargement 1.5–2x; preserve enough surroundings for orientation.
+- Keep the canvas, crop, scale, and position fixed during ordinary shots. Move only for a deliberate detail enlargement or return to overview; hold completely still after each move. No continuous push-in, drift, automatic pan, or floating dashboard. Typical deliberate enlargement is 1.5–2x; preserve enough surroundings for orientation.
 - Use a local magnifier for small photo labels; use rectangular crops for paragraphs. No continuous scrolling while text is meant to be read.
 - One conclusion per shot. No four-app wall of unreadable text. Captions must not cover approval buttons, key record fields, or model answers.
 - Use actual light-theme screenshots and source footage. Editorial diagrams are visibly diagrams, not fabricated application features.
@@ -105,8 +105,8 @@ If existing comparable measurements are available, use only a defined task, base
 ## Real-time recording contract — user update
 
 - Capture actual English typing, Send, the full wait, and the returned answer in one continuous take. Follow-up questions use the same conversation. No prewritten assistant responses or substituted historical answers.
-- Preserve a full-length real-time evidence recording. The submission cut targets 4:30 and must stay within the competition limit; include fewer complete interaction sequences if necessary rather than speeding up the agent's response. Longer evidence footage can accompany the submission where allowed. Do not claim the whole 19-event rehearsal fits in four minutes in real time.
-- For the recorded invocation, show application request time/model and the matching AWS event when readable. Inspect request ID, timestamp, model, and matching prompt/response content; a settings screen alone is insufficient. Keep unrelated account details and credentials outside the shot.
+- Preserve a full-length real-time evidence recording. The submission cut targets 4:30 and must stay within the competition limit. The user approved excerpts of genuine interaction: remove long waits with a clear time-jump label, retaining actual input, observed processing, and the returned response in causal order. Do not simulate streaming or imply the edited duration is measured latency. Longer evidence footage can accompany the submission where allowed.
+- AWS logs are optional supplementary evidence, not a mandatory main-film insert. If included, correlate request ID, timestamp, model, and prompt/response; a settings screen alone is insufficient. Keep unrelated account details and credentials outside the shot. Prioritize the real interaction and same-order native records in the submission cut.
 - For an approved action, show the same case and operation identifiers in the application, native ERP document activity (creation/submission by the integration user), Airtable record history or current readback, Jira activity, and the actual Slack update. Preserve each system's timestamp rather than implying instantaneous synchronization.
 - Use the concise English provenance caption: **“Simulated business scenario. Live Bedrock inference and real writes to connected demo systems.”** The transactions are actual persisted demo-tenant records; they are not independently verified real-customer business or physical deliveries.
 - While waiting for the model, narration may explain the evidence being checked, but must not announce an answer before the actual response. Zooms emphasize observed content and preserve the causal order.
