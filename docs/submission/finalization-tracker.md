@@ -1,5 +1,18 @@
 # Finalization tracker — authoritative current ledger
 
+## September 12 return-to-project audit
+
+**Current runtime needs updates; historical PO20 completion remains supported.**
+Fresh read-only ERP inspection confirms 40 received/dispatched and A25/B15.
+The inspected V2 workspace uses dated retained evidence with fresh actions disabled;
+its actual Agent request fails with Bedrock model-access denial. Independent code
+review found retained-to-model freshness loss, raw provider-error propagation, and
+an older-event confirmation response that can misdate/regress the displayed snapshot.
+See the [full audit and update order](../audits/2026-09-12-return-to-project-review.md)
+and [market review](../research/2026-09-12-logisticpilot-market-review.md).
+This audit makes no business writes, IAM changes, new successful model-run claim,
+or publication/submission claim. The September 11 status below remains historical.
+
 Updated 2026-09-11. **READY_FOR_FINAL_PUBLICATION_CONFIRMATION.** PO20 same-case
 fulfillment is complete, and the final English film independently passed review. Public
 video upload, Devpost preview, entrant attestation, and publication/submission remain

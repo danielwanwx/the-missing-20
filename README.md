@@ -1,5 +1,12 @@
 # LogisticPilot — The Missing 20
 
+> **September 12 runtime review:** Fresh read-only ERP checks still confirm PO20's
+> 40 received / 40 dispatched and A25/B15 dispatch. The inspected workspace is in
+> dated retained-evidence mode; its current Agent call fails with model-access
+> denial. Source-freshness propagation and completed-event confirmation also need
+> correction. See the [current audit and prioritized updates](docs/audits/2026-09-12-return-to-project-review.md).
+> Historical business completion below does not certify current end-to-end availability.
+
 > **September 11 status: the PO20 same-case business loop is complete; final video
 > production and Devpost upload are in progress.** The current case is
 > `M20-DIST-COMPONENT-V2-20260910` / `PUR-ORD-2026-00020`. See the [current
