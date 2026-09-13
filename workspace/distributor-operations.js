@@ -105,9 +105,13 @@
     if (!isRetainedEvidence(value) || !asOf || !Number.isFinite(Date.parse(asOf))) return "";
     return `Retained accepted evidence · as of ${formatDate(asOf)} · ${conversationInferenceCapability(conversation) || "read-only Agent available when configured"}`;
   };
-  const erpEvidenceSourceLabel = (value) => isRetainedEvidence(value)
-    ? "retained accepted ERP evidence"
-    : "current ERP source";
+  const erpEvidenceSourceLabel = (value) => {
+    const status = text(value?.status).toUpperCase();
+    if (status === "RETAINED_AS_OF") return "retained accepted ERP evidence";
+    if (status === "CURRENT") return "current ERP source";
+    if (status.includes("UNAVAILABLE")) return "ERP source unavailable";
+    return "ERP source freshness unknown";
+  };
   const freshActionsAllowed = (value) => value?.actions_enabled !== false;
   const sourceAwareErpText = (value, evidenceMode) => {
     const source = erpEvidenceSourceLabel(evidenceMode);
@@ -1881,8 +1885,8 @@
 
   function approvalReadback(next) {
     const direct = isRecord(next?.approval_evidence) ? next.approval_evidence : null;
-    if (direct) return direct;
     const proposal = isRecord(next?.prepared_proposal) ? next.prepared_proposal : null;
+    if (direct && (!proposal || text(proposal.status).toUpperCase() === "APPLIED")) return direct;
     const approval = isRecord(proposal?.approval) ? proposal.approval : null;
     if (!approval || text(proposal?.status).toUpperCase() !== "APPLIED") return null;
     return { ...approval, event_id: firstText(proposal.event, ["event_id"]) };
@@ -1895,18 +1899,27 @@
     const button = $("ops-approve-proposal");
     if (!panel || !button) return;
     const proposal = preparedProposal;
+    const proposalStatus = text(proposal?.status).toUpperCase();
+    const confirmationPending = proposalStatus === "PENDING_MANAGER_APPROVAL";
+    const applied = proposalStatus === "APPLIED";
+    const recordedOutcome = Boolean(proposal && proposalStatus) && !confirmationPending && !applied;
     const retained = isRetainedEvidence(next?.evidence_mode);
-    setText("ops-manager-gate-label", retained ? "Recorded completion" : "Manager gate");
-    setText("ops-evidence-title", retained ? "Confirm recorded completion" : "Process evidence");
-    setText("ops-evidence-copy", retained
+    const retainedLabel = recordedOutcome ? "Recorded event outcome" : "Recorded completion";
+    setText("ops-manager-gate-label", retained ? retainedLabel : "Manager gate");
+    setText("ops-evidence-title", recordedOutcome ? `Recorded event ${pretty(proposalStatus)}` : retained ? "Confirm recorded completion" : "Process evidence");
+    setText("ops-evidence-copy", recordedOutcome
+      ? `The recorded event outcome is ${pretty(proposalStatus || "unavailable")}; it cannot be confirmed as completed.`
+      : retained
       ? "Review the recorded completion and confirm the exact retained case revision."
       : "Prepare one bounded action from operator-declared evidence, then confirm the exact case revision.");
-    setText("ops-gate-note", retained
+    setText("ops-gate-note", recordedOutcome
+      ? "No confirmation or fresh native execution is available for this recorded outcome."
+      : retained
       ? "Manager confirmation recovers a recorded completed event; it does not create a fresh native operation."
       : "Manager approval stays bounded to the prepared case revision.");
-    setText("ops-proposal-label", retained ? "Recorded completion" : "Manager approval");
-    setText("ops-proposal-title", retained ? "Confirm recorded completion" : "Prepared same-case operation");
-    setText("ops-approve-label", retained ? "Confirm recorded completion" : "Approve and execute");
+    setText("ops-proposal-label", retained ? retainedLabel : "Manager approval");
+    setText("ops-proposal-title", recordedOutcome ? `Recorded event ${pretty(proposalStatus)}` : retained ? "Confirm recorded completion" : "Prepared same-case operation");
+    setText("ops-approve-label", recordedOutcome ? "Confirmation unavailable" : retained ? "Confirm recorded completion" : "Approve and execute");
     const readback = $("ops-approval-readback");
     const approval = approvalReadback(next);
     if (readback) {
@@ -1923,11 +1936,13 @@
     const fields = Object.entries(event)
       .filter(([key]) => !["event_id", "type", "occurred_at", "synthetic"].includes(key))
       .map(([key, value]) => `${pretty(key)}: ${Array.isArray(value) ? value.join(", ") : String(value)}`);
-    const actionCopy = retained
+    const actionCopy = recordedOutcome
+      ? `Recorded event status: ${pretty(proposalStatus || "unavailable")}. No native execution is attempted.`
+      : retained
       ? "This confirms a recorded completed event; no new native execution is attempted."
       : "Approval checks this exact current-case revision before one native execution.";
     setText("ops-proposal-summary", `${text(proposal.case_id) || text(next?.case_id)} · PO ${text(proposal.purchase_order) || text(next?.purchase_order) || "unavailable"} · ${pretty(event.type || "operation")}. ${fields.join(" · ")}. ${proposalSourceLabel(proposal.source)} ${actionCopy}`);
-    button.disabled = processingEvent || !next?.available || !sourceState?.hidden || !text($("ops-manager-id")?.value) || (!retained && !freshActionsAllowed(next));
+    button.disabled = processingEvent || !confirmationPending || !next?.available || !sourceState?.hidden || !text($("ops-manager-id")?.value) || (!retained && !freshActionsAllowed(next));
   }
 
   function photoAttachmentList(next) {

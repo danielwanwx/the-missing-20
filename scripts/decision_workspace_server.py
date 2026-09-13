@@ -27,6 +27,17 @@ from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 from uuid import uuid4
 
+from botocore.exceptions import (  # type: ignore[import-untyped]
+    BotoCoreError,
+    ClientError,
+    ConnectTimeoutError,
+    CredentialRetrievalError,
+    LoginError,
+    NoCredentialsError,
+    PartialCredentialsError,
+    ReadTimeoutError,
+)
+
 if __package__ in {None, ""}:
     _root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(_root / "src"))
@@ -1036,8 +1047,45 @@ def distributor_fulfillment_facts(
     return facts
 
 
+def _distributor_evidence_mode(projection: Mapping[str, object]) -> dict[str, object]:
+    """Carry the projection's source mode into every native-model boundary."""
+
+    raw = projection.get("evidence_mode")
+    supplied = dict(raw) if isinstance(raw, Mapping) else {}
+    raw_status = supplied.get("status")
+    status = (
+        raw_status.strip().upper() if isinstance(raw_status, str) and raw_status.strip() else ""
+    )
+    live_source = projection.get("live_source")
+    if status == "CURRENT" and live_source is False:
+        status = "UNKNOWN"
+    elif not status:
+        if projection.get("available") is False:
+            status = "UNAVAILABLE"
+        elif live_source is True:
+            status = "CURRENT"
+        else:
+            status = "UNKNOWN"
+    raw_as_of = supplied.get("as_of", projection.get("as_of"))
+    as_of = raw_as_of.strip() if isinstance(raw_as_of, str) and raw_as_of.strip() else None
+    return {**supplied, "status": status, "as_of": as_of}
+
+
+def _distributor_source_instruction(evidence_mode: Mapping[str, object]) -> str:
+    """Describe the source boundary without relabeling retained data as current."""
+
+    status = evidence_mode.get("status")
+    if status == "CURRENT":
+        return "Answer only from current source facts. Do not process events or write."
+    if isinstance(status, str) and "UNAVAILABLE" in status:
+        return "Source facts are unavailable for this turn. Do not infer business facts or write."
+    if isinstance(status, str) and status.startswith("RETAINED"):
+        return "Answer only from retained source facts at the stated effective time. Do not write."
+    return "Source freshness is unknown. Do not call supplied facts current or infer a source time."
+
+
 def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, object]:
-    """Build a compact, current, read-only source packet for the native session."""
+    """Build a compact, qualified read-only source packet for the native session."""
 
     case_id = projection.get("case_id")
     if not isinstance(case_id, str) or not case_id:
@@ -1067,6 +1115,8 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
         else []
     )
     synthetic_input = projection.get("synthetic_input")
+    evidence_mode = _distributor_evidence_mode(projection)
+    live_source = evidence_mode["status"] == "CURRENT"
     recorded_events = (
         "Arrival, pickup, and delivery are recorded synthetic test events; they are not "
         "actual sensor, carrier, or customer-receipt proof."
@@ -1077,7 +1127,9 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
         )
     )
     erp_facts = {
-        "status": "CURRENT",
+        "status": evidence_mode["status"],
+        "as_of": evidence_mode["as_of"],
+        "live_source": live_source,
         "case_id": case_id,
         "case_label": projection.get("case_label"),
         "synthetic_input": synthetic_input,
@@ -1132,9 +1184,10 @@ def _distributor_native_packet(projection: Mapping[str, object]) -> dict[str, ob
                     "case_class": "distributor_operations",
                     "synthetic_input": projection.get("synthetic_input"),
                     "read_only": True,
-                    "instruction": (
-                        "Answer only from current source facts. Do not process events or write."
-                    ),
+                    "evidence_mode": evidence_mode,
+                    "live_source": live_source,
+                    "as_of": evidence_mode["as_of"],
+                    "instruction": _distributor_source_instruction(evidence_mode),
                     "retained_event_count": len(retained_events),
                     "retained_event_limit": _DISTRIBUTOR_NATIVE_EVENT_LIMIT,
                     "retained_event_history_complete": (
@@ -1219,7 +1272,7 @@ def _distributor_session_namespace(factory: AgentModelFactory) -> str | None:
     if namespace is None:
         return None
     if namespace == "opus46":
-        return namespace
+        return "opus46"
     raise ValueError("distributor model factory lacks an approved session namespace")
 
 
@@ -1246,6 +1299,71 @@ def _distributor_native_allocation_selector(
     return select
 
 
+def _distributor_model_unavailable(error: Exception) -> dict[str, str]:
+    """Classify provider failures without returning provider messages to the client."""
+
+    code = "MODEL_PROVIDER_UNAVAILABLE"
+    detail = (
+        "The configured model provider is unavailable. Check the configured model and retry; "
+        "no fallback answer was used."
+    )
+    if isinstance(error, ClientError):
+        response_error = error.response.get("Error")
+        provider_code = ""
+        if isinstance(response_error, Mapping):
+            raw_provider_code = response_error.get("Code")
+            if isinstance(raw_provider_code, str):
+                provider_code = raw_provider_code.upper()
+        if "ACCESSDENIED" in provider_code or provider_code in {
+            "UNAUTHORIZED",
+            "UNAUTHORIZEDOPERATION",
+        }:
+            code = "MODEL_ACCESS_DENIED"
+            detail = (
+                "Model access was denied. Check the configured model and runtime permissions "
+                "before retrying; no fallback answer was used."
+            )
+        elif "EXPIRED" in provider_code or provider_code in {
+            "INVALIDCLIENTTOKENID",
+            "INVALIDSIGNATUREEXCEPTION",
+            "UNRECOGNIZEDCLIENTEXCEPTION",
+        }:
+            code = "MODEL_CREDENTIALS_EXPIRED"
+            detail = (
+                "Model credentials are unavailable or expired. Refresh the configured runtime "
+                "credentials and retry; no fallback answer was used."
+            )
+        elif "TIMEOUT" in provider_code:
+            code = "MODEL_REQUEST_TIMEOUT"
+            detail = (
+                "The model request timed out. Retry after confirming the configured model is "
+                "available; no fallback answer was used."
+            )
+    elif isinstance(
+        error,
+        (CredentialRetrievalError, LoginError, NoCredentialsError, PartialCredentialsError),
+    ):
+        code = "MODEL_CREDENTIALS_EXPIRED"
+        detail = (
+            "Model credentials are unavailable or expired. Refresh the configured runtime "
+            "credentials and retry; no fallback answer was used."
+        )
+    elif isinstance(error, (ConnectTimeoutError, ReadTimeoutError, TimeoutError)):
+        code = "MODEL_REQUEST_TIMEOUT"
+        detail = (
+            "The model request timed out. Retry after confirming the configured model is "
+            "available; no fallback answer was used."
+        )
+    elif isinstance(error, BotoCoreError):
+        code = "MODEL_PROVIDER_UNAVAILABLE"
+    return {
+        "status": "UNAVAILABLE",
+        "code": code,
+        "detail": detail,
+        "error_type": type(error).__name__,
+    }
+
+
 def _distributor_native_ask_turn(
     *,
     settings: Settings,
@@ -1263,6 +1381,7 @@ def _distributor_native_ask_turn(
         if projection.get("available") is not True:
             return {
                 "status": "UNAVAILABLE",
+                "code": "SOURCE_UNAVAILABLE",
                 "detail": "Current ERP evidence is unavailable; no model request was started.",
             }
         try:
@@ -1293,6 +1412,12 @@ def _distributor_native_ask_turn(
                 question=question,
                 factory=selected_factory,
             )
+        except (
+            BotoCoreError,
+            ClientError,
+            TimeoutError,
+        ) as error:
+            return _distributor_model_unavailable(error)
         except (
             NativeReceivingDialogueError,
             OSError,

@@ -583,47 +583,46 @@ class DistributorOperations:
                 stored_approved_at,
             ) = cast(tuple[str, str, str | None, str, str | None, str | None, str | None], row)
             event = _decoded(event_json, "proposal event")
+            event_status = self._stored_event_status(event)
             if stored_result is not None:
-                result = self._projection_from_record(stored_result)
-                if self._retained_projection:
-                    self._mark_retained_projection(result, self._latest_state_with_recorded_at()[1])
-                return result
-            recovered = self._db.execute(
-                "SELECT result_json FROM distributor_operation_events WHERE event_id=?",
-                (event["event_id"],),
-            ).fetchone()
-            if recovered is not None and recovered[0] is not None:
-                result = self._projection_from_record(cast(str, recovered[0]))
+                approval = self._approval_from_record(stored_result)
+                recorded_manager = approval.get("manager_id")
+                recorded_at = approval.get("approved_at")
+                prior_manager = recorded_manager if isinstance(recorded_manager, str) else None
+                prior_approved_at = recorded_at if isinstance(recorded_at, str) else None
+                return self._confirmation_projection(
+                    proposal_id=proposal_id,
+                    case_id=case_id,
+                    event=event,
+                    source=source,
+                    attachment_id=attachment_id,
+                    state_revision=stored_revision,
+                    manager_id=stored_manager or prior_manager or manager_id,
+                    approved_at=stored_approved_at or prior_approved_at,
+                    recovered=approval.get("recovered") is True,
+                    event_status=event_status or "UNKNOWN_OUTCOME",
+                )
+            if event_status is not None:
                 approved_at = stored_approved_at or self._next_recorded_at()
                 recorded_manager = stored_manager or manager_id
-                result["approval_evidence"] = {
-                    "proposal_id": proposal_id,
-                    "case_id": case_id,
-                    "manager_id": recorded_manager,
-                    "approved_at": approved_at,
-                    "source": source,
-                    "event_id": event["event_id"],
-                    "recovered": True,
-                }
-                result["prepared_proposal"] = {
-                    "proposal_id": proposal_id,
-                    "case_id": case_id,
-                    "purchase_order": self._config["purchase_order"],
-                    "event": _copy(event),
-                    "source": source,
-                    "photo_attachment_id": attachment_id,
-                    "state_revision": stored_revision,
-                    "status": "APPLIED",
-                    "approval": {"manager_id": recorded_manager, "approved_at": approved_at},
-                }
+                result = self._confirmation_projection(
+                    proposal_id=proposal_id,
+                    case_id=case_id,
+                    event=event,
+                    source=source,
+                    attachment_id=attachment_id,
+                    state_revision=stored_revision,
+                    manager_id=recorded_manager,
+                    approved_at=approved_at,
+                    recovered=True,
+                    event_status=event_status,
+                )
                 self._db.execute(
                     "UPDATE distributor_operation_proposals SET result_json=?, manager_id=?, "
                     "approved_at=? "
                     "WHERE proposal_id=?",
                     (_encode(result), recorded_manager, approved_at, proposal_id),
                 )
-                if self._retained_projection:
-                    self._mark_retained_projection(result, self._latest_state_with_recorded_at()[1])
                 return result
             self._require_live_operations()
             if stored_revision != revision:
@@ -638,7 +637,11 @@ class DistributorOperations:
                 or self._proposal_revision(state, source_facts) != revision
             ):
                 raise ValueError("proposal is stale; current ERP evidence changed before approval")
-            result = self.record_event(event)
+            event_result = self.record_event(event)
+            event_status = self._event_status_from_projection(
+                event_result,
+                _text(event.get("event_id"), "proposal event_id"),
+            )
             approved_at = self._next_recorded_at()
             if attachment_id is not None:
                 self._db.execute(
@@ -646,37 +649,129 @@ class DistributorOperations:
                     "WHERE attachment_id=? AND proposal_id=?",
                     (event["event_id"], attachment_id, proposal_id),
                 )
-                self._add_photo_attachments(result)
+            result = self._confirmation_projection(
+                proposal_id=proposal_id,
+                case_id=case_id,
+                event=event,
+                source=source,
+                attachment_id=attachment_id,
+                state_revision=revision,
+                manager_id=manager_id,
+                approved_at=approved_at,
+                recovered=False,
+                event_status=event_status,
+            )
             self._db.execute(
                 "UPDATE distributor_operation_proposals SET result_json=?, manager_id=?, "
                 "approved_at=? "
                 "WHERE proposal_id=? AND result_json IS NULL",
                 (_encode(result), manager_id, approved_at, proposal_id),
             )
-            result["approval_evidence"] = {
-                "proposal_id": proposal_id,
-                "case_id": case_id,
-                "manager_id": manager_id,
-                "approved_at": approved_at,
-                "source": source,
-                "event_id": event["event_id"],
-            }
-            result["prepared_proposal"] = {
-                "proposal_id": proposal_id,
-                "case_id": case_id,
-                "purchase_order": self._config["purchase_order"],
-                "event": _copy(event),
-                "source": source,
-                "photo_attachment_id": attachment_id,
-                "state_revision": revision,
-                "status": "APPLIED",
-                "approval": {"manager_id": manager_id, "approved_at": approved_at},
-            }
-            self._db.execute(
-                "UPDATE distributor_operation_proposals SET result_json=? WHERE proposal_id=?",
-                (_encode(result), proposal_id),
-            )
             return result
+
+    @staticmethod
+    def _approval_from_record(record: str) -> dict[str, object]:
+        """Recover only durable approval metadata from a prior confirmation response."""
+
+        projection = _decoded(record, "proposal result")
+        approval = projection.get("approval_evidence")
+        return dict(approval) if isinstance(approval, Mapping) else {}
+
+    def _stored_event_status(self, event: Mapping[str, object]) -> str | None:
+        """Return a completed event's durable status without assuming success."""
+
+        event_id = _text(event.get("event_id"), "proposal event_id")
+        row = self._db.execute(
+            "SELECT payload_json, result_json FROM distributor_operation_events WHERE event_id=?",
+            (event_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        stored_payload, stored_result = cast(tuple[str, str | None], row)
+        if stored_payload != _encode(event):
+            raise DistributorEventConflict("A duplicate distributor event ID has different input.")
+        if stored_result is None:
+            return None
+        projection = _decoded(stored_result, "event result")
+        return self._event_status_from_projection(projection, event_id)
+
+    @staticmethod
+    def _event_status_from_projection(projection: Mapping[str, object], event_id: str) -> str:
+        """Read one persisted event result, failing closed when its status is absent."""
+
+        events = projection.get("events")
+        if not isinstance(events, list):
+            return "UNKNOWN_OUTCOME"
+        for row in events:
+            if not isinstance(row, Mapping) or row.get("event_id") != event_id:
+                continue
+            status = row.get("status")
+            if isinstance(status, str) and status.strip():
+                return status.strip()
+            return "UNKNOWN_OUTCOME"
+        return "UNKNOWN_OUTCOME"
+
+    def _confirmation_projection(
+        self,
+        *,
+        proposal_id: str,
+        case_id: str,
+        event: Mapping[str, object],
+        source: str,
+        attachment_id: str | None,
+        state_revision: str,
+        manager_id: str,
+        approved_at: str | None,
+        recovered: bool,
+        event_status: str,
+    ) -> dict[str, object]:
+        """Return the latest case state while retaining the confirmed event's own time.
+
+        A manager can confirm a completion recorded earlier than later case events.
+        The response must show the latest projection rather than reviving that old
+        projection, while retaining the earlier event's record time separately.
+        """
+
+        event_id = _text(event.get("event_id"), "proposal event_id")
+        row = self._db.execute(
+            "SELECT recorded_at FROM distributor_operation_events WHERE event_id=?",
+            (event_id,),
+        ).fetchone()
+        event_recorded_at = row[0] if row is not None and isinstance(row[0], str) else None
+        result = self.projection()
+        approval: dict[str, object] = {
+            "proposal_id": proposal_id,
+            "case_id": case_id,
+            "manager_id": manager_id,
+            "source": source,
+            "event_id": event_id,
+        }
+        if approved_at is not None:
+            approval["approved_at"] = approved_at
+        if recovered:
+            approval["recovered"] = True
+        result["approval_evidence"] = approval
+        result["historical_confirmation"] = {
+            "event_id": event_id,
+            "event_occurred_at": event.get("occurred_at"),
+            "event_recorded_at": event_recorded_at,
+            "confirmed_at": approved_at,
+            "source": source,
+            "recovered": recovered,
+            "event_status": event_status,
+        }
+        result["prepared_proposal"] = {
+            "proposal_id": proposal_id,
+            "case_id": case_id,
+            "purchase_order": self._config["purchase_order"],
+            "event": _copy(event),
+            "source": source,
+            "photo_attachment_id": attachment_id,
+            "state_revision": state_revision,
+            "status": event_status,
+            "approval": {"manager_id": manager_id, "approved_at": approved_at},
+        }
+        return result
 
     def retry_pending_allocation(self, request: Mapping[str, object]) -> dict[str, object]:
         """Re-evaluate one retained pending allocation without replaying a physical event.
@@ -1070,6 +1165,7 @@ class DistributorOperations:
             raise ValueError("Distributor conversation returned an invalid read-only result.")
         if result.get("status") != "COMPLETE":
             detail = result.get("detail")
+            code = result.get("code")
             message = (
                 detail.strip()
                 if isinstance(detail, str) and detail.strip()
@@ -1078,12 +1174,18 @@ class DistributorOperations:
                     "no fallback answer was used."
                 )
             )
-            return {
+            unavailable = {"status": "UNAVAILABLE", "message": message}
+            response: dict[str, object] = {
                 **projection,
-                "conversation": {"status": "UNAVAILABLE", "message": message},
+                "conversation": unavailable,
                 "conversation_status": "UNAVAILABLE",
                 "conversation_message": message,
             }
+            if isinstance(code, str) and code.strip():
+                safe_code = code.strip()
+                unavailable["code"] = safe_code
+                response["conversation_error_code"] = safe_code
+            return response
         answer = result.get("answer")
         if not isinstance(answer, str) or not answer.strip():
             raise ValueError("Distributor conversation returned no displayable answer.")
@@ -1092,10 +1194,40 @@ class DistributorOperations:
             "answer": answer.strip(),
             "provider": result.get("provider"),
             "session_id": result.get("session_id"),
-            "context": "Current case-scoped ERP facts and retained physical event evidence",
+            "context": self._conversation_context(projection),
             "read_only": True,
         }
         return {**projection, "conversation": conversation}
+
+    @staticmethod
+    def _conversation_context(projection: Mapping[str, object]) -> str:
+        """Describe source freshness in the visible read-only conversation context."""
+
+        raw_mode = projection.get("evidence_mode")
+        mode = raw_mode.get("status") if isinstance(raw_mode, Mapping) else None
+        status = mode.strip().upper() if isinstance(mode, str) and mode.strip() else "UNKNOWN"
+        if status == "CURRENT" and projection.get("live_source") is False:
+            status = "UNKNOWN"
+        as_of = raw_mode.get("as_of") if isinstance(raw_mode, Mapping) else None
+        effective_time = as_of.strip() if isinstance(as_of, str) and as_of.strip() else None
+        if status == "CURRENT":
+            return "Current case-scoped ERP facts and retained physical event evidence"
+        if status == "RETAINED_AS_OF":
+            if effective_time is not None:
+                return (
+                    f"Retained case-scoped ERP facts as of {effective_time} and retained "
+                    "physical event evidence"
+                )
+            return (
+                "Retained case-scoped ERP facts with no supplied effective time and retained "
+                "physical event evidence"
+            )
+        if "UNAVAILABLE" in status:
+            return "ERP source unavailable; retained physical event evidence only"
+        return (
+            "Case-scoped ERP facts with unknown source freshness and retained physical "
+            "event evidence"
+        )
 
     def _validate_config(self, config: Mapping[str, object]) -> dict[str, object]:
         normalized = cast(dict[str, object], _copy(config))
@@ -1333,6 +1465,13 @@ class DistributorOperations:
             return self._source_unavailable("ERP_SOURCE_MALFORMED")
 
     @staticmethod
+    def _source_as_of(source: Mapping[str, object]) -> str | None:
+        """Preserve an explicit source timestamp without manufacturing a fresh one."""
+
+        value = source.get("as_of")
+        return value.strip() if isinstance(value, str) and value.strip() else None
+
+    @staticmethod
     def _source_unavailable(error_code: str) -> dict[str, object]:
         return {"source_status": "UNAVAILABLE", "source_error": error_code}
 
@@ -1401,6 +1540,9 @@ class DistributorOperations:
             "allocations": allocations,
             "financials": financials,
         }
+        as_of = self._source_as_of(source)
+        if as_of is not None:
+            canonical["as_of"] = as_of
         if parent_purchase_order is not None:
             canonical["parent_purchase_order"] = parent_purchase_order
         return canonical
@@ -3426,7 +3568,9 @@ class DistributorOperations:
         self._deadline_alerts(result, alerts)
         result["stage"] = self._stage(result, alerts)
         result["available_event_templates"] = (
-            [] if retained_at is not None else self._event_templates()
+            []
+            if source["source_status"] == "RETAINED" or retained_at is not None
+            else self._event_templates()
         )
         self._add_photo_attachments(result)
         proposal = self._current_proposal()
@@ -3440,9 +3584,41 @@ class DistributorOperations:
         result.pop("source_status", None)
         result.pop("source_error", None)
         result.pop("source_observation", None)
-        if retained_at is not None:
+        if source["source_status"] == "RETAINED":
             self._mark_retained_projection(result, retained_at)
+        elif source["source_status"] == "CURRENT":
+            self._mark_current_projection(result, source)
+        else:
+            self._mark_unavailable_projection(result)
         return result
+
+    @classmethod
+    def _mark_current_projection(
+        cls, result: dict[str, object], source: Mapping[str, object]
+    ) -> None:
+        result["available"] = True
+        result["actions_enabled"] = True
+        result["live_source"] = True
+        result["evidence_mode"] = {
+            "status": "CURRENT",
+            "as_of": cls._source_as_of(source),
+            "message": (
+                "Current ERP evidence was read for this turn. Its effective time is available "
+                "only when supplied by the source."
+            ),
+        }
+
+    @staticmethod
+    def _mark_unavailable_projection(result: dict[str, object]) -> None:
+        result["available"] = False
+        result["actions_enabled"] = False
+        result["live_source"] = False
+        result["available_event_templates"] = []
+        result["evidence_mode"] = {
+            "status": "UNAVAILABLE",
+            "as_of": None,
+            "message": "Current ERP evidence is unavailable; no source time is claimed.",
+        }
 
     @staticmethod
     def _mark_retained_projection(result: dict[str, object], retained_at: str | None) -> None:
@@ -3553,8 +3729,8 @@ class DistributorOperations:
         if case_id != self._config["case_id"] or proposal_id is not None or event_id is not None:
             raise ValueError("photo attachment is already associated with another operation")
 
-    @staticmethod
     def _proposal_record(
+        self,
         proposal_id: str,
         state_revision: str,
         event: Mapping[str, object],
@@ -3564,13 +3740,18 @@ class DistributorOperations:
         manager_id: str | None,
         approved_at: str | None,
     ) -> dict[str, object]:
+        status = (
+            self._stored_event_status(event) or "UNKNOWN_OUTCOME"
+            if result_json is not None
+            else "PENDING_MANAGER_APPROVAL"
+        )
         return {
             "proposal_id": proposal_id,
             "state_revision": state_revision,
             "event": _copy(event),
             "source": source,
             "photo_attachment_id": attachment_id,
-            "status": "APPLIED" if result_json is not None else "PENDING_MANAGER_APPROVAL",
+            "status": status,
             "read_only_agent_context": source == "RETAINED_ALLOCATION_RECOMMENDATION",
             "approval": (
                 {"manager_id": manager_id, "approved_at": approved_at}

@@ -70,6 +70,10 @@ test('applied proposal keeps approval evidence after projection refresh', () => 
   assert.equal(approvalReadback({
     prepared_proposal: { status: 'PENDING_MANAGER_APPROVAL', approval: { manager_id: 'M' } },
   }), null);
+  assert.equal(approvalReadback({
+    approval_evidence: { manager_id: 'Operations Manager' },
+    prepared_proposal: { status: 'UNKNOWN_OUTCOME' },
+  }), null);
 });
 
 test('retained manager recovery copy confirms a recorded completion without fresh execution', () => {
@@ -124,7 +128,11 @@ test('retained evidence is labeled with its as-of time and does not claim a live
   assert.equal(isRetainedEvidence({ status: 'CURRENT' }), false);
   assert.equal(erpEvidenceSourceLabel({ status: 'RETAINED_AS_OF' }), 'retained accepted ERP evidence');
   assert.equal(erpEvidenceSourceLabel({ status: 'CURRENT' }), 'current ERP source');
+  assert.equal(erpEvidenceSourceLabel({ status: 'UNAVAILABLE' }), 'ERP source unavailable');
+  assert.equal(erpEvidenceSourceLabel({ status: 'RETAINED_EVIDENCE_UNAVAILABLE' }), 'ERP source unavailable');
+  assert.equal(erpEvidenceSourceLabel({ status: 'UNKNOWN' }), 'ERP source freshness unknown');
   assert.equal(sourceAwareErpText('Current ERP source returned the case.', { status: 'RETAINED_AS_OF' }), 'retained accepted ERP evidence returned the case.');
+  assert.equal(sourceAwareErpText('Current ERP source returned the case.', { status: 'UNAVAILABLE' }), 'ERP source unavailable returned the case.');
   const html = fs.readFileSync(path.join(__dirname, '../workspace/distributor-operations.html'), 'utf8');
   assert.match(html, /ops-ask-link[\s\S]*?<span>Agent board<\/span>/);
   assert.match(html, /<span class="object-label">Agent<\/span><h2 id="ops-chat-title">Agent board<\/h2>/);

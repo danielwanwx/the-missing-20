@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from botocore.exceptions import ClientError, LoginRefreshRequired  # type: ignore[import-untyped]
 from test_distributor_erp import NativeERP
 from test_distributor_erp import r4_config as native_r4_config
 
@@ -1172,6 +1173,111 @@ def test_native_packet_keeps_bounded_complete_history_financials_and_selected_pl
     assert cast(Mapping[str, object], missing_control)["retained_event_history_complete"] is False
 
 
+def test_native_packet_preserves_current_and_retained_evidence_mode_and_as_of(
+    tmp_path: Path,
+) -> None:
+    fresh_service, fresh_bridge = _service(tmp_path / "fresh")
+    fresh_source = dict(fresh_bridge.read_case(fresh_bridge.config))
+    fresh_source["as_of"] = "2026-09-12T08:15:00+00:00"
+    fresh_bridge.source_override = fresh_source
+
+    fresh = fresh_service.projection()
+    fresh_mode = cast(Mapping[str, object], fresh["evidence_mode"])
+    assert fresh_mode["status"] == "CURRENT"
+    assert fresh_mode["as_of"] == "2026-09-12T08:15:00+00:00"
+    assert fresh["live_source"] is True
+
+    fresh_packet = workspace_server._distributor_native_packet(fresh)
+    fresh_sources = cast(
+        Mapping[str, object], cast(Mapping[str, object], fresh_packet["tool_payload"])["sources"]
+    )
+    fresh_control = cast(Mapping[str, object], fresh_sources["read_control_context"])
+    fresh_erp = cast(Mapping[str, object], fresh_sources["read_erp_evidence"])
+    assert fresh_control["evidence_mode"] == fresh_mode
+    assert fresh_control["live_source"] is True
+    assert fresh_erp["status"] == "CURRENT"
+    assert fresh_erp["as_of"] == "2026-09-12T08:15:00+00:00"
+    assert fresh_erp["live_source"] is True
+
+    legacy = dict(fresh)
+    legacy.pop("evidence_mode")
+    legacy.pop("live_source")
+    legacy_packet = workspace_server._distributor_native_packet(legacy)
+    legacy_sources = cast(
+        Mapping[str, object], cast(Mapping[str, object], legacy_packet["tool_payload"])["sources"]
+    )
+    legacy_control = cast(Mapping[str, object], legacy_sources["read_control_context"])
+    legacy_erp = cast(Mapping[str, object], legacy_sources["read_erp_evidence"])
+    assert cast(Mapping[str, object], legacy_control["evidence_mode"])["status"] == "UNKNOWN"
+    assert legacy_control["live_source"] is False
+    assert legacy_erp["status"] == "UNKNOWN"
+
+    conflicted = dict(fresh)
+    conflicted["live_source"] = False
+    conflicted_packet = workspace_server._distributor_native_packet(conflicted)
+    conflicted_sources = cast(
+        Mapping[str, object],
+        cast(Mapping[str, object], conflicted_packet["tool_payload"])["sources"],
+    )
+    conflicted_control = cast(Mapping[str, object], conflicted_sources["read_control_context"])
+    assert cast(Mapping[str, object], conflicted_control["evidence_mode"])["status"] == "UNKNOWN"
+    assert conflicted_control["live_source"] is False
+
+    retained_writer, retained_bridge = _service(tmp_path / "retained")
+    retained_writer.record_event(_arrival("retained-packet", lot="LOT-A", cartons=2, observed=20))
+    retained = DistributorOperations(
+        tmp_path / "retained" / "distributor-operations.sqlite3",
+        retained_bridge.config,
+        retained_bridge,
+        retained_projection=True,
+    ).projection()
+    retained_mode = cast(Mapping[str, object], retained["evidence_mode"])
+    assert retained_mode["status"] == "RETAINED_AS_OF"
+    assert isinstance(retained_mode["as_of"], str)
+    assert retained["live_source"] is False
+
+    retained_packet = workspace_server._distributor_native_packet(retained)
+    retained_sources = cast(
+        Mapping[str, object], cast(Mapping[str, object], retained_packet["tool_payload"])["sources"]
+    )
+    retained_control = cast(Mapping[str, object], retained_sources["read_control_context"])
+    retained_erp = cast(Mapping[str, object], retained_sources["read_erp_evidence"])
+    assert retained_control["evidence_mode"] == retained_mode
+    assert retained_control["live_source"] is False
+    assert retained_erp["status"] == "RETAINED_AS_OF"
+    assert retained_erp["as_of"] == retained_mode["as_of"]
+    assert retained_erp["live_source"] is False
+
+
+def test_ask_visible_context_preserves_retained_evidence_mode_and_as_of(tmp_path: Path) -> None:
+    writer, bridge = _service(tmp_path)
+    writer.record_event(_arrival("retained-context", lot="LOT-A", cartons=2, observed=20))
+    retained = DistributorOperations(
+        tmp_path / "distributor-operations.sqlite3",
+        bridge.config,
+        bridge,
+        retained_projection=True,
+        ask_turn=lambda _question, _projection: {
+            "status": "COMPLETE",
+            "answer": "The retained case has 20 Box received.",
+            "provider": {"provider": "test"},
+            "session_id": "retained-context-test",
+        },
+    )
+    reads_before = bridge.reads
+
+    response = retained.ask("What quantity is recorded?")
+
+    mode = cast(Mapping[str, object], response["evidence_mode"])
+    conversation = cast(Mapping[str, object], response["conversation"])
+    assert mode["status"] == "RETAINED_AS_OF"
+    assert isinstance(mode["as_of"], str)
+    assert conversation["context"] == (
+        f"Retained case-scoped ERP facts as of {mode['as_of']} and retained physical event evidence"
+    )
+    assert bridge.reads == reads_before
+
+
 @pytest.mark.parametrize(
     ("synthetic_input", "kind"),
     [
@@ -1771,6 +1877,189 @@ def test_retained_projection_uses_durable_evidence_without_erp_reads_or_new_acti
     assert cast(Mapping[str, object], applied["quantities"])["received"] == 20
 
 
+def test_retained_confirmation_returns_latest_case_with_separate_historical_event_time(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path, _r4_config())
+    first_arrival = _r4_arrival("arrival-r4-20", "R4-ARRIVAL-20", 20)
+    prepared = service.prepare_event_proposal(
+        {
+            "proposal_id": "confirm-arrival-r4-20",
+            "case_id": "M20-DIST-R4-FOLLOW-ON",
+            "event": first_arrival,
+            "source": "OPERATOR_DECLARED",
+        }
+    )
+    prepared_proposal = cast(Mapping[str, object], prepared["prepared_proposal"])
+    service.record_event(first_arrival)
+    latest = service.record_event(_r4_arrival("arrival-r4-19", "R4-ARRIVAL-19", 19))
+    assert cast(Mapping[str, object], latest["quantities"])["received"] == 39
+    first_event_recorded_at = cast(
+        str,
+        service._db.execute(
+            "SELECT recorded_at FROM distributor_operation_events WHERE event_id=?",
+            ("arrival-r4-20",),
+        ).fetchone()[0],
+    )
+
+    retained = DistributorOperations(
+        tmp_path / "distributor-operations.sqlite3",
+        bridge.config,
+        bridge,
+        retained_projection=True,
+    )
+    reads_before = bridge.reads
+    operations_before = list(bridge.calls)
+    request = {
+        "proposal_id": "confirm-arrival-r4-20",
+        "case_id": "M20-DIST-R4-FOLLOW-ON",
+        "state_revision": prepared_proposal["state_revision"],
+        "manager_id": "Recording Manager",
+    }
+
+    confirmed = retained.approve_event_proposal(request)
+
+    assert cast(Mapping[str, object], confirmed["quantities"])["received"] == 39
+    latest_mode = cast(Mapping[str, object], confirmed["evidence_mode"])
+    assert latest_mode["status"] == "RETAINED_AS_OF"
+    assert latest_mode["as_of"] != first_event_recorded_at
+    historical = cast(Mapping[str, object], confirmed["historical_confirmation"])
+    assert historical["event_id"] == "arrival-r4-20"
+    assert historical["event_occurred_at"] == first_arrival["occurred_at"]
+    assert historical["event_recorded_at"] == first_event_recorded_at
+    assert cast(Mapping[str, object], confirmed["approval_evidence"])["recovered"] is True
+    assert bridge.reads == reads_before
+    assert bridge.calls == operations_before
+
+    repeated = retained.approve_event_proposal(request)
+
+    assert cast(Mapping[str, object], repeated["quantities"])["received"] == 39
+    assert repeated["historical_confirmation"] == historical
+    assert bridge.reads == reads_before
+    assert bridge.calls == operations_before
+
+
+def test_retained_confirmation_rejects_a_different_event_payload_with_the_same_id(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path)
+    proposed = _arrival("same-id", lot="LOT-A", cartons=2, observed=20)
+    prepared = service.prepare_event_proposal(
+        {
+            "proposal_id": "proposal-same-id",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "event": proposed,
+            "source": "OPERATOR_DECLARED",
+        }
+    )
+    prepared_proposal = cast(Mapping[str, object], prepared["prepared_proposal"])
+    recorded = {**proposed, "observed_stock_quantity": 10}
+    service.record_event(recorded)
+    retained = DistributorOperations(
+        tmp_path / "distributor-operations.sqlite3",
+        bridge.config,
+        bridge,
+        retained_projection=True,
+    )
+
+    with pytest.raises(DistributorEventConflict):
+        retained.approve_event_proposal(
+            {
+                "proposal_id": "proposal-same-id",
+                "case_id": "M20-DIST-COMPONENT-01",
+                "state_revision": prepared_proposal["state_revision"],
+                "manager_id": "Recording Manager",
+            }
+        )
+
+
+def test_confirmation_keeps_an_already_applied_event_applied_when_fresh_source_fails(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path)
+    event = _arrival("source-failure-confirmation", lot="LOT-A", cartons=2, observed=20)
+    prepared = service.prepare_event_proposal(
+        {
+            "proposal_id": "proposal-source-failure-confirmation",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "event": event,
+            "source": "OPERATOR_DECLARED",
+        }
+    )
+    prepared_proposal = cast(Mapping[str, object], prepared["prepared_proposal"])
+    service.record_event(event)
+    operations_before = list(bridge.calls)
+    bridge.source_override = {
+        "source_status": "UNAVAILABLE",
+        "source_error": "ERP_SOURCE_UNAVAILABLE",
+    }
+    request = {
+        "proposal_id": "proposal-source-failure-confirmation",
+        "case_id": "M20-DIST-COMPONENT-01",
+        "state_revision": prepared_proposal["state_revision"],
+        "manager_id": "Recording Manager",
+    }
+
+    confirmed = service.approve_event_proposal(request)
+
+    assert confirmed["available"] is False
+    assert cast(Mapping[str, object], confirmed["prepared_proposal"])["status"] == "APPLIED"
+    assert cast(Mapping[str, object], confirmed["approval_evidence"])["recovered"] is True
+    assert bridge.calls == operations_before
+
+    repeated = service.approve_event_proposal(request)
+
+    assert cast(Mapping[str, object], repeated["prepared_proposal"])["status"] == "APPLIED"
+    assert bridge.calls == operations_before
+
+
+def test_retained_confirmation_preserves_a_recorded_unknown_event_status(
+    tmp_path: Path,
+) -> None:
+    service, bridge = _service(tmp_path)
+    bridge.statuses["receive_arrival"] = "UNKNOWN_OUTCOME"
+    event = _arrival("unknown-confirmation", lot="LOT-A", cartons=2, observed=20)
+    prepared = service.prepare_event_proposal(
+        {
+            "proposal_id": "proposal-unknown-confirmation",
+            "case_id": "M20-DIST-COMPONENT-01",
+            "event": event,
+            "source": "OPERATOR_DECLARED",
+        }
+    )
+    prepared_proposal = cast(Mapping[str, object], prepared["prepared_proposal"])
+    service.record_event(event)
+    retained = DistributorOperations(
+        tmp_path / "distributor-operations.sqlite3",
+        bridge.config,
+        bridge,
+        retained_projection=True,
+    )
+    reads_before = bridge.reads
+    operations_before = list(bridge.calls)
+    request = {
+        "proposal_id": "proposal-unknown-confirmation",
+        "case_id": "M20-DIST-COMPONENT-01",
+        "state_revision": prepared_proposal["state_revision"],
+        "manager_id": "Recording Manager",
+    }
+
+    confirmed = retained.approve_event_proposal(request)
+
+    assert cast(Mapping[str, object], confirmed["prepared_proposal"])["status"] == "UNKNOWN_OUTCOME"
+    assert cast(Mapping[str, object], confirmed["historical_confirmation"])["event_status"] == (
+        "UNKNOWN_OUTCOME"
+    )
+    assert bridge.reads == reads_before
+    assert bridge.calls == operations_before
+
+    repeated = retained.approve_event_proposal(request)
+
+    assert cast(Mapping[str, object], repeated["prepared_proposal"])["status"] == "UNKNOWN_OUTCOME"
+    assert bridge.reads == reads_before
+    assert bridge.calls == operations_before
+
+
 def test_proposal_rejects_stale_case_and_manual_photo_stays_unanalyzed(tmp_path: Path) -> None:
     service, bridge = _service(tmp_path)
     image = base64.b64encode(b"\x89PNG\r\n\x1a\nmanual-evidence").decode("ascii")
@@ -1897,6 +2186,87 @@ def test_native_ask_packet_is_current_read_only_and_static_ui_files_are_allowed(
     assert workspace_server.STATIC_FILES["/operations"][0] == "distributor-operations.html"
     assert "/distributor-operations.js" in workspace_server.STATIC_FILES
     assert "/distributor-operations.css" in workspace_server.STATIC_FILES
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_code", "expected_detail"),
+    [
+        (
+            ClientError(
+                {
+                    "Error": {
+                        "Code": "AccessDeniedException",
+                        "Message": "User arn:aws:iam::123456789012:role/private-runtime is denied",
+                    }
+                },
+                "InvokeModel",
+            ),
+            "MODEL_ACCESS_DENIED",
+            "Model access was denied. Check the configured model and runtime permissions "
+            "before retrying; no fallback answer was used.",
+        ),
+        (
+            ClientError(
+                {
+                    "Error": {
+                        "Code": "ExpiredTokenException",
+                        "Message": (
+                            "Expired token for arn:aws:iam::123456789012:role/private-runtime"
+                        ),
+                    }
+                },
+                "InvokeModel",
+            ),
+            "MODEL_CREDENTIALS_EXPIRED",
+            "Model credentials are unavailable or expired. Refresh the configured runtime "
+            "credentials and retry; no fallback answer was used.",
+        ),
+        (
+            LoginRefreshRequired(),
+            "MODEL_CREDENTIALS_EXPIRED",
+            "Model credentials are unavailable or expired. Refresh the configured runtime "
+            "credentials and retry; no fallback answer was used.",
+        ),
+        (
+            TimeoutError("timed out while invoking arn:aws:bedrock:us-east-1:123456789012:model/x"),
+            "MODEL_REQUEST_TIMEOUT",
+            "The model request timed out. Retry after confirming the configured model is "
+            "available; no fallback answer was used.",
+        ),
+    ],
+)
+def test_native_ask_maps_provider_failures_to_safe_actionable_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+    expected_code: str,
+    expected_detail: str,
+) -> None:
+    service, _bridge = _service(tmp_path, _r4_config())
+
+    def failing_native_run(**_kwargs: object) -> SimpleNamespace:
+        raise error
+
+    monkeypatch.setattr(workspace_server, "run_native_receiving_turn", failing_native_run)
+    ask_turn = workspace_server._distributor_native_ask_turn(
+        settings=Settings(agent_provider=AgentProvider.BEDROCK),
+        session_root=tmp_path / "native-sessions",
+    )
+
+    result = ask_turn("What is currently received?", service.projection())
+
+    assert result["status"] == "UNAVAILABLE"
+    assert result["code"] == expected_code
+    assert result["detail"] == expected_detail
+    assert result["error_type"] == type(error).__name__
+    assert "arn:aws:" not in json.dumps(result)
+
+    service._ask_turn = lambda _question, _projection: result
+    api_result = service.ask("What is currently received?")
+    conversation = cast(Mapping[str, object], api_result["conversation"])
+    assert conversation["code"] == expected_code
+    assert api_result["conversation_error_code"] == expected_code
+    assert "arn:aws:" not in json.dumps(api_result)
 
 
 def test_distributor_model_selection_is_explicit_and_opus_history_is_isolated(
